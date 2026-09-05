@@ -1,0 +1,102 @@
+/*
+ * What the review came to, as the last thing the page says. A card on the scrim
+ * rather than a full-bleed screen: the diff stays visible behind it, because it
+ * is the evidence for every figure on the card, and a review that ends by
+ * wiping the work off the screen reads as a session expiring rather than as one
+ * finished.
+ *
+ * Surface, not raised: raised is the shade of things that are still in play —
+ * pills, popups, the compose box — and this is the one panel nothing can be
+ * done to. The border and the lift are what carry it off the page instead.
+ */
+.lsr-closing {
+  /* One measure, whatever the review was: a reviewer who reads two files and
+   * one who reads forty should be handed the same page, not a card that shrinks
+   * around the smaller job. */
+  width: min(40rem, 100%);
+  /* Never taller than the window: a long review's figures wrap, but a small
+   * laptop must still reach the last line rather than have it cut off. */
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--lsr-surface);
+  border: 1px solid var(--lsr-border);
+  border-radius: 0.75rem;
+  padding: var(--lsr-space-8);
+  box-shadow: var(--lsr-shadow-lift);
+}
+
+/* The card's two labels — where the reviewer is, and what each count counts —
+ * in the same quiet uppercase as the panel's own section labels, so the card
+ * opens by saying where the reviewer is rather than by congratulating. One
+ * treatment for both, because a card whose top line and column headings were
+ * lettered differently would read as two cards. */
+.lsr-closing-eyebrow,
+.lsr-closing-label {
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lsr-closing-eyebrow {
+  margin: 0;
+  font-weight: 600;
+}
+
+/*
+ * The verdict, at the one size above reading size: how much of the review was
+ * approved is the sentence the reviewer came here to have said back to them,
+ * and it is a statement of fact, so it is set in the text colour rather than in
+ * the accent — approving nothing must look exactly as considered as approving
+ * everything.
+ */
+.lsr-closing-verdict {
+  margin: var(--lsr-space-2) 0 var(--lsr-space-6);
+  color: var(--lsr-strong);
+  font-size: var(--lsr-size-title);
+  font-weight: 600;
+  line-height: var(--lsr-leading-tight);
+}
+
+/*
+ * The figures, under a rule. The rule is the whole ceremony: it separates the
+ * verdict from the account of the work the way a printed page separates a
+ * chapter from its colophon, and it costs one pixel of ink.
+ */
+.lsr-closing-figures {
+  /* Columns rather than a wrapped row: at six figures the second row lines up
+   * under the first, which reads as an account of the work being rendered
+   * rather than as a sentence that ran out of room. The floor is the width of
+   * the longest label, so nothing is ever hyphenated onto two lines. */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--lsr-space-6) var(--lsr-space-4);
+  margin: 0;
+  padding: var(--lsr-space-6) 0 0;
+  border-top: 1px solid var(--lsr-border);
+  list-style: none;
+}
+
+.lsr-closing-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-1);
+}
+
+/* The count carries the weight, and tabular figures keep the row of them from
+ * shifting as a review of 9 files becomes one of 1,204 lines. */
+.lsr-closing-count {
+  color: var(--lsr-strong);
+  font-size: var(--lsr-size-title);
+  line-height: var(--lsr-leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Who ended it and where the words went: administration, at the size the rest
+ * of the page states its administration, below the work it is about. */
+.lsr-closing-note {
+  margin: var(--lsr-space-6) 0 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+}

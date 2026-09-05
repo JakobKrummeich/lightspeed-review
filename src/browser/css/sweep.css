@@ -1,0 +1,48 @@
+/*
+ * The mechanical lane at the foot of the survey: the chapters whose every file
+ * is bulk, held below everything there is something to decide about. It is a
+ * separate area from the index above it because it answers a separate question
+ * — the index asks what to read next, and this asks what not to read at all —
+ * and it is written after `index.css` in the cascade so it can lean on the rows
+ * that file already paints. The chapters in here wear exactly those rows: a
+ * swept chapter is still a chapter, and a reviewer who wants to see what moved
+ * opens it the same way as any other. Only where it is read has changed.
+ *
+ * Everything about the band is quiet apart from the one press. A rule and a
+ * step of space put the lane below the reading, the heading says how much bulk
+ * there is in the words the reviewer will meet again on the button, and the
+ * button itself is the only thing here in the accent — because it is the only
+ * thing here worth crossing the screen for.
+ */
+.lsr-sweep {
+  margin-top: var(--lsr-space-12);
+  padding-top: var(--lsr-space-6);
+  border-top: 1px solid var(--lsr-border);
+}
+
+/*
+ * A heading for a band nobody is meant to read line by line, set at the size
+ * the counts beside it are: it names the lane, and a name at the size of the
+ * chapter names above would be a fourth thing competing with them for the eye
+ * on a screen that exists to be taken in at a glance.
+ */
+.lsr-sweep-heading {
+  margin: 0 0 var(--lsr-space-3);
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
+}
+
+/*
+ * The press the whole lane is for, left in the accent fill the page gives every
+ * button by default — this is the one action on the survey, and the ordinary
+ * button is already what an action looks like here. It sits under the rows it
+ * settles rather than beside the heading, so it is read last: the reviewer sees
+ * which chapters are about to be ticked before they meet the thing that ticks
+ * them.
+ */
+.lsr-sweep-approve {
+  margin-top: var(--lsr-space-4);
+  font-size: var(--lsr-size-meta);
+}

@@ -1,0 +1,130 @@
+/* A shadow lifts the popup off the diff; a border on top of it adds nothing. */
+.lsr-popup {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lsr-space-3);
+  width: 22rem;
+  max-width: calc(100vw - 2rem);
+  /*
+   * The backstop for a screen too short for the popup at all. It is placed by
+   * its measured height (`dom/popup-position.ts`), so an uncapped popup would
+   * be placed off the bottom whatever that code did. The 8px is that file's
+   * `EDGE`, in its own units: `1rem` would agree with it only at a 16px root
+   * font. What is normally scrolled is the file list below, not this — landing
+   * here means scrolling to reach the button.
+   *
+   * This makes the popup a scroll container on both axes, so it depends on the
+   * `overflow-wrap: anywhere` below: without it a long path would grow a
+   * sideways scrollbar here, the same way one did in the panel's history.
+   */
+  max-height: calc(100vh - 8px);
+  overflow-y: auto;
+  background: var(--lsr-raised);
+  border-radius: 0.5rem;
+  padding: var(--lsr-space-3);
+  box-shadow: var(--lsr-shadow-lift);
+  /*
+   * The popup hangs off `<body>`, so it inherits none of the panel's wrapping,
+   * and it quotes exactly the things that cannot break: the paths a selection
+   * came from and the code itself. Its children are flex items on a column with
+   * `align-items: flex-start`, so each is sized to fit-content — which follows
+   * min-content, which is why this must be `anywhere` and not `break-word`.
+   * `break-word` wraps the text but still measures the item at the full width of
+   * the token, and a 22rem popup would go on spilling a long path past its edge.
+   */
+  overflow-wrap: anywhere;
+}
+
+.lsr-popup > * {
+  margin: 0;
+}
+
+.lsr-popup[hidden] {
+  display: none;
+}
+
+.lsr-popup-files {
+  margin: 0 0 var(--lsr-space-2);
+  font-size: var(--lsr-size-meta);
+  color: var(--lsr-accent);
+  /*
+   * A selection across a dozen files lists a dozen paths, and everything under
+   * them — the quote, the comment box, the Queue Feedback button — is pushed
+   * down by every one. This is the only part of the popup that grows without
+   * limit, so it is the part that scrolls: the button keeps its place on screen
+   * instead of being reachable only by scrolling the popup.
+   */
+  max-height: 6rem;
+  overflow-y: auto;
+}
+
+.lsr-popup-preview,
+.lsr-prompt-selection {
+  margin: 0 0 var(--lsr-space-2);
+  max-height: 8rem;
+  overflow: auto;
+  background: var(--lsr-bg);
+  border-radius: 0.35rem;
+  padding: var(--lsr-space-2);
+  font-size: var(--lsr-size-code);
+  line-height: var(--lsr-leading-code);
+  /*
+   * Quoted code wraps rather than scrolling sideways: at 22rem a sideways
+   * scrollbar puts the end of every long line behind a gesture, on the one text
+   * a reviewer opened because they wanted to read it. `pre-wrap` keeps the
+   * leading space that says where the line sat, and takes the mid-token breaks
+   * from whichever of the panel or the popup this copy is in — both set them.
+   * `overflow: auto` above is left to the vertical: 8rem of snippet, then
+   * scroll.
+   */
+  white-space: pre-wrap;
+}
+
+/*
+ * Both boxes a reviewer types into, and the one place they paste the token they
+ * are asking about. A textarea comes out of the UA sheet at `break-word`, which
+ * does not inherit the panel's rule away, and which wraps a pasted type name
+ * only after the box has already scrolled sideways to fit it.
+ */
+textarea {
+  overflow-wrap: anywhere;
+  width: 100%;
+  min-height: 4.5rem;
+  resize: vertical;
+  background: var(--lsr-bg);
+  color: inherit;
+  /* A form field is one of the few places a border earns its keep. */
+  border: 1px solid var(--lsr-border);
+  border-radius: 0.35rem;
+  padding: var(--lsr-space-2);
+  font: inherit;
+  font-size: var(--lsr-size-ui);
+}
+
+button {
+  background: var(--lsr-accent);
+  /* The accent flips depth with the scheme, and its label flips with it:
+   * near-white on the deep light cobalt, night ink on the brighter dark one. */
+  color: var(--lsr-on-accent);
+  border: 0;
+  border-radius: 0.35rem;
+  padding: var(--lsr-space-2) var(--lsr-space-3);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* One action is the one to take; the other must not compete for attention. */
+.lsr-secondary {
+  background: var(--lsr-raised);
+  color: var(--lsr-text);
+  font-weight: 500;
+}

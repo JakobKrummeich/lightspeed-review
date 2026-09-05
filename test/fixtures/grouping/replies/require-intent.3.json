@@ -1,0 +1,50 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Intent requirement in CLI argument parsing and validation",
+      "rationale": "Makes --intent a required flag on start, parsing it as a repeatable argument that accumulates values in order, then validates presence before any repository or git work.",
+      "watch": "The parseStartArgs refactor introduces scanArgs to handle repeatable flags; --intent must not lose values when given multiple times, blank intents are filtered out, and the intent_missing check runs after branch validation but before repoContext so the error emphasizes intent is known only to the agent.",
+      "files": [
+        "src/commands/start.ts",
+        "src/cli.ts",
+        "src/errors.ts"
+      ]
+    },
+    {
+      "name": "Intent storage and retrieval in rounds and sessions",
+      "rationale": "Records the stated intents on each round so later rounds can carry different intents without disturbing prior approvals, and retrieves current intents for display in session state.",
+      "watch": "currentIntents reads the latest round's intents, defaulting to empty array for rounds written before this change; the intent field is optional on SessionRound for backward compatibility; intents flow into CreateSessionRequest, openRound, and back through currentIntents on session GET.",
+      "files": [
+        "src/rounds/session-round.ts",
+        "src/session-store.ts",
+        "src/server.ts"
+      ]
+    },
+    {
+      "name": "Documentation and help text",
+      "rationale": "Explains the intent requirement to agents, with examples showing repetition, and clarifies that intent should state what the branch is for, not list files.",
+      "watch": "Help messages in README, SKILL.md, spec.md and command-help.ts all carry the intent flag and its purpose; the canonical HELP_START string is updated once and reused, so changes propagate uniformly.",
+      "files": [
+        "README.md",
+        "skills/lightspeed-review/SKILL.md",
+        "spec.md",
+        "src/commands/command-help.ts",
+        "src/commands/home.ts",
+        "src/skill.ts"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/cli.test.ts",
+        "test/commands/start.test.ts",
+        "test/commands/home.test.ts",
+        "test/rounds/session-round.test.ts",
+        "test/server.test.ts"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "name": "attention-per-file",
+  "commit": "8bf36740b9fb11beabbfebb850b0739ceff92e66",
+  "subject": "Derive how much attention each file of a round needs",
+  "intents": ["Derive how much attention each file of a round needs from its approval history"],
+  "files": [
+    {
+      "path": "src/browser/dom/session-api.ts",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "src/ledger/outcomes.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "src/rounds/history.ts",
+      "status": "modified",
+      "insertions": 25,
+      "deletions": 0
+    },
+    {
+      "path": "src/rounds/session-round.ts",
+      "status": "modified",
+      "insertions": 4,
+      "deletions": 5
+    },
+    {
+      "path": "src/server.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 2
+    },
+    {
+      "path": "src/session-store.ts",
+      "status": "modified",
+      "insertions": 26,
+      "deletions": 12
+    },
+    {
+      "path": "test/commands/end.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "test/commands/home.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "test/commands/poll.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "test/html-template.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "test/ledger/write.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "test/rounds/history.test.ts",
+      "status": "modified",
+      "insertions": 77,
+      "deletions": 1
+    },
+    {
+      "path": "test/server.test.ts",
+      "status": "modified",
+      "insertions": 48,
+      "deletions": 8
+    },
+    {
+      "path": "test/session-resolve.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "test/session-store.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    }
+  ],
+  "human": [
+    {
+      "name": "What a file's approval state is",
+      "files": ["src/rounds/history.ts", "src/rounds/session-round.ts", "src/session-store.ts"]
+    },
+    {
+      "name": "Serving that state to the page",
+      "files": ["src/server.ts", "src/browser/dom/session-api.ts", "src/ledger/outcomes.ts"]
+    },
+    {
+      "name": "Tests",
+      "files": [
+        "test/rounds/history.test.ts",
+        "test/server.test.ts",
+        "test/session-store.test.ts",
+        "test/session-resolve.test.ts",
+        "test/commands/end.test.ts",
+        "test/commands/home.test.ts",
+        "test/commands/poll.test.ts",
+        "test/html-template.test.ts",
+        "test/ledger/write.test.ts"
+      ]
+    }
+  ]
+}

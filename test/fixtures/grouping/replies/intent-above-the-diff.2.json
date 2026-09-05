@@ -1,0 +1,84 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Intent view rendering",
+      "rationale": "Adds the pure function to render stated intent and commit subjects as HTML, the foundation for both server and browser rendering.",
+      "watch": "HTML escaping must prevent script injection; the intent precedes commits in the markup, so a reviewer sees the stated reason before corroboration.",
+      "files": [
+        "src/browser/intent-view.ts"
+      ]
+    },
+    {
+      "name": "Diff extraction of commit subjects",
+      "rationale": "Extracts commit subjects from the branch's own commits (base..branch) to populate the corroboration displayed beneath stated intent.",
+      "watch": "The range base..branch correctly excludes commits already on base; an empty log from git is handled as an empty list, not an error.",
+      "files": [
+        "src/diff-extract.ts"
+      ]
+    },
+    {
+      "name": "Session data structure updates",
+      "rationale": "Adds intents and commits fields to SessionRound and CreateSessionRequest so the stated reason and branch commits flow from creation through storage to rendering.",
+      "watch": "SessionRound marks both fields optional to tolerate rounds written before this change; CreateSessionRequest requires both so the server never stores undefined values.",
+      "files": [
+        "src/session-store.ts",
+        "src/rounds/session-round.ts"
+      ]
+    },
+    {
+      "name": "Server endpoints and request handling",
+      "rationale": "Wires commits and intents through the server: parses them from create requests, stores them in rounds, and serves them on the data endpoint.",
+      "watch": "The stringList helper treats untrusted input as an empty list; currentCommits and currentIntents must handle rounds without these fields to accept old sessions.",
+      "files": [
+        "src/server.ts"
+      ]
+    },
+    {
+      "name": "CLI integration",
+      "rationale": "Passes extracted commit subjects from diff extraction into the start command's session creation request.",
+      "watch": "The commits field is set from extracted.commits, matching the flow of other metadata like baseCommit and headCommit.",
+      "files": [
+        "src/commands/start.ts"
+      ]
+    },
+    {
+      "name": "Server-side page rendering",
+      "rationale": "Renders the intent section into the HTML template on first load, using currentIntents and currentCommits to show the reason before the diff loads.",
+      "watch": "The intent renders on the server so it is never blank on first paint; escaping happens in renderIntent, so the template need not escape twice.",
+      "files": [
+        "src/html-template.ts"
+      ]
+    },
+    {
+      "name": "Browser-side rendering and updates",
+      "rationale": "Mounts the intent view in the DOM and re-renders it when the session updates, so a new round with a different stated reason appears without a page reload.",
+      "watch": "The intentRoot element must exist in the DOM (the template creates it); innerHTML assignment happens before diff.update so the reason is on screen first.",
+      "files": [
+        "src/browser/dom/main.ts",
+        "src/browser/dom/session-api.ts"
+      ]
+    },
+    {
+      "name": "Intent display styling",
+      "rationale": "Styles the intent as a full-width band above the diff, with a fixed title, scrollable reasons, and collapsible commit subjects beneath.",
+      "watch": "The grid-template-rows change adds a row to the page layout; max-height and overflow-y prevent a long intent from consuming the entire viewport; .lsr-intent:empty hides the band when there is nothing to show.",
+      "files": [
+        "src/browser/chrome.css"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/browser/intent-view.test.ts",
+        "test/diff-extract.test.ts",
+        "test/rounds/session-round.test.ts",
+        "test/server.test.ts",
+        "test/commands/start.test.ts",
+        "test/html-template.test.ts"
+      ]
+    }
+  ]
+}

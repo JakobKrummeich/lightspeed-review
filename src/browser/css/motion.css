@@ -1,0 +1,68 @@
+/*
+ * A reviewer who asked for less movement gets the whole handover without any
+ * of it: the sheet on top is replaced by the one under it, and nothing rises,
+ * flares, breathes or floods. The two light layers are hidden outright rather
+ * than left to fade, because a quarter-second of white across the screen is
+ * worse than no reward at all.
+ *
+ * The working line at the foot of the conversation is held to the same
+ * preference and answers it differently: it is the page's own way of saying
+ * that an agent is away with the feedback, so it stays — its dots up and still
+ * instead of breathing. Nothing is lost by holding still, because it is the
+ * line being there at all that carries the fact; the movement was only ever
+ * what made it easy to catch.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .lsr-opening-sheet {
+    transition: none;
+  }
+
+  .lsr-opening-motes,
+  .lsr-opening-bloom {
+    display: none;
+  }
+
+  .lsr-opening-overlay::after,
+  .lsr-opening-overlay[data-flare="true"]::after {
+    opacity: 0;
+    transition: none;
+  }
+
+  .lsr-opening-sheet[data-at="top"] .lsr-opening-body {
+    animation: none;
+  }
+
+  .lsr-opening-press {
+    animation: none;
+    transition: none;
+  }
+
+  .lsr-working-dots i {
+    animation: none;
+  }
+
+  /* The offer is news either way; it can simply be there. */
+  .lsr-round-offer {
+    animation: none;
+  }
+
+  /* The announcement too: the card may simply be there and simply be gone —
+   * the mount hides it on the same clock either way — and the offer keeps its
+   * place without glowing for a flight nobody saw. The spark goes entirely:
+   * an orbit is exactly the ongoing motion this reviewer asked not to have. */
+  .lsr-round-card {
+    animation: none;
+  }
+
+  #lsr-round-popup[data-state="folding"] {
+    display: none;
+  }
+
+  .lsr-round-offer[data-beckon="true"] {
+    animation: none;
+  }
+
+  .lsr-round-offer[data-beckon="true"]::after {
+    display: none;
+  }
+}

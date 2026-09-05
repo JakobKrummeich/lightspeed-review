@@ -1,0 +1,314 @@
+/*
+ * The page. Each of the four regions below names both its column and its row,
+ * and nothing else in this file places them: auto-flow cannot be left to fill
+ * in the other half, because it places the items that name only a row before
+ * the ones that name only a column. That is how the rail and the panel, which
+ * named `grid-row: 2 / -1` and no column, were dealt columns 1 and 2 and stood
+ * at the left edge, while the regions that named a column, or neither, were
+ * left whatever cells remained, in an implicit row past the bottom of a 100vh
+ * page.
+ */
+body {
+  margin: 0;
+  background: var(--lsr-bg);
+  color: var(--lsr-text);
+  font-family: var(--lsr-font);
+  font-size: var(--lsr-size-ui);
+  line-height: var(--lsr-leading);
+  display: grid;
+  /* The rail is its own column so a shut panel cannot take its control away. */
+  grid-template-columns: minmax(0, 1fr) auto 22rem;
+  /*
+   * The header, then everything that scrolls. The intent used to be a row of
+   * its own so that it stayed on screen the whole way down a review; it was
+   * paid for out of the height of every file under it, on every line the
+   * reviewer read, and the reviewer asked for that height back. It now heads
+   * the scrolling region instead, so it is what the review opens on and it
+   * leaves once the reading starts.
+   */
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+}
+
+/*
+ * Separation comes from the background step and from generous padding, not from
+ * rules: every line drawn here is one more thing between the eye and the code.
+ */
+.lsr-header {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--lsr-space-4);
+  padding: var(--lsr-space-3) var(--lsr-space-4);
+  background: var(--lsr-surface);
+}
+
+/*
+ * Everything the reviewer scrolls through: what the change is for, and then the
+ * groups. One scroll container for the two, so the intent leaves the way any
+ * other content does. It takes the diff's column rather than the full width,
+ * which would run it under the conversation panel and push the panel down a
+ * row, reading as the two overlapping.
+ */
+.lsr-review {
+  grid-column: 1;
+  grid-row: 2;
+  overflow-y: auto;
+}
+
+/*
+ * The browser's own scroll anchoring is off for exactly as long as this review
+ * is doing its own, in `dom/fold.ts`: that holds the element the reviewer's
+ * gesture was about, which the browser cannot know, and it holds it every frame
+ * of the fold. Two anchors would take turns writing the offset in the same
+ * frame, and the browser's picks a node of its choosing — one that a collapsing
+ * group takes off the page halfway through, at which point it gives up and
+ * leaves the reviewer thousands of pixels from what they ticked.
+ *
+ * Scoped in time rather than in space on purpose. Turning it off only inside
+ * the folding block leaves the browser free to anchor on something below the
+ * fold and write the offset itself, which the fold reads back as the reviewer
+ * scrolling and lets go of its hold for. Between folds the browser's anchoring
+ * is the better one, and it is on.
+ */
+.lsr-review:has(.lsr-folding) {
+  overflow-anchor: none;
+}
+
+/*
+ * What the change is for, above every group. No height cap and no scrollbar of
+ * its own: the cap was there to stop a pinned band with many stated reasons
+ * eating the review it introduces, and a band that scrolls away cannot. A box
+ * that scrolls inside a box that scrolls would also swallow the wheel on the
+ * way past it.
+ */
+.lsr-intent {
+  padding: var(--lsr-space-3) var(--lsr-space-4);
+  background: var(--lsr-raised);
+}
+
+/* A round from before intents existed says nothing and takes no room. */
+.lsr-intent:empty {
+  display: none;
+}
+
+.lsr-intent-title {
+  margin: 0 0 var(--lsr-space-2);
+  font-size: var(--lsr-size-label);
+  font-weight: 600;
+  line-height: var(--lsr-leading-tight);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lsr-muted);
+}
+
+.lsr-intent-list {
+  margin: 0;
+  padding-left: var(--lsr-space-4);
+  color: var(--lsr-strong);
+}
+
+/* One reason per line: a run-on paragraph loses where one ends and the next starts. */
+.lsr-intent-item {
+  margin-bottom: var(--lsr-space-1);
+}
+
+.lsr-intent-item:last-child {
+  margin-bottom: 0;
+}
+
+.lsr-intent-none {
+  margin: 0;
+  color: var(--lsr-muted);
+}
+
+/*
+ * The header is one row at every width the page supports: what it runs out of
+ * room for is the presence sentence, which is the only part that can be cut
+ * and still read, so the branch, the count and the switches keep their line.
+ *
+ * Progress is a bar and a count side by side. `12/40` is exact and says nothing
+ * about how much is left to read: the mind does not turn a pair of numbers into
+ * a distance, and it reads one straight off a line that is filling up. The bar
+ * is the distance, the count is the exact answer, and neither is dropped.
+ *
+ * It takes the slack in the header row and is the first thing to give it back:
+ * the switches are controls at a fixed size, the bar is happy at any width.
+ *
+ * Its own items sit on a baseline, not centred, so that the count is what the
+ * header measures this whole box by — the row is a baseline row, and a flex
+ * container of centred items has no baseline to give it, so the number came out
+ * half a pixel above the branch name and the presence sentence beside it. The
+ * bar is the one thing in here with no text in it, and it centres itself.
+ */
+.lsr-progress {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lsr-space-3);
+  flex: 1 1 12rem;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * One segment per group, each as wide as the lines its group changed, laid out
+ * by `flex-grow` from the markup. The slack it gives back has a floor: shrunk
+ * below eight characters' worth it is no longer a distance anybody can read,
+ * and the presence sentence beside it is the part of this row built to be cut
+ * short instead. Narrower than the floor itself fits, the bar is not drawn at
+ * all — the media query at the foot of this file measures where that is.
+ */
+.lsr-progress-bar {
+  display: flex;
+  align-self: center;
+  gap: var(--lsr-space-1);
+  flex: 1 1 auto;
+  min-width: 8rem;
+  /* A spacing step taller than it used to be: the segments are presses now,
+   * and eight pixels was a target for a dart, not a pointer. */
+  height: var(--lsr-space-3);
+}
+
+/*
+ * The work of one group: an empty slot waiting to be filled, painted in the
+ * shade this page draws its lines in. The step off the surface that the rest of
+ * the chrome uses is a shade too quiet for it — at eight pixels tall an
+ * untouched bar in it is a row of ghosts the eye slides off, and this one is
+ * meant to be seen from across the room. The floor was one spacing step, which
+ * drew a two-line group as four pixels: a target for nothing. It is eight steps
+ * now, capped at an equal share of the row so that a review of thirty chapters
+ * still fits the header instead of pushing it sideways — the markup passes the
+ * count in `--lsr-progress-segments`, and one gap per segment comes off the
+ * share because `100%` here does not know the gaps are there.
+ */
+.lsr-progress-segment {
+  position: relative;
+  flex-basis: 0;
+  min-width: min(
+    var(--lsr-space-8),
+    calc(100% / var(--lsr-progress-segments, 1) - var(--lsr-space-1))
+  );
+  border-radius: 999px;
+  /* A button by markup — the segment is the fastest way into its chapter —
+   * so the button base's accent fill and padding are both put back. */
+  padding: 0;
+  background: var(--lsr-border);
+}
+
+/*
+ * A chapter of bulk, hatched: the same empty slot, drawn in stripes of the line
+ * colour it was already painted in. The bar says how much of the review is left
+ * and this is how it also says where the reading in it is — an eighth of the
+ * width in hatch is bulk the reviewer can tick in one press on the survey, and
+ * the same eighth plain is a chapter somebody has to judge. Only the slot is
+ * striped: the fill runs over it in flat accent exactly as everywhere else, so
+ * approval reads the same in every segment and the hatch says one thing only,
+ * which is what kind of reading this width stands for.
+ */
+.lsr-progress-segment[data-tier="sweep"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--lsr-border) 0 var(--lsr-space-1),
+    transparent var(--lsr-space-1) var(--lsr-space-2)
+  );
+}
+
+/*
+ * The press, which is taller than the picture. Twelve pixels is the right
+ * height for a bar and half the height a pointer is entitled to, so the target
+ * is grown a spacing step past the pill on each side and left invisible: the
+ * bar keeps its line, and the hand aiming at it stops missing. It reaches over
+ * the row's own gaps, which hold nothing else to press. This is also why the
+ * segment no longer clips — the fill inside carries the same pill radius, so
+ * there was nothing left for `overflow: hidden` to do except cut this off.
+ */
+.lsr-progress-segment::after {
+  content: "";
+  position: absolute;
+  inset-block: calc(-1 * var(--lsr-space-2));
+  inset-inline: 0;
+}
+
+/* The hand hovers, the pill answers: a quiet ring, so the accent one below
+ * keeps meaning "you are here" and nothing else. */
+.lsr-progress-segment:hover {
+  outline: 1px solid var(--lsr-muted);
+  outline-offset: 1px;
+}
+
+/*
+ * Where the reviewer is: the segment of the chapter standing open in focus
+ * mode wears a ring. An outline rather than a border or a shadow because it
+ * costs no layout — the segments share the row by `flex-grow`, and a border
+ * would widen the marked one by two pixels of lie. Offset a pixel so the ring
+ * reads as around the pill, not as a taller pill; in the accent because the
+ * question it answers — "which of these am I in?" — is asked mid-read, and
+ * the accent is the one colour this bar already teaches the eye to find.
+ */
+.lsr-progress-segment[data-current] {
+  outline: 1px solid var(--lsr-accent);
+  outline-offset: 1px;
+}
+
+/*
+ * How much of that group is read. The accent is the page's "done" colour — the
+ * index counters are already in it — and a group still in progress takes it
+ * mixed halfway into the header's surface: a full segment and a nearly full one
+ * are a hard pair to tell apart at this height, and the hue says which is which
+ * before the width has to be measured.
+ */
+.lsr-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--lsr-accent);
+  transition: width 120ms ease;
+}
+
+.lsr-progress-segment[data-state="partial"] .lsr-progress-fill {
+  background: color-mix(in srgb, var(--lsr-accent) 55%, var(--lsr-surface));
+}
+
+/*
+ * Never squeezed: the exact count is the half of this that survives being read
+ * in a hurry, and a narrow page that cut it to `5/` would have taken away the
+ * one thing the bar cannot say. Which is also why `.lsr-progress` keeps its
+ * automatic minimum size — the bar's floor plus this — rather than the
+ * `min-width: 0` its neighbours in the header carry.
+ */
+.lsr-progress-count {
+  flex: 0 0 auto;
+}
+
+.lsr-header h1 {
+  font-size: var(--lsr-size-ui);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.lsr-base,
+.lsr-status,
+.lsr-file-stats,
+.lsr-binary {
+  color: var(--lsr-muted);
+}
+
+.lsr-status {
+  margin: 0;
+  font-size: var(--lsr-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lsr-diff {
+  /*
+   * The tail is a screen's worth of nothing: without it the last file of a
+   * review can never be scrolled up to where it is comfortable to read.
+   */
+  padding: var(--lsr-space-6) var(--lsr-space-4) var(--lsr-space-12);
+}

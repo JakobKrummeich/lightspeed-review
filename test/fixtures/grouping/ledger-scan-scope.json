@@ -1,0 +1,106 @@
+{
+  "name": "ledger-scan-scope",
+  "commit": "b689504d2f555c02badd1dbd9d6183ae8d71bf86",
+  "subject": "Stop judging a round from reading every ledger there is",
+  "intents": [
+    "Stop a round from scanning every monthly ledger there is when it judges annotations"
+  ],
+  "files": [
+    {
+      "path": ".lavish/badges-rethink.html",
+      "status": "added",
+      "insertions": 326,
+      "deletions": 0
+    },
+    {
+      "path": ".lavish/draft-preservation-plan.html",
+      "status": "added",
+      "insertions": 300,
+      "deletions": 0
+    },
+    {
+      "path": ".lavish/focus-model.html",
+      "status": "added",
+      "insertions": 328,
+      "deletions": 0
+    },
+    {
+      "path": ".lavish/r1.png",
+      "status": "binary",
+      "insertions": 0,
+      "deletions": 0
+    },
+    {
+      "path": ".lavish/r2.png",
+      "status": "binary",
+      "insertions": 0,
+      "deletions": 0
+    },
+    {
+      "path": ".lavish/settled-files-done.html",
+      "status": "added",
+      "insertions": 296,
+      "deletions": 0
+    },
+    {
+      "path": ".lavish/settled-files-plan.html",
+      "status": "added",
+      "insertions": 669,
+      "deletions": 0
+    },
+    {
+      "path": ".lavish/two-round-proof.html",
+      "status": "added",
+      "insertions": 240,
+      "deletions": 0
+    },
+    {
+      "path": "src/ledger/store.ts",
+      "status": "modified",
+      "insertions": 74,
+      "deletions": 10
+    },
+    {
+      "path": "src/server.ts",
+      "status": "modified",
+      "insertions": 14,
+      "deletions": 8
+    },
+    {
+      "path": "tasks/todo.md",
+      "status": "modified",
+      "insertions": 9,
+      "deletions": 8
+    },
+    {
+      "path": "test/ledger/store.test.ts",
+      "status": "modified",
+      "insertions": 136,
+      "deletions": 1
+    }
+  ],
+  "human": [
+    {
+      "name": "Which ledgers a round reads",
+      "files": ["src/ledger/store.ts", "src/server.ts"]
+    },
+    {
+      "name": "Tests",
+      "files": ["test/ledger/store.test.ts"]
+    },
+    {
+      "name": "Mechanical: recorded review artifacts",
+      "files": [
+        ".lavish/badges-rethink.html",
+        ".lavish/draft-preservation-plan.html",
+        ".lavish/focus-model.html",
+        ".lavish/settled-files-done.html",
+        ".lavish/settled-files-plan.html",
+        ".lavish/two-round-proof.html",
+        ".lavish/r1.png",
+        ".lavish/r2.png",
+        "tasks/todo.md"
+      ]
+    }
+  ]
+}

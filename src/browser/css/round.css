@@ -1,0 +1,176 @@
+/*
+ * The next round, waiting to be taken. It appears in the header rather than
+ * over the review because it is news, not an interruption: the reviewer is in
+ * the middle of a group and the whole point of holding the round is that they
+ * get to finish it. Filled with the accent, unlike the quiet reopen control
+ * beside it — this is the one thing in the header that was not there a second
+ * ago, and it has to be found without being hunted for.
+ */
+.lsr-round-offer {
+  background: var(--lsr-accent);
+  color: var(--lsr-bg);
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: var(--lsr-size-meta);
+  padding: var(--lsr-space-1) var(--lsr-space-3);
+  border-radius: 0.5rem;
+  /* One arrival, one movement: it grows in from slightly under its place and
+   * stops. Nothing here pulses on and on — a round can wait ten minutes for a
+   * break in the reading, and ten minutes of blinking is a thing to switch off. */
+  animation: lsr-offer-arrive 220ms ease-out;
+}
+
+.lsr-round-offer:hover {
+  background: color-mix(in oklab, var(--lsr-accent) 82%, white);
+}
+
+/*
+ * The offer once the popup's card has folded into it: for a moment it glows,
+ * and then a spark rides its border until it is pressed. This is the one
+ * ongoing animation the page allows itself, and it earns the exception the
+ * offer's own comment above denies to blinking: the reviewer just waved the
+ * announcement away, so the news is known — the spark is not telling them
+ * something, it is holding the place they said they would come back to.
+ * Ends with the offer, however the offer ends.
+ */
+.lsr-round-offer[data-beckon="true"] {
+  position: relative;
+  animation:
+    lsr-offer-arrive 220ms ease-out,
+    lsr-offer-glow 900ms ease-out 260ms;
+}
+
+@keyframes lsr-offer-glow {
+  50% {
+    box-shadow: 0 0 1.25rem color-mix(in srgb, var(--lsr-accent) 75%, transparent);
+  }
+}
+
+/*
+ * The spark: a streak whose bright end leads, lapping the button's own
+ * border. `offset-path: border-box` is what makes the orbit hug the pill
+ * whatever width its label gives it; a browser without it shows no spark and
+ * misses nothing but a flourish — the glow above already pointed here.
+ * Invisible through the animation's delay (no fill), so it appears only once
+ * the glow has handed over.
+ */
+@supports (offset-path: border-box) {
+  .lsr-round-offer[data-beckon="true"]::after {
+    content: "";
+    position: absolute;
+    width: 0.875rem;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(to right, transparent, var(--lsr-accent));
+    box-shadow: 0 0 0.375rem color-mix(in srgb, var(--lsr-accent) 80%, transparent);
+    offset-path: border-box;
+    opacity: 0;
+    animation: lsr-offer-orbit 1800ms linear 1160ms infinite;
+  }
+}
+
+@keyframes lsr-offer-orbit {
+  from {
+    offset-distance: 0%;
+    opacity: 1;
+  }
+
+  to {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+}
+
+/*
+ * The announcement that a round arrived: one card over the same scrim as the
+ * replay, above it in the stack because it can only appear while the reviewer
+ * is somewhere — and below the ended overlay, whose word is last. Dismissing
+ * folds the card into the header's offer: it shrinks away toward the corner
+ * the offer lives in, which is the animation saying where the round went.
+ */
+.lsr-round-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--lsr-space-6);
+  background: var(--lsr-scrim);
+  z-index: 19;
+  transition: background 200ms ease-in;
+}
+
+.lsr-round-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-3);
+  width: min(24rem, 100%);
+  background: var(--lsr-surface);
+  border: 1px solid var(--lsr-border);
+  border-radius: 0.75rem;
+  padding: var(--lsr-space-6);
+  box-shadow: var(--lsr-shadow-lift);
+  animation: lsr-round-announce 180ms ease-out;
+}
+
+.lsr-round-title {
+  margin: 0;
+  font-size: var(--lsr-size-ui);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
+}
+
+.lsr-round-size {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.lsr-round-note {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+}
+
+.lsr-round-actions {
+  display: flex;
+  gap: var(--lsr-space-3);
+  margin-top: var(--lsr-space-2);
+}
+
+@keyframes lsr-round-announce {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(0.5rem);
+  }
+}
+
+/*
+ * The fold: the card flies to where the offer sits — up and to the right,
+ * shrinking to nothing — while the scrim lets go underneath it. The corner is
+ * aimed by viewport measure rather than measured to the pixel; the glow the
+ * offer answers with is what closes the gap between roughly-there and there.
+ */
+#lsr-round-popup[data-state="folding"] .lsr-round-overlay {
+  background: transparent;
+  pointer-events: none;
+}
+
+#lsr-round-popup[data-state="folding"] .lsr-round-card {
+  animation: lsr-round-fold 260ms ease-in forwards;
+}
+
+@keyframes lsr-round-fold {
+  to {
+    transform: translate(38vw, -44vh) scale(0.04);
+    opacity: 0;
+  }
+}
+
+@keyframes lsr-offer-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+}

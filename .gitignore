@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.log
+.lightspeed/
+*.tsbuildinfo
+# Every checkout reviews with its own model and its own endpoint, so this one
+# stays local; .lightspeed.conf.example.json is the portable copy to start from.
+.lightspeed.conf.json
+.lavish/
+# Whoever works here brings their own agent skills and agent tooling; neither is
+# part of the project. `lightspeed init --agent pi` writes the one skill this
+# project does own, wherever the contributor wants it.
+.pi/
+.maintenance-agent.yaml
+# pnpm owns the lockfile; install.sh's npm fallback is told not to write one.
+package-lock.json

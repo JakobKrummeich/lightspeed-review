@@ -1,0 +1,87 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Panel collapse mechanism",
+      "rationale": "Introduces the core collapse functionality with state management, labels, badges, and detection of when the agent speaks.",
+      "watch": "agentSpokeAgain must distinguish a fresh agent message from the reviewer's own send arriving over SSE or a re-group redrawing unchanged conversation.",
+      "files": [
+        "src/browser/panel-collapse.ts"
+      ]
+    },
+    {
+      "name": "Responsive breakpoint calculation",
+      "rationale": "Updates the view format logic to account for panel collapse state, offering two different media query breakpoints based on whether the panel is open or shut.",
+      "watch": "roomQuery must subtract exactly PANEL_WIDTH_PX from the minimum when collapsed, or the breakpoint will incorrectly hide side-by-side at widths where it now fits.",
+      "files": [
+        "src/browser/view-format.ts"
+      ]
+    },
+    {
+      "name": "Panel rail UI component",
+      "rationale": "Creates the rail that stays on screen when the panel collapses, rendering state changes, handling the toggle click, and exposing methods to update the badge and force expand.",
+      "watch": "The rail must trigger onToggle only when collapsed state actually changes, not on every setQueued or expand call, so the view toggle is not refreshed needlessly.",
+      "files": [
+        "src/browser/dom/panel-rail.ts"
+      ]
+    },
+    {
+      "name": "Panel mount API change",
+      "rationale": "Refactors mountPanel to accept an options object and calls onPending whenever the unsent queue changes so the rail can display the count.",
+      "watch": "onPending is called on every draw, even when the count has not changed; the rail must deduplicate its state to avoid unnecessary re-renders.",
+      "files": [
+        "src/browser/dom/panel-mount.ts"
+      ]
+    },
+    {
+      "name": "View toggle responsiveness",
+      "rationale": "Changes the view toggle from consuming a media query directly to calling a hasRoom function, and returns a refresh method so the main script can trigger re-evaluation when the panel state changes.",
+      "watch": "refresh must be callable from outside and must re-query hasRoom, not cache the answer, or collapsing the panel will not immediately make side-by-side available.",
+      "files": [
+        "src/browser/dom/view-toggle.ts"
+      ]
+    },
+    {
+      "name": "Main page wiring",
+      "rationale": "Extracts page element queries into readPage for safety, wires the rail and its callbacks, maintains two separate media queries for open and shut states, tracks panel collapse state, auto-expands when the agent speaks, and calls view.refresh when breakpoint state changes.",
+      "watch": "The expanded auto-expand on agentSpokeAgain must not fire on the reviewer's own send or a re-group, and the view refresh listeners must be on both room queries so changes are caught regardless of panel state.",
+      "files": [
+        "src/browser/dom/main.ts"
+      ]
+    },
+    {
+      "name": "Layout and styling",
+      "rationale": "Adds the rail column to the grid, hides the panel and shows a narrower grid when collapsed, truncates header text to prevent wrapping, and adjusts media queries to account for panel state.",
+      "watch": "The grid-template-columns changes from two to three columns; a shut panel must set the third column to 0 so the rail is still clickable but takes no space. The media query at 1399px must only hide the view switch when the panel is open, since at 1100px the panel is likely shut and side-by-side fits.",
+      "files": [
+        "src/browser/chrome.css"
+      ]
+    },
+    {
+      "name": "Server-side template",
+      "rationale": "Adds the rail button to the HTML template with the badge span and sets the initial data-panel attribute to 'open'.",
+      "watch": "The rail button must have aria-controls pointing to the panel and aria-expanded reflecting the state, and the badge must be hidden by default.",
+      "files": [
+        "src/html-template.ts"
+      ]
+    },
+    {
+      "name": "Task documentation",
+      "rationale": "Marks the panel collapse task complete and documents the implementation details: the rail width, the two breakpoints, the lack of persistence, and the header text truncation.",
+      "watch": "The width numbers (1400, 1048, 352) must match the actual CSS and the roomQuery function; the badge behavior and auto-expand logic should be briefly explained so future maintainers understand what counts as the agent speaking.",
+      "files": [
+        "tasks/todo.md"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/browser/panel-collapse.test.ts",
+        "test/browser/view-format.test.ts",
+        "test/browser/dom/panel-mount.test.ts"
+      ]
+    }
+  ]
+}

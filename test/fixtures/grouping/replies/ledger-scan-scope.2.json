@@ -1,0 +1,45 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Stop rescanning every ledger line when a round judges annotations",
+      "rationale": "Adds filtering to the ledger store so session annotation lookups read only their own kind, repo and round ids instead of parsing the entire ledger, reducing 185ms to 22ms on a 50k-record ledger.",
+      "watch": "The substring gate must not reject lines that match — false negatives break the query; the month file filter compares only the YYYY-MM prefix so a since timestamp halfway through a month does not skip that month entirely.",
+      "files": [
+        "src/ledger/store.ts",
+        "src/server.ts"
+      ]
+    },
+    {
+      "name": "Documentation and backlog closure",
+      "rationale": "Marks the stated intent complete and documents the performance fix and its constraints.",
+      "watch": "The entry correctly names the cost, the new field names, and the trade-off that corrupt counts a filtered read, not the whole ledger.",
+      "files": [
+        "tasks/todo.md"
+      ]
+    },
+    {
+      "name": "Planning artifacts for related future work",
+      "rationale": "Adds design documents exploring approval carrying across rounds, front-end draft preservation, focus state modeling, and two-round validation — context for understanding the ledger changes but not implementing them.",
+      "watch": "These are planning documents only; none of their proposed changes are in the code being reviewed.",
+      "files": [
+        ".lavish/badges-rethink.html",
+        ".lavish/draft-preservation-plan.html",
+        ".lavish/focus-model.html",
+        ".lavish/settled-files-plan.html",
+        ".lavish/settled-files-done.html",
+        ".lavish/two-round-proof.html",
+        ".lavish/r1.png",
+        ".lavish/r2.png"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/ledger/store.test.ts"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Intent argument and validation",
+      "rationale": "Makes --intent a required argument on start, checking before any git or model work, and adds the intent_missing error code.",
+      "watch": "The intent_missing error code must exit with code 2 (argument error), and the validation must happen before repository checks so blank intents fail immediately without touching git.",
+      "files": [
+        "src/errors.ts",
+        "src/cli.ts"
+      ]
+    },
+    {
+      "name": "Argument parsing and start command implementation",
+      "rationale": "Refactors the start command argument parser to handle --intent as a repeatable flag, threads intents through StartInput to round creation, and echoes them back in the output.",
+      "watch": "The scanArgs helper must preserve order for repeating flags and filter blank intents before returning; intents must be passed through to createSession and recorded on the round; the agent must see what was stored in the session summary.",
+      "files": [
+        "src/commands/start.ts"
+      ]
+    },
+    {
+      "name": "Intent storage and round lifecycle",
+      "rationale": "Records intents on each round as a per-round field and provides a helper to retrieve the current round's intents for display.",
+      "watch": "Intents are per-round so a later round can state different ones without altering approvals; the currentIntents helper must return an empty array for rounds predating the feature, not undefined.",
+      "files": [
+        "src/session-store.ts",
+        "src/rounds/session-round.ts"
+      ]
+    },
+    {
+      "name": "Intent delivery and retrieval via server",
+      "rationale": "Sends intents in the create session request, stores them on the round, and returns current intents in the session read response.",
+      "watch": "The server must filter intents to strings in parseCreateSession for forward compatibility with older clients; the currentIntents call in the read handler must reflect the round on screen, not stale state.",
+      "files": [
+        "src/server.ts"
+      ]
+    },
+    {
+      "name": "Documentation and help text",
+      "rationale": "Updates command help, README and skill description to document --intent as required, repeatable, and the strongest signal to the grouping model.",
+      "watch": "The help messages must explain that the agent is the only party knowing why the branch exists; the spec must reflect that intent is required and fails before git work.",
+      "files": [
+        "README.md",
+        "skills/lightspeed-review/SKILL.md",
+        "src/commands/command-help.ts",
+        "src/commands/home.ts",
+        "spec.md",
+        "src/skill.ts"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/commands/start.test.ts",
+        "test/cli.test.ts",
+        "test/commands/home.test.ts",
+        "test/rounds/session-round.test.ts",
+        "test/server.test.ts"
+      ]
+    }
+  ]
+}

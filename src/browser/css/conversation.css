@@ -1,0 +1,306 @@
+.lsr-entry,
+.lsr-pill {
+  position: relative;
+  background: var(--lsr-raised);
+  border-radius: 0.5rem;
+  padding: var(--lsr-space-2) var(--lsr-space-3);
+  margin-bottom: var(--lsr-space-2);
+  font-size: var(--lsr-size-ui);
+}
+
+/*
+ * A round of the review is a round of the conversation too, and scrolled back
+ * far enough every message looks equally current. This is the line between
+ * them. It sticks to the top of the history while the round under it scrolls
+ * past, so the answer to "which round am I reading?" is on screen the whole way
+ * up — which means it is drawn over text and must be opaque: the panel's own
+ * surface, not a tint of it.
+ */
+.lsr-round-mark {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--lsr-space-2);
+  background: var(--lsr-surface);
+  padding: var(--lsr-space-2) 0;
+  /*
+   * More air above than below: a label with equal air on both sides floats
+   * between the two rounds and has to be read twice to see which side it names.
+   * It names what is under it, so it sits with it.
+   */
+  margin: var(--lsr-space-4) 0 var(--lsr-space-2);
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  color: var(--lsr-muted);
+}
+
+/* The rule itself: whatever width the two labels leave, and no more. */
+.lsr-round-mark::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--lsr-border);
+}
+
+.lsr-round-name {
+  color: var(--lsr-strong);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  /* A narrow panel may wrap the note away; the round's number never goes. */
+  white-space: nowrap;
+}
+
+/* One round of a review is live, and it is the one the diff on the left is. */
+.lsr-round-mark[data-round-state="current"] .lsr-round-name {
+  color: var(--lsr-accent);
+}
+
+/*
+ * An agent is away with the reviewer's feedback, said in the place the news is
+ * about: the foot of the conversation, where the answer will be written. The
+ * header states the same thing in words, but it states it in a corner — a
+ * reviewer who has just pressed Send is looking here, and what they used to
+ * find was the conversation exactly as they left it, with no sign that their
+ * words had been picked up. Now the wait has a place to happen, and the reply
+ * lands in it.
+ *
+ * A line rather than an entry card: it is not something anybody said, and
+ * dressing it as a message would put a card in the history that is deleted a
+ * minute later.
+ */
+.lsr-working {
+  display: flex;
+  align-items: center;
+  gap: var(--lsr-space-2);
+  margin: 0 0 var(--lsr-space-2);
+  padding: var(--lsr-space-2) var(--lsr-space-3);
+  font-size: var(--lsr-size-meta);
+  color: var(--lsr-accent);
+}
+
+.lsr-working-dots {
+  display: inline-flex;
+  /* Never squeezed by the sentence beside it: the dots are the moving part. */
+  flex: 0 0 auto;
+  gap: var(--lsr-space-1);
+}
+
+/*
+ * Three dots breathing out of step, which is the oldest way of drawing somebody
+ * being about to say something and needs no legend. They fade rather than
+ * travel: this sits inside a panel the reviewer reads, and text moving beside
+ * text being read is the kind of motion that gets a page closed.
+ */
+.lsr-working-dots i {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: currentcolor;
+  animation: lsr-working-breathe 1200ms ease-in-out infinite;
+}
+
+.lsr-working-dots i:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.lsr-working-dots i:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+/* Down to a quarter rather than out: a dot that goes to nothing leaves a hole
+ * in the row, and the row is what reads as one thing. */
+@keyframes lsr-working-breathe {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+}
+
+/*
+ * Said in a round that is over. Flat instead of raised, rather than dimmed:
+ * opacity stacks with everything under it and takes the reviewer's own words
+ * down with it, while a card that has lost its lift reads as history in both
+ * schemes — the live round is the one still standing off the panel.
+ */
+.lsr-entry[data-round-state="earlier"] {
+  background: none;
+}
+
+.lsr-entry-role,
+.lsr-prompt-file {
+  font-size: var(--lsr-size-label);
+  color: var(--lsr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 var(--lsr-space-1);
+}
+
+/*
+ * The file name is a press now — it leads back to the lines the comment was
+ * written over — but it keeps the label's clothes: a row of button chrome
+ * down the card would shout over the comments it is only a caption to. The
+ * accent arrives on hover, which is where "this goes somewhere" is answered,
+ * and the underline says so to a pointer that has not moved yet.
+ */
+.lsr-prompt-file {
+  display: block;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--lsr-border);
+  text-underline-offset: 2px;
+}
+
+.lsr-prompt-file:hover {
+  color: var(--lsr-accent);
+  text-decoration-color: var(--lsr-accent);
+}
+
+/*
+ * The seam between two comments of one turn. They used to run together into
+ * one tall block — quote, comment, the next file's caption, all at the same
+ * indent — and the eye had to parse which line answered which. A hairline and
+ * a step of air say where one thought ends and the next begins, which also
+ * sets the round's closing message apart from the anchored comment above it.
+ */
+.lsr-prompt + .lsr-prompt {
+  border-top: 1px solid var(--lsr-border);
+  margin-top: var(--lsr-space-3);
+  padding-top: var(--lsr-space-3);
+}
+
+.lsr-prompt-comment {
+  margin: 0;
+}
+
+/*
+ * The agent's declared answer to this very comment, set inside the reviewer's
+ * prompt under the words it answers. The accent rules its left edge the way
+ * violet rules the reviewer's quote in the replay: one hue for "the agent
+ * spoke here", a step quieter than the comment above it — an answer is read
+ * after the question, never instead of it.
+ */
+.lsr-prompt-answer {
+  margin-top: var(--lsr-space-2);
+  padding-left: var(--lsr-space-2);
+  border-left: 2px solid color-mix(in oklab, var(--lsr-accent) 55%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-1);
+}
+
+.lsr-prompt-answer-label {
+  margin: 0;
+  color: var(--lsr-accent);
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+}
+
+/* The agent's words keep the line breaks the agent wrote them with. */
+.lsr-prompt-answer-note {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--lsr-text);
+  font-size: var(--lsr-size-meta);
+}
+
+/*
+ * The stamp on a pill that outlived the round it was queued in. Same recipe as
+ * the file rows' approval and commented badges, in amber: caution,
+ * not error — the pill is still sendable, its anchor just points into a diff
+ * that has been redrawn since. In light the yellow leans on the ink so it does
+ * not wash out — the same amber the "changed after approval" badge wears,
+ * because both say the same thing: time moved on under these words.
+ */
+.lsr-pill-round {
+  display: inline-block;
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  border-radius: 999px;
+  padding: 0 var(--lsr-space-2);
+  margin-bottom: var(--lsr-space-1);
+  white-space: nowrap;
+  color: var(--lsr-amber);
+  border: 1px solid color-mix(in oklab, var(--lsr-amber) 42%, var(--lsr-surface));
+  background: color-mix(in oklab, var(--lsr-amber) 13%, transparent);
+}
+
+.lsr-pill-remove {
+  position: absolute;
+  top: var(--lsr-space-1);
+  right: var(--lsr-space-1);
+  background: transparent;
+  color: var(--lsr-muted);
+  padding: 0 var(--lsr-space-1);
+}
+
+.lsr-compose-actions {
+  display: flex;
+  gap: var(--lsr-space-2);
+  margin-top: var(--lsr-space-2);
+}
+
+/*
+ * The line that says there is nothing left to read, above the button it points
+ * at. Its element is always in the markup — it is the panel's live region — so
+ * it must cost nothing while it has nothing to say: an empty block box is zero
+ * high, and the padding only arrives with the sentence.
+ */
+.lsr-complete {
+  margin: 0;
+  padding: 0;
+  color: var(--lsr-accent);
+  font-size: var(--lsr-size-meta);
+}
+
+.lsr-complete:not(:empty) {
+  padding: 0 0 var(--lsr-space-2);
+}
+
+.lsr-ended {
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+}
+
+#lsr-status-banner {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lsr-space-3);
+  min-width: 0;
+}
+
+.lsr-presence {
+  margin: 0;
+  font-size: var(--lsr-size-meta);
+  color: var(--lsr-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Somebody is on the other end of the review, one way or the other. */
+.lsr-presence[data-waiting="true"],
+.lsr-presence[data-working="true"] {
+  color: var(--lsr-accent);
+}
+
+/* The review is over: readable, but unmistakably closed for input. */
+.lsr-ended-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Room at the edges, so a short window shrinks the margin before the card. */
+  padding: var(--lsr-space-6);
+  background: var(--lsr-scrim);
+  /* Above the annotation popup, which may still be open when the review ends. */
+  z-index: 20;
+}

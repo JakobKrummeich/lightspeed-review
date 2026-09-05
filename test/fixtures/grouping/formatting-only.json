@@ -1,0 +1,26 @@
+{
+  "name": "formatting-only",
+  "commit": "497f127ea39a656332b2da41f5324b725316f85a",
+  "subject": "Stop formatting review artifacts as if they were source",
+  "intents": ["Stop prettier from reformatting recorded review artifacts as if they were source"],
+  "files": [
+    {
+      "path": ".prettierignore",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "test/server-ledger.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 5
+    }
+  ],
+  "human": [
+    {
+      "name": "Mechanical: formatting scope",
+      "files": [".prettierignore", "test/server-ledger.test.ts"]
+    }
+  ]
+}

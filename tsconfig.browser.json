@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Node types stay available because browser modules import domain types
+    // from `src/` (type-only, so nothing node-specific reaches the bundle).
+    // `DOM.Iterable` because these modules walk `querySelectorAll` results and
+    // `childNodes` with `for…of`, which browsers have supported throughout.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/browser/**/*.ts", "test/browser/dom/**/*.ts"],
+  // The base config excludes exactly the files this one exists to check, and an
+  // inherited `exclude` outranks this `include`: without clearing it, every
+  // module under `dom/` is checked by neither config.
+  "exclude": []
+}

@@ -1,0 +1,81 @@
+/*
+ * The chapter's gate: the card a chapter stands behind until the reviewer
+ * presses through to its diff. Its own area, and not part of the chapter
+ * screen it interrupts, because it is the one surface of the review with no
+ * code on it — everything here is sized and coloured to be read rather than
+ * scanned, which is the opposite of every rule in `index.css`. The cascade
+ * puts it straight after that screen: these rules answer its `.lsr-group`
+ * selectors and must be able to overrule them.
+ */
+
+/*
+ * The gate a chapter opens behind: the card saying what the chapter is for,
+ * alone on the screen with the diff shut behind one press. One column at a
+ * reading measure, because these are sentences to read and not a row to scan,
+ * and nothing on it is muted — on a screen holding this and nothing else,
+ * quiet type says "skip me", which is what the same sentences got when they
+ * headed the first file's diff.
+ */
+.lsr-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--lsr-space-4);
+  max-width: 70ch;
+  padding: var(--lsr-space-2) var(--lsr-space-3) var(--lsr-space-4);
+}
+
+/* Gone the moment the diff is up: the room the intent held is the diff's now. */
+.lsr-group:has(.lsr-gate-press[aria-expanded="true"]) .lsr-gate {
+  display: none;
+}
+
+/*
+ * And the chapter's own tick is not on the card. Drawn there it sits a
+ * centimetre from "Read the diff" and offers the whole chapter approved
+ * without opening it — the one press the gate exists to interrupt, made the
+ * easier of the two. It comes back at the foot of the diff, under the lines it
+ * stands for.
+ */
+.lsr-group:has(.lsr-gate-press[aria-expanded="false"]) .lsr-group-foot {
+  display: none;
+}
+
+.lsr-gate-name {
+  margin: 0;
+  /* The same headline it wears on the survey: one chapter, one voice,
+   * whichever screen it is named on. */
+  font-size: var(--lsr-size-title);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
+  color: var(--lsr-strong);
+}
+
+/*
+ * What happened and what to watch for, set to be read: the lead step, a
+ * half-step above the reading size, because on this screen they are the
+ * content — and with a paragraph's leading rather than the tight one a lone
+ * heading line takes.
+ */
+.lsr-gate-rationale,
+.lsr-gate-watch {
+  margin: 0;
+  font-size: var(--lsr-size-lead);
+  line-height: var(--lsr-leading);
+}
+
+/* What the press opens, path by path, with the size of each change beside it. */
+.lsr-gate-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lsr-gate-file {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lsr-space-3);
+}

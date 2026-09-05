@@ -1,0 +1,30 @@
+/*
+ * The page's one stylesheet, and now only its table of contents: every rule
+ * lives in an area file under `css/`, and this file says which areas there are
+ * and in what order they are read.
+ *
+ * The order is the cascade. esbuild inlines a relative `@import` where it
+ * stands, in order, so moving a line here moves a whole area past or behind
+ * every rule it shares a selector with. Nothing else belongs in this file: a
+ * rule written here is a rule with no area, which is how the 2,916-line file
+ * these imports came out of was written one rule at a time.
+ *
+ * Read down the list and the page assembles: the tokens everything is painted
+ * from, the shell the regions are laid out in, then one area per screen of the
+ * review, and last the one answer to `prefers-reduced-motion` that speaks for
+ * all of them.
+ */
+@import "./css/tokens.css";
+@import "./css/page.css";
+@import "./css/panel.css";
+@import "./css/index.css";
+@import "./css/sweep.css";
+@import "./css/gate.css";
+@import "./css/popup.css";
+@import "./css/conversation.css";
+@import "./css/closing.css";
+@import "./css/code.css";
+@import "./css/replay.css";
+@import "./css/round.css";
+@import "./css/opening.css";
+@import "./css/motion.css";

@@ -1,0 +1,148 @@
+{
+  "name": "require-intent",
+  "commit": "bc8bcc157a5978fabd544662259c425564d6572e",
+  "subject": "Require --intent on start, and record it on the round",
+  "intents": [
+    "Make --intent required on start, so a review always says what the branch is for",
+    "Record the stated intent on the round and echo it back to the agent"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "status": "modified",
+      "insertions": 24,
+      "deletions": 7
+    },
+    {
+      "path": "skills/lightspeed-review/SKILL.md",
+      "status": "modified",
+      "insertions": 16,
+      "deletions": 1
+    },
+    {
+      "path": "spec.md",
+      "status": "modified",
+      "insertions": 8,
+      "deletions": 3
+    },
+    {
+      "path": "src/cli.ts",
+      "status": "modified",
+      "insertions": 24,
+      "deletions": 6
+    },
+    {
+      "path": "src/commands/command-help.ts",
+      "status": "modified",
+      "insertions": 7,
+      "deletions": 1
+    },
+    {
+      "path": "src/commands/home.ts",
+      "status": "modified",
+      "insertions": 7,
+      "deletions": 1
+    },
+    {
+      "path": "src/commands/start.ts",
+      "status": "modified",
+      "insertions": 64,
+      "deletions": 11
+    },
+    {
+      "path": "src/errors.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "src/rounds/session-round.ts",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0
+    },
+    {
+      "path": "src/server.ts",
+      "status": "modified",
+      "insertions": 10,
+      "deletions": 2
+    },
+    {
+      "path": "src/session-store.ts",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "src/skill.ts",
+      "status": "modified",
+      "insertions": 15,
+      "deletions": 0
+    },
+    {
+      "path": "test/cli.test.ts",
+      "status": "modified",
+      "insertions": 17,
+      "deletions": 1
+    },
+    {
+      "path": "test/commands/home.test.ts",
+      "status": "modified",
+      "insertions": 4,
+      "deletions": 4
+    },
+    {
+      "path": "test/commands/start.test.ts",
+      "status": "modified",
+      "insertions": 141,
+      "deletions": 14
+    },
+    {
+      "path": "test/rounds/session-round.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "test/server.test.ts",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 0
+    }
+  ],
+  "human": [
+    {
+      "name": "The flag and its refusal",
+      "files": [
+        "src/commands/start.ts",
+        "src/cli.ts",
+        "src/errors.ts",
+        "src/commands/command-help.ts"
+      ]
+    },
+    {
+      "name": "Where the intent is kept",
+      "files": ["src/session-store.ts", "src/rounds/session-round.ts", "src/server.ts"]
+    },
+    {
+      "name": "What the agent is told",
+      "files": [
+        "src/skill.ts",
+        "src/commands/home.ts",
+        "skills/lightspeed-review/SKILL.md",
+        "README.md",
+        "spec.md"
+      ]
+    },
+    {
+      "name": "Tests",
+      "files": [
+        "test/commands/start.test.ts",
+        "test/cli.test.ts",
+        "test/commands/home.test.ts",
+        "test/rounds/session-round.test.ts",
+        "test/server.test.ts"
+      ]
+    }
+  ]
+}

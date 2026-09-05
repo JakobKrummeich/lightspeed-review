@@ -1,0 +1,15 @@
+# Two of the six runtime dependencies are pinned or pre-1.0 (pi-ai exactly,
+# axi-sdk-js at 0.x), so nothing but a bot would notice when they move.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dependencies:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

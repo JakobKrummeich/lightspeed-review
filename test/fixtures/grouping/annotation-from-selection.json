@@ -1,0 +1,123 @@
+{
+  "name": "annotation-from-selection",
+  "commit": "66b1a684cf1472d030044e11d0e3e6042ce25c87",
+  "subject": "Queue file-scoped annotations from diff selections",
+  "intents": ["Let the reviewer select diff text and queue a file-scoped annotation from it"],
+  "files": [
+    {
+      "path": "scripts/build.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "src/browser/annotation.ts",
+      "status": "added",
+      "insertions": 55,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/chrome.css",
+      "status": "modified",
+      "insertions": 112,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/conversation-panel.ts",
+      "status": "added",
+      "insertions": 59,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/dom/annotation-popup.ts",
+      "status": "added",
+      "insertions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/dom/diff-mount.ts",
+      "status": "renamed",
+      "insertions": 16,
+      "deletions": 40,
+      "previousPath": "src/browser/main.ts"
+    },
+    {
+      "path": "src/browser/dom/main.ts",
+      "status": "added",
+      "insertions": 30,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/dom/panel-mount.ts",
+      "status": "added",
+      "insertions": 71,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/dom/session-api.ts",
+      "status": "added",
+      "insertions": 38,
+      "deletions": 0
+    },
+    {
+      "path": "tasks/plan.md",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "tasks/todo.md",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "test/browser/annotation.test.ts",
+      "status": "added",
+      "insertions": 102,
+      "deletions": 0
+    },
+    {
+      "path": "test/browser/conversation-panel.test.ts",
+      "status": "added",
+      "insertions": 79,
+      "deletions": 0
+    },
+    {
+      "path": "tsconfig.json",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 2
+    }
+  ],
+  "human": [
+    {
+      "name": "Selection to annotation",
+      "files": ["src/browser/annotation.ts", "src/browser/dom/annotation-popup.ts"]
+    },
+    {
+      "name": "Where a queued annotation shows",
+      "files": [
+        "src/browser/conversation-panel.ts",
+        "src/browser/dom/panel-mount.ts",
+        "src/browser/dom/session-api.ts",
+        "src/browser/chrome.css"
+      ]
+    },
+    {
+      "name": "Tests",
+      "files": ["test/browser/annotation.test.ts", "test/browser/conversation-panel.test.ts"]
+    },
+    {
+      "name": "Mechanical: the browser entry point split in two",
+      "files": [
+        "src/browser/dom/diff-mount.ts",
+        "src/browser/dom/main.ts",
+        "scripts/build.ts",
+        "tsconfig.json",
+        "tasks/plan.md",
+        "tasks/todo.md"
+      ]
+    }
+  ]
+}

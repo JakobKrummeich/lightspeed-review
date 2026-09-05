@@ -1,0 +1,215 @@
+/*
+ * "Porcelain & Cobalt": porcelain neutrals — warm near-white paper in light,
+ * cool graphite-blue night in dark — under one cobalt accent at hue 262. Red
+ * and green stay reserved for the diff, and the accent lives far from both,
+ * so nothing else on screen can be misread as add or remove. Every colour
+ * literal on this page lives in this token block; everything after it is a
+ * token or a mix of two, so nothing is eyeballed.
+ */
+:root {
+  /*
+   * One token set for both schemes: `light-dark()` resolves against the used
+   * `color-scheme`, so the switch only has to change that one property. On
+   * `light dark` the page follows the OS with no flash and no script.
+   */
+  color-scheme: light dark;
+
+  --lsr-bg: light-dark(oklch(0.966 0.004 90), oklch(0.22 0.01 262));
+  --lsr-surface: light-dark(oklch(0.984 0.003 90), oklch(0.252 0.011 262));
+  /*
+   * One step off the surface: separates without drawing a line. A chrome token —
+   * it is measured from `--lsr-surface`, so it belongs on things that sit on a
+   * surface (a group card, a header a pointer is over) and nowhere in the diff,
+   * which is painted on `--lsr-bg` a shade below. Down there the same step lands
+   * two shades up and reads as a highlight; `--lsr-code-quiet` is that step.
+   */
+  --lsr-raised: light-dark(oklch(0.995 0.002 90), oklch(0.292 0.012 262));
+  --lsr-border: light-dark(oklch(0.89 0.006 90), oklch(0.36 0.014 262));
+  /*
+   * Tinted with the accent rather than lifted one more shade: a single step of
+   * lightness is invisible, a change of hue is not. Marks the one option of a
+   * set that is in use.
+   */
+  --lsr-selected: light-dark(oklch(0.935 0.012 262), oklch(0.34 0.022 262));
+  /*
+   * The row of a diff that is not a change to read: the `@@` header between
+   * hunks. Built off `--lsr-bg`'s own bases, because that is what the diff is
+   * painted on — the chrome tokens above are measured from `--lsr-surface`, and
+   * taken down into the diff they land two shades above their neighbours, a pale
+   * blue-grey band the reviewer cannot name. One step is all this needs: it says
+   * "not one of the red and green lines", and nothing louder.
+   */
+  --lsr-code-quiet: light-dark(oklch(0.976 0.003 90), oklch(0.236 0.01 262));
+  --lsr-text: light-dark(oklch(0.32 0.012 270), oklch(0.87 0.008 262));
+  --lsr-strong: light-dark(oklch(0.21 0.015 270), oklch(0.945 0.006 262));
+  --lsr-muted: light-dark(oklch(0.54 0.015 270), oklch(0.65 0.012 262));
+  --lsr-accent: light-dark(oklch(0.55 0.17 262), oklch(0.72 0.12 262));
+  /* Text and glyphs on accent-filled controls: near-white on the deep light
+   * cobalt, deep night ink on the brighter dark one. */
+  --lsr-on-accent: light-dark(oklch(0.98 0.005 262), oklch(0.2 0.03 262));
+  /*
+   * The few hues beside the accent, one duty each: green for approved and
+   * addressed, amber for "time moved on" warnings, violet for where the
+   * reviewer spoke, pink for a repeated comment, red and cyan only inside
+   * code. Each pair is deepened for paper and brightened for night, so a chip
+   * can use the token straight and stay legible in both schemes.
+   */
+  --lsr-green: light-dark(oklch(0.4 0.082 148), oklch(0.83 0.088 148));
+  --lsr-red: light-dark(oklch(0.44 0.098 22), oklch(0.81 0.082 22));
+  --lsr-amber: light-dark(oklch(0.5 0.105 75), oklch(0.82 0.115 80));
+  --lsr-violet: light-dark(oklch(0.48 0.125 292), oklch(0.78 0.095 292));
+  --lsr-pink: light-dark(oklch(0.5 0.135 350), oklch(0.78 0.105 350));
+  --lsr-cyan: light-dark(oklch(0.45 0.078 200), oklch(0.8 0.085 200));
+  /*
+   * The diff's own colours. Backgrounds are deliberately soft (chroma ≈ 0.04)
+   * so hours of scanning don't buzz; the hue is carried by the text colour,
+   * and the `hl` step marks the word-level change inside a line.
+   */
+  --lsr-add-bg: light-dark(oklch(0.936 0.038 148), oklch(0.315 0.042 148));
+  --lsr-add-tx: light-dark(oklch(0.4 0.082 148), oklch(0.83 0.088 148));
+  --lsr-add-hl: light-dark(oklch(0.872 0.07 148), oklch(0.415 0.07 148));
+  --lsr-del-bg: light-dark(oklch(0.938 0.036 22), oklch(0.315 0.04 22));
+  --lsr-del-tx: light-dark(oklch(0.44 0.098 22), oklch(0.81 0.082 22));
+  --lsr-del-hl: light-dark(oklch(0.876 0.068 22), oklch(0.415 0.068 22));
+  /* Shadows and the scrim are tinted toward the night blue, not black: black
+   * on porcelain reads as dirt. */
+  --lsr-shadow-lift: 0 8px 24px light-dark(oklch(0.25 0.02 262 / 0.14), oklch(0 0 0 / 0.45));
+  --lsr-shadow-flat: 0 1px 3px light-dark(oklch(0.25 0.02 262 / 0.1), oklch(0 0 0 / 0.35));
+  --lsr-scrim: light-dark(oklch(0.25 0.015 270 / 0.45), oklch(0.1 0.01 262 / 0.6));
+  --lsr-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /*
+   * Type, chosen once instead of inherited element by element. Every size on
+   * this page used to be whatever the first draft reached for — five ad-hoc
+   * steps in the chrome, and diff2html's 13px in the diff — at the browser's
+   * `normal` leading throughout.
+   *
+   * Code and chrome are both 1rem: the reviewer reads their editor at 16px, and
+   * a comment about a line should not be smaller than the line. 1.5 leading is
+   * the accessibility floor for body text and what editors sit at for code;
+   * headings and single-line labels take the tight step, because leading there
+   * only pushes a lone line's box around. Meta and label sit below the reading
+   * size on purpose: stats and badges are glanced at, not read.
+   *
+   * The gutter is four digits of 1rem monospace plus its padding, which is what
+   * the line-number column needs and no more.
+   */
+  --lsr-leading: 1.5;
+  --lsr-leading-tight: 1.25;
+  --lsr-leading-code: 1.5;
+  --lsr-size-code: 1rem;
+  --lsr-size-ui: 1rem;
+  --lsr-size-meta: 0.875rem;
+  --lsr-size-label: 0.8125rem;
+  /* Above the reading sizes, for a glyph that is a control rather than text:
+   * drawn at 1rem a chevron is a speck, and the eye skips the strip it is on. */
+  --lsr-size-icon: 1.75rem;
+  /*
+   * The steps above the reading size, and the page speaks at them only on the
+   * screens with no code to shout over: the survey, whose chapter names are the
+   * headlines of the whole review; the gate a chapter opens behind, whose two
+   * sentences are set a half-step up at the lead size because they are all
+   * there is to read on it; and the closing summary of a finished review.
+   * Everything else here is chrome around the diff and has no business being
+   * louder than the code.
+   */
+  --lsr-size-lead: 1.1875rem;
+  --lsr-size-title: 1.5rem;
+  /*
+   * Louder still, and only ever in the opening. It is the review's other end
+   * and the one screen with nothing on it but a sentence: no diff, no index, no
+   * comment — so the rule about not shouting over the code has nothing here to
+   * shout over. The cover is a headline and is set like one; a reason is set
+   * halfway between that and the reading size, which is what stops it being
+   * skimmed. Both take their own leading: at these sizes 1.5 is a gap, not a
+   * line.
+   */
+  --lsr-size-cover: 3.125rem;
+  --lsr-size-reason: 1.5625rem;
+  --lsr-leading-display: 1.05;
+  --lsr-leading-reason: 1.32;
+  --lsr-gutter: 3.4rem;
+  /* The focus bar's height is a token because the sticky file rows under it
+   * pin at exactly this offset; the two must agree without measuring. */
+  --lsr-focus-bar: 3.25rem;
+
+  /*
+   * One spacing scale, on 4px. The stylesheet used to hold 23 different gaps —
+   * 0.45 next to 0.5, 0.65 next to 0.7 — because each was picked alone. Steps
+   * 1–4 are the inside of a control, 6 and 8 hold two things apart, 12 says the
+   * thing below belongs to a different concern.
+   */
+  --lsr-space-1: 0.25rem;
+  --lsr-space-2: 0.5rem;
+  --lsr-space-3: 0.75rem;
+  --lsr-space-4: 1rem;
+  --lsr-space-6: 1.5rem;
+  --lsr-space-8: 2rem;
+  --lsr-space-12: 3rem;
+
+  /*
+   * Syntax token colours, drawn from the hue tokens above: each pair is
+   * already deepened for paper and brightened for night, so the hue and the
+   * meaning survive both schemes at 4.4:1 or better. Comments stay the
+   * dimmest thing on the line in both.
+   */
+  /* Untokenised code, one step stronger than prose: it is the thing being
+     read, and plain text next to the deepened accents looked washed out. */
+  --lsr-code-plain: light-dark(oklch(0.28 0.012 270), oklch(0.8 0.01 262));
+  --lsr-code-comment: light-dark(oklch(0.5 0.014 270), oklch(0.58 0.012 262));
+  --lsr-code-keyword: var(--lsr-green);
+  --lsr-code-string: var(--lsr-cyan);
+  --lsr-code-name: var(--lsr-accent);
+  --lsr-code-attr: var(--lsr-amber);
+  --lsr-code-meta: var(--lsr-pink);
+  --lsr-code-builtin: var(--lsr-violet);
+  --lsr-code-deletion: var(--lsr-red);
+
+  /*
+   * diff2html's own variables, so the diff is painted from this palette instead
+   * of its GitHub-flavoured defaults. Added and removed lines are the palette's
+   * green and red thinned into the page background: legible in both schemes,
+   * and never brighter than the code they mark.
+   */
+  --d2h-bg-color: var(--lsr-bg);
+  --d2h-border-color: var(--lsr-border);
+  --d2h-dim-color: var(--lsr-muted);
+  --d2h-line-border-color: var(--lsr-border);
+  --d2h-file-header-bg-color: var(--lsr-surface);
+  --d2h-file-header-border-color: var(--lsr-border);
+  --d2h-empty-placeholder-bg-color: var(--lsr-surface);
+  --d2h-empty-placeholder-border-color: var(--lsr-border);
+  --d2h-selected-color: var(--lsr-selected);
+  --d2h-ins-bg-color: var(--lsr-add-bg);
+  --d2h-ins-border-color: color-mix(in oklab, var(--lsr-add-tx) 30%, var(--lsr-bg));
+  --d2h-ins-highlight-bg-color: var(--lsr-add-hl);
+  --d2h-ins-label-color: var(--lsr-add-tx);
+  --d2h-del-bg-color: var(--lsr-del-bg);
+  --d2h-del-border-color: color-mix(in oklab, var(--lsr-del-tx) 28%, var(--lsr-bg));
+  --d2h-del-highlight-bg-color: var(--lsr-del-hl);
+  --d2h-del-label-color: var(--lsr-del-tx);
+  /*
+   * A line that was edited rather than replaced still has a side: keeping the
+   * removal red and the addition green means one hue per direction, a step
+   * softer than a whole added or removed line.
+   */
+  --d2h-change-ins-color: color-mix(in oklab, var(--lsr-add-bg) 55%, var(--lsr-bg));
+  --d2h-change-del-color: color-mix(in oklab, var(--lsr-del-bg) 55%, var(--lsr-bg));
+  --d2h-change-label-color: var(--lsr-amber);
+  /* The `@@` row states its line numbers; it does not need a band to be found. */
+  --d2h-info-bg-color: var(--lsr-code-quiet);
+  --d2h-info-border-color: var(--lsr-border);
+}
+
+/* An explicit pick overrides the OS; `light-dark()` re-resolves every token. */
+:root[data-color-scheme="light"] {
+  color-scheme: light;
+}
+
+:root[data-color-scheme="dark"] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}

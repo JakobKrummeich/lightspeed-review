@@ -1,0 +1,277 @@
+/*
+ * The between-rounds replay: one card per comment the reviewer made last
+ * round, over the same scrim as the closing summary. Below the ended overlay
+ * on purpose — a review that ends while the replay is up is over, and the
+ * summary is the page's last word.
+ */
+.lsr-replay-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--lsr-space-6);
+  background: var(--lsr-scrim);
+  z-index: 18;
+}
+
+/*
+ * Same card language as the closing summary — surface, border, lift — but
+ * wider: this one holds code, and a hunk folded to 40rem wraps more than it
+ * says. The nav has to stay reachable however long a card runs, so the card is
+ * a column whose middle scrolls.
+ */
+.lsr-replay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-4);
+  width: min(56rem, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--lsr-surface);
+  border: 1px solid var(--lsr-border);
+  border-radius: 0.75rem;
+  padding: var(--lsr-space-6);
+  box-shadow: var(--lsr-shadow-lift);
+}
+
+.lsr-replay-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lsr-space-4);
+}
+
+/* The same quiet uppercase as the closing summary's eyebrow: one voice for
+ * "where you are" across the page's two overlays. */
+.lsr-replay-eyebrow,
+.lsr-replay-label,
+.lsr-replay-quote-label {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.lsr-replay-progress {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.lsr-replay-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-4);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.lsr-replay-file {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lsr-space-3);
+  flex-wrap: wrap;
+}
+
+.lsr-replay-path {
+  color: var(--lsr-strong);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: var(--lsr-size-meta);
+}
+
+/*
+ * The status chip: the same pill shape as the file badges, in the verdict's
+ * own colour. Grey for both `unchanged` and `unknown` on purpose — neither is
+ * failure, and only `addressed` (green) and `repeated` (magenta) carry news
+ * worth a hue. No animation anywhere here: the spec says serious.
+ */
+.lsr-replay-chip {
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  border-radius: 999px;
+  padding: 0 var(--lsr-space-2);
+  white-space: nowrap;
+  color: var(--lsr-muted);
+  border: 1px solid var(--lsr-border);
+  background: none;
+}
+
+.lsr-replay-chip[data-status="addressed"] {
+  color: var(--lsr-green);
+  border-color: color-mix(in oklab, var(--lsr-green) 42%, var(--lsr-surface));
+  background: color-mix(in oklab, var(--lsr-green) 12%, transparent);
+}
+
+.lsr-replay-chip[data-status="repeated"] {
+  color: var(--lsr-pink);
+  border-color: color-mix(in oklab, var(--lsr-pink) 42%, var(--lsr-surface));
+  background: color-mix(in oklab, var(--lsr-pink) 12%, transparent);
+}
+
+/*
+ * The reviewer's own words, in the violet the "commented last round" badge
+ * wears: one colour for "this is where you spoke", wherever it appears.
+ */
+.lsr-replay-quote {
+  margin: 0;
+  padding: var(--lsr-space-3) var(--lsr-space-4);
+  border-left: 3px solid color-mix(in oklab, var(--lsr-violet) 75%, var(--lsr-surface));
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: color-mix(in oklab, var(--lsr-violet) 10%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-2);
+}
+
+/* The quoted selection keeps its own line breaks and marker column; a long
+ * quote scrolls inside its box rather than growing the card past its nav. */
+.lsr-replay-selected {
+  margin: 0;
+  max-height: 10rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: var(--lsr-size-meta);
+  line-height: var(--lsr-leading-code);
+  color: var(--lsr-text);
+}
+
+.lsr-replay-comment {
+  margin: 0;
+  color: var(--lsr-strong);
+  font-size: var(--lsr-size-ui);
+}
+
+.lsr-replay-answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-2);
+}
+
+/* The agent's words keep the line breaks the agent wrote them with. */
+.lsr-replay-note {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--lsr-text);
+  font-size: var(--lsr-size-ui);
+}
+
+.lsr-replay-changes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-2);
+}
+
+/* The mechanical-fallback marker: a remark beside the label, not a warning. */
+.lsr-replay-unmapped {
+  margin-left: var(--lsr-space-2);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  font-size: var(--lsr-size-label);
+  color: var(--lsr-muted);
+}
+
+.lsr-replay-answer-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-1);
+}
+
+.lsr-replay-answer-path {
+  margin: 0;
+  font-size: var(--lsr-size-meta);
+  color: var(--lsr-strong);
+}
+
+/* The hunks, on the page's own code background, framed the way a file's diff
+ * is framed in the review below. */
+.lsr-replay-diff {
+  background: var(--lsr-bg);
+  border-radius: 0.5rem;
+  padding: var(--lsr-space-2) 0;
+  overflow: hidden;
+}
+
+/* Why there is nothing to draw: a fact about the answer, never failure. */
+.lsr-replay-nochange,
+.lsr-replay-state {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+}
+
+.lsr-replay-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lsr-space-4);
+  padding: var(--lsr-space-4) 0 0;
+  border-top: 1px solid var(--lsr-border);
+}
+
+/* Next is the way on and keeps the page's action colour; a floor under its
+ * width so the label turning into Done does not shift the nav under a pressed
+ * pointer. */
+.lsr-replay-next {
+  min-width: 6rem;
+}
+
+/* Previous steps back; it must not compete with Next, which is the way on. */
+.lsr-replay-prev {
+  background: var(--lsr-raised);
+  color: var(--lsr-text);
+  font-weight: 500;
+}
+
+/* One dot per card: where the reviewer is in the replay, and a press that goes
+ * there. Sized as a target, drawn as a dot. */
+.lsr-replay-dots {
+  display: flex;
+  align-items: center;
+  gap: var(--lsr-space-2);
+}
+
+.lsr-replay-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--lsr-border);
+}
+
+.lsr-replay-dot[aria-current="true"] {
+  background: var(--lsr-accent);
+}
+
+/* The way out, under the nav and quieter than it: always there, never urgent. */
+.lsr-replay-skip {
+  align-self: center;
+  background: none;
+  color: var(--lsr-muted);
+  font-weight: 500;
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* The header control that brings the replay back while the round is open,
+ * dressed like the switches beside it rather than like an action button. */
+.lsr-replay-reopen {
+  background: none;
+  white-space: nowrap;
+  color: var(--lsr-muted);
+  font-weight: 500;
+  font-size: var(--lsr-size-meta);
+  padding: var(--lsr-space-1) var(--lsr-space-3);
+  border-radius: 0.5rem;
+  box-shadow: inset 0 0 0 1px var(--lsr-border);
+}
+
+.lsr-replay-reopen:hover {
+  background: var(--lsr-raised);
+  color: var(--lsr-strong);
+}

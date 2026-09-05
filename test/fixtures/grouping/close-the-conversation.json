@@ -1,0 +1,109 @@
+{
+  "name": "close-the-conversation",
+  "commit": "cfb9b39f0c0c1e4295da4376744a0e031470bea8",
+  "subject": "Let the reviewer shut the conversation and read the code",
+  "intents": ["Let the reviewer collapse the conversation panel and read the code full width"],
+  "files": [
+    {
+      "path": "src/browser/chrome.css",
+      "status": "modified",
+      "insertions": 81,
+      "deletions": 2
+    },
+    {
+      "path": "src/browser/dom/main.ts",
+      "status": "modified",
+      "insertions": 79,
+      "deletions": 13
+    },
+    {
+      "path": "src/browser/dom/panel-mount.ts",
+      "status": "modified",
+      "insertions": 14,
+      "deletions": 8
+    },
+    {
+      "path": "src/browser/dom/panel-rail.ts",
+      "status": "added",
+      "insertions": 57,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/dom/view-toggle.ts",
+      "status": "modified",
+      "insertions": 14,
+      "deletions": 8
+    },
+    {
+      "path": "src/browser/panel-collapse.ts",
+      "status": "added",
+      "insertions": 42,
+      "deletions": 0
+    },
+    {
+      "path": "src/browser/view-format.ts",
+      "status": "modified",
+      "insertions": 13,
+      "deletions": 1
+    },
+    {
+      "path": "src/html-template.ts",
+      "status": "modified",
+      "insertions": 4,
+      "deletions": 1
+    },
+    {
+      "path": "tasks/todo.md",
+      "status": "modified",
+      "insertions": 12,
+      "deletions": 2
+    },
+    {
+      "path": "test/browser/dom/panel-mount.test.ts",
+      "status": "modified",
+      "insertions": 7,
+      "deletions": 1
+    },
+    {
+      "path": "test/browser/panel-collapse.test.ts",
+      "status": "added",
+      "insertions": 36,
+      "deletions": 0
+    },
+    {
+      "path": "test/browser/view-format.test.ts",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0
+    }
+  ],
+  "human": [
+    {
+      "name": "The collapse rule",
+      "files": ["src/browser/panel-collapse.ts", "src/browser/view-format.ts"]
+    },
+    {
+      "name": "Wiring it to the page",
+      "files": [
+        "src/browser/dom/panel-rail.ts",
+        "src/browser/dom/main.ts",
+        "src/browser/dom/panel-mount.ts",
+        "src/browser/dom/view-toggle.ts",
+        "src/html-template.ts",
+        "src/browser/chrome.css"
+      ]
+    },
+    {
+      "name": "Tests",
+      "files": [
+        "test/browser/panel-collapse.test.ts",
+        "test/browser/view-format.test.ts",
+        "test/browser/dom/panel-mount.test.ts"
+      ]
+    },
+    {
+      "name": "Mechanical: the backlog note",
+      "files": ["tasks/todo.md"]
+    }
+  ]
+}

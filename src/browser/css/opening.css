@@ -1,0 +1,364 @@
+/*
+ * The opening: the first round of a review handed over one reason at a time.
+ * Not a card on a scrim but a room — the field is opaque and full-bleed, so
+ * until the last press there is no review behind it to look at instead of the
+ * reason being read. The replay overlay, which is a card on a scrim, belongs
+ * to every round after a commented one; the two never meet, because a first
+ * round has no previous round to replay.
+ *
+ * Both schemes are painted from the locals below, and they are declared here
+ * rather than on `:root` because nothing else on the page is in this room. All
+ * of them go through `light-dark()` for one reason: the reviewer can pick a
+ * scheme by hand, on top of whatever the machine asked for, so a
+ * `prefers-color-scheme` query would paint this room the machine's way while
+ * the rest of the page followed the pick.
+ */
+.lsr-opening-overlay {
+  /* Darker than the page's own dark, because a room is not a surface: the
+     room has to read as unlit space with a lamp over it. */
+  --lsr-opening-room: light-dark(
+    var(--lsr-bg),
+    color-mix(in oklab, var(--lsr-bg) 52%, oklch(0.09 0.01 280))
+  );
+  /* The four parts of the light, always all painted and each transparent in
+     the scheme it is not for. Dark hangs a cobalt lamp over the sheets and
+     lets a faint pool of it gather on the floor; light keeps the paper, puts
+     a breath of the accent behind the words, and darkens toward the edges
+     the way paper does under a lamp. */
+  --lsr-opening-lamp: light-dark(
+    transparent,
+    color-mix(in oklab, var(--lsr-accent) 44%, transparent)
+  );
+  --lsr-opening-halo: light-dark(
+    color-mix(in oklab, var(--lsr-accent) 7%, transparent),
+    transparent
+  );
+  --lsr-opening-edge: light-dark(
+    color-mix(in oklab, var(--lsr-text) 14%, transparent),
+    transparent
+  );
+  --lsr-opening-pool: light-dark(
+    transparent,
+    color-mix(in oklab, var(--lsr-accent) 10%, transparent)
+  );
+  /* The dust in the light: the accent itself, a shade denser in the dark
+     room where a faint mote would vanish — and there it gets a glow with it,
+     which is the lamp catching on something rather than a dot. */
+  --lsr-opening-dust: light-dark(
+    color-mix(in oklab, var(--lsr-accent) 55%, transparent),
+    color-mix(in oklab, var(--lsr-accent) 65%, transparent)
+  );
+  --lsr-opening-flash: light-dark(
+    color-mix(in oklab, var(--lsr-accent) 20%, transparent),
+    color-mix(in oklab, var(--lsr-accent) 45%, transparent)
+  );
+  /* The flood the last press ends on: white with a trace of the accent on
+     paper, the night scheme's own near-white in the dark room. */
+  --lsr-opening-bloom-core: light-dark(white, var(--lsr-strong));
+  --lsr-opening-bloom-edge: light-dark(
+    color-mix(in oklab, var(--lsr-accent) 22%, white),
+    var(--lsr-strong)
+  );
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lsr-space-4);
+  padding: var(--lsr-space-6);
+  overflow: hidden;
+  background: var(--lsr-opening-room);
+  z-index: 18;
+}
+
+/* The light itself: four gradients on one layer, of which the scheme decides
+ * which two you can see — lamp and pool in the dark, halo and edges on paper. */
+.lsr-opening-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 70% at 50% -8%, var(--lsr-opening-lamp), transparent 78%),
+    radial-gradient(ellipse 60% 45% at 50% 38%, var(--lsr-opening-halo), transparent 70%),
+    radial-gradient(ellipse 130% 110% at 50% 42%, transparent 55%, var(--lsr-opening-edge) 100%),
+    radial-gradient(ellipse 90% 50% at 50% 115%, var(--lsr-opening-pool), transparent 60%);
+}
+
+/*
+ * The flare: the room takes a hit on the press itself, not only on what the
+ * press reveals. In fast and out slow, so it reads as a strike rather than as
+ * a fade in and out again.
+ *
+ * It is opacity on this one layer and nothing else. A `filter` would be the
+ * shorter way to brighten everything underneath, but a filter value cannot be
+ * switched per scheme the way a colour can, and this room is painted in both.
+ */
+.lsr-opening-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 42%, var(--lsr-opening-flash), transparent 56%);
+  transition: opacity 520ms ease;
+}
+
+.lsr-opening-overlay[data-flare="true"]::after {
+  opacity: 0.6;
+  transition-duration: 90ms;
+}
+
+/* Dust drifting up through the light: sparse and slow, and never over a word.
+ * Where each mote is and how long it takes is the renderer's business — it
+ * hands every one of them its own life, delay and drift. */
+.lsr-opening-motes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lsr-opening-mote {
+  position: absolute;
+  bottom: -0.625rem;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  opacity: 0;
+  background: var(--lsr-opening-dust);
+  box-shadow: 0 0 0.5rem var(--lsr-opening-lamp);
+  animation: lsr-opening-rise var(--life) linear var(--delay) infinite;
+}
+
+/*
+ * Where the sheets are dealt. Its children are laid on top of one another
+ * rather than after one another, which leaves it no height of its own: it
+ * states one, and the sheets fill it. Wide and tall enough that the longest
+ * reason still sits in the middle of the room rather than against its edges.
+ */
+/*
+ * Every sheet lies in the same grid cell, so the room is as tall as the
+ * longest reason in it: a long one pushes its button down rather than
+ * scrolling behind it. The floor keeps short reasons from shrinking the room
+ * to a strip, and the ceiling is the viewport — the overlay is a flex column,
+ * so when the screen runs out the stack gives way and the sheet scrolls.
+ */
+.lsr-opening-stack {
+  display: grid;
+  /* Content-sized while there is room, the flexed height once there is not:
+   * without the minmax an auto row would hold its content height and spill
+   * past the dots instead of letting the sheet scroll. */
+  grid-template-rows: minmax(0, 1fr);
+  width: min(45rem, 92%);
+  min-height: 19rem;
+}
+
+/*
+ * A sheet is not a card here: no surface, no border, no shadow. There is
+ * nothing behind it to be a card against, and the room's whole point is that
+ * one sentence is the only thing on screen.
+ */
+.lsr-opening-sheet {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: safe center;
+  justify-items: center;
+  gap: var(--lsr-space-3);
+  padding: var(--lsr-space-6);
+  text-align: center;
+  /* Only a reason too long for the screen itself scrolls, and `safe` keeps
+   * the top of it reachable when it does. */
+  overflow-y: auto;
+  transition:
+    transform 520ms cubic-bezier(0.3, 0.7, 0.2, 1),
+    opacity 340ms ease;
+}
+
+/*
+ * There is no pile any more, so there is no depth to draw: the sheets cross in
+ * the middle of the room instead. What is coming rises from below, what is
+ * done lifts away above, and both are invisible while they do it — the only
+ * sheet ever readable is the one being spoken.
+ */
+.lsr-opening-sheet[data-at="gone"] {
+  transform: translateY(-3.5rem) scale(0.94);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lsr-opening-sheet[data-at="under"] {
+  transform: translateY(3.5rem) scale(0.94);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lsr-opening-sheet[data-at="top"] {
+  transform: none;
+  opacity: 1;
+}
+
+/* Where this came from, in the accent, above the one loud line on the cover.
+ * The reasons carry no lead: it said the same thing on every one of them. */
+.lsr-opening-lead {
+  margin: 0;
+  color: var(--lsr-accent);
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+}
+
+/* The cover's headline. Its glow is the lamp again, which means it is cobalt
+ * in the dark room and simply absent in the light one, where there is no
+ * lamp. */
+.lsr-opening-headline {
+  margin: 0;
+  max-width: 16ch;
+  color: var(--lsr-strong);
+  font-size: var(--lsr-size-cover);
+  line-height: var(--lsr-leading-display);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-shadow: 0 0 2.25rem var(--lsr-opening-lamp);
+}
+
+/* One reason, set nearly as large as the headline: the size is what stops the
+ * skim, and the width is what keeps it a sentence rather than a paragraph. */
+.lsr-opening-body {
+  margin: 0;
+  max-width: 30ch;
+  color: var(--lsr-strong);
+  font-size: var(--lsr-size-reason);
+  line-height: var(--lsr-leading-reason);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+/* On the cover the body is not the news — the headline above it is — so it
+ * speaks at the reading size and gets out of the way. */
+.lsr-opening-sheet[data-sheet="cover"] .lsr-opening-body {
+  max-width: 40ch;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-ui);
+  line-height: var(--lsr-leading);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* The words land rather than appear: they arrive from just below, a beat
+ * behind the sheet carrying them, which is what makes a press feel answered. */
+.lsr-opening-sheet[data-at="top"] .lsr-opening-body {
+  animation: lsr-opening-land 520ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/*
+ * The one thing to do in the room, and it says so: it breathes on its own,
+ * lifts to meet the pointer and squashes under the press. A filled pill: the
+ * one solid block of the accent in the room, which is what makes it read as
+ * the way out rather than as one more line of type.
+ *
+ * The floor under its width keeps the label changing on the last sheet from
+ * moving the button out from under a pointer already on its way to it.
+ */
+.lsr-opening-press {
+  min-width: 8rem;
+  margin-top: var(--lsr-space-6);
+  padding: var(--lsr-space-3) var(--lsr-space-6);
+  border-radius: 999px;
+  background: var(--lsr-accent);
+  color: var(--lsr-on-accent);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--lsr-accent) 60%, transparent);
+  animation: lsr-opening-pulse 2.4s infinite;
+  transition:
+    transform 160ms ease,
+    filter 160ms ease;
+}
+
+.lsr-opening-press:hover {
+  transform: translateY(-1px) scale(1.03);
+  filter: brightness(1.07);
+}
+
+.lsr-opening-press:active {
+  transform: scale(0.97);
+}
+
+/*
+ * How many sheets there are and how far through them the reviewer is. The
+ * count is itself news — it says how much was asked for — so it is under the
+ * stack from the first frame rather than appearing with the second sheet. It
+ * is positioned so the light does not wash over it: the beam is a layer of
+ * this element, and everything not positioned paints under it.
+ */
+.lsr-opening-dots {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--lsr-space-2);
+}
+
+.lsr-opening-dot {
+  display: block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--lsr-accent) 26%, transparent);
+}
+
+.lsr-opening-dot[data-on="true"] {
+  background: var(--lsr-accent);
+  box-shadow: 0 0 0.75rem color-mix(in oklab, var(--lsr-accent) 60%, transparent);
+}
+
+/* The last press floods the room before it hands the review over, so the way
+ * out is a light rather than a screen being taken away. */
+.lsr-opening-bloom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at 50% 42%,
+    var(--lsr-opening-bloom-core),
+    var(--lsr-opening-bloom-edge)
+  );
+  transition: opacity 320ms ease;
+}
+
+.lsr-opening-overlay[data-bloom="true"] .lsr-opening-bloom {
+  opacity: 0.95;
+  transition-duration: 140ms;
+}
+
+@keyframes lsr-opening-rise {
+  8% {
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: translateY(-30rem) translateX(var(--drift));
+    opacity: 0;
+  }
+}
+
+@keyframes lsr-opening-land {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.985);
+  }
+}
+
+@keyframes lsr-opening-pulse {
+  70% {
+    box-shadow: 0 0 0 1.375rem transparent;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}

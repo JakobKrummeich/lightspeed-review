@@ -1,0 +1,70 @@
+{
+  "name": "lightspeed-review",
+  "version": "1.0.0",
+  "description": "Semantic diff review with targeted agent feedback",
+  "keywords": [
+    "code-review",
+    "diff",
+    "agent",
+    "cli",
+    "llm",
+    "ai-agents",
+    "pull-request",
+    "review-tool"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "author": "Jakob Krummeich",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JakobKrummeich/lightspeed-review.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JakobKrummeich/lightspeed-review/issues"
+  },
+  "homepage": "https://github.com/JakobKrummeich/lightspeed-review#readme",
+  "bin": {
+    "lightspeed": "bin/lightspeed.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "skills"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@11.15.1",
+  "scripts": {
+    "prepare": "node scripts/build.ts",
+    "prepack": "node scripts/build.ts",
+    "build": "node scripts/build.ts",
+    "build:skill": "node scripts/build-skill.ts",
+    "grade:grouping": "node scripts/grade-grouping.ts",
+    "judge:grouping": "node scripts/judge-grouping.ts",
+    "pretest": "node scripts/build.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.84.3",
+    "@toon-format/toon": "^2.3.1",
+    "axi-sdk-js": "^0.1.8",
+    "diff2html": "^3.4.56",
+    "highlight.js": "^11.11.1",
+    "typebox": "^1.1.38"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.18.0"
+  }
+}

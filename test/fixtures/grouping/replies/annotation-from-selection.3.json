@@ -1,0 +1,89 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Annotation data flow: selection to queueable prompts",
+      "rationale": "Extracts the core logic that turns a text selection into structured annotations ready to send, independent of DOM operations or UI rendering.",
+      "watch": "The splitting of multi-file selections into one annotation per file must preserve the group attribution, and blank comments correctly prevent empty queuing.",
+      "files": [
+        "src/browser/annotation.ts"
+      ]
+    },
+    {
+      "name": "Conversation panel rendering and state",
+      "rationale": "Renders the right-side panel showing queued pills, delivered conversation, and send UI as a pure function, separating markup generation from DOM interaction.",
+      "watch": "HTML escaping prevents comment injection, and the distinction between browser-local pending prompts and server-side session pending must not be confused in display.",
+      "files": [
+        "src/browser/conversation-panel.ts"
+      ]
+    },
+    {
+      "name": "Selection popup and annotation trigger",
+      "rationale": "Turns a mouseup text selection into annotation fragments split along file blocks, displays them in a floating popup, and routes queued prompts to the panel.",
+      "watch": "The selection must be split on full diff lines even when clipped, half lines are not anchors, and the popup must not consume its own clicks before checking for outside selection.",
+      "files": [
+        "src/browser/dom/annotation-popup.ts"
+      ]
+    },
+    {
+      "name": "Session API for fetch, persist, and send",
+      "rationale": "Centralizes all HTTP routes the browser needs: loading the session, persisting reviewed flags, and sending feedback with prompts and end-of-session flag.",
+      "watch": "Each route correctly encodes its parameters and the error for failed sends must distinguish server failure from no delivery to let the panel hold state safely.",
+      "files": [
+        "src/browser/dom/session-api.ts"
+      ]
+    },
+    {
+      "name": "Diff view mounting and update",
+      "rationale": "Mounts the diff into the DOM with reviewed checkboxes, persists checkbox changes, and exposes an update method so a re-group can redraw without losing scroll position.",
+      "watch": "The error handler for persist must not silence failures, and the update path must preserve the groups and reviewed state across a full re-render.",
+      "files": [
+        "src/browser/dom/diff-mount.ts"
+      ]
+    },
+    {
+      "name": "Panel mounting with feedback send",
+      "rationale": "Mounts the conversation panel, manages unsent queue state separately from server pending, removes pills on demand, and sends feedback bundling queued annotations with optional general comment.",
+      "watch": "The browser's local pending queue must not be cleared until the fetch succeeds, and the ended status must disable send UI and prevent further feedback.",
+      "files": [
+        "src/browser/dom/panel-mount.ts"
+      ]
+    },
+    {
+      "name": "Main entry point and component orchestration",
+      "rationale": "Loads the session, mounts diff and panel, wires the annotation popup to the panel's queue method, and subscribes to session updates to refresh both views.",
+      "watch": "The event source listener must call both update methods so a re-group refreshes both the diff and the conversation, and SSE subscription lifetime must span the page.",
+      "files": [
+        "src/browser/dom/main.ts"
+      ]
+    },
+    {
+      "name": "Styling for popup, panel, and interactive elements",
+      "rationale": "Adds CSS for the annotation popup, queued pills, conversation entries, textarea and buttons, using existing design tokens for consistency with the diff view.",
+      "watch": "The popup z-index must float above the diff, the popup sizing must not clip on mobile, and button and textarea styles must inherit from the lavish editor pattern.",
+      "files": [
+        "src/browser/chrome.css"
+      ]
+    },
+    {
+      "name": "Build and configuration updates",
+      "rationale": "Updates the entry point path after refactoring main.ts into dom/, excludes the DOM module from the base tsconfig, and marks Task 8 complete in the plan.",
+      "watch": "The build entry point must match the new dom/main.ts location and the tsconfig exclude must cover all DOM-touching files without excluding server-only code.",
+      "files": [
+        "scripts/build.ts",
+        "tsconfig.json",
+        "tasks/plan.md",
+        "tasks/todo.md"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/browser/annotation.test.ts",
+        "test/browser/conversation-panel.test.ts"
+      ]
+    }
+  ]
+}

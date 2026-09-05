@@ -1,0 +1,39 @@
+{
+  "what": "Blind A/B votes from a human reviewer, the only ground truth the LLM judge and the fixtures can be checked against. Collected through .lavish/grouping-verdicts.html: two layouts of one diff, sides shuffled per diff, nothing saying which came from the model.",
+  "summary": "Six votes, six for the model's grouping over the hand-written fixture. The opus-5 judge decided two of those six the other way and left the rest undecided, so on the only evidence there is, the judge does not track the reviewer — and neither do the fixtures it is scored against.",
+  "rounds": [
+    {
+      "recorded": "2026-01-29",
+      "replies": "recorded before `trailTests`, so each source file still sat with its own test",
+      "votes": [
+        {
+          "fixture": "close-the-conversation",
+          "chose": "recorded",
+          "note": "A is more descriptive, what happens in the files. But I still would like the tests in their own section at the bottom I think."
+        },
+        {
+          "fixture": "intent-above-the-diff",
+          "chose": "recorded",
+          "note": "Same argument as the previous one. Would be perfect if all tests formed the last group, which I can then just ignore."
+        },
+        { "fixture": "ledger-scan-scope", "chose": "recorded", "note": "" }
+      ],
+      "judge": { "model": "anthropic/claude-opus-5", "agreed": 1, "disagreed": 0, "undecided": 2 }
+    },
+    {
+      "recorded": "2026-01-29",
+      "replies": "recorded after `trailTests`, so every layout already ends in one group of tests",
+      "votes": [
+        { "fixture": "close-the-conversation", "chose": "recorded", "note": "" },
+        { "fixture": "intent-above-the-diff", "chose": "recorded", "note": "" },
+        { "fixture": "ledger-scan-scope", "chose": "recorded", "note": "" }
+      ],
+      "judge": { "model": "anthropic/claude-opus-5", "agreed": 0, "disagreed": 2, "undecided": 1 }
+    }
+  ],
+  "what_it_means": [
+    "The reviewer prefers the model's finer, more descriptive groups to the fixtures' three or four broad ones — which is exactly what the fixtures, and therefore ARI, penalise.",
+    "The judge reasons about the same rules the prompt states and still lands on the fixture, so it is closer to the fixture author's taste than to the reviewer's.",
+    "Next: rewrite the fixtures around what the reviewer actually chose, or score against these votes directly. Until then, read both automatic numbers as regression detectors, not as verdicts."
+  ]
+}

@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The pnpm version comes from package.json's `packageManager`; naming it here
+      # too makes the action refuse to pick between the two.
+      - uses: pnpm/action-setup@v4
+
+      # `engines` says >= 22.18; 22 is the version the suite is developed on and
+      # the one `node --test` runs TypeScript directly under.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+      - run: pnpm test
+      - run: pnpm run format:check
+
+      # The checked-in skill is a build artifact of the CLI's own help strings.
+      # A stale one ships guidance the CLI no longer prints, and nothing else in
+      # the gate would notice.
+      - run: pnpm run build:skill --check

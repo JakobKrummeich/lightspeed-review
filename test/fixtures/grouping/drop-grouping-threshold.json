@@ -1,0 +1,72 @@
+{
+  "name": "drop-grouping-threshold",
+  "commit": "c780f74ac6d3be40450b5bd647f07c3f6a296f31",
+  "subject": "Send every multi-file diff to the grouping model",
+  "intents": [
+    "Send every diff of two files or more to the grouping model instead of serving it alphabetically"
+  ],
+  "files": [
+    {
+      "path": "skills/lightspeed-review/SKILL.md",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "spec.md",
+      "status": "modified",
+      "insertions": 8,
+      "deletions": 4
+    },
+    {
+      "path": "src/config.ts",
+      "status": "modified",
+      "insertions": 12,
+      "deletions": 9
+    },
+    {
+      "path": "src/llm/grouping.ts",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 5
+    },
+    {
+      "path": "src/skill.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "test/commands/start.test.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 3
+    },
+    {
+      "path": "test/config.test.ts",
+      "status": "modified",
+      "insertions": 14,
+      "deletions": 5
+    },
+    {
+      "path": "test/llm/grouping.test.ts",
+      "status": "modified",
+      "insertions": 9,
+      "deletions": 14
+    }
+  ],
+  "human": [
+    {
+      "name": "The threshold goes",
+      "files": ["src/llm/grouping.ts", "src/config.ts"]
+    },
+    {
+      "name": "What the docs and the skill say",
+      "files": ["src/skill.ts", "skills/lightspeed-review/SKILL.md", "spec.md"]
+    },
+    {
+      "name": "Tests",
+      "files": ["test/llm/grouping.test.ts", "test/config.test.ts", "test/commands/start.test.ts"]
+    }
+  ]
+}

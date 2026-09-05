@@ -1,0 +1,5 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "thinking": "off",
+  "classify": { "mechanical": [], "guardrail": ["bin/**", "scripts/**"] }
+}

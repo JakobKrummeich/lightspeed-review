@@ -1,0 +1,62 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "File focus types and derivation",
+      "rationale": "Introduces the FileFocus type and functions to derive how much attention each file needs based on its approval history across rounds.",
+      "watch": "The fileFocus function determines focus from approval and blob changes; it must correctly distinguish between files never seen, files approved and untouched, and files that changed since approval.",
+      "files": [
+        "src/rounds/history.ts"
+      ]
+    },
+    {
+      "name": "Session API contract for focus data",
+      "rationale": "Adds the focus field to SessionData so the frontend receives file attention levels along with other session data.",
+      "watch": "The focus field documents that new paths are marked 'new' and that the field is derived server-side, never stored, so it always reflects current rounds.",
+      "files": [
+        "src/browser/dom/session-api.ts"
+      ]
+    },
+    {
+      "name": "Server-side focus derivation on read",
+      "rationale": "Derives and attaches focus to every session data response, computing it fresh from rounds each time to stay in sync with any round changes.",
+      "watch": "Focus is computed on every read and never stored; if round structure changes after storage, the computed focus must remain consistent with the new rounds.",
+      "files": [
+        "src/server.ts"
+      ]
+    },
+    {
+      "name": "Session rounds made mandatory",
+      "rationale": "Changes rounds from optional to required in SessionRecord, rejecting old session files that lack round history rather than loading them as historyless.",
+      "watch": "Sessions without rounds are now rejected at parse time; the sessionCorrupt helper must be called for both parse errors and missing-rounds cases.",
+      "files": [
+        "src/session-store.ts"
+      ]
+    },
+    {
+      "name": "Rounds field assumed in session code",
+      "rationale": "Updates code that reads session.rounds to no longer null-coalesce since rounds is now guaranteed present.",
+      "watch": "All `session.rounds ?? []` patterns are simplified to `session.rounds`; any path that still treats rounds as optional is now wrong.",
+      "files": [
+        "src/ledger/outcomes.ts",
+        "src/rounds/session-round.ts"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/commands/end.test.ts",
+        "test/commands/home.test.ts",
+        "test/commands/poll.test.ts",
+        "test/html-template.test.ts",
+        "test/ledger/write.test.ts",
+        "test/session-resolve.test.ts",
+        "test/session-store.test.ts",
+        "test/rounds/history.test.ts",
+        "test/server.test.ts"
+      ]
+    }
+  ]
+}

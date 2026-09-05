@@ -1,0 +1,289 @@
+/*
+ * The switches sit to the right of the title, before the status banner. Every
+ * option is always on screen and the pressed one is filled in, so a control
+ * shows the current state instead of naming the next click's destination.
+ */
+/* A sunken track, so the raised segment inside it reads as the one in use. */
+.lsr-switch {
+  display: flex;
+  gap: 0;
+  padding: var(--lsr-space-1);
+  border-radius: 0.5rem;
+  background: var(--lsr-bg);
+  box-shadow: inset 0 0 0 1px var(--lsr-border);
+}
+
+/* The first switch carries the gap that holds the group to the right. */
+#lsr-view-switch {
+  margin-left: auto;
+}
+
+.lsr-switch-option {
+  background: none;
+  white-space: nowrap;
+  color: var(--lsr-muted);
+  font-weight: 500;
+  font-size: var(--lsr-size-meta);
+  padding: var(--lsr-space-1) var(--lsr-space-3);
+  border-radius: 0.375rem;
+}
+
+/* The idle segment lights up under the pointer, which is what marks it as a
+ * second choice rather than a caption next to the current one. */
+.lsr-switch-option:hover {
+  background: var(--lsr-raised);
+  color: var(--lsr-strong);
+}
+
+.lsr-switch-option[aria-pressed="true"] {
+  background: var(--lsr-selected);
+  color: var(--lsr-strong);
+  font-weight: 600;
+  box-shadow: var(--lsr-shadow-flat);
+}
+
+/*
+ * Two code columns plus the conversation panel do not fit below 1400px, so the
+ * view falls back to unified (in JS, via the same breakpoint) and the toggle
+ * has nothing to offer.
+ */
+@media (max-width: 1399px) {
+  [data-panel="open"] #lsr-view-switch {
+    display: none;
+  }
+
+  /* The hidden switch carried the gap that held the group to the right. */
+  [data-panel="open"] #lsr-scheme-switch {
+    margin-left: auto;
+  }
+}
+
+/* Shut, the panel's 352px belong to the columns, so the offer survives 352px
+ * further down — below that not even two bare columns fit. */
+@media (max-width: 1047px) {
+  #lsr-view-switch {
+    display: none;
+  }
+
+  #lsr-scheme-switch {
+    margin-left: auto;
+  }
+}
+
+/*
+ * Measured, in the browser, on a header carrying a branch name of ordinary
+ * length: with the bar at its 128px floor the row stops fitting at 746px, and
+ * without it at 606px. So the bar is drawn down to 747 and no further — below
+ * that it would push the page sideways, and the count stays, because the exact
+ * number is the half of progress that survives being small.
+ *
+ * It is the bar's own limit and not the header's: the branch name never wraps
+ * and is never cut, so a long enough one takes the row past every width here,
+ * bar or no bar. That is what the `h1` was decided to be worth, above.
+ */
+@media (max-width: 746px) {
+  .lsr-progress-bar {
+    display: none;
+  }
+}
+
+/*
+ * While a drag is in progress the column it did not start in cannot be
+ * selected, so the selection stops at the column boundary.
+ */
+.lsr-diff[data-lock-column="left"] .d2h-file-side-diff:last-child,
+.lsr-diff[data-lock-column="right"] .d2h-file-side-diff:first-child {
+  user-select: none;
+}
+
+/*
+ * diff2html positions its line-number gutter with `position: absolute` and
+ * ships no positioned ancestor for it. Without this the gutter is laid out
+ * against the document: it drifts out of sync as soon as the review pane
+ * scrolls, and it stretches the document so the page grows a second scrollbar
+ * next to the pane's own. The row is the containing block the gutter was written for.
+ */
+.d2h-diff-table tr {
+  position: relative;
+}
+
+/*
+ * diff2html repeats the file name next to an icon and a CHANGED/ADDED tag. The
+ * file block already states the path and its stats, so the second copy is pure
+ * noise between the reviewer and the code.
+ */
+.d2h-file-header {
+  display: none;
+}
+
+/*
+ * diff2html frames every file and rules off its gutter. The +/- colours already
+ * say where a change starts and ends, so the frames only add visual noise.
+ */
+.d2h-file-wrapper {
+  border: 0;
+  margin-bottom: 0;
+}
+
+.d2h-code-linenumber,
+.d2h-code-side-linenumber,
+.d2h-diff-tbody {
+  border-color: transparent;
+}
+
+/*
+ * Code type, chosen rather than inherited: diff2html ships 13px at the
+ * browser's `normal` leading, tabs eight columns wide, and whatever ligatures
+ * the monospace face offers. A diff is read line by line, so the rows take the
+ * same 16px an editor is read at and the same 1.5 leading as the prose beside
+ * them; a tab is two columns, as this repo writes them; and `=>` stays the two
+ * characters that are in the file.
+ */
+.d2h-diff-table {
+  font-size: var(--lsr-size-code);
+  line-height: var(--lsr-leading-code);
+  tab-size: 2;
+  font-variant-ligatures: none;
+}
+
+/*
+ * Unified burns 121px before the first character of code: two 3.5em number
+ * columns, one of which is blank on every added and every removed line, and
+ * `padding: 0 8em` whose right half is never drawn in. One column — the old
+ * number on a deletion, the new number everywhere else — and a left padding
+ * equal to the gutter it clears bring that to 75px. That reclaimed width is
+ * what pays for 16px code: 98 columns at a 1440px window against the repo's
+ * 100-column line. Side-by-side keeps diff2html's own layout: at half the
+ * width it scrolls at any size, so there is nothing to buy there.
+ */
+.d2h-code-linenumber {
+  width: var(--lsr-gutter);
+}
+
+/* The gutter keeps the line's hue but not its volume: the number says which
+ * side the line is on without competing with the code that changed. */
+.d2h-code-linenumber.d2h-ins,
+.d2h-code-side-linenumber.d2h-ins {
+  color: color-mix(in oklab, var(--lsr-add-tx) 65%, transparent);
+}
+
+.d2h-code-linenumber.d2h-del,
+.d2h-code-side-linenumber.d2h-del {
+  color: color-mix(in oklab, var(--lsr-del-tx) 65%, transparent);
+}
+
+.d2h-code-linenumber:not(.d2h-del) .line-num1,
+.d2h-code-linenumber.d2h-del .line-num2 {
+  display: none;
+}
+
+.line-num1,
+.line-num2 {
+  float: none;
+  width: 100%;
+}
+
+.d2h-code-line {
+  padding: 0 0 0 var(--lsr-gutter);
+  width: 100%;
+}
+
+/*
+ * diff2html renders with its plain `--d2h-*` variables, which the palette at the
+ * top of this file redefines per scheme, so the diff cannot disagree with the
+ * chrome around it — and it follows the switch, not only the operating system.
+ */
+.d2h-wrapper {
+  color: var(--lsr-code-plain);
+}
+
+/*
+ * Syntax highlighting. highlight.js tags tokens with `hljs-*` classes; the
+ * assignment below is Solarized's own (accents carry meaning by hue, so the
+ * same hue works on either base and none of these needs `light-dark()`).
+ * Deliberately flat: no backgrounds, no borders, because the line already uses
+ * background to say added or removed.
+ */
+.d2h-code-line-ctn.hljs {
+  background: none;
+  color: inherit;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--lsr-code-comment);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag {
+  color: var(--lsr-code-keyword);
+}
+
+.hljs-string,
+.hljs-number,
+.hljs-regexp,
+.hljs-template-tag,
+.hljs-meta .hljs-string {
+  color: var(--lsr-code-string);
+}
+
+.hljs-title,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--lsr-code-name);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type,
+.hljs-params {
+  color: var(--lsr-code-attr);
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-subst,
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-link,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: var(--lsr-code-meta);
+}
+
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: var(--lsr-code-builtin);
+}
+
+.hljs-tag {
+  color: var(--lsr-strong);
+}
+
+/*
+ * A highlighted line still shows word-level diff marks underneath the tokens:
+ * the token colour wins, and `<ins>`/`<del>` keep saying where inside the line
+ * the edit was.
+ */
+.hljs-addition {
+  color: var(--lsr-code-keyword);
+}
+
+.hljs-deletion {
+  color: var(--lsr-code-deletion);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}

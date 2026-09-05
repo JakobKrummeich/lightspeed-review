@@ -1,0 +1,41 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Skip threshold reduced to one file",
+      "rationale": "Changes the grouping logic to send every diff of two files or more to the model instead of using a configurable threshold, making git's alphabetical order never the final output for multi-file diffs.",
+      "watch": "The skip condition now hardcodes `files.length <= 1` instead of checking the config threshold; this change is irreversible without backward-incompatible config removal, and the reason message claims every one-file diff has nothing to order, which must hold true.",
+      "files": [
+        "src/llm/grouping.ts"
+      ]
+    },
+    {
+      "name": "Config migration for retired threshold",
+      "rationale": "Removes `groupingThreshold` from the active config interface and marks it as retired so old configs load without error but the value is never used.",
+      "watch": "The retired key is still accepted in KNOWN_KEYS to prevent upgrade failures, but it is not read into the returned config object; a config file with only `groupingThreshold` set and no other required keys will still fail validation on missing `model` or `thinking`, which is correct.",
+      "files": [
+        "src/config.ts"
+      ]
+    },
+    {
+      "name": "Documentation and help text",
+      "rationale": "Updates spec, skill description, and test output to reflect the new behavior: only one-file diffs skip grouping, and `groupingThreshold` no longer controls anything.",
+      "watch": "The spec claims every diff of two files or more goes to the model, and the reason message now says '1 changed file: nothing to order' instead of the threshold comparison; these claims must match the code's actual behavior.",
+      "files": [
+        "spec.md",
+        "skills/lightspeed-review/SKILL.md",
+        "src/skill.ts"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/commands/start.test.ts",
+        "test/config.test.ts",
+        "test/llm/grouping.test.ts"
+      ]
+    }
+  ]
+}

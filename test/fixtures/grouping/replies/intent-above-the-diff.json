@@ -1,0 +1,84 @@
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "recorded": "2026-08-05",
+  "groups": [
+    {
+      "name": "Intent view rendering logic",
+      "rationale": "Introduces the pure function that renders stated intents and commit subjects into HTML, the core of the feature.",
+      "watch": "The escaping of user input prevents XSS; the list structure preserves the distinct reasons the reviewer must hold separately; the commit subject limit prevents long histories from drowning the intent.",
+      "files": [
+        "src/browser/intent-view.ts"
+      ]
+    },
+    {
+      "name": "Diff extraction and commit subject capture",
+      "rationale": "Extracts commit subjects from the branch to provide corroboration for the stated intent.",
+      "watch": "The `base..branch` range captures only commits this branch adds, not shared ancestors; the git command must not fail the entire review.",
+      "files": [
+        "src/diff-extract.ts"
+      ]
+    },
+    {
+      "name": "Session data contract for intents and commits",
+      "rationale": "Defines the data shape that flows from server to browser, carrying both stated reasons and actual commit subjects.",
+      "watch": "The optional fields must default gracefully for rounds opened before this feature existed; both intents and commits must round-trip through JSON validation.",
+      "files": [
+        "src/browser/dom/session-api.ts",
+        "src/session-store.ts",
+        "src/rounds/session-round.ts"
+      ]
+    },
+    {
+      "name": "Server handling of intents and commits",
+      "rationale": "Accepts, validates, stores, and serves the stated intent and commit subjects through the API.",
+      "watch": "The `stringList` helper sanitizes untrusted input from the request body; the validation must reject malformed lists without crashing; commits flow from extraction through to storage.",
+      "files": [
+        "src/server.ts"
+      ]
+    },
+    {
+      "name": "Server-side template rendering",
+      "rationale": "Renders the intent band into the HTML shell on the server so the reason appears without waiting for JavaScript, preventing a flash of blank page.",
+      "watch": "The intent is escaped by `renderIntent` when the server renders it, so the same escaping function applies both on server and client; the section element is always present but empty when there is nothing to show.",
+      "files": [
+        "src/html-template.ts"
+      ]
+    },
+    {
+      "name": "Browser-side intent updates",
+      "rationale": "Re-renders the intent band when a new round arrives, so the reason stays current as the review progresses.",
+      "watch": "The intent is updated before the diff, so the reviewer always sees the current reason when they see the current diff; the markup flows through `innerHTML` which relies on prior escaping.",
+      "files": [
+        "src/browser/dom/main.ts"
+      ]
+    },
+    {
+      "name": "Command integration for intent capture",
+      "rationale": "Passes the intent and commits through the start command to the session creation request.",
+      "watch": "The commits come from extraction, so they must be present in the payload for the server to receive them.",
+      "files": [
+        "src/commands/start.ts"
+      ]
+    },
+    {
+      "name": "Layout and styling for the intent band",
+      "rationale": "Positions the intent as a full-width row above the diff, with scrolling and collapse behavior for long lists, and quieter styling for commits.",
+      "watch": "The grid row is explicit in the template, so empty intent bands occupy no space; the max-height of 30vh prevents a long intent from eating the review it introduces; the commits are details-collapsed by default so they do not distract from the stated reason.",
+      "files": [
+        "src/browser/chrome.css"
+      ]
+    },
+    {
+      "name": "Tests",
+      "rationale": "The checks this change ships, gathered to be read or skipped together.",
+      "files": [
+        "test/browser/intent-view.test.ts",
+        "test/diff-extract.test.ts",
+        "test/rounds/session-round.test.ts",
+        "test/server.test.ts",
+        "test/html-template.test.ts",
+        "test/commands/start.test.ts"
+      ]
+    }
+  ]
+}
