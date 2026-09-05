@@ -26,10 +26,10 @@ export function renderIntent(view: IntentView): string {
 /**
  * The block stands with the overview and goes away with the chapter: beside a
  * survey it is the point, beside one diff it is dead space. Takes anything
- * with a `hidden` flag so the rule tests without a page; the attribute is
- * enough — `.lsr-intent` sets no `display` for it to lose to.
+ * with an element's `hidden` flag so the rule tests without a page; the
+ * attribute is enough — `.lsr-intent` sets no `display` for it to lose to.
  */
-export function showIntentFor(block: { hidden: boolean }, focus: number | undefined): void {
+export function showIntentFor(block: Pick<HTMLElement, "hidden">, focus: number | undefined): void {
   block.hidden = focus !== undefined;
 }
 
