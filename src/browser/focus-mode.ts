@@ -27,9 +27,10 @@ export function clampFocus(focus: number | undefined, count: number): number | u
  * Where a reviewer goes once the chapter at `from` is finished: the next one in
  * reading order with something still unticked in it, wrapping round to the
  * start, so approving chapter after chapter never needs a press between them.
- * Never a sweep chapter — the survey approves those in one press, and landing
- * on one would ask for exactly the reading its tier says is not worth having.
- * Undefined when nothing is left: the finished card stays, mark and all.
+ * Sweep chapters are landed on like any other: the reviewer settles every
+ * chapter in order, and a sweep's card offers its tick without the diff, so
+ * one is a press and not a reading. Undefined when nothing is left: the
+ * finished card stays, mark and all.
  */
 export function nextChapterToRead(
   groups: DiffGroup[],
@@ -40,7 +41,7 @@ export function nextChapterToRead(
   for (let step = 1; step < groups.length; step++) {
     const index = (from + step) % groups.length;
     const entry = entries[index]!;
-    if (!isSweep(groups[index]!) && entry.approved < entry.files) return index;
+    if (entry.approved < entry.files) return index;
   }
   return undefined;
 }
@@ -88,7 +89,7 @@ export interface ChapterGate {
  */
 export function renderChapterGate({ group, contentId, counter }: ChapterGate): string {
   return `<div class="lsr-gate">
-    <h2 class="lsr-gate-name">${escapeHtml(group.name)}</h2>
+    <h2 class="lsr-gate-name">${escapeHtml(group.name)}</h2>${tierLine(group)}
     <p class="lsr-gate-rationale">${escapeHtml(group.rationale)}</p>${watchLine(group)}
     <ul class="lsr-gate-files">
       ${group.files.map(gateFile).join("\n      ")}
@@ -96,6 +97,17 @@ export function renderChapterGate({ group, contentId, counter }: ChapterGate): s
     <p class="lsr-gate-counter">${counter}</p>
     <button type="button" class="lsr-gate-press" aria-expanded="false" aria-controls="${contentId}">Read the diff</button>
   </div>`;
+}
+
+/**
+ * Why a sweep chapter's card offers its tick where a study chapter's does not:
+ * the survey's own words for its lane, said again on the one card that can be
+ * reached without passing through the lane. Nothing on a study chapter's card,
+ * because reading is the default and needs no label.
+ */
+function tierLine(group: DiffGroup): string {
+  if (!isSweep(group)) return "";
+  return `\n    <p class="lsr-gate-tier">Mechanical — nothing to decide</p>`;
 }
 
 /**

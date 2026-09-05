@@ -178,11 +178,15 @@ held is the diff's:
 - The chapter's tick is not offered on an unticked card: drawn there it is the
   cheaper of the two presses, and the gate exists to interrupt exactly that
   one. An approved chapter's card does show it, ticked — the mark is the
-  chapter's state, and the card is where that state has to be legible.
+  chapter's state, and the card is where that state has to be legible. A
+  sweep chapter's card (`data-tier="sweep"` on its section) offers the tick
+  from the start, under a `.lsr-gate-tier` label in the survey lane's words:
+  there is nothing in it to decide, so the interruption has nothing to protect.
 - A tick that finishes the focused chapter moves on: the next chapter in order
-  with something still unticked takes the screen, on its gate, wrapping round
-  and skipping sweep chapters (the survey approves those in one press). With
-  nothing left to read, the finished card stays, mark and all.
+  with something still unticked takes the screen, on its gate, wrapping round.
+  Sweep chapters are landed on like any other — one press on their card
+  settles them. With nothing left to read, the finished card stays, mark and
+  all.
 - Passing a gate is view state and nothing more: it is never sent to the server
   and never stored per file. It survives a redraw inside the round (an agent
   reply must not put the card back over a half-read diff) and a reload, which

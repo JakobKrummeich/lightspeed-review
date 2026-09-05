@@ -37,11 +37,29 @@
  * easier of the two. It comes back at the foot of the diff, under the lines it
  * stands for. Once the chapter is approved the same box is its mark, not an
  * offer: a finished chapter shuts back onto its card, and the card is where
- * its state has to show.
+ * its state has to show. A sweep chapter's card offers the tick from the
+ * start: there is nothing in it to decide, so the interruption has nothing to
+ * protect, and the press is the one the reviewer came to its card to make.
  */
-.lsr-group:has(.lsr-gate-press[aria-expanded="false"]):has(.lsr-tick-all:not(:checked))
+.lsr-group:not([data-tier="sweep"]):has(.lsr-gate-press[aria-expanded="false"]):has(
+    .lsr-tick-all:not(:checked)
+  )
   .lsr-group-foot {
   display: none;
+}
+
+/*
+ * The words the survey's lane wore, on the one card reachable without the
+ * lane: they say why this card offers a tick where the last one did not. Set
+ * as the lane's heading is, in the meta size and muted, because it is a label
+ * on the chapter and not one of the sentences the card exists to have read.
+ */
+.lsr-gate-tier {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
 }
 
 /*

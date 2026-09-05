@@ -1,5 +1,6 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
+import { isSweep } from "../group-tier.ts";
 import { reviewPaths } from "../review-files.ts";
 import type { Approval } from "../rounds/history.ts";
 import {
@@ -187,7 +188,12 @@ function renderGroup(group: DiffGroup, index: number, review: ReviewRender): str
   // chapter is still on screen once it has.
   const contentId = `lsr-group-content-${index}`;
   const densest = heaviestFiles(group);
-  return `<section class="lsr-group" data-group-index="${index}">
+  // The tier is the one thing the card's chrome turns on: a sweep chapter's
+  // card offers its tick, a study chapter's holds it back until the diff is
+  // up. Written as the progress bar writes it, once, because a tier is settled
+  // for the round.
+  const tier = isSweep(group) ? ` data-tier="sweep"` : "";
+  return `<section class="lsr-group" data-group-index="${index}"${tier}>
   ${renderChapterGate({ group, contentId, counter: counterLabel(group, approved) })}
   <div class="lsr-group-content" id="${contentId}" hidden>
     ${group.files

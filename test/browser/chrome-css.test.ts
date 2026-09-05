@@ -104,12 +104,15 @@ const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** Bodies of every rule naming exactly this selector; whitespace collapsed so formatter wraps don't matter. */
 function rulesFor(selector: string): string[] {
-  const wanted = selector.replace(/\s+/g, " ");
+  const wanted = tidy(selector);
   return [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
-    .filter(([, list]) =>
-      (list ?? "").split(",").some((one) => one.trim().replace(/\s+/g, " ") === wanted),
-    )
+    .filter(([, list]) => (list ?? "").split(",").some((one) => tidy(one) === wanted))
     .map(([, , body]) => body ?? "");
+}
+
+/** One selector the way a hand would write it: runs of space collapsed, none inside a paren. */
+function tidy(selector: string): string {
+  return selector.trim().replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
 }
 
 test("a token with nothing to break at wraps rather than scrolling the panel sideways", () => {
@@ -258,15 +261,32 @@ test("a chapter cannot be approved from the card that stands in front of its dif
   // The gate exists to interrupt the tick that costs nothing. Left on the card, the chapter's
   // own tick sits beside "Read the diff" and is the cheaper of the two presses. Only while
   // unticked, though: a finished chapter shuts back onto its card, and the card must show
-  // the mark it earned.
+  // the mark it earned. And never on a sweep chapter's card, which has nothing to protect:
+  // its tick is the press the reviewer came to it for.
   const unapproved =
-    '.lsr-group:has(.lsr-gate-press[aria-expanded="false"]):has(.lsr-tick-all:not(:checked)) .lsr-group-foot';
+    '.lsr-group:not([data-tier="sweep"]):has(.lsr-gate-press[aria-expanded="false"]):has(.lsr-tick-all:not(:checked)) .lsr-group-foot';
   assert.match(rulesFor(unapproved).join(""), /display: none;/);
   assert.equal(
     rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="false"]) .lsr-group-foot').length,
     0,
     "an approved chapter's card keeps its mark",
   );
+  assert.doesNotMatch(
+    bare,
+    /\.lsr-group:has\(\.lsr-gate-press\[aria-expanded="false"\]\):has\(\s*\.lsr-tick-all:not\(:checked\)\s*\)\s+\.lsr-group-foot/,
+    "a sweep chapter's card offers its tick",
+  );
+});
+
+test("the sweep card's label is set as the survey's lane heading is", () => {
+  // Same words, same size, same grey: the reviewer meets the lane's heading again on the one
+  // card reachable without the lane, and it reads as a label, not as one of the card's sentences.
+  const tier = rulesFor(".lsr-gate-tier").join("");
+  assert.match(tier, /font-size: var\(--lsr-size-meta\);/);
+  assert.match(tier, /color: var\(--lsr-muted\);/);
+  const lane = rulesFor(".lsr-sweep-heading").join("");
+  assert.match(lane, /font-size: var\(--lsr-size-meta\);/);
+  assert.match(lane, /color: var\(--lsr-muted\);/);
 });
 
 test("a shut card is one press, and says so with the cursor alone", () => {

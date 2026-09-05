@@ -138,6 +138,20 @@ test("a chapter without a watch sentence gets none: absence is honest", () => {
   assert.doesNotMatch(html, /undefined/);
 });
 
+test("a sweep chapter's card says why it offers its tick, in the survey's words", () => {
+  const html = gate({ ...group("Docs"), tier: "sweep" });
+
+  assert.match(html, /<p class="lsr-gate-tier">Mechanical — nothing to decide<\/p>/);
+  // A label on the chapter, under its name and before the sentences about it.
+  assert.ok(html.indexOf("lsr-gate-name") < html.indexOf("lsr-gate-tier"));
+  assert.ok(html.indexOf("lsr-gate-tier") < html.indexOf("lsr-gate-rationale"));
+});
+
+test("a study chapter's card wears no tier label: reading is the default", () => {
+  assert.doesNotMatch(gate(group("API")), /lsr-gate-tier/);
+  assert.doesNotMatch(gate({ ...group("API"), tier: "study" }), /lsr-gate-tier/);
+});
+
 test("every word the grouping wrote is escaped, never injected", () => {
   const html = gate({
     name: "<script>x</script>",
@@ -176,13 +190,14 @@ test("nothing left to read is nowhere to go, and never the chapter just finished
   assert.equal(nextChapterToRead(chapters("a"), approvedIn("a"), 0), undefined);
 });
 
-test("a sweep chapter is never where a finished chapter lands", () => {
-  // The review never asked anyone to read it: it is ticked from the survey in one press, and
-  // landing on its card would ask for exactly the reading the tier says is not worth having.
+test("a sweep chapter is landed on like any other: its card takes the tick without the diff", () => {
+  // The reviewer settles every chapter in order; a sweep's card offers its tick, so landing
+  // on it is one press and not the reading its tier said was not worth having.
   const groups = chapters("a", "b", "c");
   groups[1] = { ...groups[1]!, tier: "sweep" };
-  assert.equal(nextChapterToRead(groups, approvedIn("a"), 0), 2);
-  assert.equal(nextChapterToRead(groups, approvedIn("a", "c"), 2), undefined);
+  assert.equal(nextChapterToRead(groups, approvedIn("a"), 0), 1);
+  assert.equal(nextChapterToRead(groups, approvedIn("a", "c"), 2), 1);
+  assert.equal(nextChapterToRead(groups, approvedIn("a", "b", "c"), 1), undefined);
 });
 
 test("a chapter with no files has nothing to read and is passed over", () => {

@@ -441,19 +441,26 @@ test("unticking inside a finished chapter reopens it where it is, moving nowhere
   assert.deepEqual(page.focused, []);
 });
 
-test("a finished chapter never lands on a sweep chapter", (t) => {
+test("a finished chapter lands on a sweep chapter's card, whose tick moves on without the diff", (t) => {
   const groups = threeChapters();
   groups[1] = { ...groups[1]!, tier: "sweep" };
-  const page = mount(t, groups, ["c.png"], { focus: 0 });
+  const page = mount(t, groups, [], { focus: 0 });
   page.open(0);
 
   page.tick(page.fileTick("a.png"), true);
 
-  // Docs is bulk the survey approves in one press; Tests is done. Nothing is left to read, so
-  // the finished card stays rather than asking for a reading the tier said was not worth having.
-  assert.deepEqual(shownChapters(page), ["0"]);
-  assert.equal(isOpen(page.gatePress(0)), false, "shut onto its card, mark and all");
-  assert.deepEqual(page.focused, []);
+  // Docs is bulk, but it is still the next chapter unsettled: its card is where the reviewer
+  // lands, and the card carries the tier the chrome reads to offer the tick on it.
+  assert.deepEqual(shownChapters(page), ["1"]);
+  assert.equal(isOpen(page.gatePress(1)), false, "on its card");
+  const card = page.root.querySelector('.lsr-group[data-group-index="1"]');
+  assert.equal(card?.getAttribute("data-tier"), "sweep");
+
+  page.tick(page.groupTick(1), true);
+
+  assert.deepEqual(shownChapters(page), ["2"], "ticked from the card, and on to Tests");
+  assert.deepEqual(page.focused, [1, 2]);
+  assert.deepEqual(page.posted.at(-1), ["a.png", "b.png"]);
 });
 
 test("pressing anywhere on the card passes the gate, not only the button", (t) => {

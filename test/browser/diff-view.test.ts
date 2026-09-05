@@ -631,6 +631,17 @@ test("a focused review is one chapter and its bar: no index, no other groups", (
   assert.doesNotMatch(html, /new c\.ts/);
 });
 
+test("a chapter's section carries its tier only when there is one to act on", () => {
+  // The card's chrome reads it: a sweep chapter's card offers its tick, a study chapter's
+  // holds it back until the diff is up. Absent on study, as it is on the progress bar.
+  const sweep = render({ groups: [{ ...group("Docs", ["c.md"]), tier: "sweep" }], focus: 0 });
+  assert.match(sweep, /<section class="lsr-group" data-group-index="0" data-tier="sweep">/);
+
+  const study = render({ groups: [{ ...group("API", ["b.ts"]), tier: "study" }], focus: 0 });
+  assert.match(study, /<section class="lsr-group" data-group-index="0">/);
+  assert.doesNotMatch(study, /data-tier/);
+});
+
 test("a focused chapter opens behind its gate, whichever way it was entered", () => {
   // Every draw renders the chapter shut: entering, re-entering and stepping sideways all come
   // through here, and each of them is a chapter being entered, so each of them is gated.
