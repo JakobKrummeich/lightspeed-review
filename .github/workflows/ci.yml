@@ -16,7 +16,7 @@ jobs:
 
       # `engines` says >= 22.18; 22 is the version the suite is developed on and
       # the one `node --test` runs TypeScript directly under.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
