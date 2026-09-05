@@ -5,7 +5,6 @@
     {
       "name": "Intent view rendering",
       "rationale": "Introduces the new component that renders what the change is for at the top of the page.",
-      "watch": "The markup is pure HTML generation without a DOM; it must escape user input perfectly to prevent XSS through intents and commit subjects.",
       "files": [
         "src/browser/intent-view.ts"
       ]
@@ -13,7 +12,6 @@
     {
       "name": "Commit subject extraction",
       "rationale": "Extracts commit subjects from the branch to corroborate the stated intent.",
-      "watch": "The git log format string and commit filtering must correctly capture only commits on the branch, not shared ancestors.",
       "files": [
         "src/diff-extract.ts"
       ]
@@ -21,7 +19,6 @@
     {
       "name": "Session data contract",
       "rationale": "Extends the session data structure to carry intents and commits through the API and storage layers.",
-      "watch": "The optional `commits` field in `SessionRound` must be handled gracefully for older rounds without it; untrusted input in the server must be validated.",
       "files": [
         "src/browser/dom/session-api.ts",
         "src/rounds/session-round.ts",
@@ -31,7 +28,6 @@
     {
       "name": "Server API and data serving",
       "rationale": "Threads intents and commits through the server: parsing incoming requests, storing rounds, and serving the data endpoint.",
-      "watch": "The `stringList` utility must handle any untrusted value gracefully; the data endpoint must include both fields in its response.",
       "files": [
         "src/server.ts"
       ]
@@ -39,7 +35,6 @@
     {
       "name": "CLI and diff extraction integration",
       "rationale": "Passes extracted commit subjects from the diff command through to the session creation.",
-      "watch": "The commits field must propagate correctly from extraction through the command to the request payload.",
       "files": [
         "src/commands/start.ts"
       ]
@@ -47,7 +42,6 @@
     {
       "name": "HTML template and server-side rendering",
       "rationale": "Renders the intent view in the initial HTML so the stated reason is never blank on page load.",
-      "watch": "The intent band must be placed before the diff in the grid layout and properly escaped; it must handle sessions with no rounds.",
       "files": [
         "src/html-template.ts"
       ]
@@ -55,7 +49,6 @@
     {
       "name": "Browser DOM and client-side rendering",
       "rationale": "Mounts the intent view in the browser and updates it when a new round arrives.",
-      "watch": "The intent must be re-rendered when a session event arrives, so the viewer always sees the reason for the current round.",
       "files": [
         "src/browser/dom/main.ts"
       ]
@@ -63,7 +56,6 @@
     {
       "name": "Layout and styling",
       "rationale": "Adds a new grid row for the intent band and styles it to stay visible while long diffs scroll.",
-      "watch": "The max-height cap and overflow handling must prevent a long intent list from drowning out the review; the empty state must hide the band entirely.",
       "files": [
         "src/browser/chrome.css"
       ]

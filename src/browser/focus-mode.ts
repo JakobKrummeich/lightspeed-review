@@ -79,9 +79,9 @@ export interface ChapterGate {
 }
 
 /**
- * The card a chapter opens behind: its name, the two sentences the grouping
+ * The card a chapter opens behind: its name, the one sentence the grouping
  * wrote about it, what is in it, and the one press that shows the diff. It
- * stands alone because the same sentences used to head the first file's diff,
+ * stands alone because the same sentence used to head the first file's diff,
  * where the eye went to the code and the intent was never read — a screen with
  * nothing else on it is the only place a reason gets read before the lines it
  * is about. Nothing here is muted for the same reason: on this screen quiet
@@ -90,7 +90,7 @@ export interface ChapterGate {
 export function renderChapterGate({ group, contentId, counter }: ChapterGate): string {
   return `<div class="lsr-gate">
     <h2 class="lsr-gate-name">${escapeHtml(group.name)}</h2>${tierLine(group)}
-    <p class="lsr-gate-rationale">${escapeHtml(group.rationale)}</p>${watchLine(group)}
+    <p class="lsr-gate-rationale">${escapeHtml(group.rationale)}</p>
     <ul class="lsr-gate-files">
       ${group.files.map(gateFile).join("\n      ")}
     </ul>
@@ -111,19 +111,10 @@ function tierLine(group: DiffGroup): string {
 }
 
 /**
- * What to watch for, on the groupings that carry one. Absent renders as
- * nothing: an invented caution would wear the model's voice.
- */
-function watchLine(group: DiffGroup): string {
-  if (group.watch === undefined) return "";
-  return `\n    <p class="lsr-gate-watch">${escapeHtml(group.watch)}</p>`;
-}
-
-/**
  * One file of the chapter with the size of its change. The list is what makes
- * the two sentences checkable: these paths and these many lines are the whole
- * of what the press opens, so a rationale that describes something else is
- * caught before the diff is read rather than after.
+ * the rationale checkable: these paths and these many lines are the whole of
+ * what the press opens, so a rationale that describes something else is caught
+ * before the diff is read rather than after.
  */
 function gateFile(file: DiffFile): string {
   return `<li class="lsr-gate-file"><span class="lsr-gate-path">${escapeHtml(file.path)}</span><span class="lsr-gate-lines">+${file.insertions} −${file.deletions}</span></li>`;

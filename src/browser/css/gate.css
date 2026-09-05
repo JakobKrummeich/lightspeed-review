@@ -82,13 +82,11 @@
 }
 
 /*
- * What happened and what to watch for, set to be read: the lead step, a
- * half-step above the reading size, because on this screen they are the
- * content — and with a paragraph's leading rather than the tight one a lone
- * heading line takes.
+ * What happened, set to be read: the lead step, a half-step above the reading
+ * size, because on this screen it is the content — and with a paragraph's
+ * leading rather than the tight one a lone heading line takes.
  */
-.lsr-gate-rationale,
-.lsr-gate-watch {
+.lsr-gate-rationale {
   margin: 0;
   font-size: var(--lsr-size-lead);
   line-height: var(--lsr-leading);

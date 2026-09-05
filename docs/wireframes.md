@@ -103,9 +103,8 @@ Classes per entry: `.lsr-index-name` `.lsr-index-files` `.lsr-index-lines`
 `.lsr-index-counter` `.lsr-index-logic` (badge, densest chapter only, and never
 a chapter in the sweep lane). The whole
 row is one button → enters focus mode. **A row says how big a chapter is, never
-what it is for**: the rationale and the watch sentence are said once, at full
-size, on the chapter's own gate (§4) — a clamped grey copy of them here was a
-line nobody read.
+what it is for**: the rationale is said once, at full size, on the chapter's own
+gate (§4) — a clamped grey copy of it here was a line nobody read.
 
 **The sweep lane** (`section.lsr-sweep`, painted by `css/sweep.css`) holds every
 chapter whose tier is `sweep` — bulk with nothing to decide — under one heading
@@ -132,7 +131,6 @@ diff rendered but shut behind one press.
 │ │ ┌─ .lsr-gate ─────────────────────────────────────────────┐ │   │
 │ │ │ Chapter name                                            │ │   │ .lsr-gate-name (title)
 │ │ │ What happened, one sentence.                            │ │   │ .lsr-gate-rationale (lead)
-│ │ │ What to watch for, one sentence.                        │ │   │ .lsr-gate-watch (lead)
 │ │ │ src/path/file.ts   +12 −3                               │ │   │ .lsr-gate-files / -file
 │ │ │ src/other.ts       +4 −0                                │ │   │ .lsr-gate-path / -lines
 │ │ │ 1/3 approved                                            │ │   │ .lsr-gate-counter

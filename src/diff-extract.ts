@@ -40,13 +40,8 @@ export interface DiffFile {
 /** Group order is the ARRAY position — the LLM returns an ordered array, no `order` field. */
 export interface DiffGroup {
   name: string;
-  /** One sentence of what happened in this group; the subtitle's first half. */
+  /** One sentence of what happened in this group: the primer under its name. */
   rationale: string;
-  /**
-   * What to watch for; the subtitle's second half. Absent on pre-`watch` groupings
-   * and on groupings no model wrote; absence renders as nothing, never a placeholder.
-   */
-  watch?: string;
   /**
    * How this chapter is meant to be read (`src/group-tier.ts`). Optional because
    * sessions written before tiers existed have none, and every reader takes an

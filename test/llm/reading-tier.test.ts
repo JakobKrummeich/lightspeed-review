@@ -9,7 +9,7 @@ function file(path: string, diff = "@@ -1 +1 @@\n-old\n+new"): DiffFile {
 }
 
 function group(tier: GroupTier, files: DiffFile[]): DiffGroup {
-  return { name: "Chapter", rationale: "why", watch: "what", tier, files };
+  return { name: "Chapter", rationale: "why", tier, files };
 }
 
 function tiersOf(groups: DiffGroup[]): (GroupTier | undefined)[] {
@@ -81,10 +81,10 @@ test("every chapter comes back tiered, and nothing else about it is touched", ()
     ["sweep", "study"],
   );
   assert.deepEqual(
-    raised.map((one) => ({ name: one.name, rationale: one.rationale, watch: one.watch })),
+    raised.map((one) => ({ name: one.name, rationale: one.rationale })),
     [
-      { name: "Chapter", rationale: "why", watch: "what" },
-      { name: "Chapter", rationale: "why", watch: "what" },
+      { name: "Chapter", rationale: "why" },
+      { name: "Chapter", rationale: "why" },
     ],
   );
   assert.deepEqual(raised[0]?.files, groups[0]?.files);

@@ -119,9 +119,9 @@ async function groupWithModel(input: GroupDiffInput): Promise<GroupingResult> {
 }
 
 /**
- * What is wrong with the two sentences of a chapter, while there is still a
- * round to spend fixing it. The last round takes them as they come: a grouping
- * whose `watch` orders the reviewer about is worth incomparably more than the
+ * What is wrong with a chapter's rationale, while there is still a round to
+ * spend fixing it. The last round takes it as it comes: a grouping whose
+ * `rationale` orders the reviewer about is worth incomparably more than the
  * fallback's one undivided chapter, and after that round there is nowhere left
  * to send the complaint.
  */
@@ -147,7 +147,6 @@ function toDiffGroups(groups: GroupingReply["groups"], files: DiffFile[]): DiffG
   return groups.map((group) => ({
     name: group.name,
     rationale: group.rationale,
-    watch: group.watch,
     tier: group.tier,
     files: group.files.map((path) => byPath.get(path)).filter((file) => file !== undefined),
   }));

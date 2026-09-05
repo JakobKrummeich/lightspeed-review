@@ -123,22 +123,10 @@ test("`rationale` is pinned to the third person, not to an instruction", () => {
   assert.match(RULES, /never an instruction to the reviewer/i);
 });
 
-/** `watch` follows the rationale's rules plus one: it must name this group's risk — a caution fitting every group is the review restated. */
-test("`watch` is asked for as the group's own risk, stated rather than ordered", () => {
-  assert.match(RULES, /`watch` as one short sentence/i);
-  assert.match(RULES, /same rules as `rationale`/i);
-  assert.match(RULES, /Check the expiry logic carefully/);
-  assert.match(RULES, /would fit any group fits none/i);
-});
-
-/** Measured on first baselines: imperatives came back mid-sentence ("…; verify all six…") and doc groups as reassurance — the prompt names both escapes. */
-test("`watch` bans the buried imperative and the reassuring grade, docs included", () => {
+/** Measured on first baselines: imperatives came back mid-sentence ("…; verify all six…") — the prompt names the escape, since `voiceProblem` rejects it. */
+test("`rationale` bans the buried imperative, not only the one that opens the sentence", () => {
   assert.match(RULES, /an order is still an order mid-sentence/i);
   assert.match(RULES, /`verify`, `ensure`, `confirm` or any other verb aimed at the reader/);
-  assert.match(RULES, /state the danger it points at/i);
-  assert.match(RULES, /Nor is it reassurance/i);
-  assert.match(RULES, /the comment explains the purpose clearly/i);
-  assert.match(RULES, /claim most likely to be false against the code/i);
 });
 
 /** B2: the prompt states the applicable test — each group readable from the groups above — not just "causal". */

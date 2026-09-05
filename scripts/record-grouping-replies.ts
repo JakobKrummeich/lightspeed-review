@@ -38,7 +38,6 @@ async function record(fixture: GroupingFixture, model: string, sample: number): 
     groups: result.groups.map((group) => ({
       name: group.name,
       rationale: group.rationale,
-      ...(group.watch === undefined ? {} : { watch: group.watch }),
       ...(group.tier === undefined ? {} : { tier: group.tier }),
       files: group.files.map((file) => file.path),
     })),

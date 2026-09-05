@@ -5,7 +5,6 @@
     {
       "name": "Panel collapse mechanism",
       "rationale": "Introduces the core feature: a collapsible panel controlled by a rail that stays visible when shut, with state tracking and UI labels.",
-      "watch": "The rail badge and label logic must correctly distinguish between queued feedback (shown when shut) and the panel state (shown when open); agentSpokeAgain must not fire on the reviewer's own messages or re-groups.",
       "files": [
         "src/browser/panel-collapse.ts"
       ]
@@ -13,7 +12,6 @@
     {
       "name": "Breakpoint calculation for panel state",
       "rationale": "Updates the viewport query logic to account for the panel's absence when collapsed, allowing side-by-side to reflow earlier at lower widths.",
-      "watch": "The collapsed breakpoint must be exactly COLUMNS_MIN_PX minus PANEL_WIDTH_PX, or the view toggle will hide side-by-side at widths where it fits when the panel is shut.",
       "files": [
         "src/browser/view-format.ts"
       ]
@@ -21,7 +19,6 @@
     {
       "name": "Layout grid and rail styling",
       "rationale": "Restructures the body grid to make room for the rail column, styles the rail and its badge, and adjusts header text wrapping to prevent overflow when the panel collapses.",
-      "watch": "The grid-template-columns must define three columns (content, auto rail, panel); the chevron rotation must point at what the click does; the panel width constant must match the one in view-format.ts.",
       "files": [
         "src/browser/chrome.css"
       ]
@@ -29,7 +26,6 @@
     {
       "name": "Panel rail DOM and wiring",
       "rationale": "Creates the rail UI component that toggles collapse state, reads and updates the queued count badge, and expands the panel when the agent speaks.",
-      "watch": "The rail must set data-panel on the page body, not itself; onToggle must fire only when collapsed state changes, not on queued count updates; expand must not fire onToggle when the panel is already open.",
       "files": [
         "src/browser/dom/panel-rail.ts"
       ]
@@ -37,7 +33,6 @@
     {
       "name": "Panel mount refactoring for callbacks",
       "rationale": "Restructures mountPanel to accept an options object and adds an onPending callback so the rail can show the queued count.",
-      "watch": "onPending must be called on every pending queue change, including the initial draw; the callback should never be called twice with the same count.",
       "files": [
         "src/browser/dom/panel-mount.ts"
       ]
@@ -45,7 +40,6 @@
     {
       "name": "View toggle refresh for dynamic room queries",
       "rationale": "Changes view toggle from a single static viewport query to a function that re-evaluates based on current panel state, and exposes a refresh method for the panel collapse to call.",
-      "watch": "refresh must call effectiveFormat with the current hasRoom() result; the refresh method must not be called during initialization or it will cause redundant renders.",
       "files": [
         "src/browser/dom/view-toggle.ts"
       ]
@@ -53,7 +47,6 @@
     {
       "name": "Main wiring and state management",
       "rationale": "Orchestrates all components: extracts page elements, wires the rail with toggle callbacks, connects agent speak detection to panel expansion, and manages per-state room queries.",
-      "watch": "The panel state must be toggled before calling view.refresh() so hasRoom() reads the correct state; agentSpokeAgain must be checked after fresh conversation arrives but before view refresh; the rail expand must not persist state across sessions.",
       "files": [
         "src/browser/dom/main.ts"
       ]
@@ -61,7 +54,6 @@
     {
       "name": "HTML template initial state",
       "rationale": "Adds the rail button to the template and initializes the page with data-panel='open' to set the starting state.",
-      "watch": "The rail button must have aria-controls, aria-expanded and aria-label attributes for accessibility; the data-panel attribute on body is what the stylesheet matches for layout.",
       "files": [
         "src/html-template.ts"
       ]
@@ -69,7 +61,6 @@
     {
       "name": "Documentation update",
       "rationale": "Marks the panel collapse task as complete and documents the implementation details: rail positioning, badge behavior, breakpoint changes, and header text wrapping.",
-      "watch": "The measured column counts (98 to 134 at 1440px, 147 to 184 at 1920px) should reflect the actual impact of removing 352px; the persistence note is clear that state does not carry between sessions.",
       "files": [
         "tasks/todo.md"
       ]

@@ -5,7 +5,6 @@
     {
       "name": "File focus types and computation",
       "rationale": "Introduces the three-state focus model and functions that derive how much attention each file needs from round history.",
-      "watch": "fileFocus returns 'new' for single-appearance files, but the condition fileHistory(rounds, path).length <= 1 counts a file not in any round as single-appearance too; roundFocus depends on the current round existing.",
       "files": [
         "src/rounds/history.ts"
       ]
@@ -13,7 +12,6 @@
     {
       "name": "Session rounds contract",
       "rationale": "Makes rounds mandatory on SessionRecord instead of optional, and enforces this constraint by rejecting old session files that lack rounds.",
-      "watch": "Sessions written before rounds existed now fail to load, breaking backward compatibility; the parseSession error message suggests the file path incorrectly.",
       "files": [
         "src/session-store.ts"
       ]
@@ -21,7 +19,6 @@
     {
       "name": "Browser focus API",
       "rationale": "Adds focus to SessionData so the browser can see which files need attention, populated server-side on each read.",
-      "watch": "Focus is derived fresh on every data read and never stored, so it could diverge from what was calculated during an end or re-group if the rounds changed between reads.",
       "files": [
         "src/browser/dom/session-api.ts"
       ]
@@ -29,7 +26,6 @@
     {
       "name": "Server focus derivation",
       "rationale": "Computes and sends file focus for each session read, derived from its round history.",
-      "watch": "The comment claims focus is never stored and rounds are the truth, but if a session is modified between data reads, the focus sent could reflect a stale state of the rounds.",
       "files": [
         "src/server.ts"
       ]
@@ -37,7 +33,6 @@
     {
       "name": "Rounds field cleanup",
       "rationale": "Removes optional chaining on rounds since it is now mandatory, simplifying null checks throughout.",
-      "watch": "All three removals of ?? [] assume rounds is always present; if any code path creates a SessionRecord without rounds, it will fail at runtime.",
       "files": [
         "src/rounds/session-round.ts",
         "src/ledger/outcomes.ts"

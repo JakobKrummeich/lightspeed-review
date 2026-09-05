@@ -5,7 +5,6 @@
     {
       "name": "Annotation popup: selection to queued prompts",
       "rationale": "Captures text selections within diff blocks, renders a popup with preview and comment box, and converts the selection and comment into queued annotation prompts.",
-      "watch": "The popup must capture full diff lines even when the selection clips them, so the `+`/`-` prefix survives and the agent has an unambiguous anchor; selections outside the diff root are silently ignored.",
       "files": [
         "src/browser/annotation.ts",
         "src/browser/dom/annotation-popup.ts"
@@ -14,7 +13,6 @@
     {
       "name": "Conversation panel: queued and delivered prompts",
       "rationale": "Renders queued annotations as removable pills and delivered conversation as entries with author roles, with a general comment box and send buttons that differ based on session status.",
-      "watch": "The browser's own unsent queue and the session's server-side pending queue are different things; only the browser queue shows as removable pills, and HTML escaping must prevent reviewer text from injecting markup.",
       "files": [
         "src/browser/conversation-panel.ts"
       ]
@@ -22,7 +20,6 @@
     {
       "name": "Panel and diff mounting with event-driven updates",
       "rationale": "Refactors the entry point to mount the diff view, conversation panel, and annotation popup as separate subsystems, and wires them to update together when the server sends a re-group event.",
-      "watch": "The diff and panel share a single `SessionData` object that the main function fetches; a re-group event must update both subsystems consistently to avoid showing stale reviewed flags or conversation history.",
       "files": [
         "src/browser/dom/main.ts",
         "src/browser/dom/diff-mount.ts",
@@ -33,7 +30,6 @@
     {
       "name": "Styling for popup, panel, and form controls",
       "rationale": "Adds CSS for the annotation popup, conversation panel pills, and shared form element styles, following the lavish editor design.",
-      "watch": "The popup z-index and positioning must keep it above the scrolling diff; form elements inherit font and color consistently.",
       "files": [
         "src/browser/chrome.css"
       ]
@@ -41,7 +37,6 @@
     {
       "name": "Build and config adjustments",
       "rationale": "Moves the browser entry point into a `dom/` subdirectory, updates the build script and TypeScript exclusions to match, and marks completed tasks.",
-      "watch": "The build entry point and tsconfig exclusion must stay in sync so DOM-touching code uses the correct type library.",
       "files": [
         "scripts/build.ts",
         "tsconfig.json",

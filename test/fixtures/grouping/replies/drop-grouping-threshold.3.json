@@ -5,7 +5,6 @@
     {
       "name": "Grouping threshold removal",
       "rationale": "Removes the configurable threshold that skipped small diffs from grouping, making the model group every diff of two or more files.",
-      "watch": "The reason message must handle both singular and plural file counts correctly; the threshold logic changed from `<= config.groupingThreshold` to `<= 1`.",
       "files": [
         "src/llm/grouping.ts",
         "src/config.ts"
@@ -14,7 +13,6 @@
     {
       "name": "Documentation updates",
       "rationale": "Updates spec and skill descriptions to reflect that only one-file diffs skip grouping, and replaces `groupingThreshold` with `feedbackLog` as the example optional config key.",
-      "watch": "The spec claims `groupingThreshold` is still accepted and ignored, which the code change must support; the reason message for skipped grouping must say what changed.",
       "files": [
         "spec.md",
         "skills/lightspeed-review/SKILL.md",

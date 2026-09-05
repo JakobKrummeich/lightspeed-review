@@ -19,8 +19,8 @@ function file(path: string, insertions = 3, deletions = 1): DiffFile {
   };
 }
 
-function group(name: string, files: DiffFile[], watch?: string): DiffGroup {
-  return { name, rationale: `why ${name}`, ...(watch === undefined ? {} : { watch }), files };
+function group(name: string, files: DiffFile[]): DiffGroup {
+  return { name, rationale: `why ${name}`, files };
 }
 
 const groups = [
@@ -93,29 +93,19 @@ test("the index singles no group out: every entry reads the same", () => {
 });
 
 /**
- * The rule the sentences moved out under: either the reviewer should read what
+ * The rule the rationale moved out under: either the reviewer should read what
  * a chapter is for, and then it must be set as though they should — which is
  * the chapter's own gate, one screen holding nothing else — or they should not,
  * and then a clamped grey line of it here is a line nobody reads twice.
  */
 test("an entry says how big a chapter is, never what it is for", () => {
-  const html = renderGroupIndex(
-    [group("Auth", [file("src/auth.ts")], "The expiry check moved before the skew fix.")],
-    [],
-  );
+  const html = renderGroupIndex([group("Auth", [file("src/auth.ts")])], []);
 
   assert.doesNotMatch(html, /lsr-index-subtitle/);
   assert.doesNotMatch(html, /why Auth/, "the rationale is the gate's to say");
-  assert.doesNotMatch(html, /expiry check/, "and so is the watch sentence");
-  // Nothing carries them in a tooltip either: the row is counts and a name.
+  // Nothing carries it in a tooltip either: the row is counts and a name.
   assert.doesNotMatch(html, /title=/);
-});
-
-test("a group recorded before watch existed loses nothing by it: neither is on the row", () => {
-  const html = renderGroupIndex([group("Auth", [file("src/auth.ts")])], []);
-
   assert.match(html, /<span class="lsr-index-name">Auth<\/span>/);
-  assert.doesNotMatch(html, /undefined/);
 });
 
 test("a group name is escaped, never injected", () => {

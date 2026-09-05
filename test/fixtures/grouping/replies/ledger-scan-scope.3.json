@@ -5,7 +5,6 @@
     {
       "name": "Ledger query filtering to stop rescanning every monthly ledger",
       "rationale": "Adds `kind`, `repo`, and `rounds` filters to LedgerQuery so `sessionAnnotations()` can ask the store for only matching records, skipping entire month files and unparseable lines via substring gates before parsing.",
-      "watch": "The substring gate in `lineMayMatch` must not reject lines that actually match—false positives are acceptable and get caught by `recordMatches`, but false negatives would silently drop results. The month file filter must not skip a month containing late records within the `since` window.",
       "files": [
         "src/ledger/store.ts",
         "src/server.ts"
@@ -14,7 +13,6 @@
     {
       "name": "Documentation of the fix in backlog",
       "rationale": "Marks the item done, notes the performance improvement from 185ms to 22ms on a 50k-record ledger, and clarifies that `corrupt` now counts only lines the query examined while `stats()` remains the full count.",
-      "watch": "The claim that `prune` needs no index and that filtered reads still have one source of truth should hold true against the implementation in the ledger module.",
       "files": [
         "tasks/todo.md"
       ]
@@ -22,7 +20,6 @@
     {
       "name": "Documentation artifacts for related design decisions",
       "rationale": "Six new HTML documents explaining the focus model, file approval state, draft preservation on SSE updates, two-round proof-of-concept screenshots, and UI badge choices—all supporting context for the broader change to multi-round reviews.",
-      "watch": "These are documentation and design notes, not executable code. Verify that the decisions they describe are actually reflected in the implementation—for instance, that `approval` terminology is used consistently if the focus-model document recommends it over `focus`.",
       "files": [
         ".lavish/badges-rethink.html",
         ".lavish/draft-preservation-plan.html",

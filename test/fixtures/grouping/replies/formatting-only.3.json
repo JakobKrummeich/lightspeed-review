@@ -5,7 +5,6 @@
     {
       "name": "Prettier configuration for review artifacts",
       "rationale": "Adds the `.lavish/` directory to prettier ignore rules so that recorded review artifacts are not reformatted as source code.",
-      "watch": "The comment must accurately describe what `.lavish/` contains and why it should never be formatted by prettier; if the directory purpose changes, this exclusion could become incorrect.",
       "files": [
         ".prettierignore"
       ]

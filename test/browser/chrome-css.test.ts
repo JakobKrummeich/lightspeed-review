@@ -236,19 +236,18 @@ test("a header segment is a press that still looks like a bar", () => {
   // A chapter's gate keeps the survey's sizes, so entering it never shrinks its name.
   assert.match(rulesFor(".lsr-gate-name").join(""), /font-size: var\(--lsr-size-title\);/);
   assert.match(rulesFor(".lsr-gate-rationale").join(""), /font-size: var\(--lsr-size-lead\);/);
-  assert.match(rulesFor(".lsr-gate-watch").join(""), /font-size: var\(--lsr-size-lead\);/);
 });
 
-test("the chapter's reasons are set to be read, not to be skipped past", () => {
-  // The gate is the whole screen: its sentences are what the reviewer is there
-  // to read, so they may not wear the grey the page files metadata under.
-  const sentences = [...rulesFor(".lsr-gate-rationale"), ...rulesFor(".lsr-gate-watch")].join("");
+test("the chapter's rationale is set to be read, not to be skipped past", () => {
+  // The gate is the whole screen: its sentence is what the reviewer is there
+  // to read, so it may not wear the grey the page files metadata under.
+  const sentence = rulesFor(".lsr-gate-rationale").join("");
 
-  assert.doesNotMatch(sentences, /var\(--lsr-muted\)/);
+  assert.doesNotMatch(sentence, /var\(--lsr-muted\)/);
   assert.doesNotMatch(
     bare,
-    /\.lsr-gate-(rationale|watch|name)[^{]*\{[^}]*color: var\(--lsr-muted\)/,
-    "nothing else may mute them either",
+    /\.lsr-gate-(rationale|name)[^{]*\{[^}]*color: var\(--lsr-muted\)/,
+    "nothing else may mute it either",
   );
   // And the card goes away the moment the diff is up: the room is the diff's.
   assert.match(

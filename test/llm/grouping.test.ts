@@ -63,14 +63,12 @@ function replyGrouping(files: DiffFile[]): string {
       {
         name: "Core",
         rationale: "main change",
-        watch: "the risky part",
         tier: "study",
         files: files.slice(0, half).map((f) => f.path),
       },
       {
         name: "Rest",
         rationale: "the others",
-        watch: "the quiet part",
         tier: "study",
         files: files.slice(half).map((f) => f.path),
       },
@@ -142,21 +140,38 @@ test("a valid reply becomes ordered groups holding the real diff files", async (
   assert.equal(result.groups[0]?.files[0]?.diff, eightFiles[0]?.diff);
 });
 
-test("the model's watch sentence rides its group all the way out", async () => {
+test("the model's rationale rides its group all the way out", async () => {
   const { models } = modelsReplying([replyGrouping(eightFiles)]);
 
   const result = await groupDiff({ files: eightFiles, config: config(), intents: [], models });
 
-  assert.equal(result.groups[0]?.watch, "the risky part");
-  assert.equal(result.groups[1]?.watch, "the quiet part");
+  assert.equal(result.groups[0]?.rationale, "main change");
+  assert.equal(result.groups[1]?.rationale, "the others");
+});
+
+test("a model still writing the retired `watch` sentence is neither sent back nor believed", async () => {
+  // The field is gone from the contract; a model answering off a cached prefix
+  // or a copied example may still write it. Not worth a repair round, and not
+  // carried into the review either: nothing there would show it.
+  const stale = replyGrouping(eightFiles).replace(
+    '"rationale":"main change"',
+    '"rationale":"main change","watch":"the risky part"',
+  );
+  const { models, prompts } = modelsReplying([stale]);
+
+  const result = await groupDiff({ files: eightFiles, config: config(), intents: [], models });
+
+  assert.equal(result.mode, "llm");
+  assert.equal(prompts.length, 1);
+  assert.ok(!("watch" in result.groups[0]!));
 });
 
 /** One chapter of bulk and one of code, tiered as the model saw them. */
 function replyTiered(sweep: string[], study: string[]): string {
   return JSON.stringify({
     groups: [
-      { name: "Core", rationale: "the change", watch: "the risk", tier: "study", files: study },
-      { name: "Bulk", rationale: "the rest", watch: "the claim", tier: "sweep", files: sweep },
+      { name: "Core", rationale: "the change", tier: "study", files: study },
+      { name: "Bulk", rationale: "the rest", tier: "sweep", files: sweep },
     ],
   });
 }
@@ -238,9 +253,7 @@ test("malformed JSON is repaired inside the same conversation", async () => {
 
 test("a missing file is reported back to the model and repaired", async () => {
   const incomplete = JSON.stringify({
-    groups: [
-      { name: "Core", rationale: "r", watch: "w", tier: "study", files: [eightFiles[0]!.path] },
-    ],
+    groups: [{ name: "Core", rationale: "r", tier: "study", files: [eightFiles[0]!.path] }],
   });
   const { models, prompts } = modelsReplying([incomplete, replyGrouping(eightFiles)]);
 
@@ -256,11 +269,11 @@ test("a missing file is reported back to the model and repaired", async () => {
   assert.match(prompts[1] ?? "", /src\/file-7\.ts/);
 });
 
-/** The same two groups, with one sentence written at the reviewer instead of about the code. */
+/** The same two groups, with one rationale written at the reviewer instead of about the code. */
 function replyOrdering(files: DiffFile[]): string {
   return replyGrouping(files).replace(
-    '"watch":"the risky part"',
-    '"watch":"Verify the reference is passed."',
+    '"rationale":"main change"',
+    '"rationale":"Verify the reference is passed."',
   );
 }
 
@@ -278,12 +291,12 @@ test("a sentence that orders the reviewer about is sent back to be rewritten", a
   assert.equal(prompts.length, 2);
   assert.match(prompts[1] ?? "", /order to the reader/);
   assert.match(prompts[1] ?? "", /Verify the reference is passed\./);
-  assert.equal(result.groups[0]?.watch, "the risky part");
+  assert.equal(result.groups[0]?.rationale, "main change");
 });
 
 test("a model that will not rewrite the sentence keeps its grouping anyway", async () => {
   // Wording is worth another call and never worth the review: one undivided
-  // chapter is a far worse read than a chapter whose caution is phrased badly.
+  // chapter is a far worse read than a chapter whose rationale is phrased badly.
   const ordering = replyOrdering(eightFiles);
   const { models, prompts } = modelsReplying([ordering, ordering, ordering]);
 
@@ -292,7 +305,7 @@ test("a model that will not rewrite the sentence keeps its grouping anyway", asy
   assert.equal(result.mode, "llm");
   assert.equal(prompts.length, 3);
   assert.equal(result.groups.length, 2);
-  assert.equal(result.groups[0]?.watch, "Verify the reference is passed.");
+  assert.equal(result.groups[0]?.rationale, "Verify the reference is passed.");
 });
 
 test("three invalid replies fall back to a single All Changes group", async () => {
@@ -312,9 +325,6 @@ test("three invalid replies fall back to a single All Changes group", async () =
     [FALLBACK_GROUP_NAME],
   );
   assert.equal(result.groups[0]?.files.length, eightFiles.length);
-  // No model wrote a watch sentence here, and absence is honest: the fallback
-  // never invents one.
-  assert.equal(result.groups[0]?.watch, undefined);
 });
 
 test("a one-file diff of a test file is still skipped, not reordered", async () => {

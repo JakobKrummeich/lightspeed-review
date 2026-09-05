@@ -5,7 +5,6 @@
     {
       "name": "Intent requirement and validation",
       "rationale": "Makes `--intent` a required flag on `start`, validates it before any git or model work, and maps the error code to exit 2 so agents know it is a command-line mistake.",
-      "watch": "The intent check runs before repository validation, which is correct; the error code must be in ARGUMENT_ERROR_CODES so it exits with code 2 like other argument errors.",
       "files": [
         "src/errors.ts",
         "src/cli.ts"
@@ -14,7 +13,6 @@
     {
       "name": "Intent parsing, validation and threading through start",
       "rationale": "Parses `--intent` as a repeatable flag with order preservation, filters empty strings, validates presence, and threads intents through to session creation and output.",
-      "watch": "The new `scanArgs` helper handles repeatable flags correctly but a flag at the end of args with no value must not crash; `appendValue` guards against undefined values, which is correct; blank intents are trimmed and filtered so they do not count as reasons.",
       "files": [
         "src/commands/start.ts"
       ]
@@ -22,7 +20,6 @@
     {
       "name": "Intent storage and retrieval in sessions",
       "rationale": "Records intents on each round in the session store so they persist and can be echoed back and queried per round.",
-      "watch": "The intents field is optional on older rounds, so `currentIntents` must return an empty array for rounds that predate this change; the server must handle backwards-compatible payloads from older clients that carry no intents.",
       "files": [
         "src/session-store.ts",
         "src/rounds/session-round.ts",
@@ -32,7 +29,6 @@
     {
       "name": "Documentation and help text",
       "rationale": "Updates README, skill descriptions, command help and spec to show `--intent` as required and repeatable, with examples and guidance on what makes a good intent statement.",
-      "watch": "The help text must be consistent across README, SKILL.md, command-help.ts, home.ts and spec.md; the skill template in skill.ts must match the actual behaviour for the help command to render correctly.",
       "files": [
         "README.md",
         "skills/lightspeed-review/SKILL.md",

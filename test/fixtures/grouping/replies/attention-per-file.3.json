@@ -5,7 +5,6 @@
     {
       "name": "File focus derivation from approval history",
       "rationale": "Adds the core logic to compute how much attention each file needs by examining its approval history across rounds.",
-      "watch": "fileFocus returns 'new' for files with one or fewer appearances, and only returns 'approved' when a blob sha proves the file was approved and has not changed since, which excludes binary files and first appearances.",
       "files": [
         "src/rounds/history.ts"
       ]
@@ -13,7 +12,6 @@
     {
       "name": "SessionRecord rounds field made mandatory",
       "rationale": "Rounds field becomes required rather than optional, enforcing that all sessions track their history and rejecting corrupted old sessions at parse time.",
-      "watch": "The field changes from optional to required; sessions without rounds are now rejected with a clear error message rather than silently treated as historyless, and the rejection happens in parseSession before the record is used.",
       "files": [
         "src/session-store.ts"
       ]
@@ -21,7 +19,6 @@
     {
       "name": "Focus data sent to browser on session read",
       "rationale": "The /api/session/:key/data endpoint derives and includes file focus in its response, computed fresh from rounds on every read so it never becomes stale.",
-      "watch": "Focus is derived at read time and not stored, so it reflects the current truth from rounds; the comment explains that a stored copy could disagree after `end` or a re-group.",
       "files": [
         "src/server.ts",
         "src/browser/dom/session-api.ts"
@@ -30,7 +27,6 @@
     {
       "name": "Round and session initialization cleanups",
       "rationale": "Removes unnecessary null-coalescing from code that now guarantees rounds exist, and updates comments to reflect that rounds are always present.",
-      "watch": "Changes from `rounds ?? []` to `rounds` assume rounds is never undefined; this is safe only because the SessionRecord type now requires it and parseSession rejects sessions without it.",
       "files": [
         "src/rounds/session-round.ts",
         "src/ledger/outcomes.ts"

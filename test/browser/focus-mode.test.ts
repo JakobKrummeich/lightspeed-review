@@ -82,7 +82,6 @@ test("the gate says what the chapter is for before it says what is in it", () =>
   const auth: DiffGroup = {
     name: "Auth",
     rationale: "The token expiry check moved.",
-    watch: "The retry loop exit is new.",
     files: [file("src/auth.ts", 12, 3)],
   };
 
@@ -90,15 +89,13 @@ test("the gate says what the chapter is for before it says what is in it", () =>
 
   assert.match(html, /<h2 class="lsr-gate-name">Auth<\/h2>/);
   assert.match(html, /<p class="lsr-gate-rationale">The token expiry check moved\.<\/p>/);
-  assert.match(html, /<p class="lsr-gate-watch">The retry loop exit is new\.<\/p>/);
-  // What happened reads before what to watch for, and both before the files.
-  assert.ok(html.indexOf("expiry check") < html.indexOf("retry loop"));
-  assert.ok(html.indexOf("retry loop") < html.indexOf("lsr-gate-files"));
+  // What happened reads before the files it happened to.
+  assert.ok(html.indexOf("expiry check") < html.indexOf("lsr-gate-files"));
 });
 
 test("the gate lists every file of the chapter with the size of its change", () => {
-  // The list is the promise the two sentences are checked against: a rationale
-  // about something else is caught here rather than three files into the diff.
+  // The list is the promise the rationale is checked against: a sentence about
+  // something else is caught here rather than three files into the diff.
   const html = gate({
     name: "Auth",
     rationale: "why Auth",
@@ -131,13 +128,6 @@ test("the press is a real button that names the region it reveals", () => {
   );
 });
 
-test("a chapter without a watch sentence gets none: absence is honest", () => {
-  const html = gate(group("API"));
-
-  assert.doesNotMatch(html, /lsr-gate-watch/);
-  assert.doesNotMatch(html, /undefined/);
-});
-
 test("a sweep chapter's card says why it offers its tick, in the survey's words", () => {
   const html = gate({ ...group("Docs"), tier: "sweep" });
 
@@ -156,14 +146,12 @@ test("every word the grouping wrote is escaped, never injected", () => {
   const html = gate({
     name: "<script>x</script>",
     rationale: "<img onerror=x>",
-    watch: "<b>watch</b>",
     files: [file("<script>evil</script>.ts")],
   });
 
-  assert.doesNotMatch(html, /<script>|<img|<b>/);
+  assert.doesNotMatch(html, /<script>|<img/);
   assert.match(html, /&lt;script&gt;/);
   assert.match(html, /&lt;img/);
-  assert.match(html, /&lt;b&gt;/);
 });
 
 /** Chapters in reading order, each one file, named by letter so the approved list reads easily. */

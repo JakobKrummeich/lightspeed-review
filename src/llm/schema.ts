@@ -17,7 +17,6 @@ export const GROUPING_SCHEMA = Type.Object(
       Type.Object({
         name: Type.String({ minLength: 1 }),
         rationale: Type.String({ minLength: 1 }),
-        watch: Type.String({ minLength: 1 }),
         tier: Type.Union([Type.Literal("study"), Type.Literal("sweep")]),
         files: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
       }),

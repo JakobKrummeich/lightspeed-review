@@ -5,7 +5,6 @@
     {
       "name": "Remove groupingThreshold configuration key",
       "rationale": "Eliminates the configurable threshold and fixes the logic so every diff of two files or more goes to the model instead of being served alphabetically.",
-      "watch": "The config must still accept `groupingThreshold` from older configurations without failing, but the value must be ignored entirely—the skip condition is now hardcoded to `files.length <= 1`.",
       "files": [
         "src/config.ts",
         "src/llm/grouping.ts"
@@ -14,7 +13,6 @@
     {
       "name": "Update documentation and user-facing text",
       "rationale": "Reflects the removal of the configurable threshold and clarifies that only single-file diffs skip grouping because there is nothing to order.",
-      "watch": "The reason message in grouped output must match the new skip condition—the old threshold-based message is gone.",
       "files": [
         "spec.md",
         "skills/lightspeed-review/SKILL.md",

@@ -17,14 +17,12 @@ test("accepts a reply that covers every file exactly once", () => {
         {
           name: "Core",
           rationale: "the change",
-          watch: "the risk",
           tier: "study",
           files: ["src/a.ts"],
         },
         {
           name: "Tests",
           rationale: "coverage",
-          watch: "the gap",
           tier: "study",
           files: ["src/b.ts"],
         },
@@ -39,9 +37,7 @@ test("accepts a reply that covers every file exactly once", () => {
 
 test("accepts a reply wrapped in a markdown code fence", () => {
   const reply = `Here you go:\n\`\`\`json\n${JSON.stringify({
-    groups: [
-      { name: "All", rationale: "everything", watch: "the lot", tier: "study", files: paths },
-    ],
+    groups: [{ name: "All", rationale: "everything", tier: "study", files: paths }],
   })}\n\`\`\``;
 
   assert.equal(validateGroupingReply(reply, paths).ok, true);
@@ -58,20 +54,24 @@ test("reports a schema violation with the offending path", () => {
   assert.match(problem, /name/);
 });
 
-test("a group without its watch sentence is a schema violation, not a shrug", () => {
-  const problem = problemFor(
-    JSON.stringify({ groups: [{ name: "Core", rationale: "r", files: paths }] }),
+test("a group still carrying the retired `watch` sentence is accepted, not sent back for it", () => {
+  // The contract dropped the field; a model answering from a cached prefix or
+  // a copied example may still write it, and that is not worth a repair round.
+  const result = validateGroupingReply(
+    JSON.stringify({
+      groups: [{ name: "Core", rationale: "r", watch: "the risk", tier: "study", files: paths }],
+    }),
+    paths,
   );
 
-  assert.match(problem, /schema/);
-  assert.match(problem, /watch/);
+  assert.equal(result.ok, true);
 });
 
 test("a group without its tier is a schema violation, not a defaulted answer", () => {
   // The model has read the files and is the only party that can say whether
   // there is anything in the chapter to judge; a default would be nobody's answer.
   const problem = problemFor(
-    JSON.stringify({ groups: [{ name: "Core", rationale: "r", watch: "w", files: paths }] }),
+    JSON.stringify({ groups: [{ name: "Core", rationale: "r", files: paths }] }),
   );
 
   assert.match(problem, /schema/);
@@ -81,7 +81,7 @@ test("a group without its tier is a schema violation, not a defaulted answer", (
 test("a tier that is neither of the two reading tiers is rejected", () => {
   const problem = problemFor(
     JSON.stringify({
-      groups: [{ name: "Core", rationale: "r", watch: "w", tier: "skim", files: paths }],
+      groups: [{ name: "Core", rationale: "r", tier: "skim", files: paths }],
     }),
   );
 
@@ -93,8 +93,8 @@ test("a swept chapter comes through as the model tiered it", () => {
   const result = validateGroupingReply(
     JSON.stringify({
       groups: [
-        { name: "Core", rationale: "r", watch: "w", tier: "study", files: ["src/a.ts"] },
-        { name: "Renames", rationale: "r", watch: "w", tier: "sweep", files: ["src/b.ts"] },
+        { name: "Core", rationale: "r", tier: "study", files: ["src/a.ts"] },
+        { name: "Renames", rationale: "r", tier: "sweep", files: ["src/b.ts"] },
       ],
     }),
     paths,
@@ -110,7 +110,7 @@ test("rejects an empty group list", () => {
 test("reports files that were left out", () => {
   const problem = problemFor(
     JSON.stringify({
-      groups: [{ name: "Core", rationale: "r", watch: "w", tier: "study", files: ["src/a.ts"] }],
+      groups: [{ name: "Core", rationale: "r", tier: "study", files: ["src/a.ts"] }],
     }),
   );
 
@@ -125,7 +125,6 @@ test("reports invented files that are not in the diff", () => {
         {
           name: "Core",
           rationale: "r",
-          watch: "w",
           tier: "study",
           files: [...paths, "src/ghost.ts"],
         },
@@ -141,8 +140,8 @@ test("reports files listed in more than one group", () => {
   const problem = problemFor(
     JSON.stringify({
       groups: [
-        { name: "Core", rationale: "r", watch: "w", tier: "study", files: paths },
-        { name: "Extra", rationale: "r", watch: "w", tier: "study", files: ["src/a.ts"] },
+        { name: "Core", rationale: "r", tier: "study", files: paths },
+        { name: "Extra", rationale: "r", tier: "study", files: ["src/a.ts"] },
       ],
     }),
   );
@@ -154,7 +153,7 @@ test("reports files listed in more than one group", () => {
 test("the inlined schema documents the ordered array contract without an order field", () => {
   assert.match(GROUPING_SCHEMA_JSON, /"groups"/);
   assert.match(GROUPING_SCHEMA_JSON, /"rationale"/);
-  assert.match(GROUPING_SCHEMA_JSON, /"watch"/);
+  assert.doesNotMatch(GROUPING_SCHEMA_JSON, /"watch"/);
   // The model reads the two tiers off the schema itself, so they are inlined too.
   assert.match(GROUPING_SCHEMA_JSON, /"tier"/);
   assert.match(GROUPING_SCHEMA_JSON, /"study"/);
@@ -168,9 +167,7 @@ test("schema-keyword junk at the top level is shed, not repaired", () => {
   const reply = JSON.stringify({
     type: "object",
     $schema: "http://json-schema.org/draft-07/schema#",
-    groups: [
-      { name: "All", rationale: "Everything.", watch: "The lot.", tier: "study", files: ["a.ts"] },
-    ],
+    groups: [{ name: "All", rationale: "Everything.", tier: "study", files: ["a.ts"] }],
   });
   const verdict = validateGroupingReply(reply, ["a.ts"]);
   assert.equal(verdict.ok, true);

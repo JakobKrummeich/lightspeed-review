@@ -52,13 +52,8 @@ function file(path: string, overrides: Partial<DiffFile> = {}): DiffFile {
   };
 }
 
-function group(name: string, paths: string[], watch?: string): DiffGroup {
-  return {
-    name,
-    rationale: `why ${name}`,
-    ...(watch === undefined ? {} : { watch }),
-    files: paths.map((path) => file(path)),
-  };
+function group(name: string, paths: string[]): DiffGroup {
+  return { name, rationale: `why ${name}`, files: paths.map((path) => file(path)) };
 }
 
 test("a chapter renders behind the gate that states it, name and rationale", () => {
@@ -260,15 +255,14 @@ test("the file tick sits after its diff, where reading the file ends", () => {
   assert.match(html, /class="lsr-tick-label">approve<\/span/);
 });
 
-test("the chapter's reasons head it once, on the gate, and never over the diff", () => {
-  // They used to head the first file's diff, where the eye went to the code and the sentences
-  // were never read. Now the gate says them, and the diff below carries no copy of them.
-  const html = chapter({ groups: [group("API", ["a.ts"], "The retry loop exit is new.")] });
+test("the chapter's rationale heads it once, on the gate, and never over the diff", () => {
+  // It used to head the first file's diff, where the eye went to the code and the sentence
+  // was never read. Now the gate says it, and the diff below carries no copy of it.
+  const html = chapter({ groups: [group("API", ["a.ts"])] });
   const content = html.slice(html.indexOf(`class="lsr-group-content"`));
 
   assert.equal(html.match(/why API/g)?.length, 1, "the rationale is said once");
-  assert.equal(html.match(/The retry loop exit is new\./g)?.length, 1);
-  assert.doesNotMatch(content, /why API|retry loop/, "nothing of it is repeated over the lines");
+  assert.doesNotMatch(content, /why API/, "nothing of it is repeated over the lines");
   assert.doesNotMatch(html, /lsr-group-header|lsr-group-name|lsr-group-rationale/);
 });
 

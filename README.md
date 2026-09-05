@@ -395,9 +395,9 @@ new dependency, a security-critical change or a git hook ranks high and above
 the tests in every case — where such a group sits against the intent is the
 model's to judge. Each group's `rationale` is one short sentence saying
 what that group's change does, a primer under the name; it is never a question
-and never the name again in longer words. Neither it nor `watch` addresses the
-reviewer: a sentence that asks him something, orders him to do something or
-calls him `you` is sent back for one repair round, because a chapter that asks
+and never the name again in longer words. Nor does it address the reviewer: a
+sentence that asks him something, orders him to do something or calls him
+`you` is sent back for one repair round, because a chapter that asks
 "does this look right?" has handed the reading back to the person it was
 supposed to brief.
 

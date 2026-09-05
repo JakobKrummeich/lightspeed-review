@@ -5,7 +5,6 @@
     {
       "name": "Panel collapse state and semantics",
       "rationale": "Introduces the core model for panel collapse: what state the rail holds, how to label it, what text badges show, and when to auto-expand for agent responses.",
-      "watch": "The `agentSpokeAgain` logic must not open the panel when the reviewer's own send arrives; it checks for role being 'agent' and length growth, which catches only agent additions.",
       "files": [
         "src/browser/panel-collapse.ts"
       ]
@@ -13,7 +12,6 @@
     {
       "name": "View format breakpoint logic for panel state",
       "rationale": "Refactors the viewport width calculation to account for panel collapse: closed panel returns a breakpoint 352px lower, so two-column view fits 352px earlier when the panel shuts.",
-      "watch": "The math subtracts PANEL_WIDTH_PX from the minimum only when collapsed; open panel must use the original 1400px breakpoint, and the gap between the two must be exactly PANEL_WIDTH_PX.",
       "files": [
         "src/browser/view-format.ts"
       ]
@@ -21,7 +19,6 @@
     {
       "name": "Panel rail UI mounting and control",
       "rationale": "Creates the rail element that stays visible when the panel collapses, manages its queued badge, and wires it to toggle panel state and request view refresh.",
-      "watch": "The rail only calls onToggle when collapsed state actually changes, not on every setQueued call; the badge displays count only when panel is collapsed and count is nonzero.",
       "files": [
         "src/browser/dom/panel-rail.ts"
       ]
@@ -29,7 +26,6 @@
     {
       "name": "Panel mount refactoring for callback integration",
       "rationale": "Wraps panel mount options in a single object and adds onPending callback so the rail gets notified when unsent feedback count changes.",
-      "watch": "onPending fires on every draw, even if count does not change; the rail's setQueued handles no-ops via the state check in its own set function.",
       "files": [
         "src/browser/dom/panel-mount.ts"
       ]
@@ -37,7 +33,6 @@
     {
       "name": "View toggle refactoring for dynamic room query",
       "rationale": "Replaces a static media query with a function so the view toggle checks available room accounting for panel state, and returns a refresh function so main can wire media query listeners.",
-      "watch": "The toggle must call hasRoom before deciding what format fits; it is no longer listening to its own media query — main now calls refresh when either room query changes.",
       "files": [
         "src/browser/dom/view-toggle.ts"
       ]
@@ -45,7 +40,6 @@
     {
       "name": "Main wiring for collapse and room queries",
       "rationale": "Refactors page element discovery, wires the panel rail, sets up two room queries (one per panel state), calls view refresh when panel collapses or viewport changes, and auto-expands the panel when the agent speaks.",
-      "watch": "Two media queries fire independently; view refresh must be called on both change events so the format stays correct. The agent-spoke check happens on conversation update, not on view recalculation. Queueing does not open the panel, but agent response does.",
       "files": [
         "src/browser/dom/main.ts"
       ]
@@ -53,7 +47,6 @@
     {
       "name": "Layout grid and panel visibility CSS",
       "rationale": "Adds the rail as a third column in the body grid, hides the panel and adjusts column widths when collapsed, prevents header text wrapping, and updates media query thresholds for when the toggle hides.",
-      "watch": "The grid template changes from two columns to three (content, rail, panel), and collapses by setting panel column width to 0 and hiding display. The two media queries at 1399px and 1047px serve different purposes: 1399 for open panel, 1047 for shut; the comment explains the cutoff for hidden toggle.",
       "files": [
         "src/browser/chrome.css"
       ]
@@ -61,7 +54,6 @@
     {
       "name": "Server template with rail button and initial state",
       "rationale": "Renders the rail button with badge and aria attributes, sets initial data-panel='open', and places the rail between diff and panel in the grid.",
-      "watch": "The rail element must have id 'lsr-panel-rail', class 'lsr-panel-rail', and a child span with class 'lsr-rail-badge'; aria-expanded and aria-label are set by the mount function.",
       "files": [
         "src/html-template.ts"
       ]
@@ -69,7 +61,6 @@
     {
       "name": "Task completion documentation",
       "rationale": "Marks the panel collapse feature as done and documents the implementation: rail placement, badge display, dual breakpoints, header truncation behavior, and verification across widths and schemes.",
-      "watch": "The documented measurements (1100, 1440, both schemes) and the breakpoint delta (352px) must match what is in the code; the todo lists details that should all be present in the implementation above.",
       "files": [
         "tasks/todo.md"
       ]

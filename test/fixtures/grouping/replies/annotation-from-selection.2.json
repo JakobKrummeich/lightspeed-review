@@ -5,7 +5,6 @@
     {
       "name": "Annotation model and rendering",
       "rationale": "Defines the data structures and pure functions that turn text selections into queued annotations and render the popup UI.",
-      "watch": "The annotation grouping logic merges fragments from the same file but keeps files separate, which is the contract the popup DOM code must respect; if a selection spans files, the comment must still attach to each file independently.",
       "files": [
         "src/browser/annotation.ts"
       ]
@@ -13,7 +12,6 @@
     {
       "name": "Conversation panel rendering and state",
       "rationale": "Defines the right-side panel UI as pure functions: delivered conversation entries, queued annotation pills, comment box, and send buttons.",
-      "watch": "The pending queue in the panel is the browser's own unsent buffer, separate from the server's pending prompts; the distinction matters for what the UI shows as removable, and the rendering must not expose server-side state as dismissable.",
       "files": [
         "src/browser/conversation-panel.ts"
       ]
@@ -21,7 +19,6 @@
     {
       "name": "Session API client",
       "rationale": "Centralizes all HTTP calls to the backend: fetching session data, persisting reviewed flags, and sending feedback with prompts.",
-      "watch": "The `SessionData` interface exported here is the contract between the server and all three mounted components; changes to it ripple through diff mount, panel mount, and the main orchestrator.",
       "files": [
         "src/browser/dom/session-api.ts"
       ]
@@ -29,7 +26,6 @@
     {
       "name": "Diff view mounting and update",
       "rationale": "Mounts the rendered diff groups into the DOM and handles checkbox interactions for reviewing; extracted to a mountable component so the main orchestrator can wire it to SSE updates.",
-      "watch": "The `update` method discards the old diff and redraws from scratch; if a re-group arrives while the user is scrolled deep in the old diff, focus will be lost and the scroll position reset to top.",
       "files": [
         "src/browser/dom/diff-mount.ts"
       ]
@@ -37,7 +33,6 @@
     {
       "name": "Annotation popup mounting and interaction",
       "rationale": "Wires text selection events to the popup UI, splits selections along file blocks, and queues annotations via the callback.",
-      "watch": "Selection fragments are extracted by intersecting the range with `.lsr-file` blocks and grabbing `.d2h-code-line` text content; if a block has no `data-file` attribute the block is skipped entirely, so the data model must guarantee every renderable file block carries that attribute.",
       "files": [
         "src/browser/dom/annotation-popup.ts"
       ]
@@ -45,7 +40,6 @@
     {
       "name": "Conversation panel mounting and interaction",
       "rationale": "Mounts the panel into the DOM, manages the browser's pending queue, wires pill removal and send buttons to the API, and redraws after each state change.",
-      "watch": "The `send` method clears the pending queue only after the server responds successfully; if the fetch fails, the queue is left intact so the user can retry, but the error message is generic to avoid repeating implementation detail.",
       "files": [
         "src/browser/dom/panel-mount.ts"
       ]
@@ -53,7 +47,6 @@
     {
       "name": "Main entry point and orchestration",
       "rationale": "Wires all three mounted components together, fetches the initial session, and hooks SSE updates to refresh the diff and panel when a re-group arrives.",
-      "watch": "The SSE event listener calls `diff.update()` and `panel.update()` both on a re-group; if one throws, the other does not run, leaving the UI in an inconsistent state where one view is fresh and the other is stale.",
       "files": [
         "src/browser/dom/main.ts"
       ]
@@ -61,7 +54,6 @@
     {
       "name": "Styles for annotation and panel UI",
       "rationale": "Adds CSS for the popup, pills, general comment box, send buttons, and delivered conversation entries to match the existing editor aesthetic.",
-      "watch": "The `.lsr-popup` is positioned absolutely and appended to `body` so it floats above the scrolling diff; if the popup's z-index is too low or the parent chain breaks `position: absolute`, the popup will be occluded or misplaced.",
       "files": [
         "src/browser/chrome.css"
       ]
@@ -69,7 +61,6 @@
     {
       "name": "Build entry point update",
       "rationale": "Redirects the build to the new nested entry point in `src/browser/dom/main.ts` after the old file was moved.",
-      "watch": "The path must match the new location exactly; a typo here silently builds the old entry point or fails the build before reaching the others.",
       "files": [
         "scripts/build.ts"
       ]
@@ -77,7 +68,6 @@
     {
       "name": "TypeScript configuration",
       "rationale": "Moves the DOM exclusion from the root tsconfig to cover the whole `src/browser/dom/` folder, since that directory now contains all DOM-touching modules and is checked by a separate browser config.",
-      "watch": "The exclusion must cover every file under `dom/` or the root config will try to check DOM code and fail; the comment explains why the separation exists, so a future maintainer knows not to merge it back.",
       "files": [
         "tsconfig.json"
       ]
@@ -85,7 +75,6 @@
     {
       "name": "Task tracking",
       "rationale": "Marks Task 8 (browser annotation and conversation panel) as complete in both plan and todo files.",
-      "watch": "The acceptance criteria in todo.md lists specific UI behaviors and POST body shape; if the code does not match those details, the task is not truly done, so the tracking should stay false.",
       "files": [
         "tasks/plan.md",
         "tasks/todo.md"

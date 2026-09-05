@@ -5,7 +5,6 @@
     {
       "name": "Ledger filter optimization",
       "rationale": "Adds query filters to the ledger store so that reading a session's annotations scans only relevant month files and lines instead of parsing the entire ledger.",
-      "watch": "The substring gate lineMayMatch uses JSON.stringify checks that could have false positives; recordMatches must correctly distinguish records even when the gate admits them. The monthInRange function compares only YYYY-MM prefixes, which works for ISO timestamps but would break if the format changes.",
       "files": [
         "src/ledger/store.ts"
       ]
@@ -13,7 +12,6 @@
     {
       "name": "Session annotations lookup",
       "rationale": "Changes sessionAnnotations to use the new store-level filters instead of fetching all records and filtering in memory, reducing cost from every line in the ledger to only the session's rounds.",
-      "watch": "The function now filters by kind, repo, and rounds; it must correctly extract round ids from the session and handle the case where a session has no rounds (returns empty array rather than querying).",
       "files": [
         "src/server.ts"
       ]
@@ -21,7 +19,6 @@
     {
       "name": "Documentation and changelog",
       "rationale": "Updates the backlog to mark the ledger-scanning problem as solved and documents the performance improvement measured on a real ledger.",
-      "watch": "The claim that corrupt count now reflects only filtered lines while stats() reflects the full count must remain true; a future caller must not confuse which metric they are reading.",
       "files": [
         "tasks/todo.md"
       ]
@@ -29,7 +26,6 @@
     {
       "name": "Explanatory artifacts",
       "rationale": "Adds design documents and reference implementations for related work on file focus states, approval carry-forward, and draft preservation—context for understanding the scope of the ledger optimization.",
-      "watch": "These are planning and reference documents with no runtime effect; they document decisions made elsewhere. Verify they do not contradict the actual code changes if any reader references them later.",
       "files": [
         ".lavish/badges-rethink.html",
         ".lavish/draft-preservation-plan.html",
