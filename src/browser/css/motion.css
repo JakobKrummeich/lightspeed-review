@@ -65,4 +65,11 @@
   .lsr-round-offer[data-beckon="true"]::after {
     display: none;
   }
+
+  /* The finish too: the card and its mark may simply be there, and the glow
+   * that said "this one is different" is exactly the movement asked against. */
+  .lsr-done-card,
+  .lsr-done-mark {
+    animation: none;
+  }
 }

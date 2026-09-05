@@ -76,6 +76,10 @@ test("the round popup has a reserved landmark, empty until a round arrives", () 
   assert.match(renderReviewPage(session), /<div id="lsr-round-popup" hidden><\/div>/);
 });
 
+test("the finish has a reserved landmark too, empty until the last tick", () => {
+  assert.match(renderReviewPage(session), /<div id="lsr-done-popup" hidden><\/div>/);
+});
+
 test("an ended session is shown as ended without waiting for the bundle", () => {
   assert.match(renderReviewPage({ ...session, status: "ended" }), /lsr-ended-overlay/);
 });

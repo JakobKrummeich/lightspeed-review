@@ -24,6 +24,12 @@ export interface MountedPanel {
   setAllApproved(allApproved: boolean): void;
   /** An agent took the feedback away, or came back for more. */
   setWorking(working: boolean): void;
+  /**
+   * The reviewer said done from somewhere other than the panel's own button:
+   * the same send as Send & End, queue and comment included, so there is one
+   * way a review ends however the word was given.
+   */
+  end(): void;
 }
 
 export interface PanelOptions {
@@ -138,6 +144,11 @@ export function mountPanel(options: PanelOptions): MountedPanel {
       // Full redraw for one line at the foot: `draw` follows the panel to the
       // bottom, so the line lands where the eye already is.
       draw(view);
+    },
+    end() {
+      // Not awaited, as the button's own press is not: the send reports
+      // through `onEnd`, and a failure leaves the controls full to press again.
+      void send(view, true);
     },
   };
 }

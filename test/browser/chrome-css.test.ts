@@ -646,6 +646,23 @@ test("the busy marker holds still for that reviewer rather than going away", () 
   assert.doesNotMatch(quiet, /\.lsr-working[\w-]* \{[^}]*display: none/);
 });
 
+test("the finish stands where the round's announcement does, and under the ended overlay", () => {
+  // Same layer as its sibling: news with a press on it. The ended overlay's word is last, and
+  // pressing the card's end is what puts it up — so the card must sit below it.
+  const done = rulesFor(".lsr-done-overlay").join("");
+  const round = rulesFor(".lsr-round-overlay").join("");
+  const layer = (body: string): string => /z-index: (\d+);/.exec(body)?.[1] ?? "";
+  assert.equal(layer(done), layer(round));
+  assert.ok(Number(layer(done)) < Number(layer(rulesFor(".lsr-ended-overlay").join(""))));
+  assert.match(done, /background: var\(--lsr-scrim\);/);
+});
+
+test("the finish holds still for the reviewer who asked for less movement", () => {
+  const quiet = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\n\}/.exec(bare)?.[1] ?? "";
+
+  assert.match(quiet, /\.lsr-done-card,\s*\.lsr-done-mark \{\s*animation: none;/);
+});
+
 test("the round's announcement holds still too: no fold flight, no orbiting spark", () => {
   const quiet = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\n\}/.exec(bare)?.[1] ?? "";
 

@@ -1,0 +1,115 @@
+/*
+ * The finish, said once over the review: the card that goes up as the last
+ * file is ticked. A sibling of the round announcement — same scrim, same card,
+ * same layer — because it is the same kind of thing, news with a press on it,
+ * and a reviewer who has seen one should know the other on sight. Below the
+ * ended overlay, whose word is last: pressing "End review" here is what puts
+ * that one up.
+ */
+.lsr-done-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--lsr-space-6);
+  background: var(--lsr-scrim);
+  z-index: 19;
+}
+
+/*
+ * The card arrives as the round's does and then, once, glows: this is the one
+ * moment in a review that is a finish, and a card that simply appeared would
+ * read as another interruption. One glow and done — the reviewer is about to
+ * make a decision, and nothing on the card keeps moving while they do.
+ */
+.lsr-done-card {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--lsr-space-3);
+  width: min(26rem, 100%);
+  background: var(--lsr-surface);
+  border: 1px solid var(--lsr-border);
+  border-radius: 0.75rem;
+  padding: var(--lsr-space-6);
+  box-shadow: var(--lsr-shadow-lift);
+  animation:
+    lsr-done-arrive 180ms ease-out,
+    lsr-done-glow 900ms ease-out 180ms;
+}
+
+@keyframes lsr-done-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(0.5rem);
+  }
+}
+
+@keyframes lsr-done-glow {
+  50% {
+    box-shadow:
+      var(--lsr-shadow-lift),
+      0 0 2rem color-mix(in srgb, var(--lsr-accent) 55%, transparent);
+  }
+}
+
+/*
+ * The mark: the same tick the reviewer has been pressing all review, grown to
+ * a badge and filled with the accent, because it is the last one and the only
+ * one the page makes on their behalf. It lands a beat after the card, from
+ * slightly too small — the one flourish the finish allows itself.
+ */
+.lsr-done-mark {
+  display: grid;
+  place-items: center;
+  width: var(--lsr-space-8);
+  height: var(--lsr-space-8);
+  border-radius: 50%;
+  background: var(--lsr-accent);
+  color: var(--lsr-bg);
+  font-size: var(--lsr-size-lead);
+  font-weight: 700;
+  line-height: var(--lsr-leading-display);
+  animation: lsr-done-land 320ms cubic-bezier(0.34, 1.56, 0.64, 1) 120ms backwards;
+}
+
+@keyframes lsr-done-land {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+/* The closing card's own eyebrow: where the reviewer is, before what the card wants. */
+.lsr-done-eyebrow {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* The news, at the title size the chapter names wear: one loud line, in the text colour. */
+.lsr-done-title {
+  margin: 0;
+  color: var(--lsr-strong);
+  font-size: var(--lsr-size-title);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
+}
+
+.lsr-done-note {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+  line-height: var(--lsr-leading);
+}
+
+.lsr-done-actions {
+  display: flex;
+  gap: var(--lsr-space-3);
+  margin-top: var(--lsr-space-2);
+}

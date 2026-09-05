@@ -53,6 +53,7 @@ export function renderReviewPage(session: SessionRecord): string {
     <div id="lsr-opening"></div>
     <div id="lsr-replay"></div>
     <div id="lsr-round-popup" hidden></div>
+    <div id="lsr-done-popup" hidden></div>
   </body>
 </html>
 `;

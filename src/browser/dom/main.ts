@@ -1,6 +1,5 @@
 import "diff2html/bundles/css/diff2html.min.css";
 import "../chrome.css";
-import { crossings } from "../approval-crossing.ts";
 import { DARK_SCHEME_QUERY } from "../color-scheme.ts";
 import { currentRound } from "../conversation-rounds.ts";
 import { clampFocus } from "../focus-mode.ts";
@@ -14,6 +13,7 @@ import { mountAnnotationPopup } from "./annotation-popup.ts";
 import { lockSelectionToColumn } from "./column-lock.ts";
 import { createDiff2HtmlRenderer } from "../diff2html-adapter.ts";
 import { mountDiffView } from "./diff-mount.ts";
+import { wireFinish } from "./finish.ts";
 import { mountOpening } from "./opening-overlay.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
 import type { LinePlace } from "./line-numbers.ts";
@@ -46,6 +46,8 @@ interface Page {
   roundOffer: HTMLElement;
   /** Where that round's arrival is announced, once, over the review. */
   roundPopup: HTMLElement;
+  /** Where the last tick is answered, over the review, with the press it calls for. */
+  donePopup: HTMLElement;
 }
 
 /**
@@ -69,6 +71,7 @@ function readPage(): Page | undefined {
       replayReopen: present(document.querySelector<HTMLElement>("#lsr-replay-reopen")),
       roundOffer: present(document.querySelector<HTMLElement>("#lsr-round-offer")),
       roundPopup: present(document.querySelector<HTMLElement>("#lsr-round-popup")),
+      donePopup: present(document.querySelector<HTMLElement>("#lsr-done-popup")),
     };
   } catch {
     return undefined;
@@ -95,17 +98,7 @@ async function main(): Promise<void> {
   // All reviewer-position state goes through this: a round arriving mid-read
   // asks it before taking the page.
   const reader = trackReader(page.reviewRoot, focus);
-  let allApproved = false;
-  /**
-   * The diff's first draw reports before the panel exists (it mounts later),
-   * so until then a report is only remembered; the panel is told it below.
-   */
-  let tellPanel = (complete: boolean): void => {
-    allApproved = complete;
-  };
-  // Which reports open a shut panel: see the module. The rail is built further
-  // down; the first report is never a crossing, so never asked for before it exists.
-  const expandOnCrossing = crossings(() => railControl.expand());
+  const finish = wireFinish(page.donePopup);
   const diff = mountDiffView({
     root: page.diffRoot,
     progress: page.progress,
@@ -121,10 +114,7 @@ async function main(): Promise<void> {
       focusMoved(page, live, chapter);
     },
     onOpen: (open) => updateMemory(localStorage, page.key, { round: live.round, ...open }),
-    onApproved: (complete) => {
-      tellPanel(complete);
-      expandOnCrossing(complete);
-    },
+    onApproved: finish.onApproved,
   });
   const view = mountViewToggle({
     root: page.viewSwitch,
@@ -141,17 +131,18 @@ async function main(): Promise<void> {
   const side = mountPanelSide(
     page,
     session,
-    reader.setQueued,
+    (count) => {
+      finish.setQueued(count);
+      reader.setQueued(count);
+    },
     () => {
       room.toggle();
       view.refresh();
     },
     (file, anchor) => diff.reveal(file, anchor),
   );
-  const { railControl, panel } = side;
-  // The report from before the panel existed, then every later one straight through.
-  panel.setAllApproved(allApproved);
-  tellPanel = (complete) => panel.setAllApproved(complete);
+  finish.attach(side);
+  const { panel } = side;
   // Queueing leaves a shut panel shut: the popup already showed the words,
   // and the rail counts them.
   mountAnnotationPopup({ diffRoot: page.diffRoot, onQueue: (prompts) => panel.queue(prompts) });

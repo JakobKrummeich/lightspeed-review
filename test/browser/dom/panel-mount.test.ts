@@ -419,6 +419,26 @@ test("Send & End with nothing queued ends the review", async (t) => {
   assert.equal(root.querySelector("#lsr-send-end")?.disabled, true);
 });
 
+test("the word given elsewhere ends the review exactly as the panel's own button does", async (t) => {
+  // The finish card's press: queue and comment go with it, the page locks, the controls too.
+  const sent = stubFetch(t);
+  const { root, panel, ended, box } = mount(t);
+  type(root, box()!, "one last thing");
+
+  panel.end();
+  await tick(0);
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]?.ended, true);
+  assert.deepEqual(
+    sent[0]?.prompts.map((prompt) => prompt.comment),
+    ["one last thing"],
+    "the comment box is sent, not dropped",
+  );
+  assert.equal(ended(), true);
+  assert.equal(root.querySelector("#lsr-send-end")?.disabled, true);
+});
+
 test("Send to Agent with nothing queued sends nothing", async (t) => {
   const sent = stubFetch(t);
   const { root } = mount(t);

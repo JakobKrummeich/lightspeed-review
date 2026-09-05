@@ -24,7 +24,7 @@ else is out-of-flow overlays.
 │   div#lsr-diff         (index OR one chapter)   │ L │ (collapsible)      │
 │                                                 │   │                    │
 └─────────────────────────────────────────────────┴───┴────────────────────┘
-  out of flow: #lsr-opening  #lsr-replay  #lsr-round-popup  (classless ids)
+  out of flow: #lsr-opening  #lsr-replay  #lsr-round-popup  #lsr-done-popup  (classless ids)
 ```
 
 - Rail `#lsr-panel-rail`: thin full-height button between diff and panel,
@@ -326,6 +326,38 @@ otherwise the round just applies.
 `data-state="folding"`); the header offer chip then glows and later sends an
 orbiting spark around its border. Taking the round from either place clears
 both.
+
+## 8a. Finish card (review-done.ts, dom/done-popup.ts, dom/finish.ts)
+
+The tick that approves the last file puts a card up over the review — the
+sidebar's "Every file is approved — Send & End when you are ready" note sits in
+a column the eye left an hour ago. Same scrim, layer and card as §8; below the
+ended overlay, whose word is last.
+
+```
+┌ .lsr-done-overlay (scrim, z19) ────────────────────┐
+│          ┌ .lsr-done-card ──────────────────┐      │
+│          │ (✓)                              │      │ .lsr-done-mark (accent badge)
+│          │ NOTHING LEFT TO READ             │      │ .lsr-done-eyebrow
+│          │ Every file is approved           │      │ .lsr-done-title
+│          │ End the review to hand it back   │      │ .lsr-done-note
+│          │ to the agent, or keep looking —  │      │  (+ "Your 2 queued notes
+│          │ nothing is sent until you say so.│      │    go with it." when queued)
+│          │                                  │      │
+│          │ [End review]   [Keep looking]    │      │ .lsr-done-end /
+│          └──────────────────────────────────┘      │ .lsr-done-stay
+└────────────────────────────────────────────────────┘
+```
+
+- Goes up on the crossing only (`approval-crossing.ts`): a page that opens
+  fully approved says nothing, and a finish that comes undone — a round took
+  the page, a box came unticked in another tab — takes its card down.
+- "End review" is the panel's own Send & End (`MountedPanel.end`): queue and
+  general comment go with it, the page locks, the closing summary follows.
+  "Keep looking" / Esc take the card down and send nothing. Focus is a
+  dialog's: the end press takes the caret, the previous holder gets it back.
+- Motion: arrive as §8, one glow, the mark lands a beat later; all still under
+  `prefers-reduced-motion`.
 
 ## 9. Replay overlay — between rounds (round-replay.ts, dom/replay-overlay.ts)
 
