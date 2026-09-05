@@ -37,6 +37,26 @@ test("that tick is one movement: the group folds and the file inside it does not
   ]);
 });
 
+test("unticking a group opens its files and leaves the group's own fold where it is", () => {
+  // An untick is a withdrawal, not a request to read: made on the chapter's
+  // card it must leave the card standing, and made under the lines it must
+  // leave the lines. So the group gets no step either way — only the diff's
+  // own press opens a chapter — and its files open behind whatever it is.
+  const plan = tickCollapsePlan(
+    [
+      { path: "a.ts", approved: false },
+      { path: "b.ts", approved: false },
+    ],
+    [{ index: 0, approved: false }],
+  );
+
+  assert.deepEqual(plan.steps, [
+    { target: { kind: "file", path: "a.ts" }, expanded: true, animated: true },
+    { target: { kind: "file", path: "b.ts" }, expanded: true, animated: true },
+  ]);
+  assert.deepEqual(plan.anchor, { kind: "file", path: "a.ts" });
+});
+
 test("the files of a group ticked whole are set before the group folds over them", () => {
   // Otherwise the group animates towards a height its files are about to change.
   const plan = tickCollapsePlan(

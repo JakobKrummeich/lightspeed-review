@@ -196,9 +196,10 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
     .map((one) => one.trim())
     .sort();
 
+  // `.lsr-gate-path`: one path on the chapter's card, a leaf with no diff under it.
   assert.deepEqual(
     wrapping,
-    [".lsr-panel-scroll", ".lsr-popup", "textarea"],
+    [".lsr-gate-path", ".lsr-panel-scroll", ".lsr-popup", "textarea"],
     "a new mid-token wrap is a deliberate choice: say so here, and check it cannot reach the diff",
   );
 });
@@ -256,25 +257,17 @@ test("the chapter's rationale is set to be read, not to be skipped past", () => 
   );
 });
 
-test("a chapter cannot be approved from the card that stands in front of its diff", () => {
-  // The gate exists to interrupt the tick that costs nothing. Left on the card, the chapter's
-  // own tick sits beside "Read the diff" and is the cheaper of the two presses. Only while
-  // unticked, though: a finished chapter shuts back onto its card, and the card must show
-  // the mark it earned. And never on a sweep chapter's card, which has nothing to protect:
-  // its tick is the press the reviewer came to it for.
-  const unapproved =
-    '.lsr-group:not([data-tier="sweep"]):has(.lsr-gate-press[aria-expanded="false"]):has(.lsr-tick-all:not(:checked)) .lsr-group-foot';
-  assert.match(rulesFor(unapproved).join(""), /display: none;/);
-  assert.equal(
-    rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="false"]) .lsr-group-foot').length,
-    0,
-    "an approved chapter's card keeps its mark",
-  );
+test("every chapter's card offers the chapter's tick", () => {
+  // A chapter is settled from its card as well as from under its lines: the
+  // last chapter of a review used to be the one place with no tick to press,
+  // its card hiding the foot until the diff was up. No rule hides the foot on
+  // a shut card any more, whatever the chapter's tier or state.
   assert.doesNotMatch(
     bare,
-    /\.lsr-group:has\(\.lsr-gate-press\[aria-expanded="false"\]\):has\(\s*\.lsr-tick-all:not\(:checked\)\s*\)\s+\.lsr-group-foot/,
-    "a sweep chapter's card offers its tick",
+    /aria-expanded="false"[^{]*\.lsr-group-foot\s*\{/,
+    "the foot is not hidden behind a shut gate",
   );
+  assert.equal(rulesFor(".lsr-group-foot").filter((body) => /display: none/.test(body)).length, 0);
 });
 
 test("the sweep card's label is set as the survey's lane heading is", () => {
@@ -286,6 +279,27 @@ test("the sweep card's label is set as the survey's lane heading is", () => {
   const lane = rulesFor(".lsr-sweep-heading").join("");
   assert.match(lane, /font-size: var\(--lsr-size-meta\);/);
   assert.match(lane, /color: var\(--lsr-muted\);/);
+});
+
+test("the chapter's card stands in the middle of the screen", () => {
+  // A title page, not a paragraph hugging the left edge: the card and every
+  // line on it are centred, the file rows included, so a chapter is entered
+  // the way a chapter of a book is.
+  const card = rulesFor(".lsr-gate").join("");
+  assert.match(card, /margin: 0 auto;/);
+  assert.match(card, /align-items: center;/);
+  assert.match(card, /text-align: center;/);
+  assert.match(rulesFor(".lsr-gate-file").join(""), /justify-content: center;/);
+  // A centred row that overflows loses both ends; a long path wraps instead.
+  assert.match(rulesFor(".lsr-gate-path").join(""), /overflow-wrap: anywhere;/);
+});
+
+test("the focus bar holds the way out and the way sideways, and no name", () => {
+  // The chapter's name is on its card, in the title size, and nowhere else;
+  // the bar is navigation. With no name to fill the middle, the way out
+  // pushes the place and the neighbours to the far side by itself.
+  assert.equal(rulesFor(".lsr-focus-name").length, 0);
+  assert.match(rulesFor(".lsr-focus-exit").join(""), /margin-right: auto;/);
 });
 
 test("a shut card is one press, and says so with the cursor alone", () => {

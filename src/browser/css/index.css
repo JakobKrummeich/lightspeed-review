@@ -130,10 +130,12 @@
 }
 
 /*
- * Focus mode: one chapter on the page, under a bar that says which chapter and
- * holds the way out and the way sideways. The bar sticks to the top of the
- * scroll and owns a fixed height, because the file rows below stick directly
- * under it and need to know where that is without measuring anything.
+ * Focus mode: one chapter on the page, under a bar that says which chapter
+ * this is by its place and holds the way out and the way sideways. Not the
+ * chapter's name: that is on the card right below, and the bar is navigation.
+ * The bar sticks to the top of the scroll and owns a fixed height, because
+ * the file rows below stick directly under it and need to know where that is
+ * without measuring anything.
  */
 .lsr-focus-bar {
   position: sticky;
@@ -148,13 +150,9 @@
   background: var(--lsr-bg);
 }
 
-.lsr-focus-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
+/* The way out stands alone at the left; the place and the neighbours keep the right. */
+.lsr-focus-exit {
+  margin-right: auto;
 }
 
 .lsr-focus-count {
@@ -175,17 +173,12 @@
 /*
  * The narrow pane leaves the bar less room than its words: the panel keeps its
  * column, so at 746px the review is a few hundred pixels wide. The controls
- * are what the bar is for and they stay; the name is on the chapter's own
- * header right below, and mid-scroll the sticky file row says where you are.
+ * are what the bar is for and they stay; the place goes, and mid-scroll the
+ * sticky file row says where you are.
  */
 @media (max-width: 860px) {
-  .lsr-focus-name,
   .lsr-focus-count {
     display: none;
-  }
-
-  .lsr-focus-exit {
-    margin-right: auto;
   }
 }
 

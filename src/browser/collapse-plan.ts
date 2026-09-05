@@ -34,16 +34,25 @@ export interface CollapsePlan {
  * outermost fold animates: animating a file inside a group already folding
  * over it reads as two jolts for one press, so the inner one snaps shut where
  * nobody can see it.
+ *
+ * A group folds only on the tick that finishes it. The one that undoes it
+ * moves the group nowhere: an untick is a withdrawal, not a request to read,
+ * and it is made on the chapter's card as often as under its lines — a card
+ * that opened on it would look as if it had taken the press meant for the
+ * tick. The files inside do open again, behind whatever the chapter is; the
+ * chapter itself opens on its own press and on nothing else.
  */
 export function tickCollapsePlan(
   fileFlips: FileApprovalFlip[],
   groupFlips: GroupApprovalFlip[],
 ): CollapsePlan {
-  const groups: FoldStep[] = groupFlips.map((flip) => ({
-    target: { kind: "group", index: flip.index },
-    expanded: !flip.approved,
-    animated: true,
-  }));
+  const groups: FoldStep[] = groupFlips
+    .filter((flip) => flip.approved)
+    .map((flip) => ({
+      target: { kind: "group", index: flip.index },
+      expanded: false,
+      animated: true,
+    }));
   const files: FoldStep[] = fileFlips.map((flip) => ({
     target: { kind: "file", path: flip.path },
     expanded: !flip.approved,

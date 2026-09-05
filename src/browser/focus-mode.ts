@@ -28,9 +28,9 @@ export function clampFocus(focus: number | undefined, count: number): number | u
  * reading order with something still unticked in it, wrapping round to the
  * start, so approving chapter after chapter never needs a press between them.
  * Sweep chapters are landed on like any other: the reviewer settles every
- * chapter in order, and a sweep's card offers its tick without the diff, so
- * one is a press and not a reading. Undefined when nothing is left: the
- * finished card stays, mark and all.
+ * chapter in order, and every card offers its tick, so a sweep is a press on
+ * its card and not a reading. Undefined when nothing is left: the finished
+ * card stays, mark and all.
  */
 export function nextChapterToRead(
   groups: DiffGroup[],
@@ -48,18 +48,18 @@ export function nextChapterToRead(
 
 /**
  * The bar above a focused chapter: the way back to the overview, the
- * chapter's name and place, and the way to its neighbours. Buttons, not links,
+ * chapter's place, and the way to its neighbours. Not the chapter's name —
+ * that is on the card right below, in the title size, and said again up here
+ * it was the one thing on the screen written twice. Buttons, not links,
  * because every one of them redraws in place. The ends are disabled rather
  * than dropped so the two controls keep their positions under the pointer
  * from chapter to chapter.
  */
 export function renderFocusBar(groups: DiffGroup[], focus: number): string {
-  const group = groups[focus];
-  if (group === undefined) return "";
+  if (groups[focus] === undefined) return "";
   const last = groups.length - 1;
   return `<div class="lsr-focus-bar">
   <button type="button" class="lsr-focus-exit">‹ All chapters</button>
-  <span class="lsr-focus-name">${escapeHtml(group.name)}</span>
   <span class="lsr-focus-count">Chapter ${focus + 1} of ${groups.length}</span>
   <button type="button" class="lsr-focus-prev"${focus === 0 ? " disabled" : ""}>Previous</button>
   <button type="button" class="lsr-focus-next"${focus === last ? " disabled" : ""}>Next</button>
@@ -100,8 +100,8 @@ export function renderChapterGate({ group, contentId, counter }: ChapterGate): s
 }
 
 /**
- * Why a sweep chapter's card offers its tick where a study chapter's does not:
- * the survey's own words for its lane, said again on the one card that can be
+ * Why a sweep chapter's tick is the press to make without reading first: the
+ * survey's own words for its lane, said again on the one card that can be
  * reached without passing through the lane. Nothing on a study chapter's card,
  * because reading is the default and needs no label.
  */

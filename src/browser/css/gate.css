@@ -14,15 +14,19 @@
  * reading measure, because these are sentences to read and not a row to scan,
  * and nothing on it is muted — on a screen holding this and nothing else,
  * quiet type says "skip me", which is what the same sentences got when they
- * headed the first file's diff.
+ * headed the first file's diff. Centred, column and lines both, the way a
+ * chapter of a book opens: hugging the left edge it read as one more
+ * paragraph of the page and not as the page a chapter starts on.
  */
 .lsr-gate {
   display: flex;
   flex-direction: column;
-  align-items: start;
+  align-items: center;
   gap: var(--lsr-space-4);
   max-width: 70ch;
+  margin: 0 auto;
   padding: var(--lsr-space-2) var(--lsr-space-3) var(--lsr-space-4);
+  text-align: center;
 }
 
 /* Gone the moment the diff is up: the room the intent held is the diff's now. */
@@ -31,28 +35,20 @@
 }
 
 /*
- * And the chapter's own tick is not offered on the card. Drawn there it sits a
- * centimetre from "Read the diff" and offers the whole chapter approved
- * without opening it — the one press the gate exists to interrupt, made the
- * easier of the two. It comes back at the foot of the diff, under the lines it
- * stands for. Once the chapter is approved the same box is its mark, not an
- * offer: a finished chapter shuts back onto its card, and the card is where
- * its state has to show. A sweep chapter's card offers the tick from the
- * start: there is nothing in it to decide, so the interruption has nothing to
- * protect, and the press is the one the reviewer came to its card to make.
+ * The chapter's own tick stays on the card, at its foot as it is at the
+ * diff's: a chapter is settled from its card as well as from under its lines,
+ * and once it is settled the same box is its mark — a finished chapter shuts
+ * back onto its card, and the card is where its state has to show. The tick
+ * is a press of its own: the card around it opens the diff, the tick and its
+ * label never do (`diff-mount` answers the tick and lets the card be).
  */
-.lsr-group:not([data-tier="sweep"]):has(.lsr-gate-press[aria-expanded="false"]):has(
-    .lsr-tick-all:not(:checked)
-  )
-  .lsr-group-foot {
-  display: none;
-}
 
 /*
  * The words the survey's lane wore, on the one card reachable without the
- * lane: they say why this card offers a tick where the last one did not. Set
- * as the lane's heading is, in the meta size and muted, because it is a label
- * on the chapter and not one of the sentences the card exists to have read.
+ * lane: they say this chapter's tick is the press to make, with nothing in it
+ * to read first. Set as the lane's heading is, in the meta size and muted,
+ * because it is a label on the chapter and not one of the sentences the card
+ * exists to have read.
  */
 .lsr-gate-tier {
   margin: 0;
@@ -104,6 +100,17 @@
 
 .lsr-gate-file {
   display: flex;
+  justify-content: center;
   align-items: baseline;
   gap: var(--lsr-space-3);
+}
+
+/*
+ * A path longer than the card wraps. A flex item will not shrink below its
+ * content on its own, and a centred row that overflows runs off both edges
+ * — the start of the path, the part that says where it is, going first.
+ */
+.lsr-gate-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

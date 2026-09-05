@@ -45,11 +45,13 @@ test("a chapter the review does not have is no focus at all", () => {
   assert.equal(clampFocus(0, 0), undefined);
 });
 
-test("the bar names the chapter and its place in the review", () => {
+test("the bar says the chapter's place in the review, not its name", () => {
+  // The name is on the card right below, in the title size; said again on
+  // the bar it was the one thing on the screen written twice.
   const html = renderFocusBar(groups, 1);
 
-  assert.match(html, /<span class="lsr-focus-name">API<\/span>/);
   assert.match(html, /Chapter 2 of 3/);
+  assert.doesNotMatch(html, /lsr-focus-name|API/);
 });
 
 test("the bar carries the way out and the way sideways", () => {
@@ -65,13 +67,6 @@ test("the first chapter has no previous, the last no next", () => {
   assert.doesNotMatch(renderFocusBar(groups, 0), /class="lsr-focus-next"[^>]*disabled/);
   assert.match(renderFocusBar(groups, 2), /class="lsr-focus-next"[^>]*disabled/);
   assert.doesNotMatch(renderFocusBar(groups, 2), /class="lsr-focus-prev"[^>]*disabled/);
-});
-
-test("a chapter name is escaped, never injected", () => {
-  const html = renderFocusBar([group("<script>x</script>")], 0);
-
-  assert.doesNotMatch(html, /<script>/);
-  assert.match(html, /&lt;script&gt;/);
 });
 
 test("a focus outside the groups renders nothing", () => {

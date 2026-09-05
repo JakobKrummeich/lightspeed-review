@@ -625,15 +625,13 @@ test("a focused review is one chapter and its bar: no index, no other groups", (
   assert.doesNotMatch(html, /new c\.ts/);
 });
 
-test("a chapter's section carries its tier only when there is one to act on", () => {
-  // The card's chrome reads it: a sweep chapter's card offers its tick, a study chapter's
-  // holds it back until the diff is up. Absent on study, as it is on the progress bar.
+test("a chapter's section is the same chrome whatever its tier", () => {
+  // Nothing on the section turns on the tier: every card offers its tick and the
+  // lane's words are on the card itself (`.lsr-gate-tier`), so an attribute here
+  // would be read by nobody.
   const sweep = render({ groups: [{ ...group("Docs", ["c.md"]), tier: "sweep" }], focus: 0 });
-  assert.match(sweep, /<section class="lsr-group" data-group-index="0" data-tier="sweep">/);
-
-  const study = render({ groups: [{ ...group("API", ["b.ts"]), tier: "study" }], focus: 0 });
-  assert.match(study, /<section class="lsr-group" data-group-index="0">/);
-  assert.doesNotMatch(study, /data-tier/);
+  assert.match(sweep, /<section class="lsr-group" data-group-index="0">/);
+  assert.doesNotMatch(sweep, /data-tier/);
 });
 
 test("a focused chapter opens behind its gate, whichever way it was entered", () => {

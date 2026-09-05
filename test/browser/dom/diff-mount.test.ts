@@ -288,18 +288,20 @@ test("ticking a group's last file shuts the group and marks it approved", async 
   assert.equal(page.root.querySelector(".lsr-gate-counter")?.textContent, "2/2 approved");
 });
 
-test("unticking a file in an approved group opens it again", async (t) => {
+test("unticking a file in an approved group opens that file again, under the diff already up", async (t) => {
   const page = mount(t, [group("API", ["a.png", "b.png"])], ["a.png"], { focus: 0 });
   page.open(0);
   // Read to the end, which is what shuts a chapter and marks it.
   page.tick(page.fileTick("b.png"), true);
   assert.equal(isOpen(page.gatePress(0)), false);
+  // A file's tick is under its lines, so reaching it means the diff is up again.
+  page.open(0);
 
   page.tick(page.fileTick("a.png"), false);
 
-  // Untick is asking to look again; a shut group would hide the very diff asked for.
+  // Untick is asking to look at that file again; the chapter stays as it was left.
+  assert.equal(isOpen(page.fileHeader("a.png")), true);
   assert.equal(isOpen(page.gatePress(0)), true);
-  assert.equal(page.groupContent(0).hidden, false);
   assert.equal(page.groupTick(0).checked, false);
 });
 
@@ -315,7 +317,7 @@ test("the group's own tick approves every file in it and shuts it in one go", as
   assert.deepEqual(page.posted.at(-1), ["a.png", "b.png"], "the server hears about every file");
 });
 
-test("unticking a group's own tick opens it and clears every file in it", async (t) => {
+test("unticking a chapter on its card clears every file in it and leaves the card standing", async (t) => {
   const page = mount(t, [group("API", ["a.png", "b.png"])], ["a.png"], { focus: 0 });
   page.open(0);
   page.tick(page.groupTick(0), true);
@@ -324,7 +326,10 @@ test("unticking a group's own tick opens it and clears every file in it", async 
   page.tick(page.groupTick(0), false);
 
   assert.equal(page.fileTick("a.png").checked, false);
-  assert.equal(isOpen(page.gatePress(0)), true, "asking to look again reopens the diff");
+  // The tick is its own press: withdrawing the mark is not asking to read, and
+  // the card under it never takes the press. The diff opens on its own button.
+  assert.equal(isOpen(page.gatePress(0)), false, "the card stays shut");
+  assert.equal(page.groupContent(0).hidden, true);
   assert.deepEqual(page.posted.at(-1), [], "the server hears the withdrawal too");
 });
 
@@ -431,14 +436,27 @@ test("a tick that leaves the chapter unfinished moves nowhere", (t) => {
   assert.equal(isOpen(page.gatePress(0)), true, "and the diff stays up");
 });
 
-test("unticking inside a finished chapter reopens it where it is, moving nowhere", (t) => {
+test("unticking a finished chapter on its card leaves it there, shut and moving nowhere", (t) => {
   const page = mount(t, threeChapters(), ["a.png"], { focus: 0 });
 
   page.tick(page.groupTick(0), false);
 
   assert.deepEqual(shownChapters(page), ["0"]);
-  assert.equal(isOpen(page.gatePress(0)), true, "asking to look again opens the diff");
+  assert.equal(isOpen(page.gatePress(0)), false, "withdrawing the mark opens nothing");
   assert.deepEqual(page.focused, []);
+});
+
+test("an unread chapter's card offers its tick too, and it moves on the way the diff's does", (t) => {
+  // Every card carries the chapter's tick: a chapter can be settled from its
+  // card as well as from under its lines. The press is the tick's own, so the
+  // card is not opened on the way.
+  const page = mount(t, threeChapters(), [], { focus: 0 });
+
+  page.tick(page.groupTick(0), true);
+
+  assert.deepEqual(shownChapters(page), ["1"], "ticked from the card, and on to the next");
+  assert.equal(isOpen(page.gatePress(1)), false, "on its card");
+  assert.deepEqual(page.posted.at(-1), ["a.png"]);
 });
 
 test("a finished chapter lands on a sweep chapter's card, whose tick moves on without the diff", (t) => {
@@ -450,11 +468,9 @@ test("a finished chapter lands on a sweep chapter's card, whose tick moves on wi
   page.tick(page.fileTick("a.png"), true);
 
   // Docs is bulk, but it is still the next chapter unsettled: its card is where the reviewer
-  // lands, and the card carries the tier the chrome reads to offer the tick on it.
+  // lands.
   assert.deepEqual(shownChapters(page), ["1"]);
   assert.equal(isOpen(page.gatePress(1)), false, "on its card");
-  const card = page.root.querySelector('.lsr-group[data-group-index="1"]');
-  assert.equal(card?.getAttribute("data-tier"), "sweep");
 
   page.tick(page.groupTick(1), true);
 
