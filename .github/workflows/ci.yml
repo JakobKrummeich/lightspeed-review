@@ -1,22 +1,25 @@
 name: CI
 
+# Pushes to main and every pull request; a PR branch is not also run as a push,
+# which would report each Dependabot PR twice.
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
   gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The pnpm version comes from package.json's `packageManager`; naming it here
       # too makes the action refuse to pick between the two.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       # `engines` says >= 22.18; 22 is the version the suite is developed on and
       # the one `node --test` runs TypeScript directly under.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm

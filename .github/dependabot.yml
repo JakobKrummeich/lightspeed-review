@@ -6,9 +6,19 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Minor and patch bumps travel together; a major arrives alone, so one
+    # breaking release cannot hold the other ten hostage in a red PR.
     groups:
-      dependencies:
+      minor-and-patch:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # typescript-eslint refuses TypeScript 7; lift this when it stops refusing.
+      - dependency-name: typescript
+        versions: [">=7"]
+      # Node's types follow the Node the suite runs on (engines >= 22), not the newest Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
