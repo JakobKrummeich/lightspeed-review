@@ -1,7 +1,7 @@
 import type { DiffGroup } from "../../diff-extract.ts";
 import { tickCollapsePlan, type OpenFolds } from "../collapse-plan.ts";
 import { commentedLastRound } from "../commented-files.ts";
-import { clampFocus } from "../focus-mode.ts";
+import { clampFocus, nextChapterToRead } from "../focus-mode.ts";
 import { createDiff2HtmlRenderer, type DiffOutputFormat } from "../diff2html-adapter.ts";
 import type { DiffRenderer } from "../diff-renderer.ts";
 import {
@@ -9,6 +9,7 @@ import {
   groupApprovalFlips,
   renderGroups,
   reviewApproved,
+  type GroupApprovalFlip,
 } from "../diff-view.ts";
 import { sweepApproved } from "../group-index.ts";
 import { renderProgressBar } from "../progress-bar.ts";
@@ -250,10 +251,13 @@ function handleClick(view: DiffView, event: Event): void {
   const target =
     event.target instanceof Element
       ? event.target.closest(
-          ".lsr-gate-press, .lsr-file-header, .lsr-index-entry, .lsr-form-option, .lsr-focus-exit, .lsr-focus-prev, .lsr-focus-next, .lsr-sweep-approve",
+          ".lsr-tick, .lsr-gate-press, .lsr-file-header, .lsr-index-entry, .lsr-form-option, .lsr-focus-exit, .lsr-focus-prev, .lsr-focus-next, .lsr-sweep-approve, .lsr-group",
         )
       : null;
   if (!(target instanceof HTMLElement)) return;
+  // A tick is the browser's: it fires `change`, and the card it may sit on
+  // must not read the same press as a request to open.
+  if (target.classList.contains("lsr-tick")) return;
   if (answeredItself(view, target)) return;
   if (isFocusControl(target)) {
     const press = focusPress(target, view.state.focus, view.state.groups.length);
@@ -281,14 +285,26 @@ function answeredItself(view: DiffView, target: HTMLElement): boolean {
     approveSweep(view);
     return true;
   }
-  if (target.classList.contains("lsr-gate-press")) {
-    openGate(view, target);
+  const press = gatePressOf(target);
+  if (press) {
+    // A press on a shut card, anywhere on it: the button names the action and
+    // the whole card takes it. Once the diff is up the section is just the room
+    // the lines are read in, and a press there is a press on nothing.
+    if (isExpanded(press)) return true;
+    openGate(view, press);
     // Top of the chapter, exactly as entering one does: the press was answered
     // with a screen of diff, and its first line is where reading starts.
     view.options.root.scrollIntoView({ block: "start" });
     return true;
   }
   return false;
+}
+
+/** The gate a press was on, whether it hit the button or the card around it. */
+function gatePressOf(target: HTMLElement): HTMLElement | undefined {
+  if (target.classList.contains("lsr-gate-press")) return target;
+  if (!target.classList.contains("lsr-group")) return undefined;
+  return target.querySelector<HTMLElement>(".lsr-gate-press") ?? undefined;
 }
 
 /**
@@ -337,17 +353,37 @@ function handleTick(view: DiffView, event: Event): void {
   const fileFlips = fileApprovalFlips(state.groups, state.approved, next);
   const groupFlips = groupApprovalFlips(state.groups, state.approved, next);
   state.approved = next;
-  applyApprovedState(root, state.groups, state.approved);
-  applyCollapsePlan(root, tickCollapsePlan(fileFlips, groupFlips));
-  // A tick's folds are as much a state worth restoring as hand-opened ones.
-  reportOpen(view);
-  applyProgressState(progress, state.groups, state.approved);
+  const onward = chapterToReadNext(state, groupFlips);
+  if (onward !== undefined) {
+    // The tick finished the chapter on screen: the next one still to read
+    // takes its place, on its card. A whole draw, so nothing below is patched.
+    setFocus(view, onward);
+  } else {
+    applyApprovedState(root, state.groups, state.approved);
+    applyCollapsePlan(root, tickCollapsePlan(fileFlips, groupFlips));
+    // A tick's folds are as much a state worth restoring as hand-opened ones.
+    reportOpen(view);
+    applyProgressState(progress, state.groups, state.approved);
+  }
   // A tick redraws nothing, so completion has to be reported from here too.
   view.options.onApproved(reviewApproved(state.groups, state.approved));
   // Tick stays on screen either way; log rather than lose it silently.
   persistApproved(key, state.approved).catch(() =>
     console.error("lightspeed: approved state was not saved"),
   );
+}
+
+/**
+ * Where a tick that finished the focused chapter moves on to, or nowhere: a
+ * tick that finished nothing, or finished a chapter with none left to read,
+ * leaves the reviewer where they are. Read off the group flips, so a file tick
+ * that happens to complete the chapter and the chapter's own tick are one case.
+ */
+function chapterToReadNext(state: DiffViewState, flips: GroupApprovalFlip[]): number | undefined {
+  const { focus } = state;
+  if (focus === undefined) return undefined;
+  if (!flips.some((flip) => flip.index === focus && flip.approved)) return undefined;
+  return nextChapterToRead(state.groups, state.approved, focus);
 }
 
 /** Whatever the page just left standing open, said out loud once. */

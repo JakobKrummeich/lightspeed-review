@@ -363,6 +363,129 @@ test("a tick that flips a chapter the page is not showing folds nothing", async 
   assert.equal(page.reported.at(-1), true, "and the review is done either way");
 });
 
+/** Three chapters to read in order; `approved` decides which are already done. */
+const threeChapters = (): DiffGroup[] => [
+  group("API", ["a.png"]),
+  group("Docs", ["b.png"]),
+  group("Tests", ["c.png"]),
+];
+
+const shownChapters = (page: Mounted): (string | null)[] =>
+  page.root
+    .querySelectorAll(".lsr-group")
+    .map((section) => section.getAttribute("data-group-index"));
+
+test("finishing a chapter puts the next one still to read on screen, shut on its card", (t) => {
+  const page = mount(t, threeChapters(), ["b.png"], { focus: 0 });
+  page.open(0);
+
+  page.tick(page.fileTick("a.png"), true);
+
+  // Docs is done already, so the reviewer lands on Tests — and on its card, as every way into
+  // a chapter does: the tick asked for the next thing to read, not for its lines.
+  assert.deepEqual(shownChapters(page), ["2"]);
+  assert.equal(isOpen(page.gatePress(2)), false);
+  assert.deepEqual(page.focused, [2], "reported, so a reload comes back to the same place");
+  assert.deepEqual(
+    page.posted.at(-1),
+    ["b.png", "a.png"],
+    "the tick reached the server all the same",
+  );
+  assert.equal(page.reported.at(-1), false, "two of three, so the review is not done");
+  assert.equal(
+    page.scroller.scrolledInto || page.root.scrolledInto,
+    true,
+    "top of the new chapter",
+  );
+});
+
+test("the chapter's own tick moves on the same way a last file tick does", (t) => {
+  const page = mount(t, threeChapters(), [], { focus: 1 });
+  page.open(1);
+
+  page.tick(page.groupTick(1), true);
+
+  assert.deepEqual(shownChapters(page), ["2"], "the next in order, not the first");
+  assert.deepEqual(page.focused, [2]);
+});
+
+test("the last chapter finished wraps round to the first still to read", (t) => {
+  const page = mount(t, threeChapters(), ["b.png"], { focus: 2 });
+  page.open(2);
+
+  page.tick(page.fileTick("c.png"), true);
+
+  assert.deepEqual(shownChapters(page), ["0"]);
+});
+
+test("a tick that leaves the chapter unfinished moves nowhere", (t) => {
+  const page = mount(t, [group("API", ["a.png", "b.png"]), group("Docs", ["c.png"])], [], {
+    focus: 0,
+  });
+  page.open(0);
+
+  page.tick(page.fileTick("a.png"), true);
+
+  assert.deepEqual(shownChapters(page), ["0"], "half read is not finished");
+  assert.deepEqual(page.focused, [], "no focus move to report");
+  assert.equal(isOpen(page.gatePress(0)), true, "and the diff stays up");
+});
+
+test("unticking inside a finished chapter reopens it where it is, moving nowhere", (t) => {
+  const page = mount(t, threeChapters(), ["a.png"], { focus: 0 });
+
+  page.tick(page.groupTick(0), false);
+
+  assert.deepEqual(shownChapters(page), ["0"]);
+  assert.equal(isOpen(page.gatePress(0)), true, "asking to look again opens the diff");
+  assert.deepEqual(page.focused, []);
+});
+
+test("a finished chapter never lands on a sweep chapter", (t) => {
+  const groups = threeChapters();
+  groups[1] = { ...groups[1]!, tier: "sweep" };
+  const page = mount(t, groups, ["c.png"], { focus: 0 });
+  page.open(0);
+
+  page.tick(page.fileTick("a.png"), true);
+
+  // Docs is bulk the survey approves in one press; Tests is done. Nothing is left to read, so
+  // the finished card stays rather than asking for a reading the tier said was not worth having.
+  assert.deepEqual(shownChapters(page), ["0"]);
+  assert.equal(isOpen(page.gatePress(0)), false, "shut onto its card, mark and all");
+  assert.deepEqual(page.focused, []);
+});
+
+test("pressing anywhere on the card passes the gate, not only the button", (t) => {
+  const page = mount(t, [group("API", ["a.png"])], [], { focus: 0 });
+
+  press(page, ".lsr-gate-rationale");
+
+  assert.equal(isOpen(page.gatePress(0)), true);
+  assert.equal(page.groupContent(0).hidden, false);
+});
+
+test("the chapter's own tick on a finished card is a tick, not a press through the gate", (t) => {
+  const page = mount(t, [group("API", ["a.png"])], ["a.png"], { focus: 0 });
+
+  const foot = page.root.querySelector(".lsr-group-foot");
+  assert.ok(foot, "the finished card carries its own tick");
+  page.root.dispatch("click", { target: tickTarget(foot, ".lsr-tick") });
+
+  assert.equal(isOpen(page.gatePress(0)), false, "the card stays, the box is the browser's");
+});
+
+test("a press inside an open chapter's body is a press on its lines, not on its card", (t) => {
+  const page = mount(t, [group("API", ["a.png"])], [], { focus: 0 });
+  page.open(0);
+  page.root.scrolledInto = false;
+
+  press(page, ".lsr-group-content");
+
+  assert.equal(isOpen(page.gatePress(0)), true, "nothing to open");
+  assert.equal(page.root.scrolledInto, false, "and nothing scrolled: the reviewer is reading");
+});
+
 /** A needs-reapproval file, which is the only kind that carries the switch. */
 function reapproval(path: string): Record<string, Approval> {
   return { [path]: "needs-reapproval" };
@@ -819,7 +942,9 @@ test("approving a file repaints the chapter's counter, and the index on the way 
 
   page.tick(page.fileTick("a.png"), true);
 
-  assert.equal(page.root.querySelector(".lsr-gate-counter")?.textContent, "1/1 approved");
+  // The tick finished API, so the card on screen is now Docs's, with Docs's counter.
+  assert.deepEqual(shownChapters(page), ["1"]);
+  assert.equal(page.root.querySelector(".lsr-gate-counter")?.textContent, "0/1 approved");
   assert.equal(
     page.progress.querySelector(".lsr-progress-count")?.textContent,
     "1/2 files approved",
@@ -885,10 +1010,13 @@ test("a tick fills its group's segment, and untick empties it again", (t) => {
 
   page.tick(page.fileTick("b.png"), true);
 
+  // Finishing API moved the reviewer on to Docs; the bar came with the draw and says so.
+  assert.deepEqual(shownChapters(page), ["1"]);
   assert.equal(fill(0), "width: 100%");
   assert.equal(segment(0).getAttribute("data-state"), "approved");
   assert.equal(segment(0).getAttribute("aria-label"), "API: 2/2 approved");
 
+  press(page, ".lsr-focus-prev");
   page.tick(page.fileTick("a.png"), false);
 
   assert.equal(fill(0), "width: 50%");
@@ -983,7 +1111,8 @@ test("ticking a file read to the end holds the row the tick is in, and travels n
   assert.equal(headerTop(page.fileHeader("c.png")), 100, "and the next file is directly under it");
 });
 
-test("the tick that finishes a group leaves the reviewer on the group it finished", (t) => {
+test("the tick that finishes the last chapter left to read holds the reviewer on its card", (t) => {
+  // One chapter in the review, so there is nowhere to move on to: the finished card stays.
   const page = mount(t, [group("API", ["a.png", "b.png"])], ["a.png"], { focus: 0 });
   page.open(0);
   giveHeights(page);
@@ -1435,9 +1564,10 @@ test("the bar marks the chapter on screen, and the mark moves with the reviewer"
   assert.equal(mark(0), "true", "the chapter the round opened on is marked");
   assert.equal(mark(1), null);
 
-  // A tick repaints the bar in place; the mark is not among what it repaints.
+  // The tick finished API, so the reviewer is on Docs now, and so is the mark.
   page.tick(page.fileTick("a.png"), true);
-  assert.equal(mark(0), "true", "a tick does not take the mark away");
+  assert.equal(mark(0), null);
+  assert.equal(mark(1), "true", "the mark moved on with the reviewer");
 
   press(page, ".lsr-focus-exit");
   assert.equal(mark(0), null, "the survey reads nothing, so nothing is marked");

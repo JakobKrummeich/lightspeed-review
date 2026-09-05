@@ -138,12 +138,13 @@ diff rendered but shut behind one press.
 │ │ │ 1/3 approved                                            │ │   │ .lsr-gate-counter
 │ │ │ ( Read the diff )                                       │ │   │ .lsr-gate-press
 │ │ └─────────────────────────────────────────────────────────┘ │   │
-│ │                                       approve chapter [ ]   │   │ .lsr-group-foot
+│ │                                       approve chapter [x]   │   │ .lsr-group-foot (approved only)
 │ └─────────────────────────────────────────────────────────────┘   │ .lsr-tick-all
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-Pressed, the card goes and the room it held is the diff's:
+Pressed — the button or anywhere on the card — the card goes and the room it
+held is the diff's:
 
 ```
 ┌─ main#lsr-review ─────────────────────────────────────────────────┐
@@ -174,6 +175,14 @@ Pressed, the card goes and the room it held is the diff's:
   `.lsr-group-content` hidden behind it), and the card is drawn only while that
   fold is shut. So ticking the chapter's own box shuts it back onto its card,
   and unticking opens the diff again.
+- The chapter's tick is not offered on an unticked card: drawn there it is the
+  cheaper of the two presses, and the gate exists to interrupt exactly that
+  one. An approved chapter's card does show it, ticked — the mark is the
+  chapter's state, and the card is where that state has to be legible.
+- A tick that finishes the focused chapter moves on: the next chapter in order
+  with something still unticked takes the screen, on its gate, wrapping round
+  and skipping sweep chapters (the survey approves those in one press). With
+  nothing left to read, the finished card stays, mark and all.
 - Passing a gate is view state and nothing more: it is never sent to the server
   and never stored per file. It survives a redraw inside the round (an agent
   reply must not put the card back over a half-read diff) and a reload, which

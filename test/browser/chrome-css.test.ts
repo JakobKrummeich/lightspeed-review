@@ -256,10 +256,29 @@ test("the chapter's reasons are set to be read, not to be skipped past", () => {
 
 test("a chapter cannot be approved from the card that stands in front of its diff", () => {
   // The gate exists to interrupt the tick that costs nothing. Left on the card, the chapter's
-  // own tick sits beside "Read the diff" and is the cheaper of the two presses.
-  assert.match(
-    rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="false"]) .lsr-group-foot').join(""),
-    /display: none;/,
+  // own tick sits beside "Read the diff" and is the cheaper of the two presses. Only while
+  // unticked, though: a finished chapter shuts back onto its card, and the card must show
+  // the mark it earned.
+  const unapproved =
+    '.lsr-group:has(.lsr-gate-press[aria-expanded="false"]):has(.lsr-tick-all:not(:checked)) .lsr-group-foot';
+  assert.match(rulesFor(unapproved).join(""), /display: none;/);
+  assert.equal(
+    rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="false"]) .lsr-group-foot').length,
+    0,
+    "an approved chapter's card keeps its mark",
+  );
+});
+
+test("a shut card is one press, and says so with the cursor alone", () => {
+  // The whole card opens the chapter, not only the button on it. The cursor is the only
+  // announcement: no hover dressing on a card that is text to read.
+  const shut = rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="false"])');
+  assert.equal(shut.length, 1);
+  assert.match(shut[0] ?? "", /cursor: pointer;/);
+  assert.doesNotMatch(
+    bare,
+    /\.lsr-group:has\(\.lsr-gate-press\[aria-expanded="false"\]\):hover/,
+    "no hover effect on the card",
   );
 });
 

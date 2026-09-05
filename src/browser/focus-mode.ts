@@ -1,5 +1,7 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
+import { isSweep } from "../group-tier.ts";
+import { groupIndexEntries } from "./group-index.ts";
 
 /**
  * Focus mode: one chapter of the review filling the viewport, the others not
@@ -19,6 +21,28 @@ import { escapeHtml } from "../escape-html.ts";
 export function clampFocus(focus: number | undefined, count: number): number | undefined {
   if (focus === undefined || !Number.isInteger(focus)) return undefined;
   return focus >= 0 && focus < count ? focus : undefined;
+}
+
+/**
+ * Where a reviewer goes once the chapter at `from` is finished: the next one in
+ * reading order with something still unticked in it, wrapping round to the
+ * start, so approving chapter after chapter never needs a press between them.
+ * Never a sweep chapter — the survey approves those in one press, and landing
+ * on one would ask for exactly the reading its tier says is not worth having.
+ * Undefined when nothing is left: the finished card stays, mark and all.
+ */
+export function nextChapterToRead(
+  groups: DiffGroup[],
+  approved: string[],
+  from: number,
+): number | undefined {
+  const entries = groupIndexEntries(groups, approved);
+  for (let step = 1; step < groups.length; step++) {
+    const index = (from + step) % groups.length;
+    const entry = entries[index]!;
+    if (!isSweep(groups[index]!) && entry.approved < entry.files) return index;
+  }
+  return undefined;
 }
 
 /**

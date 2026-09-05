@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { DiffFile, DiffGroup } from "../../src/diff-extract.ts";
-import { clampFocus, renderChapterGate, renderFocusBar } from "../../src/browser/focus-mode.ts";
+import {
+  clampFocus,
+  nextChapterToRead,
+  renderChapterGate,
+  renderFocusBar,
+} from "../../src/browser/focus-mode.ts";
 
 function file(path: string, insertions = 1, deletions = 1): DiffFile {
   return {
@@ -145,4 +150,46 @@ test("every word the grouping wrote is escaped, never injected", () => {
   assert.match(html, /&lt;script&gt;/);
   assert.match(html, /&lt;img/);
   assert.match(html, /&lt;b&gt;/);
+});
+
+/** Chapters in reading order, each one file, named by letter so the approved list reads easily. */
+function chapters(...names: string[]): DiffGroup[] {
+  return names.map((name) => group(name));
+}
+
+const approvedIn = (...names: string[]): string[] => names.map((name) => `src/${name}.ts`);
+
+test("finishing a chapter moves on to the next one still to read", () => {
+  assert.equal(nextChapterToRead(chapters("a", "b", "c"), approvedIn("a"), 0), 1);
+});
+
+test("a chapter already approved is passed over on the way to the next", () => {
+  assert.equal(nextChapterToRead(chapters("a", "b", "c"), approvedIn("a", "b"), 0), 2);
+});
+
+test("the last chapter finished wraps round to the first still unread", () => {
+  assert.equal(nextChapterToRead(chapters("a", "b", "c"), approvedIn("b", "c"), 2), 0);
+});
+
+test("nothing left to read is nowhere to go, and never the chapter just finished", () => {
+  assert.equal(nextChapterToRead(chapters("a", "b"), approvedIn("a", "b"), 1), undefined);
+  assert.equal(nextChapterToRead(chapters("a"), approvedIn("a"), 0), undefined);
+});
+
+test("a sweep chapter is never where a finished chapter lands", () => {
+  // The review never asked anyone to read it: it is ticked from the survey in one press, and
+  // landing on its card would ask for exactly the reading the tier says is not worth having.
+  const groups = chapters("a", "b", "c");
+  groups[1] = { ...groups[1]!, tier: "sweep" };
+  assert.equal(nextChapterToRead(groups, approvedIn("a"), 0), 2);
+  assert.equal(nextChapterToRead(groups, approvedIn("a", "c"), 2), undefined);
+});
+
+test("a chapter with no files has nothing to read and is passed over", () => {
+  const groups = [
+    ...chapters("a"),
+    { name: "empty", rationale: "nothing", files: [] },
+    ...chapters("c"),
+  ];
+  assert.equal(nextChapterToRead(groups, approvedIn("a"), 0), 2);
 });
