@@ -14,24 +14,55 @@
  * reading measure, because these are sentences to read and not a row to scan,
  * and nothing on it is muted — on a screen holding this and nothing else,
  * quiet type says "skip me", which is what the same sentences got when they
- * headed the first file's diff. Centred, column and lines both, the way a
- * chapter of a book opens: hugging the left edge it read as one more
- * paragraph of the page and not as the page a chapter starts on.
+ * headed the first file's diff. The column stands in the middle of the
+ * screen — hugging the left edge it read as one more paragraph of the page
+ * and not as the page a chapter starts on — but its lines are flush left:
+ * sentences read from one edge, and centred ones make the eye find it anew
+ * on every line.
  */
 .lsr-gate {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: start;
   gap: var(--lsr-space-4);
   max-width: 70ch;
   margin: 0 auto;
   padding: var(--lsr-space-2) var(--lsr-space-3) var(--lsr-space-4);
-  text-align: center;
 }
 
 /* Gone the moment the diff is up: the room the intent held is the diff's now. */
 .lsr-group:has(.lsr-gate-press[aria-expanded="true"]) .lsr-gate {
   display: none;
+}
+
+/*
+ * And the chapter's name moves up to the bar the moment the card goes. On the
+ * card it is the title, right under the bar, and said on both it was the one
+ * thing on the screen written twice; once the card is gone behind the diff,
+ * the bar is the only place left to say which chapter this is. Read off the
+ * gate's own fold, as the card's showing is, so the name comes back down when
+ * the chapter shuts. The bar is set in `index.css`; this one word on it is
+ * the gate's doing, so it is set here with the gate.
+ */
+.lsr-focus-name {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.lsr-focus-bar:has(+ .lsr-group .lsr-gate-press[aria-expanded="true"]) .lsr-focus-name {
+  display: block;
+}
+
+/* The narrow pane has no room for it, as it has none for the place (`index.css`). */
+@media (max-width: 860px) {
+  .lsr-focus-bar:has(+ .lsr-group .lsr-gate-press[aria-expanded="true"]) .lsr-focus-name {
+    display: none;
+  }
 }
 
 /*
@@ -100,15 +131,14 @@
 
 .lsr-gate-file {
   display: flex;
-  justify-content: center;
   align-items: baseline;
   gap: var(--lsr-space-3);
 }
 
 /*
  * A path longer than the card wraps. A flex item will not shrink below its
- * content on its own, and a centred row that overflows runs off both edges
- * — the start of the path, the part that says where it is, going first.
+ * content on its own, and a row that overflows runs out of the card with the
+ * change's size after it.
  */
 .lsr-gate-path {
   min-width: 0;

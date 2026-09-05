@@ -48,18 +48,22 @@ export function nextChapterToRead(
 
 /**
  * The bar above a focused chapter: the way back to the overview, the
- * chapter's place, and the way to its neighbours. Not the chapter's name —
- * that is on the card right below, in the title size, and said again up here
- * it was the one thing on the screen written twice. Buttons, not links,
- * because every one of them redraws in place. The ends are disabled rather
- * than dropped so the two controls keep their positions under the pointer
- * from chapter to chapter.
+ * chapter's name and place, and the way to its neighbours. The name is
+ * rendered on every draw and shown by the stylesheet only while the diff is
+ * up: on the card it is right below in the title size, and said on both it
+ * was the one thing on the screen written twice; once the card is gone
+ * behind the diff, the bar is the only place left to say which chapter this
+ * is. Buttons, not links, because every one of them redraws in place. The
+ * ends are disabled rather than dropped so the two controls keep their
+ * positions under the pointer from chapter to chapter.
  */
 export function renderFocusBar(groups: DiffGroup[], focus: number): string {
-  if (groups[focus] === undefined) return "";
+  const group = groups[focus];
+  if (group === undefined) return "";
   const last = groups.length - 1;
   return `<div class="lsr-focus-bar">
   <button type="button" class="lsr-focus-exit">‹ All chapters</button>
+  <span class="lsr-focus-name">${escapeHtml(group.name)}</span>
   <span class="lsr-focus-count">Chapter ${focus + 1} of ${groups.length}</span>
   <button type="button" class="lsr-focus-prev"${focus === 0 ? " disabled" : ""}>Previous</button>
   <button type="button" class="lsr-focus-next"${focus === last ? " disabled" : ""}>Next</button>

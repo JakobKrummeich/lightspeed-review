@@ -281,24 +281,30 @@ test("the sweep card's label is set as the survey's lane heading is", () => {
   assert.match(lane, /color: var\(--lsr-muted\);/);
 });
 
-test("the chapter's card stands in the middle of the screen", () => {
-  // A title page, not a paragraph hugging the left edge: the card and every
-  // line on it are centred, the file rows included, so a chapter is entered
-  // the way a chapter of a book is.
+test("the chapter's card stands in the middle of the screen, its lines flush left", () => {
+  // The block is centred, not the words on it: a column of sentences reads
+  // from one left edge, and a card hugging the screen's edge read as one more
+  // paragraph of the page rather than the page a chapter starts on.
   const card = rulesFor(".lsr-gate").join("");
   assert.match(card, /margin: 0 auto;/);
-  assert.match(card, /align-items: center;/);
-  assert.match(card, /text-align: center;/);
-  assert.match(rulesFor(".lsr-gate-file").join(""), /justify-content: center;/);
-  // A centred row that overflows loses both ends; a long path wraps instead.
+  assert.match(card, /align-items: start;/);
+  assert.doesNotMatch(card, /text-align: center;/);
+  assert.doesNotMatch(rulesFor(".lsr-gate-file").join(""), /justify-content: center;/);
+  // A path longer than the card wraps rather than running out of it.
   assert.match(rulesFor(".lsr-gate-path").join(""), /overflow-wrap: anywhere;/);
 });
 
-test("the focus bar holds the way out and the way sideways, and no name", () => {
-  // The chapter's name is on its card, in the title size, and nowhere else;
-  // the bar is navigation. With no name to fill the middle, the way out
-  // pushes the place and the neighbours to the far side by itself.
-  assert.equal(rulesFor(".lsr-focus-name").length, 0);
+test("the bar carries the chapter's name only while the diff is up", () => {
+  // On the card the name is in the title size right below the bar, and said
+  // twice it was the one thing on the screen written twice. Once the card is
+  // gone behind the diff, the bar is the only place left to say which chapter
+  // this is — so the name moves up there, and nowhere is it on screen twice.
+  assert.match(rulesFor(".lsr-focus-name").join(""), /display: none;/);
+  const up = rulesFor(
+    '.lsr-focus-bar:has(+ .lsr-group .lsr-gate-press[aria-expanded="true"]) .lsr-focus-name',
+  ).join("");
+  assert.match(up, /display: block;/);
+  // With the name away, the way out pushes the place and the neighbours right by itself.
   assert.match(rulesFor(".lsr-focus-exit").join(""), /margin-right: auto;/);
 });
 

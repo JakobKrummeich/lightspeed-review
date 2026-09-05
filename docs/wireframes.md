@@ -128,14 +128,14 @@ diff rendered but shut behind one press.
 ┌─ main#lsr-review ─────────────────────────────────────────────────┐
 │ ‹ All chapters                    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar
 │ ┌─ section.lsr-group ─────────────────────────────────────────┐   │
-│ │ ┌─ .lsr-gate (centred) ───────────────────────────────────┐ │   │
-│ │ │                     Chapter name                        │ │   │ .lsr-gate-name (title)
-│ │ │             What happened, one sentence.                │ │   │ .lsr-gate-rationale (lead)
-│ │ │               src/path/file.ts   +12 −3                 │ │   │ .lsr-gate-files / -file
-│ │ │               src/other.ts       +4 −0                  │ │   │ .lsr-gate-path / -lines
-│ │ │                     1/3 approved                        │ │   │ .lsr-gate-counter
-│ │ │                   ( Read the diff )                     │ │   │ .lsr-gate-press
-│ │ └─────────────────────────────────────────────────────────┘ │   │
+│ │      ┌─ .lsr-gate (column centred, lines flush left) ─┐      │   │
+│ │      │ Chapter name                                  │      │   │ .lsr-gate-name (title)
+│ │      │ What happened, one sentence.                  │      │   │ .lsr-gate-rationale (lead)
+│ │      │ src/path/file.ts   +12 −3                     │      │   │ .lsr-gate-files / -file
+│ │      │ src/other.ts       +4 −0                      │      │   │ .lsr-gate-path / -lines
+│ │      │ 1/3 approved                                  │      │   │ .lsr-gate-counter
+│ │      │ ( Read the diff )                             │      │   │ .lsr-gate-press
+│ │      └───────────────────────────────────────────────┘      │   │
 │ │                                       approve chapter [ ]   │   │ .lsr-group-foot
 │ └─────────────────────────────────────────────────────────────┘   │ .lsr-tick-all
 └───────────────────────────────────────────────────────────────────┘
@@ -146,7 +146,7 @@ held is the diff's:
 
 ```
 ┌─ main#lsr-review ─────────────────────────────────────────────────┐
-│ ‹ All chapters                    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar
+│ ‹ All chapters    Chapter name    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar (+ .lsr-focus-name)
 │ ┌─ section.lsr-group ─────────────────────────────────────────┐   │
 │ │ ┌─ .lsr-group-content ────────────────────────────────────┐ │   │
 │ │ │ ┌─ .lsr-file (open) ──────────────────────────────────┐ │ │   │
@@ -182,8 +182,9 @@ held is the diff's:
   diff, they never do. A sweep chapter's card says why its tick is the press
   to make, under a `.lsr-gate-tier` label in the survey lane's words: there is
   nothing in it to decide.
-- The card is centred, column and lines both, the way a chapter of a book
-  opens; hugging the left edge it read as one more paragraph of the page.
+- The card's column stands in the middle of the screen — hugging the left
+  edge it read as one more paragraph of the page — but its lines are flush
+  left, as sentences are read.
 - A tick that finishes the focused chapter moves on: the next chapter in order
   with something still unticked takes the screen, on its gate, wrapping round.
   Sweep chapters are landed on like any other — one press on their card
@@ -193,10 +194,12 @@ held is the diff's:
   and never stored per file. It survives a redraw inside the round (an agent
   reply must not put the card back over a half-read diff) and a reload, which
   restores the reviewer's place; every chapter move renders it shut again.
-- The chapter's name is on its card and nowhere else. The focus bar is
-  navigation and says only the chapter's place — said on both, the name was
-  the one thing on the screen written twice — and nothing above the first
-  file says what the chapter is for, which is exactly what the gate is for.
+- The chapter's name is on screen once. On the card it is the title, and the
+  bar says only the chapter's place — said on both, the name was the one
+  thing on the screen written twice. Once the card is gone behind the diff,
+  the bar's `.lsr-focus-name` shows (CSS off the gate's `aria-expanded`), the
+  only place left to say which chapter this is. Nothing above the first file
+  says what the chapter is for, which is exactly what the gate is for.
 - Both ticks close what they mark: `approve` at the file **foot**, below its
   diff, and `approve chapter` at the chapter's, below the last file —
   deliberate, you approve what you have read past.
