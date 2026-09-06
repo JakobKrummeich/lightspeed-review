@@ -1,6 +1,6 @@
 {
   "name": "lightspeed-review",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Semantic diff review with targeted agent feedback",
   "keywords": [
     "code-review",
