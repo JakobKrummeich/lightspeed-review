@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { DiffFileStatus, DiffGroup } from "./diff-extract.ts";
+import { trailSweeps } from "./group-tier.ts";
 import type { GroupingMode } from "./llm/grouping.ts";
 import { ReviewError } from "./errors.ts";
 import { sessionFilePath, sessionsDirPath } from "./paths.ts";
@@ -226,9 +227,15 @@ function parseSession(contents: string, key: string): SessionRecord {
   // written before tiers existed opens as `study`: the review it belongs to was
   // read chapter by chapter, and the safe direction for a missing answer is the
   // one that asks for the reading rather than the one that waves it through.
+  //
+  // Ordered after that default is filled in, never before, since an untiered
+  // chapter is one to study and belongs above the bulk. A session stored before
+  // the tiers decided the order — or by anything that never ordered them — opens
+  // with its bulk last all the same, rather than waiting for the next round to
+  // rewrite the file: what a reader gets is the order the review is drawn in.
   return {
     ...parsed,
-    groups: parsed.groups.map((group) => ({ ...group, tier: group.tier ?? "study" })),
+    groups: trailSweeps(parsed.groups.map((group) => ({ ...group, tier: group.tier ?? "study" }))),
     rounds: parsed.rounds.map((round) => ({ ...round, approvedAtEnd: round.approvedAtEnd ?? [] })),
   };
 }

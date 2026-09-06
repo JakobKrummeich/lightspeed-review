@@ -1,4 +1,5 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
+import { trailSweeps } from "../group-tier.ts";
 import type { GroupingMode } from "../llm/grouping.ts";
 import { readBlobs } from "../ledger/write.ts";
 import { carriedApproval } from "./history.ts";
@@ -66,7 +67,12 @@ export function nextSessionRecord(
     headCommit: payload.headCommit,
     ...carriedOver(existing, stamp.now, payload.reopen === true),
     updatedAt: stamp.now,
-    groups: payload.groups,
+    // Ordered again on the way in, although the grouping already did it: a body
+    // is whatever a client posted, and this record is what the ledger's round
+    // says the chapters were and what the reviewer is shown. One order, decided
+    // where the round is made, rather than a stored order that only matches the
+    // screen when the client happened to be this version of the CLI.
+    groups: trailSweeps(payload.groups),
     // Re-grouping withdraws approval except where a blob sha proves the file
     // unmoved: the reviewer already read this exact text.
     approved: carriedApproval(rounds),

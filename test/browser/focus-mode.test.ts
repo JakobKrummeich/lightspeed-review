@@ -182,12 +182,13 @@ test("nothing left to read is nowhere to go, and never the chapter just finished
 
 test("a sweep chapter is landed on like any other: its card takes the tick without the diff", () => {
   // The reviewer settles every chapter in order; a sweep's card offers its tick, so landing
-  // on it is one press and not the reading its tier said was not worth having.
+  // on it is one press and not the reading its tier said was not worth having. The bulk is
+  // last, as it reaches every reader (`trailSweeps`), so it is also where the wrap starts.
   const groups = chapters("a", "b", "c");
-  groups[1] = { ...groups[1]!, tier: "sweep" };
-  assert.equal(nextChapterToRead(groups, approvedIn("a"), 0), 1);
-  assert.equal(nextChapterToRead(groups, approvedIn("a", "c"), 2), 1);
-  assert.equal(nextChapterToRead(groups, approvedIn("a", "b", "c"), 1), undefined);
+  groups[2] = { ...groups[2]!, tier: "sweep" };
+  assert.equal(nextChapterToRead(groups, approvedIn("a", "b"), 1), 2);
+  assert.equal(nextChapterToRead(groups, approvedIn("b", "c"), 2), 0);
+  assert.equal(nextChapterToRead(groups, approvedIn("a", "b", "c"), 2), undefined);
 });
 
 test("a chapter with no files has nothing to read and is passed over", () => {

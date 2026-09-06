@@ -10,6 +10,25 @@ function stateDir(): string {
   return mkdtempSync(join(tmpdir(), "lsr-store-"));
 }
 
+/** One chapter of one file, for the orders and defaults the store answers for. */
+function chapter(name: string, path: string): SessionRecord["groups"][number] {
+  return {
+    name,
+    rationale: "request handling",
+    tier: "study",
+    files: [
+      {
+        path,
+        status: "modified",
+        diff: "@@ -1 +1 @@\n-old\n+new",
+        insertions: 1,
+        deletions: 1,
+        oversized: false,
+      },
+    ],
+  };
+}
+
 function sessionRecord(overrides: Partial<SessionRecord> = {}): SessionRecord {
   return {
     key: "a3f8c21b9e4d5f60",
@@ -19,23 +38,7 @@ function sessionRecord(overrides: Partial<SessionRecord> = {}): SessionRecord {
     status: "open",
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-01T00:00:00.000Z",
-    groups: [
-      {
-        name: "API Handlers",
-        rationale: "request handling",
-        tier: "study",
-        files: [
-          {
-            path: "src/api/users.ts",
-            status: "modified",
-            diff: "@@ -1 +1 @@\n-old\n+new",
-            insertions: 1,
-            deletions: 1,
-            oversized: false,
-          },
-        ],
-      },
-    ],
+    groups: [chapter("API Handlers", "src/api/users.ts")],
     conversation: [],
     pending: [],
     approved: [],
@@ -175,6 +178,30 @@ test("a session written before reading tiers existed opens, and opens as study",
   assert.equal(loaded?.groups[0]?.name, "API Handlers");
   assert.equal(loaded?.groups[0]?.tier, "study");
   assert.equal(loaded?.groups[0]?.files.length, 1);
+});
+
+test("a stored session opens with its bulk last, wherever the file kept it", () => {
+  const store = new SessionStore(stateDir());
+  // A session written before chapters were ordered by tier, or posted by a
+  // client that never ordered them: the reading order is the store's answer to
+  // give, not something every reader works out again for itself.
+  store.save(
+    sessionRecord({
+      groups: [
+        { ...chapter("Renames", "src/moved.ts"), tier: "sweep" },
+        chapter("API Handlers", "src/api/users.ts"),
+        { ...chapter("Docs", "README.md"), tier: "sweep" },
+        chapter("Billing", "src/billing.ts"),
+      ],
+    }),
+  );
+
+  const loaded = store.get("a3f8c21b9e4d5f60");
+
+  assert.deepEqual(
+    loaded?.groups.map((group) => group.name),
+    ["API Handlers", "Billing", "Renames", "Docs"],
+  );
 });
 
 test("a session written before journeys were retired still reads as a review", () => {

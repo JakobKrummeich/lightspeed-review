@@ -91,6 +91,13 @@ interface IndexRow {
  * A review with nothing swept renders exactly what it always did — the lane is
  * absent rather than empty, because a heading saying "0 files, nothing to
  * decide" is a thing to read on a screen built to be read in one look.
+ *
+ * The split moves nothing: `trailSweeps` (`src/group-tier.ts`) has already put
+ * the swept chapters at the end of the array, so this cuts the list where the
+ * bulk begins and the lane is a heading and a press over the tail. Ordering
+ * here instead would break the one number every surface names a chapter by —
+ * `data-group-index` is a position in `groups`, shared with the header bar and
+ * the chapter on screen.
  */
 export function renderGroupIndex(groups: DiffGroup[], approved: string[]): string {
   if (groups.length === 0) return "";

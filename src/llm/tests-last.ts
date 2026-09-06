@@ -5,10 +5,17 @@ import type { DiffFile, DiffGroup } from "../diff-extract.ts";
  * model does not comply — it pairs each source file with its test; blind review
  * of real diffs wanted the checks in one place at the end. An instruction the
  * model ignores twice is a rule the code should keep, so this runs on every
- * model grouping and on the fallback. Last means last, behind the mechanical
- * group: the first shape put tests ahead of mechanical bulk, and a diff whose
- * only other group was mechanical then opened on tests with the intent at the
- * bottom.
+ * model grouping and on the fallback. Last means last of the chapters a
+ * reviewer ranks, behind a chapter the model merely named mechanical: the first
+ * shape put tests ahead of mechanical bulk, and a diff whose only other group
+ * was mechanical then opened on tests with the intent at the bottom.
+ *
+ * A chapter tiered `sweep` is the one thing that now sits behind the tests, and
+ * `trailSweeps` puts it there afterwards (`src/group-tier.ts`) rather than this
+ * rule letting it through: the survey has drawn swept chapters below the
+ * reading since its lane shipped, and the array saying the same is what keeps
+ * the bar, the lane and the chapter counter naming one order. Tests are read,
+ * so they cannot be filed under a heading that says nothing here needs reading.
  */
 export function trailTests(groups: DiffGroup[]): DiffGroup[] {
   const tests = groups.flatMap((group) => group.files.filter((file) => isTestFile(file.path)));

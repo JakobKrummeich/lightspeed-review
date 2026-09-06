@@ -403,12 +403,21 @@ supposed to brief.
 
 Each group also carries a `tier`. `study` is a chapter to read; `sweep` is one
 with nothing in it to decide — every file marked mechanical on the inventory
-and no guardrail file among them — and the survey sinks those below a rule of
-their own, where the whole lane is approved in one press instead of a file at a
-time. The model names the tier and `src/llm/reading-tier.ts` may only raise it:
-a chapter holding a guardrail file is `study` whatever came back, and so is the
-`Tests` chapter. Raising only is what keeps a wrong tier cheap — it costs
-reading time, never an unread change.
+and no guardrail file among them — and the review sinks those below the
+chapters to study, where the survey files them under a rule of their own and
+the whole lane is approved in one press instead of a file at a time. The model
+names the tier and `src/llm/reading-tier.ts` may only raise it: a chapter
+holding a guardrail file is `study` whatever came back, and so is the `Tests`
+chapter. Raising only is what keeps a wrong tier cheap — it costs reading time,
+never an unread change.
+
+The sinking happens once, in the `groups` array (`trailSweeps` in
+`src/group-tier.ts`, run after the tier is settled and again on any grouping
+that reaches the server or the session store from elsewhere), and no renderer
+sorts for itself: the header bar, the survey, "Chapter n of m", Previous/Next
+and the chapter a finished one moves on to all name a chapter by its position
+in that array, so a swept chapter that is second on the bar and last in the
+survey is not a thing the review can say.
 
 One rule survives the model either way: tests trail. Whatever grouping comes
 back — and the fallback group too — every test file is pulled into a single

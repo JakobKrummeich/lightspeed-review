@@ -52,13 +52,16 @@ One baseline-aligned flex row:
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Progress bar: one `.lsr-progress-segment` per chapter, width ∝ changed
-  lines, `data-state="approved|partial|untouched"`, inner `.lsr-progress-fill`
-  at approval %. The focused chapter's segment carries `data-current` — an
-  accent outline ring. A swept chapter (§3) carries `data-tier="sweep"`: its
-  empty slot is hatched in `--lsr-border` instead of filled with it, so the bar
-  says where the reading is and not only how much of it is left. The approval
-  fill runs over it unchanged.
+- Progress bar: one `.lsr-progress-segment` per chapter, in `groups` order and
+  no other, width ∝ changed lines, `data-state="approved|partial|untouched"`,
+  inner `.lsr-progress-fill` at approval %. The focused chapter's segment
+  carries `data-current` — an accent outline ring. A swept chapter (§3) carries
+  `data-tier="sweep"`: its empty slot is hatched in `--lsr-border` instead of
+  filled with it, so the bar says where the reading is and not only how much of
+  it is left. The approval fill runs over it unchanged. Swept segments are the
+  last ones on the bar because they are the last entries in the array
+  (`trailSweeps`, `src/group-tier.ts`), which is what makes the bar, the survey
+  and "Chapter n of m" name one order; the bar itself sorts nothing.
 - `#lsr-replay-reopen` and `#lsr-round-offer` are hidden until relevant.
 - Round-offer states: plain → **glow** (`lsr-offer-glow`, after the round
   popup folds into it) → **beckon** (orbiting spark via `::after` +
@@ -117,14 +120,19 @@ gate (§4) — a clamped grey copy of it here was a line nobody read.
 
 **The sweep lane** (`section.lsr-sweep`, painted by `css/sweep.css`) holds every
 chapter whose tier is `sweep` — bulk with nothing to decide — under one heading
-naming the total, below the chapters to study and in their own order. The rows
-inside it are the same `.lsr-index-entry` buttons and enter focus mode exactly
-as the ones above; only where they are read has changed. `.lsr-sweep-approve` is
+naming the total, below the chapters to study and in their own order. That order
+is the array's: `trailSweeps` (`src/group-tier.ts`) sinks the swept chapters to
+the end of `groups` once, upstream of every renderer, so the lane is a heading
+and a press over the tail of the same list — `renderGroupIndex` cuts where the
+bulk begins and moves nothing. The rows inside it are the same
+`.lsr-index-entry` buttons and enter focus mode exactly as the ones above; only
+where they are read has changed. `.lsr-sweep-approve` is
 the one press: it ticks every file of every swept chapter at once, through the
 same approve POST as a single checkbox, and it is a union rather than a toggle —
 a second press changes nothing. A review with no swept chapter has no lane at
 all, not an empty one. The header bar marks the same chapters by hatching their
-segments (§2).
+segments (§2) — the last segments of the bar, since `data-group-index` is a
+position in `groups` and both surfaces read it front to back.
 
 ## 4. Focus mode — one chapter, its gate and its diff (focus-mode.ts, diff-view.ts)
 
@@ -195,10 +203,11 @@ held is the diff's:
   edge it read as one more paragraph of the page — but its lines are flush
   left, as sentences are read.
 - A tick that finishes the focused chapter moves on: the next chapter in order
-  with something still unticked takes the screen, on its gate, wrapping round.
-  Sweep chapters are landed on like any other — one press on their card
-  settles them. With nothing left to read, the finished card stays, mark and
-  all.
+  with something still unticked takes the screen, on its gate, wrapping round
+  (`nextChapterToRead`, which walks `groups` from the finished chapter and so
+  reaches the swept ones last, exactly where the survey draws them). Sweep
+  chapters are landed on like any other — one press on their card settles them.
+  With nothing left to read, the finished card stays, mark and all.
 - Passing a gate is view state and nothing more: it is never sent to the server
   and never stored per file. It survives a redraw inside the round (an agent
   reply must not put the card back over a half-read diff) and a reload, which

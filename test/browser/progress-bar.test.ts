@@ -41,7 +41,10 @@ test("a segment is worth the lines its group changed, and counts the files the i
   assert.equal(api?.weight, 12);
 });
 
-test("segments keep the model's group order", () => {
+test("segments keep the order of the array, which is the review's one order", () => {
+  // The bar sorts nothing, tier included: chapters reach it already in reading
+  // order (`trailSweeps`), and a bar with an order of its own would make
+  // `data-group-index` name one chapter here and another in the survey.
   assert.deepEqual(
     progressSegments(groups, []).map((segment) => segment.name),
     ["Schema", "API"],
@@ -146,7 +149,7 @@ test("a review with nothing in it says so instead of drawing an empty bar", () =
   }
 });
 
-/** The same two chapters, with the second one tiered as bulk. */
+/** The same two chapters, with the bulk where the ordering leaves it: last. */
 const tiered = [groups[0]!, { ...groups[1]!, tier: "sweep" as const }];
 
 test("a swept chapter is marked on the bar, and a studied one is not", () => {

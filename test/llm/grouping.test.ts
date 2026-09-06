@@ -166,39 +166,51 @@ test("a model still writing the retired `watch` sentence is neither sent back no
   assert.ok(!("watch" in result.groups[0]!));
 });
 
-/** One chapter of bulk and one of code, tiered as the model saw them. */
+/**
+ * One chapter of bulk and one of code, tiered as the model saw them, with the
+ * bulk in front: where the model puts a swept chapter is the model's business,
+ * and where it ends up is the pipeline's.
+ */
 function replyTiered(sweep: string[], study: string[]): string {
   return JSON.stringify({
     groups: [
-      { name: "Core", rationale: "the change", tier: "study", files: study },
       { name: "Bulk", rationale: "the rest", tier: "sweep", files: sweep },
+      { name: "Core", rationale: "the change", tier: "study", files: study },
     ],
   });
 }
 
-test("a swept chapter of nothing but bulk reaches the reviewer swept", async () => {
+test("a swept chapter of nothing but bulk reaches the reviewer swept, and last", async () => {
   const files = [diffFile("src/a.ts"), diffFile("README.md"), diffFile("docs/setup.md")];
   const { models } = modelsReplying([replyTiered(["README.md", "docs/setup.md"], ["src/a.ts"])]);
 
   const result = await groupDiff({ files, config: config(), intents: [], models });
 
+  // The reply opened on the bulk; the review opens on the change to read.
   assert.deepEqual(
-    result.groups.map((group) => group.tier),
-    ["study", "sweep"],
+    result.groups.map((group) => [group.name, group.tier]),
+    [
+      ["Core", "study"],
+      ["Bulk", "sweep"],
+    ],
   );
 });
 
 test("a chapter the model swept over a file worth judging is raised by the code", async () => {
   // The one direction the pipeline moves a tier in: a chapter carrying a file no
-  // rule calls bulk is read, whatever the reply said.
+  // rule calls bulk is read, whatever the reply said. Raised before anything is
+  // ordered, so the chapter keeps the place the model gave it — only bulk sinks.
   const files = [diffFile("src/a.ts"), diffFile("README.md"), diffFile("src/auth.ts")];
   const { models } = modelsReplying([replyTiered(["README.md", "src/auth.ts"], ["src/a.ts"])]);
 
   const result = await groupDiff({ files, config: config(), intents: [], models });
 
   assert.deepEqual(
-    result.groups.map((group) => group.tier),
-    ["study", "study"],
+    result.groups.map((group) => [group.name, group.tier]),
+    [
+      ["Bulk", "study"],
+      ["Core", "study"],
+    ],
   );
 });
 
@@ -208,12 +220,15 @@ test("the tests chapter the code adds is tiered like every other chapter", async
 
   const result = await groupDiff({ files, config: config(), intents: [], models });
 
+  // Tests trail the chapters a reviewer ranks and the bulk trails them all: the
+  // checks are still read, so they cannot sit under a heading that says nothing
+  // here needs reading.
   assert.deepEqual(
     result.groups.map((group) => [group.name, group.tier]),
     [
       ["Core", "study"],
-      ["Bulk", "sweep"],
       ["Tests", "study"],
+      ["Bulk", "sweep"],
     ],
   );
 });

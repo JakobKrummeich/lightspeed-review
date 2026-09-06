@@ -124,6 +124,7 @@ function swept(name: string, files: DiffFile[]): DiffGroup {
   return { ...group(name, files), tier: "sweep" };
 }
 
+/** A review as it reaches any renderer: the reading first, the bulk behind it. */
 const mixed = [
   group("Schema", [file("src/db.ts", 4, 0)]),
   swept("Renames", [file("src/a.ts"), file("src/b.ts")]),
@@ -144,6 +145,9 @@ test("swept chapters are collected below the studied ones, in one lane", () => {
     (match) => match[1] ?? match[2],
   );
   // The studied chapter first, then the lane, then the two chapters inside it.
+  // The indices only ascend because the array already ends with its bulk
+  // (`trailSweeps`): the lane is a heading over the tail, and this cut moves
+  // nothing — see `test/browser/chapter-order.test.ts` for the invariant.
   assert.deepEqual(order, ["0", "lsr-sweep", "1", "2"]);
 });
 

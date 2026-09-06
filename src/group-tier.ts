@@ -26,3 +26,27 @@ export type GroupTier = "study" | "sweep";
 export function isSweep(group: { tier?: GroupTier }): boolean {
   return group.tier === "sweep";
 }
+
+/**
+ * The whole review in one reading order: the chapters to study as the grouping
+ * left them, then every swept chapter, in theirs. Stable on both halves,
+ * because the order within a tier is a judgement something already made — the
+ * model's for the chapters it wrote, `trailTests`' for the checks it parks at
+ * the end — and sinking the bulk is no reason to have a second opinion about it.
+ *
+ * Ordered in the array, once, upstream of every renderer, and never re-sorted
+ * by one of them: the survey, the header bar and the chapter on screen all name
+ * a chapter by its place in this array (`data-group-index`), so a renderer that
+ * sorted for itself would make one number mean two different chapters. The
+ * survey has drawn the bulk below the reading since its lane shipped; now the
+ * array says the same, so the bar, the lane, "Chapter 2 of 4", Previous/Next
+ * and the chapter a finished one moves on to cannot disagree about where a
+ * swept chapter is.
+ *
+ * Typed on the tier alone, like `isSweep` above it: where a chapter goes is a
+ * fact about its tier and nothing else, and a signature naming `DiffGroup`
+ * would tie the answer to the half of the tool that reads git.
+ */
+export function trailSweeps<T extends { tier?: GroupTier }>(groups: T[]): T[] {
+  return [...groups.filter((group) => !isSweep(group)), ...groups.filter(isSweep)];
+}

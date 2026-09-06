@@ -2,6 +2,7 @@ import type { Message, MutableModels } from "@earendil-works/pi-ai";
 import type { LightspeedConfig } from "../config.ts";
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { ReviewError } from "../errors.ts";
+import { trailSweeps } from "../group-tier.ts";
 import {
   GROUPING_SYSTEM_PROMPT,
   buildGroupingPrompt,
@@ -102,9 +103,12 @@ async function groupWithModel(input: GroupDiffInput): Promise<GroupingResult> {
       if (voice === undefined) {
         // Tiers settled after the tests are pulled out, so the `Tests` chapter
         // `trailTests` mints is tiered like every other chapter rather than
-        // being the one chapter nobody tiered.
+        // being the one chapter nobody tiered. The bulk sinks last of all,
+        // because only a settled tier says which chapters it is: a chapter the
+        // model called `sweep` and `raiseToStudy` raised is a chapter to read,
+        // and it keeps the place the model gave it.
         const ordered = trailTests(toDiffGroups(validation.value.groups, files));
-        return { groups: raiseToStudy(ordered, config.classify), mode: "llm" };
+        return { groups: trailSweeps(raiseToStudy(ordered, config.classify)), mode: "llm" };
       }
       messages = repairRound(call, voice, round);
       continue;
