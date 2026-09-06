@@ -14,6 +14,7 @@ import { lockSelectionToColumn } from "./column-lock.ts";
 import { createDiff2HtmlRenderer } from "../diff2html-adapter.ts";
 import { mountDiffView } from "./diff-mount.ts";
 import { wireFinish } from "./finish.ts";
+import { wireIntent } from "./intent-mount.ts";
 import { mountOpening } from "./opening-overlay.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
 import type { LinePlace } from "./line-numbers.ts";
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
   const format = effectiveFormat(readViewFormat(localStorage, page.key), room.hasRoom());
   const { live, place, focus } = openedOn(page, session);
   showIntentFor(page.intentRoot, focus);
+  wireIntent(page.intentRoot);
   // All reviewer-position state goes through this: a round arriving mid-read
   // asks it before taking the page.
   const reader = trackReader(page.reviewRoot, focus);

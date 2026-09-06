@@ -93,14 +93,106 @@ body {
   display: none;
 }
 
-.lsr-intent-title {
-  margin: 0 0 var(--lsr-space-2);
-  font-size: var(--lsr-size-label);
-  font-weight: 600;
+/*
+ * The heading over the sentences the whole review is about. It used to be set
+ * the way this page files metadata — the smallest step in the scale, uppercase,
+ * muted — which read as a chrome label on a band, and the reasons under it were
+ * left at body size. Both are one step up now, and the treatment is the one
+ * every other heading here wears, so what the reviewer meets first reads as
+ * something written for them rather than as the caption of a box.
+ */
+.lsr-intent-title,
+.lsr-intent-press {
+  font-size: var(--lsr-size-lead);
   line-height: var(--lsr-leading-tight);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--lsr-strong);
+}
+
+.lsr-intent-title {
+  margin: 0;
+}
+
+/*
+ * The press is the heading: a button reset back to text, the whole row wide so
+ * the target is the line and not the words. The button base fills every press
+ * with the accent and pads it, which would open the review on a solid slab
+ * where its first heading belongs. Its `font: inherit` is left alone — the
+ * family and style are the page's, and the pair of rules above sets the rest.
+ */
+.lsr-intent-press {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--lsr-space-2);
+  width: 100%;
+  /* The arrow's column, as wide as a file row's: at this size a nearer one
+   * reads as a mark on the W rather than as a thing of its own. */
+  padding: 0 0 0 var(--lsr-space-8);
+  border-radius: 0.4rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lsr-intent-press:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * The same arrow a file row carries, drawn and turned the same way: one
+ * disclosure mark for the page, so a reviewer who has learnt it on the files
+ * has already learnt it here. Centred by its own insets rather than by the
+ * flex line, because this row aligns on the baseline of its words.
+ */
+.lsr-intent-press::before {
+  content: "";
+  position: absolute;
+  left: var(--lsr-space-2);
+  inset-block: 0;
+  margin: auto 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid var(--lsr-muted);
+  border-bottom: 2px solid var(--lsr-muted);
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.lsr-intent-press[aria-expanded="true"]::before {
+  transform: rotate(45deg);
+}
+
+/*
+ * What the press does, in words, for as long as the arrow alone might be
+ * missed. Open, the turned arrow is the whole affordance — exactly as it is on
+ * a file row — and a standing instruction to expand what is expanded would be
+ * one more thing to read past.
+ */
+.lsr-intent-hint {
+  font-size: var(--lsr-size-meta);
+  font-weight: 400;
   color: var(--lsr-muted);
+}
+
+.lsr-intent-press[aria-expanded="true"] .lsr-intent-hint {
+  display: none;
+}
+
+.lsr-intent-body {
+  margin-top: var(--lsr-space-2);
+}
+
+/*
+ * The reasons are read, so they are led as paragraphs rather than as the
+ * heading is: what separates them from it is weight and colour, not size.
+ */
+.lsr-intent-list,
+.lsr-intent-item,
+.lsr-intent-none {
+  font-size: var(--lsr-size-lead);
+  line-height: var(--lsr-leading);
 }
 
 .lsr-intent-list {

@@ -18,6 +18,45 @@ test("every stated reason is its own line, in the order the agent gave them", ()
   ]);
 });
 
+test("the block opens shut: a heading that is a press, and the reasons behind it", () => {
+  // The survey is a screen for choosing a chapter on; the reasons are read once,
+  // and after that they are a band the reviewer scrolls past every time.
+  const html = renderIntent({ intents: ["sign the tokens"], commits: [] });
+
+  assert.match(
+    html,
+    /<h2 class="lsr-intent-title"><button type="button" class="lsr-intent-press" aria-expanded="false" aria-controls="lsr-intent-body">/,
+  );
+  assert.match(html, /<div class="lsr-intent-body" id="lsr-intent-body" hidden>/);
+  // Behind the press, not beside it: a body outside it is a body the press cannot show.
+  const body = /<div class="lsr-intent-body"[^>]*>([\s\S]*)<\/div>/.exec(html)?.[1] ?? "";
+  assert.match(body, /lsr-intent-list/);
+  assert.match(body, /sign the tokens/);
+});
+
+test("a shut block says what pressing it does, in words as well as in an arrow", () => {
+  // The arrow alone is chrome anyone can miss; the hint is dropped by the
+  // stylesheet once the block is open, when the turned arrow is the whole answer.
+  const html = renderIntent({ intents: [], commits: ["some commit"] });
+
+  assert.match(html, /<span class="lsr-intent-hint">press to expand<\/span><\/button>/);
+});
+
+test("every draw of the block is a shut one, whatever the round before it was", () => {
+  // A new round redraws this from the same render, and a round that states a new
+  // reason must not unfold the page under the reviewer's cursor.
+  for (const view of [
+    { intents: ["a"], commits: [] },
+    { intents: [], commits: ["c"] },
+  ]) {
+    const html = renderIntent(view);
+
+    assert.match(html, /aria-expanded="false"/);
+    assert.doesNotMatch(html, /aria-expanded="true"/);
+    assert.match(html, /class="lsr-intent-body" id="lsr-intent-body" hidden>/);
+  }
+});
+
 test("an intent is text, never markup: a page that runs it has lost the review", () => {
   const html = renderIntent({
     intents: ["<script>alert('x')</script> & <b>bold</b>"],
@@ -44,6 +83,9 @@ test("a round from before intents existed says so rather than showing an empty b
   const html = renderIntent({ intents: [], commits: ["some commit"] });
 
   assert.match(html, /opened without a stated intent/);
+  // Behind the press too: the sentence is one of the block's answers, not its heading.
+  const body = /<div class="lsr-intent-body"[^>]*>([\s\S]*)<\/div>/.exec(html)?.[1] ?? "";
+  assert.match(body, /opened without a stated intent/);
 });
 
 /** Nothing to say and nothing to corroborate: the band must not take a row. */

@@ -15,12 +15,19 @@ export interface IntentView {
  * The first thing on the page: what this change is for. Pure; rendered by
  * both server (no flash) and browser (a new round may state a new reason).
  * Several intents stay several lines: they are separate reasons.
+ *
+ * Drawn shut, every time. The reasons are read once, at the top of the review,
+ * and after that they are a band above the chapter list that every return to
+ * the survey scrolls past; the heading alone says they are there to open. A
+ * heading holding a button rather than a bare button, because the document
+ * outline is where a screen reader finds the top of this block.
  */
 export function renderIntent(view: IntentView): string {
   if (view.intents.length === 0 && view.commits.length === 0) return "";
-  return [`<h2 class="lsr-intent-title">What this change is for</h2>`, renderIntents(view.intents)]
-    .filter((part) => part !== "")
-    .join("\n");
+  return [
+    `<h2 class="lsr-intent-title"><button type="button" class="lsr-intent-press" aria-expanded="false" aria-controls="lsr-intent-body">What this change is for<span class="lsr-intent-hint">press to expand</span></button></h2>`,
+    `<div class="lsr-intent-body" id="lsr-intent-body" hidden>${renderIntents(view.intents)}</div>`,
+  ].join("\n");
 }
 
 /**

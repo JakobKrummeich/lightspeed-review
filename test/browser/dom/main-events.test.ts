@@ -81,6 +81,16 @@ test("the intent block is told about every move between the survey and a chapter
   assert.match(page, /function openRound\([\s\S]*?showIntentFor\([^)]*undefined\)/);
 });
 
+test("the intent block's press is wired once, on the section a round redraws", () => {
+  // `#lsr-intent` sits outside the diff root, so the diff's click handler never
+  // sees it. Wired on the section rather than on the button, once: a round
+  // replaces everything inside it, and the listener has to outlive that.
+  const calls = page.split("\n").filter((line) => line.includes("wireIntent("));
+
+  assert.equal(calls.length, 1);
+  assert.match(calls[0] ?? "", /wireIntent\(page\.intentRoot\)/);
+});
+
 test("the wrapper opens on the gate's word, and is written down the moment it is up", () => {
   // `opensFor` is tested where it lives; here only that the page asks before mounting —
   // unasked, every round would be wrapped.

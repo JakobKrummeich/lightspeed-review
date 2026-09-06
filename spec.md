@@ -19,6 +19,7 @@ Developer working in TUI with Pi agent:
 
 2. Agent: npx lightspeed start feature-x main --intent "<why this branch exists>"
    └─ States the intent — required, repeatable, rendered above the diff
+      (a disclosure on the survey, shut until the reviewer presses it)
    └─ Extracts git diff
    └─ Spawns Pi (--mode json --no-session) with lightspeed-owned prompts
       → LLM returns semantic groupings

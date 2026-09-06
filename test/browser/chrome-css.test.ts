@@ -535,6 +535,66 @@ test("the intent scrolls away with the diff instead of holding a row open", () =
   assert.doesNotMatch(intent, /overflow/);
 });
 
+test("what the change is for is set to be read, not filed as a chrome label", () => {
+  // It was at label size, uppercase and muted — the smallest step in the scale,
+  // wearing the treatment this page gives metadata. It is a heading over the
+  // sentences the review exists for, and it is set like one.
+  const heading = [".lsr-intent-title", ".lsr-intent-press"].map((one) => rulesFor(one).join(""));
+
+  for (const rules of heading) {
+    assert.match(rules, /font-size: var\(--lsr-size-lead\);/);
+    assert.match(rules, /line-height: var\(--lsr-leading-tight\);/);
+    assert.match(rules, /font-weight: 600;/);
+    assert.match(rules, /color: var\(--lsr-strong\);/);
+    assert.doesNotMatch(rules, /text-transform:/);
+    assert.doesNotMatch(rules, /letter-spacing:/);
+  }
+
+  // The reasons themselves are read, so they take paragraph leading rather than
+  // the heading's; hierarchy is left to weight and colour, not to size.
+  for (const part of [".lsr-intent-list", ".lsr-intent-item", ".lsr-intent-none"]) {
+    const rules = rulesFor(part).join("");
+    assert.match(rules, /font-size: var\(--lsr-size-lead\);/, `${part} is left at body size`);
+    assert.match(rules, /line-height: var\(--lsr-leading\);/, `${part} is led as a heading`);
+  }
+
+  // A hint about a press, not part of the heading it sits in.
+  const hint = rulesFor(".lsr-intent-hint").join("");
+  assert.match(hint, /font-size: var\(--lsr-size-meta\);/);
+  assert.match(hint, /color: var\(--lsr-muted\);/);
+  assert.match(hint, /font-weight: 400;/);
+});
+
+test("the intent's press is a heading with an arrow, not a button on the page", () => {
+  // The button base fills every press with the accent and pads it; unreset, the
+  // review would open on a solid blue slab where its first heading belongs.
+  const press = rulesFor(".lsr-intent-press").join("");
+  assert.match(press, /background: transparent;/);
+  assert.match(press, /cursor: pointer;/);
+  assert.match(press, /width: 100%;/, "the whole row is the press, not the words alone");
+  assert.match(press, /text-align: left;/);
+
+  // The same arrow the file rows use, turned by the same attribute: one glyph
+  // system for every disclosure on the page.
+  const arrow = rulesFor(".lsr-intent-press::before").join("");
+  assert.match(arrow, /border-right: 2px solid var\(--lsr-muted\);/);
+  assert.match(arrow, /transform: rotate\(-45deg\);/);
+  assert.match(
+    rulesFor('.lsr-intent-press[aria-expanded="true"]::before').join(""),
+    /transform: rotate\(45deg\);/,
+  );
+  // Open, the turned arrow is the whole affordance — as it is on a file row.
+  assert.match(
+    rulesFor('.lsr-intent-press[aria-expanded="true"] .lsr-intent-hint').join(""),
+    /display: none;/,
+  );
+  // Reachable by keyboard, and visibly so: it is the way into the block.
+  assert.match(
+    rulesFor(".lsr-intent-press:focus-visible").join(""),
+    /outline: 2px solid var\(--lsr-accent\);/,
+  );
+});
+
 test("guard: shutting the panel gives back the panel's column and keeps the rail's", () => {
   // Regions are placed by line number, so the track count puts the panel at the right edge:
   // `3` stays last, open or shut.

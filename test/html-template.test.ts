@@ -197,6 +197,14 @@ test("an intent is escaped in the shell exactly as it is in the bundle", () => {
   assert.match(html, /&lt;script&gt;/);
 });
 
+/** The server draws the shut block, so the browser never has one to fold away. */
+test("the reasons the server renders are behind the press, not on the screen", () => {
+  const html = renderReviewPage(withRound(["sign the tokens"], []));
+
+  assert.match(html, /class="lsr-intent-press" aria-expanded="false"/);
+  assert.match(html, /<div class="lsr-intent-body" id="lsr-intent-body" hidden>/);
+});
+
 test("a session with no rounds still renders the page, with an empty intent band", () => {
   const html = renderReviewPage(session);
 

@@ -20,7 +20,7 @@ else is out-of-flow overlays.
 ├─────────────────────────────────────────────────┬───┬────────────────────┤
 │ REVIEW COLUMN  main#lsr-review  (scrolls)       │ R │ CONVERSATION PANEL │
 │                                                 │ A │ aside#lsr-panel    │
-│   section#lsr-intent   (survey mode only)       │ I │ fixed 22rem/352px  │
+│   section#lsr-intent   (survey only, collapsed) │ I │ fixed 22rem/352px  │
 │   div#lsr-diff         (index OR one chapter)   │ L │ (collapsible)      │
 │                                                 │   │                    │
 └─────────────────────────────────────────────────┴───┴────────────────────┘
@@ -67,14 +67,13 @@ One baseline-aligned flex row:
 ## 3. Survey mode — chapter index (intent-view.ts, group-index.ts)
 
 Default view, no chapter focused. Intent block + pressable chapter list.
-No diffs on screen.
+No diffs on screen. The intent block is a disclosure, drawn shut on every
+round: the reasons are read once and the survey is returned to many times.
 
 ```
 ┌─ main#lsr-review ────────────────────────────────────────────┐
-│  What this change is for                  .lsr-intent-title  │
-│  • first stated intent                    .lsr-intent-item   │
-│  • second stated intent                                      │
-│    (or: "This round was opened without a stated intent.")    │
+│  › What this change is for          press to expand          │
+│    (shut: the reasons wait in a hidden .lsr-intent-body)     │
 │                                                              │
 │  ┌─ nav.lsr-index ────────────────────────────────────────┐  │
 │  │ ┌─ button.lsr-index-entry ───────────────────────────┐ │  │
@@ -98,6 +97,16 @@ No diffs on screen.
 │  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+**The intent block** is `h2.lsr-intent-title` wrapping `button.lsr-intent-press`
+(`aria-expanded` + `aria-controls="lsr-intent-body"`), with `span.lsr-intent-hint`
+— "press to expand" — inside the button and dropped by CSS once it is open. The
+press carries the same CSS chevron as a file row, turned by `aria-expanded`.
+Behind it, `div#lsr-intent-body` holds `ul.lsr-intent-list` → `li.lsr-intent-item`
+per stated reason, or `p.lsr-intent-none` ("This round was opened without a
+stated intent."). Every draw is a shut one, the server's and the browser's
+alike; `dom/intent-mount.ts` delegates the press from the section, because
+`#lsr-intent` sits outside the diff root the other folds are answered in.
 
 Classes per entry: `.lsr-index-name` `.lsr-index-files` `.lsr-index-lines`
 `.lsr-index-counter` `.lsr-index-logic` (badge, densest chapter only, and never
