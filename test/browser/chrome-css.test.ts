@@ -289,6 +289,15 @@ test("the chapter's card stands in the middle of the screen, its lines flush lef
   assert.match(card, /margin: 0 auto;/);
   assert.match(card, /align-items: start;/);
   assert.doesNotMatch(card, /text-align: center;/);
+  // And the section it stands in draws in around it: a card is a card by
+  // being narrower than the page it lies on, lifted off it, with its words
+  // near its edges rather than marooned in the middle of a full-width band.
+  const shut = rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="false"])').join("");
+  assert.match(shut, /max-width: \d+ch;/);
+  assert.match(shut, /margin-inline: auto;/);
+  assert.match(shut, /box-shadow: var\(--lsr-shadow-lift\);/);
+  // The measure belongs to the card, so the gate does not cap it a second time.
+  assert.doesNotMatch(card, /max-width:/);
   assert.doesNotMatch(rulesFor(".lsr-gate-file").join(""), /justify-content: center;/);
   // A path longer than the card wraps rather than running out of it.
   assert.match(rulesFor(".lsr-gate-path").join(""), /overflow-wrap: anywhere;/);

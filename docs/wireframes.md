@@ -144,17 +144,15 @@ diff rendered but shut behind one press.
 ```
 ┌─ main#lsr-review ─────────────────────────────────────────────────┐
 │ ‹ All chapters                    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar
-│ ┌─ section.lsr-group ─────────────────────────────────────────┐   │
-│ │      ┌─ .lsr-gate (column centred, lines flush left) ─┐      │   │
-│ │      │ Chapter name                                  │      │   │ .lsr-gate-name (title)
-│ │      │ What happened, one sentence.                  │      │   │ .lsr-gate-rationale (lead)
-│ │      │ src/path/file.ts   +12 −3                     │      │   │ .lsr-gate-files / -file
-│ │      │ src/other.ts       +4 −0                      │      │   │ .lsr-gate-path / -lines
-│ │      │ 1/3 approved                                  │      │   │ .lsr-gate-counter
-│ │      │ ( Read the diff )                             │      │   │ .lsr-gate-press
-│ │      └───────────────────────────────────────────────┘      │   │
-│ │                                       approve chapter [ ]   │   │ .lsr-group-foot
-│ └─────────────────────────────────────────────────────────────┘   │ .lsr-tick-all
+│   ┌─ section.lsr-group (shut: 84ch, centred, lifted) ────┐        │
+│   │ Chapter name                                         │        │ .lsr-gate-name (title)
+│   │ What happened, one sentence.                         │        │ .lsr-gate-rationale (lead)
+│   │ src/path/file.ts   +12 −3                            │        │ .lsr-gate-files / -file
+│   │ src/other.ts       +4 −0                             │        │ .lsr-gate-path / -lines
+│   │ 1/3 approved                                         │        │ .lsr-gate-counter
+│   │ ( Read the diff )                                    │        │ .lsr-gate-press
+│   │                              approve chapter [ ]     │        │ .lsr-group-foot
+│   └──────────────────────────────────────────────────────┘        │ .lsr-tick-all
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -199,9 +197,14 @@ held is the diff's:
   diff, they never do. A sweep chapter's card says why its tick is the press
   to make, under a `.lsr-gate-tier` label in the survey lane's words: there is
   nothing in it to decide.
-- The card's column stands in the middle of the screen — hugging the left
-  edge it read as one more paragraph of the page — but its lines are flush
-  left, as sentences are read.
+- Shut, the section is drawn as the card it is: `max-width: 84ch`, centred,
+  its words a `--lsr-space-6` from its edges, lifted off the page with
+  `--lsr-shadow-lift` — the finish card's shadow. Full width it was a band the
+  size of the review with a column of words marooned in the middle of it. The
+  measure lives on the section and not on `.lsr-gate`, so card and text are
+  one width apart; the lines inside stay flush left, as sentences are read.
+  The moment the diff is up the section is full width again and unlifted: that
+  room is the code's.
 - A tick that finishes the focused chapter moves on: the next chapter in order
   with something still unticked takes the screen, on its gate, wrapping round
   (`nextChapterToRead`, which walks `groups` from the finished chapter and so

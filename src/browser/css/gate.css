@@ -25,9 +25,10 @@
   flex-direction: column;
   align-items: start;
   gap: var(--lsr-space-4);
-  max-width: 70ch;
   margin: 0 auto;
-  padding: var(--lsr-space-2) var(--lsr-space-3) var(--lsr-space-4);
+  /* No measure of its own: the card below sets one, and a second cap here
+   * would leave the words short of edges they are meant to reach. */
+  padding: var(--lsr-space-2) 0 var(--lsr-space-4);
 }
 
 /* Gone the moment the diff is up: the room the intent held is the diff's now. */
@@ -90,11 +91,24 @@
 }
 
 /*
- * A shut card opens on a press anywhere on it, not only on the button that
- * names the press. The cursor is the whole of the announcement — no hover
+ * Shut, the chapter is a card and the only thing on the screen, so the section
+ * is drawn as one: narrower than the page it lies on, centred, lifted off it
+ * the way the finish card and the closing summary are. Full width it was a
+ * band the size of the review with a column of words marooned in the middle of
+ * it — the same lines read as a card the moment its edges are near them. The
+ * measure lives here and not on the gate: card and text are one width apart,
+ * and one place to change it.
+ *
+ * A shut card also opens on a press anywhere on it, not only on the button
+ * that names the press. The cursor is the whole of the announcement — no hover
  * dressing, the card is text to read and not a control to find.
  */
 .lsr-group:has(.lsr-gate-press[aria-expanded="false"]) {
+  max-width: 84ch;
+  margin-inline: auto;
+  padding-left: var(--lsr-space-6);
+  padding-right: var(--lsr-space-6);
+  box-shadow: var(--lsr-shadow-lift);
   cursor: pointer;
 }
 
