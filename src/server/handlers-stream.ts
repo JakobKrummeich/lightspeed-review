@@ -9,7 +9,7 @@ import type { Delivery, FeedbackPrompt, SessionRecord } from "../session-store.t
 import { legalMoves } from "../commands/home.ts";
 import { agentReading, reviewerTurn, turnFacts, turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { badRequest, sendJson } from "./http.ts";
+import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
 import type { Waker } from "./streams.ts";
 import { readDelivered } from "./validate.ts";
 
@@ -220,7 +220,7 @@ function handTurnBack(context: ServerContext, key: string): void {
  * list the commands print, so a refusal and a `help[]` can never disagree about
  * what is legal.
  */
-function stillYours(session: SessionRecord): unknown {
+function stillYours(session: SessionRecord): DomainErrorBody {
   return {
     error: {
       code: "turn_still_yours",

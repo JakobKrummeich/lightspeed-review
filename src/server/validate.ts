@@ -10,7 +10,7 @@ import {
 } from "../declarations.ts";
 import { parseFeedbackRequest } from "../feedback.ts";
 import type { CreateSessionRequest } from "../rounds/session-round.ts";
-import { readJsonSafely } from "./http.ts";
+import { readJsonSafely, type DomainErrorBody } from "./http.ts";
 
 /** Anything unexpected in a create-session body becomes a 400. */
 export async function parseCreateSession(
@@ -141,7 +141,7 @@ export async function readWork(request: IncomingMessage): Promise<string | undef
  * the agent fixes them all in one retry, and the retry is safe — nothing of a
  * rejected reply is stored.
  */
-export function declarationRejection(problems: DeclarationProblem[]): unknown {
+export function declarationRejection(problems: DeclarationProblem[]): DomainErrorBody {
   return {
     error: {
       code: "declaration_invalid",

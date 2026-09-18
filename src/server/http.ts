@@ -3,7 +3,24 @@
  * and body reading that treats malformed input as absent rather than an error.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ReviewErrorCode } from "../errors.ts";
 import { readJsonBody } from "../router.ts";
+
+/**
+ * The 422 an illegal move is answered with: the rule the server refused, and the
+ * move that makes it legal. Declared once and returned by every builder of one,
+ * because the reading side is typed too (`api-client.ts`) — a code outside the
+ * closed set reaches the agent as `internal_error`, which reads as a lightspeed
+ * bug rather than something it can fix, and `help` is what it does next, so
+ * there is always at least one line.
+ *
+ * Not the shape of the 409s a session's status answers: those carry no help,
+ * because the client knows the one move an ended review leaves.
+ */
+export interface DomainErrorBody {
+  error: { code: ReviewErrorCode; message: string; detail?: string };
+  help: [string, ...string[]];
+}
 
 export function sendJson(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });

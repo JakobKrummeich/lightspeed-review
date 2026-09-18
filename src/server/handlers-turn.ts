@@ -8,7 +8,7 @@ import type { SessionRecord } from "../session-store.ts";
 import { legalMoves } from "../commands/home.ts";
 import { agentWorking, turnFacts, turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { badRequest, sendJson } from "./http.ts";
+import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
 import { readWork } from "./validate.ts";
 
 export async function handleWork(
@@ -57,7 +57,7 @@ export async function handleWork(
  * than prose because the agent reads failures the way it reads results, and the
  * fixing command names this session so nothing has to be guessed from the error.
  */
-function turnRejection(session: SessionRecord): unknown {
+function turnRejection(session: SessionRecord): DomainErrorBody {
   return {
     error: {
       code: "turn_not_yours",
