@@ -4,6 +4,13 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  helpAsk,
+  helpNextRound,
+  helpPublishAndWait,
+  helpSay,
+  helpWork,
+} from "../../src/commands/home.ts";
 import { parseSayArgs, runSay } from "../../src/commands/say.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
@@ -155,9 +162,39 @@ test("speaking leaves the turn where it was, and offers the moves that fit it", 
     assert.equal(store.get(KEY)?.turn.holder, "agent");
     assert.equal(output.turn, "agent reading");
     assert.equal(output.round, 1);
-    const help = (output.help as string[]).join("\n");
-    assert.match(help, /lightspeed work "<plan>" feature-auth main/);
-    assert.match(help, /lightspeed start feature-auth main/);
+    // The whole array: a joined string hid a `wait` here that the server refuses
+    // with exit 2 for as long as the turn is the agent's.
+    assert.deepEqual(output.help, [
+      helpAsk("feature-auth main"),
+      helpSay("feature-auth main"),
+      helpWork("feature-auth main"),
+      helpNextRound("feature-auth main"),
+    ]);
+  });
+});
+
+/** The same, from mid-edit: `work` is already declared, so the moves left are
+ * the ones that give the turn up deliberately — never a `wait`, which the poll
+ * refuses with `turn_still_yours` while the agent is working. */
+test("speaking mid-edit offers the moves that give the turn up, not a wait", async () => {
+  const record = session({
+    turn: { holder: "agent", mode: "working", at: AT, note: "splitting the helper out" },
+  });
+  await withServer(record, async ({ port }) => {
+    const output = await runSay({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      port,
+      text: "halfway through",
+    });
+
+    assert.equal(output.turn, "agent working");
+    assert.deepEqual(output.help, [
+      helpPublishAndWait("feature-auth main"),
+      helpAsk("feature-auth main"),
+      helpSay("feature-auth main"),
+    ]);
   });
 });
 

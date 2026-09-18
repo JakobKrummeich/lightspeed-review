@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { drainPending, type PollPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import type { Delivery, FeedbackPrompt, SessionRecord } from "../session-store.ts";
+import { legalMoves } from "../commands/home.ts";
 import { agentReading, reviewerTurn, turnFacts, turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
@@ -213,12 +214,13 @@ function handTurnBack(context: ServerContext, key: string): void {
 /**
  * A `wait` from an agent that is mid-edit. Parking would hand the review back
  * under it — the reviewer's Send goes live while the branch is half-written —
- * so the poll is refused with the two moves that are actually legal from here:
+ * so the poll is refused with the moves that are actually legal from here:
  * publish the round the work produced, or ask a question, both of which give
- * the turn up deliberately before they block.
+ * the turn up deliberately before they block. Those moves come from the same
+ * list the commands print, so a refusal and a `help[]` can never disagree about
+ * what is legal.
  */
 function stillYours(session: SessionRecord): unknown {
-  const target = `${session.branch} ${session.base}`;
   return {
     error: {
       code: "turn_still_yours",
@@ -227,9 +229,6 @@ function stillYours(session: SessionRecord): unknown {
         "you declared this work with `lightspeed work`, so the reviewer is waiting on you;" +
         " waiting here would hand them the turn while you are still editing",
     },
-    help: [
-      `Run \`lightspeed start ${target} --wait\` to publish what you changed and block on the next round`,
-      `Run \`lightspeed ask "<question>" ${target}\` to give the turn back with a question and wait for the answer`,
-    ],
+    help: legalMoves("agent working", `${session.branch} ${session.base}`),
   };
 }

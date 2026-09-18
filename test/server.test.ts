@@ -6,6 +6,7 @@ import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
+import { helpAsk, helpPublishAndWait, helpSay } from "../src/commands/home.ts";
 import { SessionStore } from "../src/session-store.ts";
 import { LedgerStore } from "../src/ledger/store.ts";
 import type { AnnotationRecord } from "../src/ledger/records.ts";
@@ -1373,9 +1374,13 @@ test("a wait from an agent that declared work is refused, and the turn stays put
     assert.equal(response.status, 422);
     const body = (await response.json()) as { error: { code: string }; help: string[] };
     assert.equal(body.error.code, "turn_still_yours");
-    // Both legal moves, and both give the turn up deliberately before they block.
-    assert.match(body.help.join(" "), /lightspeed start feature-auth main --wait/);
-    assert.match(body.help.join(" "), /lightspeed ask "<question>" feature-auth main/);
+    // The same list the commands print, whole: a refusal that offered the move it
+    // is refusing would send the agent straight back here.
+    assert.deepEqual(body.help, [
+      helpPublishAndWait("feature-auth main"),
+      helpAsk("feature-auth main"),
+      helpSay("feature-auth main"),
+    ]);
     assert.partialDeepStrictEqual(store.get(key)?.turn, {
       holder: "agent",
       mode: "working",

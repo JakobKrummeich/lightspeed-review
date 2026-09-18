@@ -7,7 +7,7 @@ import { turnBlock } from "../turn.ts";
 import { hasFlag, scanArgs } from "./args.ts";
 import { longPoll } from "./long-poll.ts";
 import { serverOrigin } from "./server-address.ts";
-import { helpAsk, helpNextRound, helpReopen, helpSay, helpWork } from "./home.ts";
+import { legalMoves } from "./home.ts";
 
 export interface WaitArgs {
   /** Unset when the agent left it to `resolveSession` to work out. */
@@ -81,23 +81,11 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
     ...promptBlock(result, input.full ?? false),
     ...endedFacts(result),
     help: result.ended
-      ? [endedHelp(result), ...helpApprovals(result, target), helpReopen(target)]
-      : nextMoves(result, target),
+      ? [endedHelp(result), ...helpApprovals(result, target), ...legalMoves("ended", target)]
+      : // Delivery is what ended this wait, so the turn is the agent's — stated by
+        // the answer, and assumed only of a server too old to state it.
+        legalMoves(result.turn ?? "agent reading", target),
   };
-}
-
-/**
- * The moves that are legal from here, in the order they are usually wanted:
- * ask while the reviewer is still at the page, answer a single comment without
- * going quiet, then declare the silence and go and edit.
- */
-function nextMoves(result: PollPayload, target: string): string[] {
-  return [
-    helpAsk(target),
-    ...(hasDeclarableIds(result.prompts) ? [helpSay(target)] : []),
-    helpWork(target),
-    helpNextRound(target),
-  ];
 }
 
 /**
@@ -155,11 +143,6 @@ function helpApprovals(result: PollPayload, target: string): string[] {
     `Run \`lightspeed approvals ${target}\` to name the files behind those counts —` +
       " which were approved, which were swept, which nobody signed off on",
   ];
-}
-
-/** Only prompts that carry an id can be answered by name, so only they earn the hint. */
-function hasDeclarableIds(prompts: FeedbackPrompt[]): boolean {
-  return prompts.some((prompt) => prompt.type === "annotation" && prompt.id !== undefined);
 }
 
 /** The one answer an agent may act on with nobody left in the loop. The counts

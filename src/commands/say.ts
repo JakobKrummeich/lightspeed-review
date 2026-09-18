@@ -5,7 +5,7 @@ import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { lastValue } from "./args.ts";
-import { helpNextRound, helpReopen, helpWait, helpWork } from "./home.ts";
+import { legalMoves } from "./home.ts";
 import { parseVerb, type VerbArgs } from "./verb-args.ts";
 import { serverOrigin } from "./server-address.ts";
 
@@ -80,27 +80,14 @@ export async function runSay(input: SayInput): Promise<StructuredOutput> {
     said: input.text,
     ...(input.for === undefined ? {} : { for: input.for }),
     ...(input.files === undefined || input.files.length === 0 ? {} : { files: input.files }),
-    help: nextMoves(answered.turn, target),
+    // Speaking moves nothing, so the moves that were legal before it still are.
+    // A server too old to state a turn predates the turn itself: `wait` was the
+    // only way to get one there, which is what the reviewer's turn offers.
+    help: legalMoves(answered.turn ?? "reviewer", target),
   };
 }
 
 function pinned(input: SayInput): CommentDeclaration[] {
   if (input.for === undefined) return [];
   return [{ id: input.for, note: input.text, files: input.files ?? [] }];
-}
-
-/**
- * Saying something changes nothing about whose move it is, so the moves that
- * were legal before it still are. Holding the turn, the agent is here to work;
- * not holding it, the only move left is to wait for one. An ended review holds
- * no turn at all, and a `wait` offered there would return "ended" forever — the
- * server refuses a reply into one, so this is for the answer of a server that
- * did not, and never a `wait` the agent could hang on.
- */
-function nextMoves(turn: TurnFacts["turn"] | undefined, target: string): string[] {
-  if (turn === "ended") return [helpReopen(target)];
-  if (turn === "agent reading" || turn === "agent working") {
-    return [helpWork(target), helpNextRound(target), helpWait(target)];
-  }
-  return [helpWait(target)];
 }

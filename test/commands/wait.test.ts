@@ -4,6 +4,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { helpAsk, helpNextRound, helpReopen, helpSay, helpWork } from "../../src/commands/home.ts";
 import { parseWaitArgs, runWait } from "../../src/commands/wait.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
@@ -152,14 +153,14 @@ test("a delivered wait closes with the moves that are legal from there", async (
   await withServer(session({ pending: [annotation], status: "feedback" }), async ({ port }) => {
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
 
-    const help = (output.help as string[]).join("\n");
-    assert.match(help, /lightspeed ask "<question>" feature-auth main/);
-    assert.match(help, /lightspeed work "<plan>" feature-auth main/);
-    assert.match(help, /lightspeed start feature-auth main/);
-    assert.ok(
-      (output.help as string[]).every((line) => !line.startsWith("Run `lightspeed wait")),
-      help,
-    );
+    // The whole array, not a substring of it joined up: a `wait` offered here is
+    // refused with exit 2, and only an exact list can prove it is not offered.
+    assert.deepEqual(output.help, [
+      helpAsk("feature-auth main"),
+      helpSay("feature-auth main"),
+      helpWork("feature-auth main"),
+      helpNextRound("feature-auth main"),
+    ]);
   });
 });
 
@@ -190,8 +191,9 @@ test("an ended review reports it and stops suggesting another wait", async () =>
     assert.equal(output.ended, true);
     assert.equal(output.turn, "ended");
     assert.equal(output.prompts, 0);
-    assert.ok((output.help as string[]).every((line) => !line.startsWith("Run `lightspeed wait")));
-    assert.ok((output.help as string[]).some((line) => /only the reviewer reopens/i.test(line)));
+    // The account, then the one move an ended review leaves — no `wait`, which
+    // would return "ended" forever.
+    assert.deepEqual((output.help as string[]).slice(1), [helpReopen("feature-auth main")]);
   });
 });
 
@@ -461,21 +463,12 @@ test("a wait that carries prompts spends no words saying it is not empty", async
   });
 });
 
-test("annotation ids survive into the wait output, with the hint to declare", async () => {
+test("annotation ids survive into the wait output, so an answer can be pinned to one", async () => {
   const stamped = { ...annotation, id: "evt_0abc123de_0007" };
   await withServer(session({ pending: [stamped], status: "feedback" }), async ({ port }) => {
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
 
     assert.deepEqual(output.prompts, [stamped]);
-    assert.ok((output.help as string[]).some((line) => line.includes("--for <id>")));
-  });
-});
-
-test("prompts without ids earn no declaration hint there is no id to follow", async () => {
-  await withServer(session({ pending: [annotation], status: "feedback" }), async ({ port }) => {
-    const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
-
-    assert.ok((output.help as string[]).every((line) => !line.includes("--for")));
   });
 });
 

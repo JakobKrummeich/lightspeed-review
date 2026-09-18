@@ -68,6 +68,16 @@ export function helpNextRound(target: string): string {
   return `Address the feedback, commit, then run \`lightspeed start ${target}\` to show the updated diff`;
 }
 
+/** The same move made by an agent that is going to block on what it publishes:
+ * one command, and the turn given up deliberately rather than waited for. It is
+ * the move offered to an agent mid-edit, where a bare `wait` is refused. */
+export function helpPublishAndWait(target: string): string {
+  return (
+    `Run \`lightspeed start ${target} --wait\` to publish what you changed and block on the` +
+    " next round"
+  );
+}
+
 export function helpEnd(target: string): string {
   return `Run \`lightspeed end ${target}\` to close the session`;
 }
@@ -81,6 +91,30 @@ export function helpReopen(target: string): string {
     "Only the reviewer reopens a review: run" +
     ` \`lightspeed start ${target} --reopen\` when they ask for a new round`
   );
+}
+
+/**
+ * The moves that are legal from a turn, in the order they are usually wanted.
+ * Every `help[]` about the turn is built from this one list — the commands', and
+ * the server's when it refuses a move — so nothing can advertise a move the
+ * server answers with exit 2. That is not hypothetical: `work` and `say` both
+ * closed with `wait` while the agent held the turn, which the poll refuses.
+ *
+ * `wait` is therefore offered on the reviewer's turn and nowhere else. An agent
+ * that holds it is handed the moves that give it up deliberately instead —
+ * publish the round, or ask — and `work` is offered only before the silence is
+ * declared, because redeclaring it is a no-op an agent should not be sent to.
+ *
+ * It lives here, with the lines it is made of, rather than in `turn.ts`: those
+ * lines read `turn.ts` for the label, and a module cannot import its readers.
+ */
+export function legalMoves(turn: TurnLabel, target: string): [string, ...string[]] {
+  if (turn === "ended") return [helpReopen(target)];
+  if (turn === "reviewer") return [helpWait(target)];
+  if (turn === "agent working") {
+    return [helpPublishAndWait(target), helpAsk(target), helpSay(target)];
+  }
+  return [helpAsk(target), helpSay(target), helpWork(target), helpNextRound(target)];
 }
 
 /** Stored sessions as home-view rows. Ended ones are history, not work. */

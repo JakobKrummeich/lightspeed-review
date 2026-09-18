@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { helpAsk, helpPublishAndWait, helpSay } from "../../src/commands/home.ts";
 import { parseWorkArgs, runWork } from "../../src/commands/work.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
@@ -101,6 +102,27 @@ test("declaring the plan names it on the turn the agent already holds", async ()
     assert.equal(output.round, 1);
     assert.equal(output.plan, "splitting the helper out");
     assert.equal(output.message, "the reviewer's banner names this plan until you speak again");
+  });
+});
+
+/** The happy path used to close with `lightspeed wait`, which the poll refuses
+ * with `turn_still_yours` and exit 2 the moment this command succeeds. The whole
+ * array is asserted because a joined string is what hid it. */
+test("the moves after work are the ones that give the turn up, never a wait", async () => {
+  await withServer(session(), async ({ port }) => {
+    const output = await runWork({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      port,
+      plan: "splitting the helper out",
+    });
+
+    assert.deepEqual(output.help, [
+      helpPublishAndWait("feature-auth main"),
+      helpAsk("feature-auth main"),
+      helpSay("feature-auth main"),
+    ]);
   });
 });
 

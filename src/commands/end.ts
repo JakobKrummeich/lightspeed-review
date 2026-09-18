@@ -3,7 +3,7 @@ import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
 import { apiRequest } from "./api-client.ts";
 import { serverOrigin } from "./server-address.ts";
-import { helpReopen } from "./home.ts";
+import { legalMoves } from "./home.ts";
 
 export interface EndInput {
   repoRoot: string;
@@ -29,6 +29,6 @@ export async function runEnd(input: EndInput): Promise<StructuredOutput> {
     ...turnBlock(closed),
     session: { key, branch: input.branch, base: input.base, status: "ended" },
     message: "the review session is closed; the browser shows it as ended",
-    help: [helpReopen(target)],
+    help: legalMoves("ended", target),
   };
 }

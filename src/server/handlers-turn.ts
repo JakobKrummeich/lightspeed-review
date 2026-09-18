@@ -5,6 +5,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionRecord } from "../session-store.ts";
+import { legalMoves } from "../commands/home.ts";
 import { agentWorking, turnFacts, turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
@@ -57,10 +58,8 @@ function turnRejection(session: SessionRecord): unknown {
         : "the turn moves to you when the reviewer's feedback is delivered to a blocking" +
           " `lightspeed wait`, and never before",
     },
-    help: ended
-      ? [
-          `Only the reviewer reopens a review: run \`lightspeed start ${target} --reopen\` when they ask for a new round`,
-        ]
-      : [`Run \`lightspeed wait ${target}\` to block until the reviewer sends`],
+    // The same list the commands print: a refusal must not name a move another
+    // answer calls illegal. Only a reviewer's turn or an ended review get here.
+    help: legalMoves(turnLabel(session), target),
   };
 }

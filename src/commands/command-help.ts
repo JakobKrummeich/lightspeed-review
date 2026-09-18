@@ -43,7 +43,10 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
     flags: {
       "--full": "print reviewer selections in full instead of truncating them",
     },
-    turn: `reviewer while it blocks, yours on delivery. ${TURN_RULE}`,
+    turn:
+      `reviewer while it blocks, yours on delivery. Run it while you hold the turn and` +
+      ` are working and it is refused with \`turn_still_yours\` and exit 2 — publish the` +
+      ` round or \`ask\` instead, which give the turn up deliberately. ${TURN_RULE}`,
     examples: ["lightspeed wait feature-auth main", "lightspeed wait feature-auth main --full"],
   },
   ask: {

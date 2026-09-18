@@ -2,7 +2,7 @@ import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
-import { helpNextRound, helpSay, helpWait } from "./home.ts";
+import { legalMoves } from "./home.ts";
 import { parseVerb, type VerbArgs } from "./verb-args.ts";
 import { serverOrigin } from "./server-address.ts";
 
@@ -41,6 +41,8 @@ export async function runWork(input: WorkInput): Promise<StructuredOutput> {
       declared.changed === false
         ? "the reviewer's banner already named this plan (no-op)"
         : "the reviewer's banner names this plan until you speak again",
-    help: [helpSay(target), helpNextRound(target), helpWait(target)],
+    // Never `wait`: the agent is working by the time it reads this, and the poll
+    // refuses a wait from a working agent with `turn_still_yours` and exit 2.
+    help: legalMoves(declared.turn ?? "agent working", target),
   };
 }
