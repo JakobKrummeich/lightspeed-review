@@ -2,7 +2,7 @@ import type { CommentDeclaration } from "../declarations.ts";
 import { validationError } from "../errors.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
-import type { TurnFacts } from "../turn.ts";
+import { turnBlock, type TurnFacts } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { lastValue } from "./args.ts";
 import { helpNextRound, helpReopen, helpWait, helpWork } from "./home.ts";
@@ -76,8 +76,7 @@ export async function runSay(input: SayInput): Promise<StructuredOutput> {
   )) as Partial<TurnFacts>;
   const target = `${input.branch} ${input.base}`;
   return {
-    ...(answered.turn === undefined ? {} : { turn: answered.turn }),
-    ...(answered.round === undefined ? {} : { round: answered.round }),
+    ...turnBlock(answered),
     said: input.text,
     ...(input.for === undefined ? {} : { for: input.for }),
     ...(input.files === undefined || input.files.length === 0 ? {} : { files: input.files }),

@@ -9,7 +9,7 @@ import { sessionKey } from "../paths.ts";
 import { currentGroupingMode } from "../rounds/session-round.ts";
 import type { LedgerReport } from "../server.ts";
 import { SessionStore, type SessionStatus } from "../session-store.ts";
-import type { TurnLabel } from "../turn.ts";
+import { turnBlock, type TurnLabel } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
 import { serverOrigin } from "./server-address.ts";
@@ -217,8 +217,7 @@ function startOutput({
   return {
     // A round opens on the reviewer's move: nothing has been sent to the agent
     // yet, so it holds no turn and nothing but `wait` will give it one.
-    ...(created.turn === undefined ? {} : { turn: created.turn }),
-    ...(created.round === undefined ? {} : { round: created.round }),
+    ...turnBlock(created),
     // Intents echoed back so the agent sees what the reviewer will read, in order.
     session: {
       key: created.key,

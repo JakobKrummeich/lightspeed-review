@@ -1,6 +1,6 @@
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
-import type { TurnFacts } from "../turn.ts";
+import { turnBlock, type TurnFacts } from "../turn.ts";
 import { apiRequest } from "./api-client.ts";
 import { serverOrigin } from "./server-address.ts";
 import { helpReopen } from "./home.ts";
@@ -26,8 +26,7 @@ export async function runEnd(input: EndInput): Promise<StructuredOutput> {
   )) as Partial<TurnFacts>;
   const target = `${input.branch} ${input.base}`;
   return {
-    ...(closed.turn === undefined ? {} : { turn: closed.turn }),
-    ...(closed.round === undefined ? {} : { round: closed.round }),
+    ...turnBlock(closed),
     session: { key, branch: input.branch, base: input.base, status: "ended" },
     message: "the review session is closed; the browser shows it as ended",
     help: [helpReopen(target)],

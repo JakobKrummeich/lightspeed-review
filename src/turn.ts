@@ -9,6 +9,7 @@
  * There is no timer, no staleness unlock and no override — an agent that died
  * holding the turn is recovered in the terminal it was started from.
  */
+import type { StructuredOutput } from "./output.ts";
 import type { SessionRecord, Turn } from "./session-store.ts";
 
 /** The reviewer's move: Send is live and nothing is owed to them. */
@@ -44,6 +45,22 @@ export interface TurnFacts {
 
 export function turnFacts(session: Pick<SessionRecord, "status" | "turn" | "rounds">): TurnFacts {
   return { turn: turnLabel(session), round: roundNumber(session) };
+}
+
+/**
+ * The two facts every command's answer leads with, spread into it. A server
+ * older than the turn states neither, and a reader must not read that as "the
+ * reviewer's" — so the fields are absent rather than guessed, in one place
+ * rather than once per command.
+ *
+ * The moves a turn allows are the other half of this, and they live with the
+ * rest of the help lines in `commands/home.ts`, which reads this module.
+ */
+export function turnBlock(facts: Partial<TurnFacts>): StructuredOutput {
+  return {
+    ...(facts.turn === undefined ? {} : { turn: facts.turn }),
+    ...(facts.round === undefined ? {} : { round: facts.round }),
+  };
 }
 
 export function turnLabel(session: Pick<SessionRecord, "status" | "turn">): TurnLabel {

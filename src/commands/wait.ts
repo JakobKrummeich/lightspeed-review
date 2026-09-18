@@ -3,6 +3,7 @@ import { END_VERDICTS, type EndApproval, type PollPayload } from "../feedback.ts
 import { truncateContent, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import type { FeedbackPrompt, ReviewCloser } from "../session-store.ts";
+import { turnBlock } from "../turn.ts";
 import { hasFlag, scanArgs } from "./args.ts";
 import { longPoll } from "./long-poll.ts";
 import { serverOrigin } from "./server-address.ts";
@@ -82,18 +83,6 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
     help: result.ended
       ? [endedHelp(result), ...helpApprovals(result, target), helpReopen(target)]
       : nextMoves(result, target),
-  };
-}
-
-/**
- * Whose move it is now, off the answer rather than guessed from it. An older
- * server states neither, and a reader must not read that as "the reviewer's" —
- * so the fields are simply absent, as they are everywhere else here.
- */
-function turnBlock(result: PollPayload): StructuredOutput {
-  return {
-    ...(result.turn === undefined ? {} : { turn: result.turn }),
-    ...(result.round === undefined ? {} : { round: result.round }),
   };
 }
 

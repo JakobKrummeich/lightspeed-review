@@ -1,6 +1,6 @@
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
-import type { TurnFacts } from "../turn.ts";
+import { turnBlock, type TurnFacts } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { helpNextRound, helpSay, helpWait } from "./home.ts";
 import { parseVerb, type VerbArgs } from "./verb-args.ts";
@@ -33,8 +33,7 @@ export async function runWork(input: WorkInput): Promise<StructuredOutput> {
   )) as Partial<TurnFacts> & { changed?: boolean };
   const target = `${input.branch} ${input.base}`;
   return {
-    ...(declared.turn === undefined ? {} : { turn: declared.turn }),
-    ...(declared.round === undefined ? {} : { round: declared.round }),
+    ...turnBlock(declared),
     plan: input.plan,
     // Redeclaring the same plan is legal and changes nothing; saying so keeps an
     // agent from reading a second `work` as a second thing it did.
