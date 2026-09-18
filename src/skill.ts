@@ -190,11 +190,12 @@ their own terminal; an agent must never run it.`;
 
 const OUTPUT = `## Output
 
-Every command answers TOON on stdout with a \`help[]\` block of next steps, and
-every failure answers \`error: {code, message, detail}\` plus \`help[]\` — exit 2
-when the command line itself is wrong (unknown command, subcommand or flag, a
-missing or unparseable argument), exit 1 for everything else. Run
-\`lightspeed <command> --help\` for a command's flags.`;
+Every command answers TOON on stdout, led by \`turn\` and \`round\` and closed
+by a \`help[]\` block naming the moves that are legal from there. Every failure
+answers \`error: {code, message, detail}\` plus \`help[]\` — exit 2 when the
+command line itself is wrong (unknown command, subcommand or flag, a missing or
+unparseable argument), exit 1 for everything else. Run
+\`lightspeed <command> --help\` for a command's flags and two worked examples.`;
 
 const SECTIONS = `${THE_TURN}
 

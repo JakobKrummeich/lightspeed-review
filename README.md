@@ -4,7 +4,7 @@ Semantic diff review with targeted agent feedback.
 
 An agent opens a review of a branch; a human reads the grouped diff in the
 browser, selects the exact lines that are wrong and writes a comment. The agent
-polls, receives the comment together with the selected code, and fixes it.
+waits, receives the comment together with the selected code, and fixes it.
 
 ## Quickstart
 
@@ -29,7 +29,7 @@ in pi, `/reload` does it without leaving the session.
 
 `start` prints a URL and opens it. You read the grouped diff, select the lines
 that are wrong and comment; the agent picks the comments up with
-`lightspeed poll your-branch main`, which blocks in the foreground until you
+`lightspeed wait your-branch main`, which blocks in the foreground until you
 send. Everything below is detail.
 
 ## Install
@@ -376,7 +376,7 @@ Set lightspeed up in this repository. These are two separate jobs; do both.
    Skills are scanned at startup, so you cannot use the one you just wrote until then.
 4. Then open a review with:
    `lightspeed start <branch> <base> --intent "<why this branch exists>"`
-   then `lightspeed poll <branch> <base>` in the foreground — it blocks until I send
+   then `lightspeed wait <branch> <base>` in the foreground — it blocks until I send
    feedback, so do not background it and do not wrap it in a timeout.
 ```
 
@@ -444,23 +444,46 @@ pulling the tests out of it would leave the group behind them empty.
 
 ## Commands
 
-| Command                                             | Purpose                                                                                                              |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `lightspeed start <branch> [base] --intent "<why>"` | Extract the diff, group it, open the review page                                                                     |
-| `lightspeed poll [branch] [base]`                   | Block until the reviewer sends feedback                                                                              |
-| `lightspeed approvals [branch] [base]`              | Name the files behind poll's counts: approved, swept, unapproved — the first 50 of each list, `--full` for every one |
-| `lightspeed end [branch] [base]`                    | Close the session from the agent side                                                                                |
-| `lightspeed stop`                                   | Shut the background review server down                                                                               |
-| `lightspeed feedback [sub]`                         | Read the feedback ledger: summary, list, show, prune                                                                 |
-| `lightspeed init --agent <id>`                      | Write one agent's integration instructions where it reads them                                                       |
-| `lightspeed skill --agent <id>`                     | Print one agent's integration instructions — see [Agents](#agents)                                                   |
-| `lightspeed serve`                                  | Run the review server in the foreground — `start` spawns it for you                                                  |
-| `lightspeed login <provider>`                       | Sign in to a subscription provider — a human, in their own terminal                                                  |
-| `lightspeed logout <provider>`                      | Drop lightspeed's stored credential for one provider                                                                 |
+| Command                                             | Purpose                                                                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `lightspeed start <branch> [base] --intent "<why>"` | Extract the diff, group it, open the review page                                                                  |
+| `lightspeed wait [branch] [base]`                   | Block until the reviewer sends — and take the turn when they do                                                   |
+| `lightspeed ask "<question>" [branch] [base]`       | Put a question to the reviewer, as a card with its own answer box, and block on the answer                        |
+| `lightspeed say "<text>" [branch] [base]`           | Say something without blocking; `--for <id>` pins it under the comment it answers                                 |
+| `lightspeed work "<plan>" [branch] [base]`          | Declare the silence you are about to keep — the reviewer's banner names the plan                                  |
+| `lightspeed approvals [branch] [base]`              | Name the files behind the counts: approved, swept, unapproved — the first 50 of each list, `--full` for every one |
+| `lightspeed end [branch] [base]`                    | Close the session from the agent side                                                                             |
+| `lightspeed stop`                                   | Shut the background review server down                                                                            |
+| `lightspeed feedback [sub]`                         | Read the feedback ledger: summary, list, show, prune                                                              |
+| `lightspeed init --agent <id>`                      | Write one agent's integration instructions where it reads them                                                    |
+| `lightspeed skill --agent <id>`                     | Print one agent's integration instructions — see [Agents](#agents)                                                |
+| `lightspeed serve`                                  | Run the review server in the foreground — `start` spawns it for you                                               |
+| `lightspeed login <provider>`                       | Sign in to a subscription provider — a human, in their own terminal                                               |
+| `lightspeed logout <provider>`                      | Drop lightspeed's stored credential for one provider                                                              |
 
 Every command prints TOON on stdout — failures included, as
 `error: {code, message, detail}` plus `help[]`. The one exception is `skill`,
 whose stdout is the markdown document itself; its failures are still TOON.
+
+## The turn
+
+> Queue always. End always. Send only on your turn.
+
+A review has exactly one turn holder. It is the reviewer's until a blocking
+`lightspeed wait` is handed their feedback; it is the agent's from that moment
+until the agent asks a question, publishes a new round or ends the review.
+Delivery is the only thing that hands it over — not the press of Send, because
+feedback nobody is waiting for simply queues.
+
+While the agent holds it the reviewer's **Send** is disabled, so a round cannot
+change under an agent mid-edit. Their queue, their typing and their **End** are
+never disabled, so they are never stuck behind an agent that walked away. There
+is no timer and no override: an agent that died holding the turn is restarted in
+the terminal it came from.
+
+Every answer the CLI prints carries `turn` and `round`, and its `help[]` lists
+the moves that are legal from there. `work` is the one command that can be
+refused — `turn_not_yours`, exit 2, naming the `wait` that would earn the turn.
 
 ## Intent
 
