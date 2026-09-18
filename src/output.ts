@@ -14,12 +14,12 @@ export function renderToon(output: StructuredOutput): string {
 
 /**
  * Default cap for diff/selection text in CLI output, in characters. Chosen so a
- * poll result stays readable in an agent transcript; `--full` lifts it.
+ * `wait` result stays readable in an agent transcript; `--full` lifts it.
  */
 export const CONTENT_LIMIT = 2_000;
 
 /**
- * Keeps one reviewer selection from burying a whole poll result. The browser
+ * Keeps one reviewer selection from burying a whole `wait` result. The browser
  * always shows the full text; the CLI says how much it held back and how to
  * ask for all of it.
  */

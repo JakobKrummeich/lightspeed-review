@@ -60,8 +60,8 @@ function unknownApprovalsFlag(flag: string): Error {
 }
 
 /**
- * The paths behind poll's counts, and the only place that prints them. Poll runs
- * on every round and its payload is read whether or not anyone needs a file
+ * The paths behind `wait`'s counts, and the only place that prints them. `wait`
+ * runs on every round and its payload is read whether or not anyone needs a file
  * list, so the lists live here, behind a command an agent runs when something
  * turns on which file — naming a swept change it wants read, or chasing what was
  * left unapproved. Read off the store rather than the server: a review is worth
@@ -124,8 +124,8 @@ function listing(paths: ApprovalPaths, full: boolean): Listing {
 /**
  * The account itself, never cut. A capped list renders under a length that is
  * the page's and not the tick's, so the numbers an agent decides on live beside
- * it and are read off the whole review — the same four counts poll reports under
- * its verdict, which is why the two can be compared at all.
+ * it and are read off the whole review — the same four counts `wait` reports
+ * under its verdict, which is why the two can be compared at all.
  */
 function countBlock(paths: ApprovalPaths, omitted: number): StructuredOutput {
   return {

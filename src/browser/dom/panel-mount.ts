@@ -82,7 +82,7 @@ interface PanelView {
 
 /**
  * `pending` here is the browser's unsent queue; the session's `pending`
- * (server-held, awaiting a poll) is deliberately not shown as removable pills.
+ * (server-held, awaiting a `wait`) is deliberately not shown as removable pills.
  */
 export function mountPanel(options: PanelOptions): MountedPanel {
   const { root, key, session, storage } = options;

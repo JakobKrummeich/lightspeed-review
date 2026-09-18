@@ -10,7 +10,8 @@ export type SessionStatus = "open" | "feedback" | "ended";
 
 /**
  * Who closed the review: reviewer `Send & End` or agent `lightspeed end`. An
- * agent polling an ended review must be able to tell whether a person looked at all.
+ * agent whose `wait` returns on an ended review must be able to tell whether a
+ * person looked at all.
  */
 export type ReviewCloser = "reviewer" | "agent";
 
@@ -100,7 +101,7 @@ export type AnchorFields =
 export type AnnotationPrompt = {
   type: "annotation";
   /**
-   * Server-minted id this comment goes by everywhere (poll output, declarations,
+   * Server-minted id this comment goes by everywhere (`wait` output, declarations,
    * ledger). Minted on acceptance: a queued prompt has none — `parsePrompt`
    * strips whatever a client claims — and pre-id prompts never get one, which
    * reads as "unknown", not as any particular comment.

@@ -11,7 +11,7 @@ export interface FeedbackRequest {
 /**
  * How much was approved at close. The payload must carry the evidence: a silent
  * end with nothing approved and one with everything approved are otherwise the
- * same bytes. Counts and not paths: the agent polling is the one that wrote the
+ * same bytes. Counts and not paths: the agent waiting is the one that wrote the
  * branch, it already knows the files, and a hundred paths it did not ask for are
  * a hundred paths of its context spent. `lightspeed approvals` names them when
  * something actually turns on which file — the help line says so.
@@ -208,7 +208,7 @@ export function closedBy(session: SessionRecord, closer: ReviewCloser): { endedB
 
 /**
  * The browser is untrusted like any client, and a malformed prompt would reach
- * the agent as a poll result, so the shape is checked here.
+ * the agent as a `wait` result, so the shape is checked here.
  */
 export function parseFeedbackRequest(payload: unknown): FeedbackRequest | undefined {
   if (typeof payload !== "object" || payload === null) return undefined;

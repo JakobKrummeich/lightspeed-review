@@ -257,7 +257,7 @@ function mountPanelSide(
     onEnd: (sent) => {
       // Closed on what the page already knows, without the network: ending a
       // review is the moment the server is most likely to go away (the agent's
-      // poll returns "ended" and shuts it down).
+      // `wait` returns "ended" and shuts it down).
       banner.setEndedByReviewer(sent);
       // Refined by the server's account when there is one: other-tab ticks, a
       // reply that landed mid-send.
