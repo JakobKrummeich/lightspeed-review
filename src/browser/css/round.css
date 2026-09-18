@@ -133,6 +133,18 @@
   font-size: var(--lsr-size-meta);
 }
 
+/*
+ * The promise about the reviewer's own words, and the one line on this card
+ * they need rather than merely want: it is the answer to "do I lose what I have
+ * written if I take this?". In the accent, because it is the only reassurance
+ * here — the two lines above it are facts about the round.
+ */
+.lsr-round-queue {
+  margin: 0;
+  color: var(--lsr-accent);
+  font-size: var(--lsr-size-meta);
+}
+
 .lsr-round-actions {
   display: flex;
   gap: var(--lsr-space-3);

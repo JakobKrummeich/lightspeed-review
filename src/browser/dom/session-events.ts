@@ -79,8 +79,11 @@ export function wireSessionEvents(wired: Wired): void {
   events.addEventListener("session", () => {
     void fetchSession(page.key).then((fresh) => {
       if (waits(wired, fresh)) {
-        offer.offer(fresh);
-        popup.offer(fresh);
+        // Asked at the moment, not remembered: the queue is whatever it is when
+        // the round lands, and both mouths must name the same number.
+        const queued = wired.place().queued;
+        offer.offer(fresh, queued);
+        popup.offer(fresh, queued);
         return;
       }
       // Whatever was offered is on screen now, or older than what is.

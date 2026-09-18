@@ -55,7 +55,7 @@ function control(root: FakeNode): ReturnType<typeof mountRoundOffer> {
 test("an offered round names itself and says how big it is", () => {
   const { root } = mount();
 
-  control(root).offer(session(1, { API: ["src/a.ts", "src/b.ts"] }));
+  control(root).offer(session(1, { API: ["src/a.ts", "src/b.ts"] }), 0);
 
   assert.equal(root.hidden, false);
   assert.equal(root.textContent, "Round 2 is ready · 2 files");
@@ -64,7 +64,7 @@ test("an offered round names itself and says how big it is", () => {
 test("a file in two groups is one file to read", () => {
   const { root } = mount();
 
-  control(root).offer(session(1, { API: ["src/a.ts"], Tests: ["src/a.ts", "test/a.test.ts"] }));
+  control(root).offer(session(1, { API: ["src/a.ts"], Tests: ["src/a.ts", "test/a.test.ts"] }), 0);
 
   assert.equal(root.textContent, "Round 2 is ready · 2 files");
 });
@@ -73,7 +73,7 @@ test("pressing it hands over the round that was offered", () => {
   const { root, taken } = mount();
   const fresh = session(1, { API: ["src/a.ts"] });
 
-  control(root).offer(fresh);
+  control(root).offer(fresh, 0);
   root.dispatch("click", {});
 
   assert.deepEqual(taken, [fresh]);
@@ -85,8 +85,8 @@ test("a second round replaces the first rather than queueing behind it", () => {
   const older = session(1, { API: ["src/a.ts"] });
   const newer = session(2, { API: ["src/a.ts", "src/b.ts"] });
 
-  control(root).offer(older);
-  control(root).offer(newer);
+  control(root).offer(older, 0);
+  control(root).offer(newer, 0);
   root.dispatch("click", {});
 
   // Taking the older one would open a diff the repository has moved past, and
@@ -106,7 +106,7 @@ test("a press with nothing offered does nothing at all", () => {
 test("a round that went on screen by itself leaves no offer standing", () => {
   const { root, taken } = mount();
 
-  control(root).offer(session(1, { API: ["src/a.ts"] }));
+  control(root).offer(session(1, { API: ["src/a.ts"] }), 0);
   control(root).clear();
   root.dispatch("click", {});
 
@@ -117,7 +117,7 @@ test("a round that went on screen by itself leaves no offer standing", () => {
 test("a dismissed popup leaves the offer beckoning until it is pressed", () => {
   const { root, taken } = mount();
 
-  control(root).offer(session(1, { API: ["src/a.ts"] }));
+  control(root).offer(session(1, { API: ["src/a.ts"] }), 0);
   control(root).beckon();
 
   assert.equal(root.dataset.beckon, "true", "the button calls out for the press it is owed");
@@ -139,7 +139,7 @@ test("a beckon with nothing offered is a call about nothing, and is not made", (
 test("a round that went on screen by itself takes the beckon with it", () => {
   const { root } = mount();
 
-  control(root).offer(session(1, { API: ["src/a.ts"] }));
+  control(root).offer(session(1, { API: ["src/a.ts"] }), 0);
   control(root).beckon();
   control(root).clear();
 

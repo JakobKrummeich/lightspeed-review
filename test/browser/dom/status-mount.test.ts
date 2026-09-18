@@ -78,10 +78,29 @@ test("the presence frame decides which of the three the banner says", (t) => {
   assert.match(root.innerHTML, /agent is waiting/i);
 
   banner.setPresence({ waiting: false, turn: AGENTS_TURN });
-  assert.match(root.innerHTML, /agent is working on your feedback/i);
+  assert.match(root.innerHTML, /the agent has your feedback/i);
 
   banner.setPresence({ waiting: false, turn: REVIEWERS_TURN });
   assert.match(root.innerHTML, /no agent is waiting/i);
+});
+
+/** `work` publishes a presence frame and nothing else — no session event, no
+ * round — so the banner has to hear the plan off that frame. */
+test("a plan declared mid-silence reaches the header without a reload", (t) => {
+  const root = stubDocument(t);
+  const banner = mountStatusBanner(session());
+
+  banner.setPresence({
+    waiting: false,
+    turn: {
+      holder: "agent",
+      mode: "working",
+      at: "2025-01-01T00:07:00.000Z",
+      note: "splitting the helper out",
+    },
+  });
+
+  assert.match(root.innerHTML, /implementing: splitting the helper out/);
 });
 
 test("a session that ended draws the summary of what the fresh read says", (t) => {

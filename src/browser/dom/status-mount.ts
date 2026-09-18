@@ -22,10 +22,12 @@ export interface MountedStatusBanner {
  */
 export function mountStatusBanner(session: SessionData): MountedStatusBanner {
   const root = document.querySelector<HTMLElement>("#lsr-status-banner");
+  // The turn comes off the page's own session, not off the first SSE frame: a
+  // reload mid-silence must say what the agent is doing straight away.
   let state: StatusState = {
     status: session.status,
     agentWaiting: false,
-    agentWorking: false,
+    turn: session.turn,
     review: session,
   };
   let drawn = renderStatusBanner(state);
@@ -37,8 +39,7 @@ export function mountStatusBanner(session: SessionData): MountedStatusBanner {
     root.innerHTML = html;
   };
   return {
-    setPresence: ({ waiting, turn }) =>
-      draw({ ...state, agentWaiting: waiting, agentWorking: turn.holder === "agent" }),
+    setPresence: ({ waiting, turn }) => draw({ ...state, agentWaiting: waiting, turn }),
     setSession: (fresh) => draw({ ...state, status: fresh.status, review: fresh }),
     setEndedByReviewer: (sent) =>
       draw({

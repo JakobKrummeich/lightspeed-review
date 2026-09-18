@@ -60,8 +60,15 @@ test("a round that lands mid-read waits behind the offer instead of taking the p
     listener.indexOf("waits(") < listener.indexOf("applyRound("),
     "the question is asked before the round is applied, not after it",
   );
-  assert.match(listener, /offer\.offer\(fresh\)/);
-  assert.match(listener, /popup\.offer\(fresh\)/, "the arrival is announced, not only offered");
+  assert.match(listener, /offer\.offer\(fresh, queued\)/);
+  assert.match(
+    listener,
+    /popup\.offer\(fresh, queued\)/,
+    "the arrival is announced, not only offered",
+  );
+  // Both mouths name the same unsent count, read once at the moment the round
+  // lands: a card and a header disagreeing about the queue is worse than neither.
+  assert.match(listener, /const queued = wired\.place\(\)\.queued/);
   // The only other paths onto the screen: both end in the same call, each clearing the other
   // first, so no card or offer outlives an applied round.
   assert.match(page, /popup\.clear\(\);\s*applyRound\(wired, taken\)/);

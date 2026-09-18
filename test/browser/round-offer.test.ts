@@ -52,3 +52,32 @@ test("the popup says what the offer says, and its presses name the round", () =>
 test("the popup counts one file the way the offer does", () => {
   assert.match(renderRoundPopup(0, 1), /<p class="lsr-round-size">1 file<\/p>/);
 });
+
+/**
+ * Queue always. Nothing in the page has ever dropped a queued pill on a new
+ * round, but a reviewer holding six unsent comments cannot know that — and the
+ * cost of guessing wrong is pressing "keep reading" on a round they wanted.
+ */
+test("the offer says the reviewer's unsent comments are kept", () => {
+  assert.equal(roundOfferLabel(1, 4, 2), "Round 2 is ready · 4 files · 2 comments kept");
+  assert.equal(roundOfferLabel(1, 4, 1), "Round 2 is ready · 4 files · 1 comment kept");
+});
+
+test("an empty queue is not mentioned: there is nothing to reassure anyone about", () => {
+  assert.equal(roundOfferLabel(1, 4, 0), "Round 2 is ready · 4 files");
+  assert.equal(roundOfferLabel(1, 4), "Round 2 is ready · 4 files");
+});
+
+test("the card spells out what the header only counts", () => {
+  const html = renderRoundPopup(1, 4, 2);
+
+  assert.match(
+    html,
+    /<p class="lsr-round-queue">Your 2 comments stay queued — they go out on your next send\.<\/p>/,
+  );
+  assert.match(html, /aria-label="Round 2 is ready · 4 files · 2 comments kept"/);
+});
+
+test("a card with nothing queued behind it makes no promise about a queue", () => {
+  assert.doesNotMatch(renderRoundPopup(1, 4, 0), /lsr-round-queue/);
+});

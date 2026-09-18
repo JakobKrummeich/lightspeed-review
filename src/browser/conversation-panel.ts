@@ -1,5 +1,6 @@
 import { escapeHtml } from "../escape-html.ts";
 import { currentRound, roundSegments, type RoundSegment } from "./conversation-rounds.ts";
+import { agentTurnText } from "./turn-words.ts";
 import { stalePillRound, type QueuedPill } from "./queued-pill.ts";
 import type {
   ConversationEntry,
@@ -139,21 +140,8 @@ function renderTurnLine(state: PanelState): string {
   return `
   <p class="lsr-working">
     <span class="lsr-working-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-    ${escapeHtml(turnLineText(state.turn))}
+    ${escapeHtml(agentTurnText(state.turn))}
   </p>`;
-}
-
-/**
- * The two things the agent's turn can mean. They gate identically — `mode` is
- * presentational — but a reviewer waiting on a silence is owed the difference
- * between "it has your words" and "it is writing the code", which is the whole
- * point of the plan `work` declares.
- */
-function turnLineText(turn: Turn): string {
-  if (turn.mode !== "working") return "the agent has your feedback";
-  return turn.note === undefined
-    ? "the agent is implementing your feedback"
-    : `implementing: ${turn.note}`;
 }
 
 /**

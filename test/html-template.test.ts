@@ -55,9 +55,28 @@ test("the page renders the status banner so it is right before the bundle loads"
 
   assert.match(html, /id="lsr-status-banner"/);
   assert.match(html, /data-status="open"/);
-  // Server cannot know presence from the record; the page claims neither until the stream says so.
+  // Only a live `wait` proves somebody is listening, and the record cannot say;
+  // the page claims nobody until the stream says otherwise.
   assert.match(html, /data-waiting="false"/);
   assert.match(html, /data-working="false"/);
+});
+
+/** The turn is on the record, unlike presence — so a reviewer who reloads while
+ * the agent is off implementing something reads the plan in the first paint,
+ * rather than "no agent is waiting" until the first SSE frame arrives. */
+test("the served page already says what the agent is doing", () => {
+  const html = renderReviewPage({
+    ...session,
+    turn: {
+      holder: "agent",
+      mode: "working",
+      at: "2025-01-01T00:07:00.000Z",
+      note: "splitting the helper out",
+    },
+  });
+
+  assert.match(html, /data-working="true"/);
+  assert.match(html, /implementing: splitting the helper out/);
 });
 
 test("the round offer waits in the header, empty until the bundle has news", () => {

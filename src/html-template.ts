@@ -37,7 +37,11 @@ export function renderReviewPage(session: SessionRecord): string {
            middle of something to take: the bundle writes what it says, because
            only the browser knows whether they are somewhere in this round. -->
       <button id="lsr-round-offer" class="lsr-round-offer" type="button" hidden></button>
-      <div id="lsr-status-banner">${renderStatusBanner({ status: session.status, agentWaiting: false, agentWorking: false, review: session })}</div>
+      <!-- The turn is on the record, so the served page states it: a reviewer
+           reloading mid-silence reads what the agent is doing in the first
+           paint, not one SSE frame later. Nobody is waiting until a live wait
+           says so, which only the running server knows. -->
+      <div id="lsr-status-banner">${renderStatusBanner({ status: session.status, agentWaiting: false, turn: session.turn, review: session })}</div>
     </header>
     <main id="lsr-review" class="lsr-review">
       <section id="lsr-intent" class="lsr-intent">${renderIntent({
