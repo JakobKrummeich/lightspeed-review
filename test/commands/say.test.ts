@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createServer, type Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -229,6 +230,48 @@ test("a pin naming no comment of this review is refused whole", async () => {
     assert.equal(store.get(KEY)?.declarations, undefined);
     assert.equal(store.get(KEY)?.conversation.length, 1);
   });
+});
+
+/** The reviewer has gone and their page is showing the closing summary: words
+ * filed there reach nobody, and only they ask for another round. */
+test("speaking into an ended review is refused, not filed where nobody looks", async () => {
+  await withServer(session({ status: "ended", endedBy: "reviewer" }), async ({ port, store }) => {
+    await assert.rejects(
+      () => runSay({ repoRoot: REPO, branch: BRANCH, base: BASE, port, text: "one more thing" }),
+      (error: unknown) => {
+        assert.ok(error instanceof ReviewError);
+        assert.equal(error.code, "session_ended");
+        assert.match(error.suggestions.join("\n"), /--reopen/);
+        return true;
+      },
+    );
+    assert.equal(store.get(KEY)?.conversation.length, 1);
+  });
+});
+
+/**
+ * A server that took the words anyway — one older than the guard above. The help
+ * must not offer a `wait`: on an ended review it returns "ended" at once, every
+ * time, and an agent told to run it reads that as something still to come.
+ */
+test("an answer saying the review ended points at the only command that reopens one", async () => {
+  const server: Server = createServer((request, response) => {
+    const body = request.url === "/health" ? {} : { turn: "ended", round: 1, delivered: true };
+    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(body));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const output = await runSay({ repoRoot: REPO, branch: BRANCH, base: BASE, port, text: "hi" });
+
+    assert.equal(output.turn, "ended");
+    assert.deepEqual(output.help, [
+      "Only the reviewer reopens a review: run `lightspeed start feature-auth main --reopen`" +
+        " when they ask for a new round",
+    ]);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 
 test("speaking into an unknown session fails with session_not_found", async () => {

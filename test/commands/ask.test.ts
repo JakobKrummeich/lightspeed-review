@@ -148,19 +148,21 @@ test("asking from a turn the agent holds hands it back before the wait blocks", 
   });
 });
 
-test("an ended review answers the question with the ending, not a block", async () => {
-  await withServer(session({ status: "ended", endedBy: "reviewer" }), async ({ port }) => {
-    const output = await runAsk({
-      repoRoot: REPO,
-      branch: BRANCH,
-      base: BASE,
-      port,
-      question: "anything else?",
-    });
-
-    assert.equal(output.ended, true);
-    assert.equal(output.turn, "ended");
-    assert.match((output.help as string[])[0]!, /^The reviewer ended this review/);
+/** Nobody is there to answer, so the question is refused rather than asked into
+ * the closing summary and waited on. */
+test("a question put to an ended review is refused instead of blocking on an answer", async () => {
+  await withServer(session({ status: "ended", endedBy: "reviewer" }), async ({ port, store }) => {
+    await assert.rejects(
+      () =>
+        runAsk({ repoRoot: REPO, branch: BRANCH, base: BASE, port, question: "anything else?" }),
+      (error: unknown) => {
+        assert.ok(error instanceof ReviewError);
+        assert.equal(error.code, "session_ended");
+        assert.match(error.suggestions.join("\n"), /--reopen/);
+        return true;
+      },
+    );
+    assert.deepEqual(store.get(KEY)?.conversation, []);
   });
 });
 

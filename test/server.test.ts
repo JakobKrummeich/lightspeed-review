@@ -1231,6 +1231,24 @@ test("a reply that only declares appends no conversation entry", async () => {
   });
 });
 
+/** A tick after the end is refused because it would rewrite the ledgered verdict;
+ * words after the end are refused because nobody is there to read them. */
+test("a reply into an ended review is refused, like every other move that needs a reader", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [], ended: true });
+    const before = store.get(key)!.conversation.length;
+
+    const response = await postReply(url, key, { comment: "one more thing" });
+
+    assert.equal(response.status, 409);
+    assert.partialDeepStrictEqual(await response.json(), {
+      error: { code: "session_ended" },
+    });
+    assert.equal(store.get(key)!.conversation.length, before);
+  });
+});
+
 async function postWork(url: string, key: string, body: unknown): Promise<Response> {
   return await fetch(`${url}/api/session/${key}/work`, {
     method: "POST",

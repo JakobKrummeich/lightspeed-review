@@ -5,7 +5,7 @@ import { sessionKey } from "../paths.ts";
 import type { TurnFacts } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { lastValue } from "./args.ts";
-import { helpNextRound, helpWait, helpWork } from "./home.ts";
+import { helpNextRound, helpReopen, helpWait, helpWork } from "./home.ts";
 import { parseVerb, type VerbArgs } from "./verb-args.ts";
 import { serverOrigin } from "./server-address.ts";
 
@@ -93,9 +93,13 @@ function pinned(input: SayInput): CommentDeclaration[] {
 /**
  * Saying something changes nothing about whose move it is, so the moves that
  * were legal before it still are. Holding the turn, the agent is here to work;
- * not holding it, the only move left is to wait for one.
+ * not holding it, the only move left is to wait for one. An ended review holds
+ * no turn at all, and a `wait` offered there would return "ended" forever — the
+ * server refuses a reply into one, so this is for the answer of a server that
+ * did not, and never a `wait` the agent could hang on.
  */
 function nextMoves(turn: TurnFacts["turn"] | undefined, target: string): string[] {
+  if (turn === "ended") return [helpReopen(target)];
   if (turn === "agent reading" || turn === "agent working") {
     return [helpWork(target), helpNextRound(target), helpWait(target)];
   }

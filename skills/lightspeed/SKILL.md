@@ -129,9 +129,10 @@ comment. An annotation carries:
   run while you hold the turn and are working, it answers
   `turn_still_yours` and exits 2 the same way.
 - `Send & End` from the reviewer ends the review; `wait` reports
-  `ended: true`. `start` on an ended review is refused with
-  `session_ended`. When the reviewer asks for another round — and only then —
-  run `lightspeed start <branch> [base] --reopen`.
+  `ended: true`. `start`, `say` and `ask` on an ended review are all
+  refused with `session_ended`: there is nobody left to read the words. When
+  the reviewer asks for another round — and only then — run
+  `lightspeed start <branch> [base] --reopen`.
 - An ended `wait` is not by itself an approval. Read `approval.verdict`:
   `signed-off` (every file approved), `partial` (some approved, some not),
   `none` (nothing approved) or `empty` (the review held no files). Only

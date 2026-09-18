@@ -98,6 +98,18 @@ export async function handleAgentReply(
     );
     return;
   }
+  // Words spoken into a review that is over reach nobody: the reviewer's page is
+  // showing the closing summary, and only they ask for another round. Refused
+  // the way a tick after the end is refused, rather than filed where nobody looks.
+  if (session.status === "ended") {
+    sendJson(response, 409, {
+      error: {
+        code: "session_ended",
+        message: "this review is ended; its conversation is what the reviewer left",
+      },
+    });
+    return;
+  }
   // All-or-nothing: partial acceptance would make a safe retry duplicate the conversation.
   const problems = validateDeclarations(session, reply.declarations, (from, to) =>
     listDiffNames(session.repoRoot, from, to),
