@@ -1418,7 +1418,7 @@ test("work puts the plan on the wire for the reviewer's page", async () => {
     const stream = await openStream(url, key);
     await stream.until(/event: presence/);
     await takeTheTurn(url, key);
-    await stream.until(/"working":true/);
+    await stream.until(/"turn":\{"holder":"agent"/);
 
     await postWork(url, key, { plan: "splitting the helper out" });
 
@@ -2018,7 +2018,10 @@ test("presence says an agent is working once a poll has carried the feedback off
 
     await pollAndAck(url, key);
 
-    assert.match(await stream.until(/event: presence/), /"waiting":false,"working":true/);
+    assert.match(
+      await stream.until(/event: presence/),
+      /"waiting":false,"turn":\{"holder":"agent"/,
+    );
     stream.close();
   });
 });
@@ -2047,14 +2050,14 @@ test("an agent asking for more feedback is an agent that is no longer working", 
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
     await pollAndAck(url, key);
-    await stream.until(/"working":true/);
+    await stream.until(/"turn":\{"holder":"agent"/);
 
     // An agent that skips the reply and polls again has finished with what it took;
     // parking for the next feedback is it saying so.
     const parked = new AbortController();
     void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
 
-    assert.match(await stream.until(/"waiting":true/), /"working":false/);
+    assert.match(await stream.until(/"waiting":true/), /"turn":\{"holder":"reviewer"/);
     parked.abort();
     stream.close();
   });
@@ -2071,7 +2074,7 @@ test("the agent asking a question gives the reviewer the turn back", async () =>
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
     await pollAndAck(url, key);
-    await stream.until(/"working":true/);
+    await stream.until(/"turn":\{"holder":"agent"/);
 
     const response = await postReply(url, key, {
       comment: "per-request or per-batch?",
@@ -2080,7 +2083,7 @@ test("the agent asking a question gives the reviewer the turn back", async () =>
 
     assert.equal(response.status, 200);
     assert.partialDeepStrictEqual(await response.json(), { turn: "reviewer", round: 1 });
-    assert.match(await stream.until(/event: presence/), /"working":false/);
+    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
     assert.equal(store.get(key)?.turn.holder, "reviewer");
     stream.close();
   });
@@ -2112,11 +2115,11 @@ test("a round opened on what the agent did leaves nobody working", async () => {
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
     await pollAndAck(url, key);
-    await stream.until(/"working":true/);
+    await stream.until(/"turn":\{"holder":"agent"/);
 
     await postSession(url);
 
-    assert.match(await stream.until(/event: presence/), /"working":false/);
+    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
     stream.close();
   });
 });
@@ -2128,11 +2131,11 @@ test("a review that ends leaves nobody working, whoever ended it", async () => {
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
     await pollAndAck(url, key);
-    await stream.until(/"working":true/);
+    await stream.until(/"turn":\{"holder":"agent"/);
 
     await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
 
-    assert.match(await stream.until(/event: presence/), /"working":false/);
+    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
     stream.close();
   });
 });
@@ -2149,7 +2152,7 @@ test("a poll that died holding the feedback leaves the agent reading as working"
     // of the two happened first decides what the server can say afterwards, and a test that posted
     // and killed in the same breath was letting the machine's mood pick the scenario.
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await stream.until(/"working":true/);
+    await stream.until(/"turn":\{"holder":"agent"/);
 
     poll.kill();
 
@@ -2157,7 +2160,10 @@ test("a poll that died holding the feedback leaves the agent reading as working"
     // reads exactly like one thinking hard and there is no heartbeat to tell them apart, so the
     // flag stands until the next poll, reply, round or end clears it — clearing it here would
     // announce that nobody is acting on feedback that has already left the building.
-    assert.match(await stream.until(/event: presence/), /"waiting":false,"working":true/);
+    assert.match(
+      await stream.until(/event: presence/),
+      /"waiting":false,"turn":\{"holder":"agent"/,
+    );
     stream.close();
   });
 });
@@ -2167,8 +2173,8 @@ test("the presence frame names whose turn it is, not just that somebody is worki
     const { key } = await postSession(url);
     const stream = await openStream(url, key);
 
-    // The page must be able to draw the three Send states apart, and `working`
-    // alone cannot say whether the agent is reading or editing.
+    // The page must be able to draw the three Send states apart, and a flag
+    // saying only that somebody is working cannot say which of them it is.
     assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
     stream.close();
   });
@@ -2198,7 +2204,9 @@ test("feedback nobody is waiting for queues and leaves the turn with the reviewe
   });
 });
 
-test("a delivery whose connection died gives the turn back with the prompts", async () => {
+/** Feedback sent at a connection that is already gone reaches nobody, so it
+ * takes nothing: the turn waits with the prompts for a `wait` that is really there. */
+test("a delivery into a dead connection leaves the turn for the wait that follows", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
     const watch = await parkWatch(url, key);
@@ -2209,7 +2217,8 @@ test("a delivery whose connection died gives the turn back with the prompts", as
     await postFeedback(url, key, { prompts: [annotation], ended: false });
 
     // Bounded so prompts lost into the dead connection fail the test rather than parking it.
-    await pollAndAck(url, key);
+    const polled = await pollAndAck(url, key);
+    assert.partialDeepStrictEqual(polled.prompts, [annotation]);
     assert.equal(store.get(key)?.turn.holder, "agent");
   });
 });
@@ -2228,7 +2237,7 @@ test("a server restarted over the same sessions publishes the turn the last run 
 
     // An in-memory flag would have handed Send back to the reviewer here, with
     // the agent still editing and no way for either side to find out.
-    assert.match(await stream.until(/event: presence/), /"working":true/);
+    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"agent"/);
     stream.close();
   } finally {
     await restarted.stop();
@@ -2244,7 +2253,7 @@ test("a poll carrying the reviewer's last word marks nobody working", async () =
 
     // Stream opened after the poll: its first frame is the state as it stands.
     const stream = await openStream(url, key);
-    assert.match(await stream.until(/event: presence/), /"working":false/);
+    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
     stream.close();
   });
 });

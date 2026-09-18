@@ -51,9 +51,11 @@ function turnRejection(session: SessionRecord): unknown {
       message: ended
         ? "this review is ended, so there is no turn to take"
         : `you do not hold the turn (turn: ${turnLabel(session)}) — nothing has been sent to you yet`,
-      detail:
-        "the turn moves to you when the reviewer's feedback is delivered to a blocking" +
-        " `lightspeed wait`, and never before",
+      detail: ended
+        ? "an ended review holds no turn at all, and waiting for one would return `ended`" +
+          " forever: only the reviewer opens another round"
+        : "the turn moves to you when the reviewer's feedback is delivered to a blocking" +
+          " `lightspeed wait`, and never before",
     },
     help: ended
       ? [

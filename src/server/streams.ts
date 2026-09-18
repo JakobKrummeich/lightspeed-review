@@ -69,17 +69,16 @@ export class SessionTransport {
   }
 
   /**
-   * `waiting` is a live connection and can only be counted here; `working` is
-   * derived from the turn rather than tracked beside it, so the banner and the
-   * gate on Send can never disagree about who holds the review. A dead agent
-   * leaves the turn standing — indistinguishable from thinking hard, and there
-   * is no heartbeat to tell them apart; recovery is out of band.
+   * Two facts, and no third derived from them: `waiting` is a live connection
+   * and can only be counted here, `turn` is read off the record so the banner
+   * and the gate on Send cannot disagree about who holds the review. A dead
+   * agent leaves the turn standing — indistinguishable from thinking hard, and
+   * there is no heartbeat to tell them apart; recovery is out of band.
    */
   private presenceFrame(key: string): string {
     const turn = this.turnOf(key);
     return sseFrame("presence", {
       waiting: (this.pollers.get(key)?.size ?? 0) > 0,
-      working: turn?.holder === "agent",
       ...(turn === undefined ? {} : { turn }),
     });
   }

@@ -26,11 +26,6 @@ export function agentWorking(now: string, note: string): Turn {
   return { holder: "agent", mode: "working", at: now, note };
 }
 
-/** Whether the agent may send — and, read the other way, whether Send is off. */
-export function agentHoldsTurn(session: Pick<SessionRecord, "turn">): boolean {
-  return session.turn.holder === "agent";
-}
-
 /**
  * The turn as every command prints it: one closed set of words an agent can
  * branch on without reading two fields. An ended review says so instead of

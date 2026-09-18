@@ -5,13 +5,15 @@ import { readPresence } from "../../src/browser/agent-presence.ts";
 const NOBODY = { waiting: false, turn: { holder: "reviewer", at: "" } };
 
 test("reads the waiter and the turn out of one frame", () => {
+  // `working` is a field an older server sent beside the turn; a reader that
+  // choked on one it does not know would break on the next field to be retired.
   assert.deepEqual(
     readPresence(`{"waiting":true,"working":false,"turn":{"holder":"reviewer","at":"T0"}}`),
     { waiting: true, turn: { holder: "reviewer", at: "T0" } },
   );
   assert.deepEqual(
     readPresence(
-      `{"waiting":false,"working":true,"turn":{"holder":"agent","mode":"working","at":"T1","note":"rewriting the parser"}}`,
+      `{"waiting":false,"turn":{"holder":"agent","mode":"working","at":"T1","note":"rewriting the parser"}}`,
     ),
     {
       waiting: false,
