@@ -9,7 +9,7 @@ import type { Delivery, FeedbackPrompt, SessionRecord } from "../session-store.t
 import { agentReading, reviewerTurn, turnFacts, turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
-import type { WakeReason } from "./streams.ts";
+import type { Waker } from "./streams.ts";
 import { readDelivered } from "./validate.ts";
 
 export function handleEvents(
@@ -53,14 +53,12 @@ export function handlePoll(
   // An idle poll may wait for hours: no timer of this server's may close it,
   // and TCP keepalive keeps the connection known to both ends.
   holdSocketOpen(request.socket);
-  // A fresh poll is the proof that the last handover was not read: an agent
-  // holding those prompts would be acting on them, not asking again.
-  recoverDelivery(context, session.key);
   if (deliverFeedback(context, session.key, response)) return;
   // Several agents may wait on one session; whoever loses the race to the
-  // queue stays parked rather than being answered with nothing.
-  const wake = (reason: WakeReason) => {
-    if (reason === "feedback" && !deliverFeedback(context, session.key, response)) return;
+  // queue stays parked rather than being answered with nothing. Taking it is
+  // what `true` says: the transport wakes the next one only if this one could not.
+  const wake: Waker = (reason) => {
+    if (reason === "feedback" && !deliverFeedback(context, session.key, response)) return false;
     context.transport.removePoller(session.key, wake);
     // A waiting agent must be told the wait is over, not handed an empty body.
     if (reason === "shutdown") {
@@ -68,6 +66,7 @@ export function handlePoll(
         error: { code: "server_stopped", message: "the review server shut down" },
       });
     }
+    return true;
   };
   context.transport.addPoller(session.key, wake);
   // Parking is the agent handing the turn back: it is listening, not editing,
@@ -110,10 +109,20 @@ export async function handleDelivered(
  * Drained before the write so two pollers cannot get the same prompts, and held
  * in `delivering` until the agent says it read them — the write landing proves
  * only that the kernel took the bytes, never that anybody was there to read.
+ *
+ * Recovery runs here, immediately before the drain, and not on the way in: one
+ * slot holds what is in flight, and a drain that ran without emptying it first
+ * would overwrite a batch nobody has confirmed — leaving it in neither `pending`
+ * nor `delivering`, which is the one way feedback is lost for good. A poll that
+ * arrives and a parked poller that is woken both come through here, so neither
+ * can be the path that forgets. The cost is that two agents that really are
+ * both alive can be handed the same batch — a window one acknowledgement wide,
+ * and at-least-once is the trade this whole mechanism is making.
  */
 function deliverFeedback(context: ServerContext, key: string, response: ServerResponse): boolean {
   // Nothing is drained onto a socket that is already gone.
   if (response.socket === null || response.socket.destroyed) return false;
+  recoverDelivery(context, key);
   const session = context.store.get(key);
   const drained = session && drainPending(session);
   if (!drained) return false;
@@ -159,17 +168,17 @@ function handsOverTurn(payload: PollPayload): boolean {
 
 /**
  * An unconfirmed handover put back at the head of the queue (written order,
- * before anything sent since) for the poll that is asking now. The turn is left
- * alone: this poll either takes it again with the re-delivery that follows, or
- * parks and hands it back — no path out of here leaves it where the agent that
- * never read a word left it.
+ * before anything sent since) for the drain that is about to run. The turn is
+ * left alone: that drain either takes it again with the re-delivery, or the
+ * poll parks and hands it back — no path out of here leaves it where the agent
+ * that never read a word left it.
  *
- * Recovery happens on the next poll rather than when the connection closes,
+ * Recovery happens on the next drain rather than when the connection closes,
  * because `close` always fires before the confirmation could arrive — it
  * travels on a second connection — so a close-triggered rollback would race
  * every healthy delivery and hand the same prompts out twice. An agent that
- * died holding an unconfirmed batch keeps it until something polls again, which
- * is the same recovery story as an agent that died holding the turn.
+ * died holding an unconfirmed batch keeps it until something drains again,
+ * which is the same recovery story as an agent that died holding the turn.
  */
 function recoverDelivery(context: ServerContext, key: string): void {
   const session = context.store.get(key);

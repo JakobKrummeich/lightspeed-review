@@ -10,13 +10,19 @@ import { sseFrame } from "./http.ts";
 
 export type WakeReason = "feedback" | "shutdown";
 
+/**
+ * A parked poller. Answering takes what was queued, so it says whether it did:
+ * the queue is one batch and it belongs to one agent.
+ */
+export type Waker = (reason: WakeReason) => boolean;
+
 /** The stored turn of one session, or none when no such session is on disk. */
 export type TurnReader = (key: string) => Turn | undefined;
 
 export class SessionTransport {
   private readonly streams = new Map<string, Set<ServerResponse>>();
   /** Long-polling agents, woken when their session receives feedback or the server stops. */
-  private readonly pollers = new Map<string, Set<(reason: WakeReason) => void>>();
+  private readonly pollers = new Map<string, Set<Waker>>();
 
   /**
    * The turn is session state, not transport state: it is read here rather than
@@ -43,19 +49,28 @@ export class SessionTransport {
   }
 
   /** Several agents may wait on one session; each is parked under its wake call. */
-  addPoller(key: string, wake: (reason: WakeReason) => void): void {
-    const waiting = this.pollers.get(key) ?? new Set<(reason: WakeReason) => void>();
+  addPoller(key: string, wake: Waker): void {
+    const waiting = this.pollers.get(key) ?? new Set<Waker>();
     waiting.add(wake);
     this.pollers.set(key, waiting);
   }
 
-  removePoller(key: string, wake: (reason: WakeReason) => void): void {
+  removePoller(key: string, wake: Waker): void {
     this.pollers.get(key)?.delete(wake);
   }
 
-  /** Copied first: a woken poller removes itself from the set as it answers. */
+  /**
+   * Copied first: a woken poller removes itself from the set as it answers. The
+   * loop stops at the one that takes the feedback, and goes on past the ones
+   * that cannot — a poller whose connection died takes nothing. Stopping is the
+   * whole of "whoever loses the race stays parked": a delivery is not spent
+   * until the agent confirms it, so a second poller woken after the first would
+   * otherwise be handed the batch that is still in flight to the first.
+   */
   wakePollers(key: string): void {
-    for (const wake of [...(this.pollers.get(key) ?? [])]) wake("feedback");
+    for (const wake of [...(this.pollers.get(key) ?? [])]) {
+      if (wake("feedback")) return;
+    }
   }
 
   /** Pushes an SSE event to every browser watching one session. */

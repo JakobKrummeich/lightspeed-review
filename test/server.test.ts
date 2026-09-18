@@ -1269,14 +1269,18 @@ async function pollAndAck(url: string, key: string): Promise<Record<string, unkn
     signal: AbortSignal.timeout(2_000),
   });
   const payload = (await answer.json()) as Record<string, unknown>;
-  if (typeof payload.delivery === "string") {
-    await fetch(`${url}/api/session/${key}/delivered`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ delivery: payload.delivery }),
-    });
-  }
+  await ackDelivery(url, key, payload);
   return payload;
+}
+
+/** The confirmation a live `wait` sends the moment the answer is in its hands. */
+async function ackDelivery(
+  url: string,
+  key: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  if (typeof payload.delivery !== "string") return;
+  await postDelivered(url, key, { delivery: payload.delivery });
 }
 
 /** Delivery is the only thing that hands the turn over, so it is what every
@@ -1779,6 +1783,42 @@ function postDelivered(url: string, key: string, body: unknown): Promise<Respons
   });
 }
 
+/**
+ * The woken path, which is the common one: an agent is normally already parked
+ * when the reviewer sends, and a silently dropped connection never fires
+ * `close`, so a zombie poller that was answered and confirmed nothing is
+ * routine. The batch in flight to it must survive the drain that answers the
+ * next poller — overwritten, it would be in neither `pending` nor `delivering`,
+ * and no wait could ever find it again.
+ */
+test("a batch in flight is not overwritten by the delivery that answers the next poller", async () => {
+  const later = { type: "message" as const, comment: "and one more thing" };
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    const watch = await parkWatch(url, key);
+    // Parked first, so the reviewer's word goes to it — and it never reads the
+    // answer and never confirms it, which is what a dropped connection looks like.
+    const zombie = await parkedPoll(url, key, () => watch.until(/"waiting":true/));
+    const second = fetch(`${url}/api/poll?key=${key}`, {
+      signal: AbortSignal.timeout(PARKED_POLL_LIMIT_MS),
+    });
+    await watch.until(/"waiting":true/);
+    watch.close();
+
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation]);
+    await postFeedback(url, key, { prompts: [later], ended: false });
+
+    // The second poller is handed the unconfirmed batch at the head, in written
+    // order, ahead of everything sent since.
+    const answered = (await (await second).json()) as { prompts: unknown[] };
+    assert.partialDeepStrictEqual(answered.prompts, [annotation, later]);
+    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation, later]);
+    assert.deepEqual(store.get(key)?.pending, []);
+    zombie.kill();
+  });
+});
+
 test("feedback drained onto a connection nobody read is handed out again", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
@@ -1867,8 +1907,13 @@ test("a second poller keeps waiting instead of getting an empty answer", async (
 
     await postFeedback(url, key, { prompts: [annotation], ended: false });
 
-    const drained = (await (await first).json()) as { prompts: unknown[] };
+    const drained = (await (await first).json()) as Record<string, unknown>;
     assert.partialDeepStrictEqual(drained.prompts, [annotation]);
+    // Confirmed, because this test is about a healthy agent taking the feedback.
+    // An unacknowledged batch is one the server has to assume nobody read, so it
+    // rides out again on the next drain — a real answer to a different question,
+    // and the second poller would get the first poller's words.
+    await ackDelivery(url, key, drained);
 
     // The queue is empty now, so the second poller must still be waiting.
     await postFeedback(url, key, {
