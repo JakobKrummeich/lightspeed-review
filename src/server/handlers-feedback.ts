@@ -9,11 +9,19 @@ import { withAgentReply, withFeedback } from "../feedback.ts";
 import { listDiffNames } from "../git-file.ts";
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
+import type { SessionRecord } from "../session-store.ts";
+import { turnFacts } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { announceRoundEnd } from "./handlers-session.ts";
 import { badRequest, sendJson } from "./http.ts";
 import { logAgentReply, logDeclarations, logFeedback } from "./ledger-log.ts";
-import { declarationRejection, parseApproved, readFeedback, readReply } from "./validate.ts";
+import {
+  declarationRejection,
+  parseApproved,
+  readFeedback,
+  readReply,
+  type AgentReply,
+} from "./validate.ts";
 
 export async function handleApproved(
   context: ServerContext,
@@ -83,7 +91,11 @@ export async function handleAgentReply(
   if (!session) return;
   const reply = await readReply(request);
   if (reply === undefined) {
-    badRequest(response, "expected JSON {comment: string, declarations?: [{id, note?, files?}]}");
+    badRequest(
+      response,
+      "expected JSON {comment?: string, kind?: 'question', declarations?: [{id, note?, files?}]}" +
+        " with at least one of comment and declarations",
+    );
     return;
   }
   // All-or-nothing: partial acceptance would make a safe retry duplicate the conversation.
@@ -95,17 +107,28 @@ export async function handleAgentReply(
     return;
   }
   const now = new Date().toISOString();
-  const updated = withDeclarations(
-    withAgentReply(session, reply.comment, now),
-    reply.declarations,
-    now,
-  );
+  const updated = withDeclarations(spoken(session, reply, now), reply.declarations, now);
   context.store.save(updated);
-  logAgentReply(context.log, session, reply.comment, now);
+  if (reply.comment !== undefined) logAgentReply(context.log, session, reply.comment, now);
   logDeclarations(context.log, session, reply.declarations, now);
-  // The answer is the end of the work the last delivery went off with, so the
-  // turn goes back with it (`withAgentReply`).
+  // A question gives the turn back (`withAgentReply`); plain speech leaves it
+  // where it was. The frame goes out either way — it is idempotent, and one
+  // route deciding not to publish is how a page comes to show a stale lock.
   context.transport.publishPresence(session.key);
   context.transport.publish(session.key, "session", { reason: "agent_reply" });
-  sendJson(response, 200, { delivered: true, declared: reply.declarations.length });
+  sendJson(response, 200, {
+    ...turnFacts(updated),
+    delivered: true,
+    declared: reply.declarations.length,
+  });
+}
+
+/**
+ * The conversation after the agent's words. `say --for <id>` pins its whole
+ * answer under one comment and says nothing in the open, so it appends no entry:
+ * the same sentence in both places would read as the agent saying it twice.
+ */
+function spoken(session: SessionRecord, reply: AgentReply, now: string): SessionRecord {
+  if (reply.comment === undefined) return session;
+  return withAgentReply(session, reply.comment, now, reply.kind);
 }

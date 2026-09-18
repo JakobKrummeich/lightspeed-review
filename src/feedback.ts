@@ -1,7 +1,7 @@
 import { parsePrompt } from "./feedback-prompt.ts";
 import { approvalPaths, type ApprovalPaths } from "./review-files.ts";
 import type { FeedbackPrompt, ReviewCloser, SessionRecord } from "./session-store.ts";
-import { reviewerTurn } from "./turn.ts";
+import { reviewerTurn, type TurnLabel } from "./turn.ts";
 
 export interface FeedbackRequest {
   prompts: FeedbackPrompt[];
@@ -45,11 +45,19 @@ export const END_VERDICTS = ["signed-off", "partial", "none", "empty"] as const;
 
 export type EndVerdict = (typeof END_VERDICTS)[number];
 
-/** What a poll hands back to the waiting agent. */
+/** What a `wait` hands back to the blocked agent. */
 export interface PollPayload {
   status: string;
   ended: boolean;
   prompts: FeedbackPrompt[];
+  /**
+   * Whose move it is once this answer has landed, and which round it is about.
+   * Added by the delivery handler, not by `drainPending`: the turn moves with
+   * the bytes, so only the handler knows what it became. Absent from a payload
+   * an older server wrote.
+   */
+  turn?: TurnLabel;
+  round?: number;
   /**
    * Only on an ended payload, and absent from one an older server wrote: a
    * reader must treat its absence as "not stated", never as "nothing approved".
@@ -88,19 +96,31 @@ export function withFeedback(
   };
 }
 
-/** `lightspeed say` / `lightspeed ask`: the agent speaks mid-review. */
+/**
+ * `lightspeed say` / `lightspeed ask`: the agent speaks mid-review. A question
+ * hands the turn back — it is the agent asking to be answered, and Send has to
+ * be live for that. Plain speech does not: an agent that answers one comment
+ * and keeps editing is still working, and unlocking Send between its sentences
+ * would flap the reviewer's button for the length of a round.
+ */
 export function withAgentReply(
   session: SessionRecord,
   comment: string,
   now: string,
+  kind?: "question",
 ): SessionRecord {
   return {
     ...session,
     conversation: [
       ...session.conversation,
-      { role: "agent", at: now, ...currentRound(session), prompts: [{ type: "message", comment }] },
+      {
+        role: "agent",
+        at: now,
+        ...currentRound(session),
+        prompts: [{ type: "message", comment, ...(kind === undefined ? {} : { kind }) }],
+      },
     ],
-    turn: reviewerTurn(now),
+    ...(kind === "question" ? { turn: reviewerTurn(now) } : {}),
     updatedAt: now,
   };
 }

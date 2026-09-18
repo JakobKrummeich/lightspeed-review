@@ -267,15 +267,33 @@ test("ending the review returns the turn, whoever was holding it", () => {
   assert.deepEqual(updated.turn, { holder: "reviewer", at: "2025-01-03T00:00:00.000Z" });
 });
 
-test("the agent speaking gives the turn back to the reviewer", () => {
+/**
+ * `say` is free speech, not a handover: an agent that reported progress mid-edit
+ * is still mid-edit, and a `say` that returned the turn would make the `work`
+ * the agent runs next an illegal move.
+ */
+test("the agent saying something keeps the turn it is holding", () => {
+  const held = agentsTurn();
+
+  const replied = withAgentReply(held, "wrapped it in a transaction", "2025-01-02T02:00:00.000Z");
+
+  assert.deepEqual(replied.turn, held.turn);
+  assert.equal(replied.conversation.at(-1)?.prompts[0]?.comment, "wrapped it in a transaction");
+});
+
+/** A question is the one thing an agent cannot go on without, so asking it is a
+ * handover: the reviewer now owns the move, and the plan goes with the turn —
+ * a banner naming work nobody is doing is worse than none. */
+test("the agent asking a question gives the turn back to the reviewer", () => {
   const replied = withAgentReply(
     agentsTurn(),
-    "wrapped it in a transaction",
+    "per-request or per-batch?",
     "2025-01-02T02:00:00.000Z",
+    "question",
   );
 
-  // The plan goes with it: a banner naming work nobody is doing is worse than none.
   assert.deepEqual(replied.turn, { holder: "reviewer", at: "2025-01-02T02:00:00.000Z" });
+  assert.partialDeepStrictEqual(replied.conversation.at(-1)?.prompts[0], { kind: "question" });
 });
 
 test("an end from the browser is recorded as the reviewer's", () => {

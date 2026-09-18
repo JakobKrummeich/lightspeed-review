@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { homeOutput, sessionSummaries } from "../../src/commands/home.ts";
+import { homeOutput, sessionSummaries, type SessionSummary } from "../../src/commands/home.ts";
 import type { SessionRecord } from "../../src/session-store.ts";
 
 function record(overrides: Partial<SessionRecord>): SessionRecord {
@@ -22,13 +22,27 @@ function record(overrides: Partial<SessionRecord>): SessionRecord {
   };
 }
 
-test("a stored session becomes a row carrying its undelivered feedback count", () => {
+test("a stored session becomes a row carrying its turn, round and queue", () => {
   const summaries = sessionSummaries([
-    record({ status: "feedback", pending: [{ type: "message", comment: "fix it" }] }),
+    record({
+      status: "feedback",
+      pending: [{ type: "message", comment: "fix it" }],
+      rounds: [{ index: 1, at: "2025-01-02T00:00:00.000Z", files: [], approvedAtEnd: [] }],
+      turn: { holder: "agent", mode: "working", at: "2025-01-02T00:01:00.000Z", note: "fixing it" },
+    }),
   ]);
 
+  // Rounds are counted from one on screen, and the note the banner shows is
+  // the reviewer's business, not a row's.
   assert.deepEqual(summaries, [
-    { branch: "feature-auth", base: "main", status: "feedback", pending: 1 },
+    {
+      branch: "feature-auth",
+      base: "main",
+      status: "feedback",
+      turn: "agent working",
+      round: 2,
+      pending: 1,
+    },
   ]);
 });
 
@@ -51,33 +65,52 @@ test("empty state offers exactly the start command as next step", () => {
   assert.match(help[0]!, /^Run `lightspeed start <branch> \[base\] --intent /);
 });
 
-test("active sessions are listed as uniform rows", () => {
-  const output = homeOutput([
-    { branch: "feature-auth", base: "main", status: "open", pending: 0 },
-    { branch: "fix-billing", base: "develop", status: "feedback", pending: 3 },
-  ]);
+const row = (over: Partial<SessionSummary> = {}): SessionSummary => ({
+  branch: "feature-auth",
+  base: "main",
+  status: "open",
+  turn: "reviewer",
+  round: 1,
+  pending: 0,
+  ...over,
+});
 
-  assert.deepEqual(output.sessions, [
-    { branch: "feature-auth", base: "main", status: "open", pending: 0 },
-    { branch: "fix-billing", base: "develop", status: "feedback", pending: 3 },
-  ]);
+test("active sessions are listed as uniform rows", () => {
+  const rows = [
+    row(),
+    row({
+      branch: "fix-billing",
+      base: "develop",
+      status: "feedback",
+      turn: "agent working",
+      round: 2,
+      pending: 3,
+    }),
+  ];
+
+  const output = homeOutput(rows);
+
+  // Whose move it is, on the one view an agent opens before it knows anything:
+  // "may I send?" and "am I owed a turn?" answered without a second command.
+  assert.deepEqual(output.sessions, rows);
   assert.equal(output.message, undefined);
 });
 
-test("session listing help covers start, poll and end", () => {
-  const output = homeOutput([{ branch: "feature-auth", base: "main", status: "open", pending: 0 }]);
+test("session listing help leads with the rule and covers start, wait and end", () => {
+  const output = homeOutput([row()]);
 
   const help = output.help as string[];
-  assert.equal(help.length, 3);
-  assert.match(help[0]!, /^Run `lightspeed start <branch> \[base\] --intent /);
-  assert.match(help[1]!, /^Run `lightspeed poll <branch> \[base\]`/);
-  assert.match(help[2]!, /^Run `lightspeed end <branch> \[base\]`/);
+  assert.equal(help.length, 4);
+  assert.equal(help[0]!, "Queue always. End always. Send only on your turn.");
+  assert.match(help[1]!, /^Run `lightspeed start <branch> \[base\] --intent /);
+  assert.match(help[2]!, /^Run `lightspeed wait <branch> \[base\]`/);
+  assert.match(help[3]!, /^Run `lightspeed end <branch> \[base\]`/);
 });
 
-test("poll help warns it must block in the foreground", () => {
-  const output = homeOutput([{ branch: "feature-auth", base: "main", status: "open", pending: 0 }]);
+test("wait help warns it must block in the foreground", () => {
+  const output = homeOutput([row()]);
 
-  const pollHelp = (output.help as string[])[1]!;
-  assert.match(pollHelp, /foreground/);
-  assert.match(pollHelp, /never background it or wrap it in a timeout/);
+  const waitHelp = (output.help as string[])[2]!;
+  assert.match(waitHelp, /foreground/);
+  assert.match(waitHelp, /never background it or wrap it in a timeout/);
 });

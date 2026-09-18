@@ -8,7 +8,7 @@ import { closedBy } from "../feedback.ts";
 import { sessionKey } from "../paths.ts";
 import { nextSessionRecord, withClosedRound } from "../rounds/session-round.ts";
 import type { SessionRecord } from "../session-store.ts";
-import { reviewerTurn } from "../turn.ts";
+import { reviewerTurn, turnFacts } from "../turn.ts";
 import { loadAssets } from "../static-assets.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
@@ -53,6 +53,7 @@ export async function handleCreateSession(
     key,
     url: `${context.baseUrl()}/session/${key}`,
     status: record.status,
+    ...turnFacts(record),
     ledger,
   });
 }
@@ -81,18 +82,17 @@ export function handleEnd(
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
   const now = new Date().toISOString();
-  context.store.save(
-    withClosedRound({
-      ...session,
-      status: "ended",
-      ...closedBy(session, "agent"),
-      turn: reviewerTurn(now),
-      updatedAt: now,
-    }),
-  );
+  const ended = withClosedRound({
+    ...session,
+    status: "ended",
+    ...closedBy(session, "agent"),
+    turn: reviewerTurn(now),
+    updatedAt: now,
+  });
+  context.store.save(ended);
   context.transport.wakePollers(session.key);
   announceRoundEnd(context, session, now);
-  sendJson(response, 200, { status: "ended" });
+  sendJson(response, 200, { status: "ended", ...turnFacts(ended) });
 }
 
 /** A closed round is logged once and the status changes under every open tab. */

@@ -67,17 +67,63 @@ export async function readFeedback(request: IncomingMessage) {
   return parseFeedbackRequest(await readJsonSafely<unknown>(request));
 }
 
-/** An agent reply: the round summary, plus whatever it declares per comment. */
-export async function readReply(
-  request: IncomingMessage,
-): Promise<{ comment: string; declarations: CommentDeclaration[] } | undefined> {
-  const payload = await readJsonSafely<{ comment?: unknown; declarations?: unknown }>(request);
-  const comment = payload?.comment;
-  if (typeof comment !== "string" || comment.trim() === "") return undefined;
-  const declarations =
-    payload?.declarations === undefined ? [] : parseDeclarations(payload.declarations);
+/**
+ * The agent speaking: `say` sends a comment, a pinned answer, or both; `ask`
+ * sends a comment marked as a question. A body saying neither is rejected — an
+ * empty turn in the conversation reads as words lost, not words never said.
+ */
+export interface AgentReply {
+  /** Absent when the whole answer was pinned under one comment (`say --for`). */
+  comment?: string;
+  /** `ask`: the panel draws an answer box under it and the turn goes back. */
+  kind?: "question";
+  declarations: CommentDeclaration[];
+}
+
+interface ReplyBody {
+  comment?: unknown;
+  kind?: unknown;
+  declarations?: unknown;
+}
+
+export async function readReply(request: IncomingMessage): Promise<AgentReply | undefined> {
+  const body = (await readJsonSafely<ReplyBody>(request)) ?? {};
+  const comment = spokenWords(body.comment);
+  const declarations = body.declarations === undefined ? [] : parseDeclarations(body.declarations);
   if (declarations === undefined) return undefined;
-  return { comment, declarations };
+  if (rejected(body, comment, declarations)) return undefined;
+  return {
+    ...(comment === undefined ? {} : { comment }),
+    ...(body.kind === "question" ? { kind: "question" as const } : {}),
+    declarations,
+  };
+}
+
+/** The three bodies that would land in the conversation as words nobody said. */
+function rejected(
+  body: ReplyBody,
+  comment: string | undefined,
+  declarations: CommentDeclaration[],
+): boolean {
+  // A comment field that says nothing is a mistake, not silence.
+  if (body.comment !== undefined && comment === undefined) return true;
+  // A question with nothing to ask is not a question; only spoken words carry it.
+  if (body.kind === "question" && comment === undefined) return true;
+  // Neither spoken nor pinned: nothing to deliver at all.
+  return comment === undefined && declarations.length === 0;
+}
+
+/** Words the reviewer could read, or nothing. Blank is nothing. */
+function spokenWords(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  return value;
+}
+
+/** `work`: the plan the agent is about to go quiet over. */
+export async function readWork(request: IncomingMessage): Promise<string | undefined> {
+  const plan = (await readJsonSafely<{ plan?: unknown }>(request))?.plan;
+  if (typeof plan !== "string" || plan.trim() === "") return undefined;
+  return plan;
 }
 
 /**
@@ -93,7 +139,7 @@ export function declarationRejection(problems: DeclarationProblem[]): unknown {
       detail: problems.map((problem) => `${problem.id}: ${problem.reason}`).join("; "),
     },
     help: [
-      "Ids come from the annotations in `lightspeed poll` output",
+      "Ids come from the annotations in `lightspeed wait` output",
       "Fix the declaration and re-send the whole reply; no part of it was delivered",
     ],
   };

@@ -23,6 +23,7 @@ export type ReviewErrorCode =
   | "session_not_found"
   | "session_ended"
   | "declaration_invalid"
+  | "turn_not_yours"
   | "ambiguous_session"
   | "invalid_arguments"
   | "intent_missing"

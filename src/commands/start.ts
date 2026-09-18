@@ -9,12 +9,14 @@ import { sessionKey } from "../paths.ts";
 import { currentGroupingMode } from "../rounds/session-round.ts";
 import type { LedgerReport } from "../server.ts";
 import { SessionStore, type SessionStatus } from "../session-store.ts";
+import type { TurnLabel } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
 import { serverOrigin } from "./server-address.ts";
-import { helpPoll } from "./home.ts";
+import { helpEnd, helpWait } from "./home.ts";
 import { openBrowser } from "./open-browser.ts";
 import { ensureServerRunning, type EnsureServerOptions } from "./server-lifecycle.ts";
+import { runWait } from "./wait.ts";
 
 export interface StartArgs {
   branch: string | undefined;
@@ -25,6 +27,8 @@ export interface StartArgs {
   model: string | undefined;
   /** `--reopen`: the reviewer asked for another round on a review they ended. */
   reopen: boolean;
+  /** `--wait`: block on the new round instead of returning to the agent's own loop. */
+  wait: boolean;
   /** `--intent <text>`, repeatable: why this branch exists, in the order given. */
   intents: string[];
 }
@@ -37,12 +41,26 @@ export interface StartDeps {
   openBrowser?: (url: string) => void;
 }
 
+/** The seams filled in once, so the run below reads as the steps it takes
+ * rather than as four fallbacks. */
+function resolveDeps(deps: StartDeps = {}): Required<StartDeps> {
+  return {
+    extractDiff: deps.extractDiff ?? extractDiffFromGit,
+    groupDiff: deps.groupDiff ?? groupDiffWithModel,
+    ensureServerRunning: deps.ensureServerRunning ?? ensureServerRunning,
+    openBrowser: deps.openBrowser ?? openBrowser,
+  };
+}
+
 /** What `POST /api/sessions` answers. The status is the server's, not ours: a
  * review the reviewer ended stays ended until they open a new one. */
 interface CreatedSession {
   key: string;
   url: string;
   status: SessionStatus;
+  /** Whose move it is on the round just opened — always the reviewer's. */
+  turn?: TurnLabel;
+  round?: number;
   /** How the durable feedback ledger fared while recording this round. */
   ledger?: LedgerReport;
 }
@@ -57,13 +75,15 @@ export interface StartInput {
   open?: boolean;
   /** Only ever true because the reviewer asked; the agent never decides this. */
   reopen?: boolean;
+  /** Block on the round just published rather than returning at once. */
+  wait?: boolean;
   deps?: StartDeps;
 }
 
 /** Flags that consume the next argument. `--intent` is the only repeatable one. */
 const VALUE_FLAGS = ["--base", "--model", "--intent"];
 
-const SWITCHES = ["--no-open", "--reopen"];
+const SWITCHES = ["--no-open", "--reopen", "--wait"];
 
 const START_FLAGS = [...VALUE_FLAGS, ...SWITCHES];
 
@@ -83,6 +103,7 @@ export function parseStartArgs(args: string[]): StartArgs {
     open: !hasFlag(scanned, "--no-open"),
     model: lastValue(scanned, "--model"),
     reopen: hasFlag(scanned, "--reopen"),
+    wait: hasFlag(scanned, "--wait"),
     // A blank intent is dropped here; the caller reports it missing rather than
     // storing a reason nobody can read.
     intents: allValues(scanned, "--intent")
@@ -108,21 +129,40 @@ function nonEmpty(value: string): boolean {
  * it after every round of fixes.
  */
 export async function runStart(input: StartInput): Promise<StructuredOutput> {
-  const { repoRoot, branch, base, config, deps = {} } = input;
-  const extracted = (deps.extractDiff ?? extractDiffFromGit)(repoRoot, branch, base);
-  const grouping = await (deps.groupDiff ?? groupDiffWithModel)({
+  const { repoRoot, branch, base, config } = input;
+  const run = resolveDeps(input.deps);
+  const extracted = run.extractDiff(repoRoot, branch, base);
+  const grouping = await run.groupDiff({
     files: extracted.files,
     config,
     intents: input.intents,
     ...previousGrouping(input),
   });
-  await (deps.ensureServerRunning ?? ensureServerRunning)({ port: config.port });
-  const created = (await apiRequest(
-    `${serverOrigin(config.port)}/api/sessions`,
+  await run.ensureServerRunning({ port: config.port });
+  const created = await publishRound(input, extracted, grouping);
+  if (input.open !== false) run.openBrowser(created.url);
+  // `--wait` is the round and the block in one line, for the agent that has
+  // nothing else to do until the reviewer answers. It blocks like `wait` does.
+  if (input.wait === true) {
+    return await runWait({ repoRoot, branch, base, port: config.port });
+  }
+  return startOutput({ created, extracted, grouping, branch, base, intents: input.intents });
+}
+
+/** The round itself, posted to the server: this diff, this grouping, and why the
+ * branch exists. The server decides whether it opens a session or a new round on
+ * one — and whether an ended review may have either. */
+async function publishRound(
+  input: StartInput,
+  extracted: ExtractedDiff,
+  grouping: GroupingResult,
+): Promise<CreatedSession> {
+  return (await apiRequest(
+    `${serverOrigin(input.config.port)}/api/sessions`,
     jsonPost({
-      repoRoot,
-      branch,
-      base,
+      repoRoot: input.repoRoot,
+      branch: input.branch,
+      base: input.base,
       baseCommit: extracted.baseCommit,
       headCommit: extracted.headCommit,
       groups: grouping.groups,
@@ -132,8 +172,6 @@ export async function runStart(input: StartInput): Promise<StructuredOutput> {
       reopen: input.reopen === true,
     }),
   )) as CreatedSession;
-  if (input.open !== false) (deps.openBrowser ?? openBrowser)(created.url);
-  return startOutput({ created, extracted, grouping, branch, base, intents: input.intents });
 }
 
 /**
@@ -177,6 +215,10 @@ function startOutput({
   const target = `${branch} ${base}`;
   const ledger = created.ledger ?? { status: "off" as const };
   return {
+    // A round opens on the reviewer's move: nothing has been sent to the agent
+    // yet, so it holds no turn and nothing but `wait` will give it one.
+    ...(created.turn === undefined ? {} : { turn: created.turn }),
+    ...(created.round === undefined ? {} : { round: created.round }),
     // Intents echoed back so the agent sees what the reviewer will read, in order.
     session: {
       key: created.key,
@@ -196,8 +238,9 @@ function startOutput({
     // An ended review never gets here (server refuses the round), so this help
     // assumes an active one.
     help: [
-      helpPoll(target),
-      "The reviewer selects diff text and sends targeted comments; poll returns them",
+      helpWait(target),
+      "The reviewer selects diff text and sends targeted comments; `wait` returns them and the turn",
+      helpEnd(target),
       ...(ledger.status === "degraded" ? [helpLedgerDegraded(ledger)] : []),
     ],
   };

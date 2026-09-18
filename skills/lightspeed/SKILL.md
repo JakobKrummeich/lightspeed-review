@@ -8,6 +8,29 @@ description: Get a human review of a branch diff. Use when work is ready for rev
 Semantic diff review: a reviewer reads your branch diff in a browser, selects
 the lines they care about and sends comments back to you, one round at a time.
 
+## The turn
+
+> Queue always. End always. Send only on your turn.
+
+A review has exactly one turn holder. It is the reviewer's until your
+`wait` is handed their feedback; it is yours from that moment until you
+`ask`, `start` or `end`. While you hold it the reviewer's Send is
+disabled, so a round cannot change under you mid-edit; their queue and their
+End are never disabled, so they are never stuck behind you.
+
+Every answer this CLI prints carries `turn` and `round`. Read `turn`
+before choosing the next command; the `help[]` under it lists the moves that
+are legal from where you are.
+
+| command | turn after | blocks |
+| --- | --- | --- |
+| `start` | reviewer | no, unless `--wait` |
+| `wait` | yours, on delivery | **yes** |
+| `ask` | reviewer, then yours on their answer | **yes** |
+| `say` | unchanged | no |
+| `work` | yours, and the banner names your plan | no |
+| `end` | ended | no |
+
 ## The loop
 
 1. **Show the diff.**
@@ -28,20 +51,32 @@ the lines they care about and sends comments back to you, one round at a time.
    ```
 
    Omitting it fails with `intent_missing` before any git or model work.
-2. **Wait for feedback.**
-   > Run `lightspeed poll <branch> [base]` in the foreground to wait for reviewer feedback — it blocks until the reviewer sends, so never background it or wrap it in a timeout
+2. **Wait for the turn.**
+   > Run `lightspeed wait <branch> [base]` in the foreground to take the turn when the reviewer sends — it blocks until the reviewer sends, so never background it or wrap it in a timeout
 
-   A poll that is backgrounded or timed out loses the reviewer's feedback.
-3. **Address what came back.** Each prompt names the file, the group and the
+   A `wait` that is backgrounded or timed out loses the reviewer's feedback.
+   It returns when they send, and the turn is yours from that moment.
+3. **Say what you are doing, before you go quiet.**
+   `lightspeed work "<plan>" <branch> [base]` puts your plan in the
+   reviewer's banner for as long as the silence lasts. It is not a lock you
+   take — you already hold the turn — it is the reason they are waiting.
+4. **Address what came back.** Each prompt names the file, the group and the
    exact text the reviewer selected — see **What a prompt says** below for the
-   fields that pin it down. Fix, commit, then run `start` again:
-   it is idempotent, re-groups the fresh diff and keeps the conversation.
-   Files the reviewer already approved come back ticked and dimmed unless you
-   touched them, so each round shows the reviewer only what is new work.
-4. **Keep the reviewer in the loop.** Reply while you work with
-   `lightspeed poll <branch> [base] --agent-reply "<summary>"`.
-5. **Close it.**
-   > Run `lightspeed end <branch> [base]` to close a session
+   fields that pin it down. Answer a single comment by name, without blocking
+   and without giving the turn up:
+
+   ```sh
+   lightspeed say "now one transaction" --for evt_0abc123de_0007 --files src/api/users.ts
+   ```
+
+   If something is unclear, `lightspeed ask "<question>"` hands the turn back
+   and blocks on the answer — cheaper than guessing and rewriting a round.
+5. **Publish the next round.** Fix, commit, then run `start` again: it is
+   idempotent, re-groups the fresh diff and keeps the conversation. Files the
+   reviewer already approved come back ticked and dimmed unless you touched
+   them, so each round shows the reviewer only what is new work.
+6. **Close it.**
+   > Run `lightspeed end <branch> [base]` to close the session
 
 ## What a prompt says
 
@@ -78,12 +113,16 @@ comment. An annotation carries:
 
 ## Rules
 
-- Run `poll` in the foreground, every time. It has no timeout by design.
-- `Send & End` from the reviewer ends the review; poll reports `ended: true`.
-  `start` on an ended review is refused with `session_ended`. When the reviewer
-  asks for another round — and only then — run
-  `lightspeed start <branch> [base] --reopen`.
-- An ended poll is not by itself an approval. Read `approval.verdict`:
+- Run `wait` and `ask` in the foreground, every time. They have no timeout
+  by design.
+- `work` is the only command that requires the turn. Running it without one
+  answers `turn_not_yours` and exits 2, with the fixing command in its
+  `help[]` — read it rather than retrying.
+- `Send & End` from the reviewer ends the review; `wait` reports
+  `ended: true`. `start` on an ended review is refused with
+  `session_ended`. When the reviewer asks for another round — and only then —
+  run `lightspeed start <branch> [base] --reopen`.
+- An ended `wait` is not by itself an approval. Read `approval.verdict`:
   `signed-off` (every file approved), `partial` (some approved, some not),
   `none` (nothing approved) or `empty` (the review held no files). Only
   `signed-off` is a sign-off; a review may be ended with nothing approved at

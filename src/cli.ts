@@ -3,21 +3,25 @@ import { homedir } from "node:os";
 import { exitCodeForError, runAxiCli } from "axi-sdk-js";
 import {
   HELP_END,
-  HELP_POLL,
   HELP_START,
+  HELP_WAIT,
+  TURN_RULE,
   homeOutput,
   sessionSummaries,
   type SessionSummary,
 } from "./commands/home.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
+import { parseAskArgs, runAsk } from "./commands/ask.ts";
 import { commandHelp, commandSummary } from "./commands/command-help.ts";
 import { runEnd } from "./commands/end.ts";
 import { runFeedback } from "./commands/feedback.ts";
 import { parseInitArgs, runInit } from "./commands/init.ts";
 import { authStateDir, runLogin } from "./commands/login.ts";
 import { runLogout } from "./commands/logout.ts";
-import { parsePollArgs, runPoll } from "./commands/poll.ts";
+import { parseSayArgs, runSay } from "./commands/say.ts";
 import { runServe } from "./commands/serve.ts";
+import { parseWaitArgs, runWait } from "./commands/wait.ts";
+import { parseWorkArgs, runWork } from "./commands/work.ts";
 import { parseSkillArgs, runSkill } from "./commands/skill.ts";
 import { parseStartArgs, runStart } from "./commands/start.ts";
 import { runStop } from "./commands/stop.ts";
@@ -41,7 +45,10 @@ const { version, description } = require("../package.json") as {
  * top-level help and the unknown-command error are built from. */
 const commands = {
   start: startCommand,
-  poll: pollCommand,
+  wait: waitCommand,
+  ask: askCommand,
+  say: sayCommand,
+  work: workCommand,
   approvals: approvalsCommand,
   end: endCommand,
   serve: serveCommand,
@@ -67,7 +74,7 @@ const COMMAND_NAMES = Object.keys(commands);
 const topLevelHelp = `${renderToon({
   description,
   commands: Object.fromEntries(COMMAND_NAMES.map((name) => [name, commandSummary(name)])),
-  help: [HELP_START, HELP_POLL, HELP_END],
+  help: [TURN_RULE, HELP_START, HELP_WAIT, HELP_END],
 })}\n`;
 
 /** Everything a command needs before it can talk to a session or the server. */
@@ -88,7 +95,7 @@ function resolveTarget(
 
 /** Extracts the diff, groups it and opens the review page. Safe to re-run. */
 async function startCommand(args: string[]): Promise<StructuredOutput> {
-  const { branch, base, open, model, reopen, intents } = parseStartArgs(args);
+  const { branch, base, open, model, reopen, wait, intents } = parseStartArgs(args);
   if (branch === undefined) {
     throw new ReviewError({
       code: "invalid_arguments",
@@ -119,18 +126,50 @@ async function startCommand(args: string[]): Promise<StructuredOutput> {
     intents,
     open,
     reopen,
+    wait,
   });
 }
 
-/** Blocks in the foreground until the reviewer sends feedback. */
-async function pollCommand(args: string[]): Promise<StructuredOutput> {
-  const { branch, base, agentReply, full, declarations } = parsePollArgs(args);
+/** The one blocking call: the turn comes to the agent when this returns. */
+async function waitCommand(args: string[]): Promise<StructuredOutput> {
+  const { branch, base, full } = parseWaitArgs(args);
   const { repoRoot, config } = repoContext();
   const target = resolveTarget(repoRoot, config, branch, base);
-  return await runPoll({ repoRoot, ...target, port: config.port, agentReply, full, declarations });
+  return await runWait({ repoRoot, ...target, port: config.port, full });
 }
 
-/** Names the files behind the counts poll reports; nothing else prints them. */
+/** Puts a question to the reviewer and blocks on their answer. */
+async function askCommand(args: string[]): Promise<StructuredOutput> {
+  const { message, branch, base } = parseAskArgs(args);
+  const { repoRoot, config } = repoContext();
+  const target = resolveTarget(repoRoot, config, branch, base);
+  return await runAsk({ repoRoot, ...target, port: config.port, question: message });
+}
+
+/** Says something without blocking and without giving the turn up. */
+async function sayCommand(args: string[]): Promise<StructuredOutput> {
+  const parsed = parseSayArgs(args);
+  const { repoRoot, config } = repoContext();
+  const target = resolveTarget(repoRoot, config, parsed.branch, parsed.base);
+  return await runSay({
+    repoRoot,
+    ...target,
+    port: config.port,
+    text: parsed.message,
+    ...(parsed.for === undefined ? {} : { for: parsed.for }),
+    files: parsed.files,
+  });
+}
+
+/** Declares the plan the agent is about to go quiet over. */
+async function workCommand(args: string[]): Promise<StructuredOutput> {
+  const { message, branch, base } = parseWorkArgs(args);
+  const { repoRoot, config } = repoContext();
+  const target = resolveTarget(repoRoot, config, branch, base);
+  return await runWork({ repoRoot, ...target, port: config.port, plan: message });
+}
+
+/** Names the files behind the counts `wait` reports; nothing else prints them. */
 function approvalsCommand(args: string[]): StructuredOutput {
   const { branch, base, full } = parseApprovalsArgs(args);
   const { repoRoot, config } = repoContext();
@@ -229,7 +268,14 @@ function liveSessions(): SessionSummary[] {
  * Exit 2 = "the command line was wrong". The SDK only knows its own VALIDATION_ERROR,
  * so these map alongside it rather than as generic failures an agent would retry.
  */
-const ARGUMENT_ERROR_CODES = ["invalid_arguments", "intent_missing", "agent_missing"];
+const ARGUMENT_ERROR_CODES = [
+  "invalid_arguments",
+  "intent_missing",
+  "agent_missing",
+  // A move made out of turn is a wrong command line like any other: the fixing
+  // command is in the error's own `help[]`, and exit 2 says "read it, don't retry".
+  "turn_not_yours",
+];
 
 function exitCodeFor(error: unknown): number {
   if (error instanceof ReviewError && ARGUMENT_ERROR_CODES.includes(error.code)) return 2;

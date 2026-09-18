@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { drainPending, type PollPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import type { FeedbackPrompt } from "../session-store.ts";
-import { agentReading, reviewerTurn } from "../turn.ts";
+import { agentReading, reviewerTurn, turnFacts } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { sendJson } from "./http.ts";
 import type { WakeReason } from "./streams.ts";
@@ -85,15 +85,16 @@ function deliverFeedback(context: ServerContext, key: string, response: ServerRe
   const drained = session && drainPending(session);
   if (!drained) return false;
   const handedOver = handsOverTurn(drained.payload);
-  context.store.save(
-    handedOver
-      ? { ...drained.session, turn: agentReading(new Date().toISOString()) }
-      : drained.session,
-  );
+  const saved = handedOver
+    ? { ...drained.session, turn: agentReading(new Date().toISOString()) }
+    : drained.session;
+  context.store.save(saved);
   response.on("close", () => {
     if (!response.writableFinished) requeue(context, key, drained.payload.prompts);
   });
-  sendJson(response, 200, drained.payload);
+  // The turn as it stands after the handover, not before it: the answer is the
+  // agent's proof that the review is now its move.
+  sendJson(response, 200, { ...drained.payload, ...turnFacts(saved) });
   if (handedOver) context.transport.publishPresence(key);
   return true;
 }

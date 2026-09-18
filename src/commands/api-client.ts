@@ -1,4 +1,4 @@
-import { ReviewError } from "../errors.ts";
+import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /** Talks to the review server for a command, mapping transport failures to codes
@@ -77,13 +77,25 @@ export function parseBody(status: number, body: string, key?: string): unknown {
   }
 }
 
-/** 422 is the server rejecting the request's content (today, a declaration) with a
- * structured error relayed as it stands — the server is the one place the rules are
- * spelt. A 422 whose body is not that shape is a bug. */
+/** The rules the server states as 422s, relayed to the agent under their own
+ * codes. Listed rather than accepted wholesale so the closed `ReviewErrorCode`
+ * set stays true — and listed as a set rather than one hardcoded code, which is
+ * how `turn_not_yours` first reached agents as `internal_error`: a bug in
+ * lightspeed, they read, instead of an illegal move they could fix. */
+const DOMAIN_ERROR_CODES = new Set<ReviewErrorCode>(["declaration_invalid", "turn_not_yours"]);
+
+function isDomainCode(code: unknown): code is ReviewErrorCode {
+  return typeof code === "string" && DOMAIN_ERROR_CODES.has(code as ReviewErrorCode);
+}
+
+/** 422 is the server rejecting the request's content — a declaration that names no
+ * comment, a `work` on a turn the agent does not hold — with a structured error
+ * relayed as it stands. The server is the one place those rules are spelt. A 422
+ * whose body is not that shape is a bug. */
 function domainError(body: string): ReviewError {
   const parsed = readErrorBody(body);
   const { code, message, detail } = parsed.error ?? {};
-  if (code !== "declaration_invalid" || typeof message !== "string") {
+  if (!isDomainCode(code) || typeof message !== "string") {
     return new ReviewError({
       code: "internal_error",
       message: "the review server answered 422 without a readable error",
@@ -98,7 +110,10 @@ function domainError(body: string): ReviewError {
     code,
     message,
     ...(typeof detail === "string" ? { detail } : {}),
-    suggestions: [help[0] ?? "Fix the declaration and re-send the whole reply", ...help.slice(1)],
+    suggestions: [
+      help[0] ?? "Fix what the message names and run the command again",
+      ...help.slice(1),
+    ],
   });
 }
 

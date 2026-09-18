@@ -87,7 +87,7 @@ test("a 422 relays the server's own structured error, help and all", () => {
       message: "the reply was rejected whole: 1 declaration problem(s)",
       detail: "evt_a: declares nothing",
     },
-    help: ["Ids come from the annotations in `lightspeed poll` output"],
+    help: ["Ids come from the annotations in `lightspeed wait` output"],
   });
 
   const parsed = parseBody(422, body);
@@ -97,7 +97,30 @@ test("a 422 relays the server's own structured error, help and all", () => {
   assert.match(parsed.message, /rejected whole/);
   assert.equal(parsed.detail, "evt_a: declares nothing");
   assert.deepEqual(parsed.suggestions, [
-    "Ids come from the annotations in `lightspeed poll` output",
+    "Ids come from the annotations in `lightspeed wait` output",
+  ]);
+});
+
+/** Every rule the server can state arrives this way, not just the first one that
+ * needed it: a code this client did not know about used to reach the agent as
+ * `internal_error`, which reads as a lightspeed bug rather than an illegal move. */
+test("a 422 carrying a code this client has never seen is relayed, not swallowed", () => {
+  const body = JSON.stringify({
+    error: {
+      code: "turn_not_yours",
+      message: "you do not hold the turn (turn: reviewer)",
+      detail: "the turn moves to you on delivery to a blocking `lightspeed wait`",
+    },
+    help: ["Run `lightspeed wait feature-auth main` to block until the reviewer sends"],
+  });
+
+  const parsed = parseBody(422, body);
+
+  assert.ok(parsed instanceof ReviewError);
+  assert.equal(parsed.code, "turn_not_yours");
+  assert.match(parsed.detail ?? "", /on delivery/);
+  assert.deepEqual(parsed.suggestions, [
+    "Run `lightspeed wait feature-auth main` to block until the reviewer sends",
   ]);
 });
 

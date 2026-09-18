@@ -38,6 +38,19 @@ export function agentHoldsTurn(session: Pick<SessionRecord, "turn">): boolean {
  */
 export type TurnLabel = "reviewer" | "agent reading" | "agent working" | "ended";
 
+/**
+ * What every command's output carries, and the whole protocol an agent needs to
+ * read off one answer: whose move it is now, and which round it is about.
+ */
+export interface TurnFacts {
+  turn: TurnLabel;
+  round: number;
+}
+
+export function turnFacts(session: Pick<SessionRecord, "status" | "turn" | "rounds">): TurnFacts {
+  return { turn: turnLabel(session), round: roundNumber(session) };
+}
+
 export function turnLabel(session: Pick<SessionRecord, "status" | "turn">): TurnLabel {
   if (session.status === "ended") return "ended";
   if (session.turn.holder === "reviewer") return "reviewer";

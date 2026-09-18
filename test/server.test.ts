@@ -1144,7 +1144,12 @@ test("a reply may declare what each comment led to, stored under the comment's i
     });
 
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { delivered: true, declared: 1 });
+    assert.deepEqual(await response.json(), {
+      turn: "reviewer",
+      round: 1,
+      delivered: true,
+      declared: 1,
+    });
     const declared = store.get(key)!.declarations?.[id];
     assert.partialDeepStrictEqual(declared, {
       note: "one transaction now",
@@ -1186,7 +1191,7 @@ test("a reply whose declarations are not even the right shape is a 400", async (
   });
 });
 
-test("an agent reply without a comment is a 400", async () => {
+test("an agent reply with neither a comment nor declarations is a 400", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);
 
@@ -1197,6 +1202,139 @@ test("an agent reply without a comment is a 400", async () => {
     });
 
     assert.equal(response.status, 400);
+  });
+});
+
+/**
+ * `say --for <id>` pins its whole answer under the comment it answers and says
+ * nothing in the open, so the reply carries declarations and no comment: the
+ * same sentence in the thread and under the card would read as it said twice.
+ */
+test("a reply that only declares appends no conversation entry", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    const id = (store.get(key)!.pending[0] as { id: string }).id;
+    const before = store.get(key)!.conversation.length;
+
+    const response = await postReply(url, key, {
+      declarations: [{ id, note: "intentional: the index covers it", files: [] }],
+    });
+
+    assert.equal(response.status, 200);
+    assert.partialDeepStrictEqual(await response.json(), { delivered: true, declared: 1 });
+    assert.equal(store.get(key)!.conversation.length, before);
+    assert.partialDeepStrictEqual(store.get(key)!.declarations?.[id], {
+      note: "intentional: the index covers it",
+    });
+  });
+});
+
+async function postWork(url: string, key: string, body: unknown): Promise<Response> {
+  return await fetch(`${url}/api/session/${key}/work`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Delivery is the only thing that hands the turn over, so it is what every
+ * `work` test has to do first. */
+async function takeTheTurn(url: string, key: string): Promise<void> {
+  await postFeedback(url, key, { prompts: [annotation], ended: false });
+  await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+}
+
+test("work names the plan on the turn the agent is already holding", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await takeTheTurn(url, key);
+
+    const response = await postWork(url, key, { plan: "splitting the helper out" });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { turn: "agent working", round: 1, changed: true });
+    assert.partialDeepStrictEqual(store.get(key)?.turn, {
+      holder: "agent",
+      mode: "working",
+      note: "splitting the helper out",
+    });
+  });
+});
+
+/** Saying the same thing twice changed nothing, and an agent that re-runs `work`
+ * after a crash must not be told it just announced something. */
+test("redeclaring the same plan reports that nothing changed", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+    await takeTheTurn(url, key);
+    await postWork(url, key, { plan: "splitting the helper out" });
+
+    const again = await postWork(url, key, { plan: "splitting the helper out" });
+    const refined = await postWork(url, key, { plan: "splitting the helper out, then the test" });
+
+    assert.partialDeepStrictEqual(await again.json(), { changed: false });
+    assert.partialDeepStrictEqual(await refined.json(), { changed: true });
+  });
+});
+
+/** The one illegal move in the protocol, and the only place `turn_not_yours`
+ * comes from: an agent that declares work on feedback nobody sent it. */
+test("work without the turn is refused, with the command that earns it", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+
+    const response = await postWork(url, key, { plan: "guessing at what they want" });
+
+    assert.equal(response.status, 422);
+    const body = (await response.json()) as { error: { code: string }; help: string[] };
+    assert.equal(body.error.code, "turn_not_yours");
+    assert.match(body.help.join(" "), /lightspeed wait feature-auth main/);
+    assert.equal(store.get(key)?.turn.holder, "reviewer");
+  });
+});
+
+/** An ended review has no turn to take, so the help must not send the agent into
+ * a `wait` that returns "ended" forever. */
+test("work on an ended review points at the only command that reopens one", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [], ended: true });
+
+    const response = await postWork(url, key, { plan: "carrying on regardless" });
+
+    assert.equal(response.status, 422);
+    const body = (await response.json()) as { error: { code: string }; help: string[] };
+    assert.equal(body.error.code, "turn_not_yours");
+    assert.match(body.help.join(" "), /--reopen/);
+  });
+});
+
+test("work without a plan is a 400, and on an unknown session a 404", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+    await takeTheTurn(url, key);
+
+    assert.equal((await postWork(url, key, {})).status, 400);
+    assert.equal((await postWork(url, key, { plan: "  " })).status, 400);
+    assert.equal((await postWork(url, "deadbeefdeadbeef", { plan: "x" })).status, 404);
+  });
+});
+
+/** The banner is the whole point of `work`: the reviewer's page has to hear the
+ * plan without a reload. */
+test("work puts the plan on the wire for the reviewer's page", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+    const stream = await openStream(url, key);
+    await stream.until(/event: presence/);
+    await takeTheTurn(url, key);
+    await stream.until(/"working":true/);
+
+    await postWork(url, key, { plan: "splitting the helper out" });
+
+    assert.match(await stream.until(/"mode":"working"/), /splitting the helper out/);
+    stream.close();
   });
 });
 
@@ -1298,6 +1436,8 @@ test("ending a session closes it and releases a waiting poll", async () => {
     assert.equal(store.get(key)?.status, "ended");
     assert.equal(store.get(key)?.endedBy, "agent");
     assert.deepEqual(await (await polling).json(), {
+      turn: "ended",
+      round: 1,
       status: "ended",
       ended: true,
       prompts: [],
@@ -1320,6 +1460,8 @@ test("an agent's `end` after the reviewer already ended does not take the credit
     assert.equal(response.status, 200);
     assert.equal(store.get(key)?.endedBy, "reviewer");
     assert.deepEqual(await (await fetch(`${url}/api/poll?key=${key}`)).json(), {
+      turn: "ended",
+      round: 1,
       status: "ended",
       ended: true,
       prompts: [],
@@ -1339,6 +1481,8 @@ test("a stale tab ending a session an agent already ended does not become the cl
     assert.equal(posted.status, 200);
     assert.equal(store.get(key)?.endedBy, "agent");
     assert.deepEqual(await (await fetch(`${url}/api/poll?key=${key}`)).json(), {
+      turn: "ended",
+      round: 1,
       status: "ended",
       ended: true,
       prompts: [],
@@ -1386,6 +1530,8 @@ test("a poll after a silent ending is told the review is over, and nothing more"
 
     // A silent ending with nothing ticked must not reach the agent looking like a sign-off.
     assert.deepEqual(polled, {
+      turn: "ended",
+      round: 1,
       status: "ended",
       ended: true,
       prompts: [],
@@ -1404,6 +1550,8 @@ test("a silent ending after the reviewer ticked every file says so on the wire",
     const polled = await (await fetch(`${url}/api/poll?key=${key}`)).json();
 
     assert.deepEqual(polled, {
+      turn: "ended",
+      round: 1,
       status: "ended",
       ended: true,
       prompts: [],
@@ -1551,6 +1699,8 @@ test("polling an ended session returns at once instead of blocking forever", asy
 
     // Ended in the store without either route — how a session written before `endedBy` reads.
     assert.deepEqual(polled, {
+      turn: "ended",
+      round: 1,
       status: "ended",
       ended: true,
       prompts: [],
@@ -1717,8 +1867,12 @@ test("an agent asking for more feedback is an agent that is no longer working", 
   });
 });
 
-test("the agent answering says the work on that feedback is over", async () => {
-  await withServer(async ({ url }) => {
+/**
+ * A question is the agent handing the move back: it cannot go on without an
+ * answer, so the reviewer's Send comes alive the moment the card lands.
+ */
+test("the agent asking a question gives the reviewer the turn back", async () => {
+  await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
     const stream = await openStream(url, key);
     await stream.until(/event: presence/);
@@ -1726,13 +1880,35 @@ test("the agent answering says the work on that feedback is over", async () => {
     await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
     await stream.until(/"working":true/);
 
-    assert.equal(
-      (await postReply(url, key, { comment: "wrapped it in a transaction" })).status,
-      200,
-    );
+    const response = await postReply(url, key, {
+      comment: "per-request or per-batch?",
+      kind: "question",
+    });
 
+    assert.equal(response.status, 200);
+    assert.partialDeepStrictEqual(await response.json(), { turn: "reviewer", round: 1 });
     assert.match(await stream.until(/event: presence/), /"working":false/);
+    assert.equal(store.get(key)?.turn.holder, "reviewer");
     stream.close();
+  });
+});
+
+/**
+ * `say` is the other half of that pair, and the reason the two verbs exist: an
+ * agent reporting progress mid-edit is still mid-edit, so the banner must not
+ * flap back to "your move" on every sentence it speaks.
+ */
+test("the agent saying something leaves the turn where it is", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+
+    const response = await postReply(url, key, { comment: "wrapped it in a transaction" });
+
+    assert.equal(response.status, 200);
+    assert.partialDeepStrictEqual(await response.json(), { turn: "agent reading", round: 1 });
+    assert.equal(store.get(key)?.turn.holder, "agent");
   });
 });
 

@@ -167,7 +167,7 @@ test("reports why grouping was skipped so the agent can see the LLM was not used
   });
 });
 
-test("tells the agent to poll in the foreground for this branch pair", async () => {
+test("tells the agent to wait in the foreground for this branch pair", async () => {
   await withHarness(async ({ config, deps }) => {
     const output = await runStart({
       repoRoot: REPO,
@@ -179,8 +179,12 @@ test("tells the agent to poll in the foreground for this branch pair", async () 
     });
 
     const help = output.help as string[];
-    assert.ok(help.some((line) => line.includes(`poll ${BRANCH} ${BASE}`)));
+    assert.ok(help.some((line) => line.includes(`wait ${BRANCH} ${BASE}`)));
     assert.ok(help.some((line) => /foreground/.test(line)));
+    // The help has to say what `wait` is for, not only that it blocks: it is the
+    // one command that ever hands the agent the turn.
+    assert.ok(help.some((line) => /returns them and the turn/.test(line)));
+    assert.ok(help.some((line) => line.includes(`end ${BRANCH} ${BASE}`)));
   });
 });
 
@@ -437,8 +441,16 @@ test("reads the branch pair and flags off the command line", () => {
     open: true,
     model: undefined,
     reopen: false,
+    wait: false,
     intents: [],
   });
+});
+
+/** `--wait` is `start` and the block that follows it in one line, for the agent
+ * with nothing to do until the reviewer sends. */
+test("--wait is off unless the command line says so", () => {
+  assert.equal(parseStartArgs(["feature-auth"]).wait, false);
+  assert.equal(parseStartArgs(["feature-auth", "--wait"]).wait, true);
 });
 
 test("--intent is repeatable and keeps the order it was given in", () => {
@@ -520,6 +532,7 @@ test("--base names the base branch when it is not positional", () => {
     open: true,
     model: undefined,
     reopen: false,
+    wait: false,
     intents: [],
   });
 });
@@ -549,6 +562,7 @@ test("--no-open and --model are picked up wherever they appear", () => {
     open: false,
     model: "anthropic/opus",
     reopen: false,
+    wait: false,
     intents: [],
   });
 });

@@ -107,7 +107,7 @@ test("an unknown command fails in the same error shape as everything else", asyn
   assert.match(stdout, /^ {2}code: VALIDATION_ERROR$/m);
   assert.match(stdout, /^ {2}message: "?Unknown command: nonsense"?$/m);
   assert.match(stdout, /^help\[\d+\]/m);
-  assert.match(stdout, /start, poll, approvals/);
+  assert.match(stdout, /start, wait, ask, say, work, approvals/);
 });
 
 test("--help lists every command the CLI answers", async () => {
@@ -116,7 +116,10 @@ test("--help lists every command the CLI answers", async () => {
   assert.equal(code, 0);
   for (const command of [
     "start",
-    "poll",
+    "wait",
+    "ask",
+    "say",
+    "work",
     "approvals",
     "end",
     "serve",
@@ -129,8 +132,9 @@ test("--help lists every command the CLI answers", async () => {
   ]) {
     assert.match(stdout, new RegExp(`^ {2}"?${command}"?: `, "m"), command);
   }
-  // The workflow stays called out under the listing: start, poll, end in order.
-  assert.match(stdout, /^help\[3\]/m);
+  // The rule leads, then the workflow: start, wait, end in order.
+  assert.match(stdout, /^help\[4\]/m);
+  assert.match(stdout, /Queue always\. End always\. Send only on your turn\./);
 });
 
 test("a subcommand's --help describes it instead of running it", async () => {
@@ -214,7 +218,17 @@ test("a missing or unparseable argument exits 2 like an unknown flag does", asyn
 });
 
 test("every command answers --help", async () => {
-  for (const command of ["start", "poll", "end", "serve", "stop", "feedback"]) {
+  for (const command of [
+    "start",
+    "wait",
+    "ask",
+    "say",
+    "work",
+    "end",
+    "serve",
+    "stop",
+    "feedback",
+  ]) {
     const { stdout, code } = await runCli([command, "--help"]);
 
     assert.equal(code, 0, command);
