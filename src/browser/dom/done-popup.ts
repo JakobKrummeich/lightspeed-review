@@ -1,8 +1,11 @@
 import { renderReviewDone } from "../review-done.ts";
 
 export interface MountedDonePopup {
-  /** The last file was just ticked: the card goes up over the review. */
-  open(queued: number): void;
+  /**
+   * The last file was just ticked: the card goes up over the review.
+   * `sendsQueue` is false on the agent's turn, where ending takes nothing with it.
+   */
+  open(queued: number, sendsQueue: boolean): void;
   /** The review is no longer finished (a round took the page, a box came unticked): nothing to say. */
   close(): void;
 }
@@ -40,7 +43,7 @@ export function mountDonePopup(options: DonePopupOptions): MountedDonePopup {
   };
   options.root.addEventListener("click", (event) => pressed(view, event));
   return {
-    open: (queued) => show(view, queued),
+    open: (queued, sendsQueue) => show(view, queued, sendsQueue),
     close: () => {
       if (!view.options.root.hidden) hide(view);
     },
@@ -60,7 +63,7 @@ function pressed(view: PopupView, event: Event): void {
   if (target.classList.contains("lsr-done-stay")) hide(view);
 }
 
-function show(view: PopupView, queued: number): void {
+function show(view: PopupView, queued: number, sendsQueue: boolean): void {
   const { root } = view.options;
   // A card already up keeps its place: the newest word replaces it without
   // taking the caret twice.
@@ -68,7 +71,7 @@ function show(view: PopupView, queued: number): void {
     view.before = document.activeElement;
     document.addEventListener("keydown", view.onKey);
   }
-  root.innerHTML = renderReviewDone(queued);
+  root.innerHTML = renderReviewDone(queued, sendsQueue);
   root.hidden = false;
   root.querySelector<HTMLElement>(".lsr-done-end")?.focus();
 }

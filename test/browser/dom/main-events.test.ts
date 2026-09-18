@@ -39,14 +39,15 @@ test("every event the server pushes down the stream is one the page listens for"
   );
 });
 
-test("a presence frame reaches both places the page says who is on the review", () => {
-  // One frame, two consumers (banner and panel): telling only the banner was the complaint —
-  // the fact hid in a corner.
+test("a presence frame reaches every place the page speaks for the turn", () => {
+  // One frame, three consumers: the banner says it in words, the panel gates Send on it, and
+  // the finish card promises to carry the queue only when the queue can still go anywhere.
   const listener = /addEventListener\("presence"[\s\S]*?\n {2}\}\);/.exec(page)?.[0] ?? "";
 
   assert.ok(listener, "expected the presence listener to be found");
   assert.match(listener, /banner\.setPresence\(/);
-  assert.match(listener, /panel\.setWorking\(/);
+  assert.match(listener, /panel\.setTurn\(/);
+  assert.match(listener, /finish\.setTurn\(/);
 });
 
 test("a round that lands mid-read waits behind the offer instead of taking the page", () => {

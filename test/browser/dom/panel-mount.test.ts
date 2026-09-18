@@ -7,12 +7,31 @@ import type {
   ConversationEntry,
   FeedbackPrompt,
   SessionStatus,
+  Turn,
 } from "../../../src/session-store.ts";
 import { keydown } from "./fake-keys.ts";
 import { asPanelRoot, FakeNode, installFakeElements, type FakeWindow } from "./fake-panel-dom.ts";
 import { FakeStorage } from "../fake-storage.ts";
 import { readMemory, updateMemory } from "../../../src/browser/review-memory.ts";
 import { SAVE_DELAY_MS } from "../../../src/browser/dom/save-later.ts";
+
+const REVIEWERS: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
+const READING: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
+
+const working = (note: string): Turn => ({
+  holder: "agent",
+  mode: "working",
+  at: "2025-01-01T00:07:00.000Z",
+  note,
+});
+
+const annotation: FeedbackPrompt = {
+  type: "annotation",
+  file: "src/api/users.ts",
+  group: "API",
+  selected_text: "+const user = 1;",
+  comment: "wrap in a transaction",
+};
 
 const reply: ConversationEntry = {
   role: "agent",
@@ -32,6 +51,7 @@ function session(over: Partial<SessionData> = {}): SessionData {
     rounds: [{ index: 0, at: "2025-01-01T00:00:00.000Z" }],
     pending: [],
     status: "open" as SessionStatus,
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
   };
   return Object.assign(base, over);
 }
@@ -179,31 +199,135 @@ test("a reply arriving while the reviewer reads the live end keeps them at it", 
 test("an agent taking the feedback away is said at the foot of the conversation", (t) => {
   const { root, panel } = mount(t);
 
-  panel.setWorking(true);
+  panel.setTurn(READING);
 
   assert.match(
     root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "",
-    /lsr-working/,
+    /the agent has your feedback/,
     "the marker stands where the answer will be written",
   );
 
-  panel.setWorking(false);
+  panel.setTurn(REVIEWERS);
 
   assert.doesNotMatch(
     root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "",
     /lsr-working/,
-    "the agent came back for more, so nobody is working",
+    "the agent handed the turn back, so nobody is working",
   );
+});
+
+test("the agent's declared plan is what the foot of the conversation says", (t) => {
+  const { root, panel } = mount(t);
+
+  panel.setTurn(working("splitting the transaction helper out"));
+
+  // `reading` and `working` gate identically; the difference is only ever this
+  // sentence, which is the reason `work` takes a plan at all.
+  assert.match(
+    root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "",
+    /implementing: splitting the transaction helper out/,
+  );
+});
+
+test("a plan out of a hand-edited session is escaped like any other text", (t) => {
+  const { root, panel } = mount(t);
+
+  panel.setTurn(working("<img src=x onerror=alert(1)>"));
+
+  assert.doesNotMatch(root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "", /<img/);
 });
 
 test("the working marker arrives on screen rather than just below the fold", (t) => {
   const { root, panel } = mount(t);
   const host = scrolledTo(root, 800);
 
-  panel.setWorking(true);
+  panel.setTurn(READING);
 
   // The reviewer just pressed Send, so they are at the live end: a marker below the fold is no marker.
   assert.equal(host.scrollTop, host.scrollHeight);
+});
+
+test("the agent's turn takes Send away and leaves everything else pressable", (t) => {
+  const { root, panel } = mount(t);
+
+  panel.setTurn(READING);
+
+  assert.equal(root.querySelector("#lsr-send")?.disabled, true);
+  // Send is the only control a turn can take: ending is never gated, and
+  // queueing and typing are how a reviewer keeps working through the silence.
+  assert.equal(root.querySelector("#lsr-send-end")?.disabled, false);
+  assert.equal(root.querySelector("#lsr-general-comment")?.disabled, false);
+});
+
+test("a locked end says on itself that it carries nothing", (t) => {
+  const { root, panel } = mount(t);
+  assert.equal(root.querySelector("#lsr-send-end")?.textContent, "Send & End");
+
+  panel.setTurn(READING);
+  assert.equal(root.querySelector("#lsr-send-end")?.textContent, "End without Sending");
+
+  panel.setTurn(REVIEWERS);
+  assert.equal(root.querySelector("#lsr-send-end")?.textContent, "Send & End");
+});
+
+test("the turn coming back hands Send back without replacing the compose box", (t) => {
+  const { root, panel, box } = mount(t);
+  const typing = box();
+  typing!.value = "half a thought";
+  panel.setTurn(working("rewriting the parser"));
+
+  panel.setTurn(REVIEWERS);
+
+  assert.equal(root.querySelector("#lsr-send")?.disabled, false);
+  assert.equal(box(), typing, "the very element they were typing into");
+  assert.equal(typing!.value, "half a thought");
+});
+
+test("a session that opens on the agent's turn is locked before any SSE frame", (t) => {
+  const { root } = mount(t, session({ turn: READING }));
+
+  // A reload is not an escape: the turn is server truth, and the page draws it
+  // from the session it was handed rather than waiting to be told.
+  assert.equal(root.querySelector("#lsr-send")?.disabled, true);
+});
+
+test("a press on a locked Send sends nothing at all", (t) => {
+  const { root, panel } = mount(t, session({ pending: [] }));
+  const sent = stubFetch(t);
+  panel.queue([annotation]);
+  panel.setTurn(READING);
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+
+  // Browsers fire nothing off a disabled button, but the handler is the lock:
+  // a stale listener must not put words on somebody else's turn.
+  assert.deepEqual(sent, []);
+});
+
+test("Enter is the same Send, so the same turn takes it away", (t) => {
+  const { root, panel, box } = mount(t);
+  const sent = stubFetch(t);
+  box()!.value = "one more thing";
+  panel.setTurn(READING);
+
+  root.dispatch("keydown", keydown(box(), { key: "Enter" }));
+
+  assert.deepEqual(sent, []);
+});
+
+test("ending on the agent's turn ends the review and leaves the queue queued", async (t) => {
+  const { root, panel, ended } = mount(t);
+  const sent = stubFetch(t);
+  panel.queue([annotation]);
+  panel.setTurn(working("rewriting the parser"));
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send-end") });
+  await tick(0);
+
+  // End always: the review closes on the reviewer's word whoever holds the
+  // turn. Send only on your turn: the pills do not ride out with it.
+  assert.deepEqual(sent, [{ path: "/api/session/key/feedback", prompts: [], ended: true }]);
+  assert.equal(ended(), true);
 });
 
 test("a reviewer reading an earlier round is not yanked back down by a reply", (t) => {

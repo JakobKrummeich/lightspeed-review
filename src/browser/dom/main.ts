@@ -154,7 +154,7 @@ async function main(): Promise<void> {
 
   // `reader.place`, not a flag: where the reviewer stands is only answerable
   // at the moment a round lands.
-  wireSessionEvents({ page, live, diff, ...side, refreshReplay, place: reader.place });
+  wireSessionEvents({ page, live, diff, ...side, finish, refreshReplay, place: reader.place });
 }
 
 /**

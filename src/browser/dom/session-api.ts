@@ -10,6 +10,7 @@ import type {
   RoundFile,
   RoundMark,
   SessionStatus,
+  Turn,
 } from "../../session-store.ts";
 
 /** The slice of the stored session the review page renders. */
@@ -35,11 +36,16 @@ export interface SessionData {
   rounds: (RoundMark & { files?: RoundFile[] })[];
   pending: FeedbackPrompt[];
   /**
-   * Agent's per-comment answers (`poll --for <id> --note`), keyed by comment
-   * id; the panel shows each note under the comment it answers.
+   * Agent's per-comment answers (`say --for <id>`), keyed by comment id; the
+   * panel shows each note under the comment it answers.
    */
   declarations?: Record<string, DeclaredAnswer>;
   status: SessionStatus;
+  /**
+   * Whose move it is, so a reload draws the lock the server already holds
+   * rather than a live Send that goes away one SSE frame later.
+   */
+  turn: Turn;
   /**
    * Who closed it, when recorded. Absent reads as "not written down", not as
    * either party — the closing summary says so in words.

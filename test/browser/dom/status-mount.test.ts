@@ -43,6 +43,9 @@ function said(role: "reviewer" | "agent", comments: number): ConversationEntry {
   };
 }
 
+const REVIEWERS_TURN = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" } as const;
+const AGENTS_TURN = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" } as const;
+
 function session(over: Partial<SessionData> = {}): SessionData {
   const base: SessionData = {
     intents: [],
@@ -54,6 +57,7 @@ function session(over: Partial<SessionData> = {}): SessionData {
     rounds: [{ index: 0, at: "2025-01-01T00:00:00.000Z" }],
     pending: [],
     status: "open",
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
   };
   return Object.assign(base, over);
 }
@@ -70,13 +74,13 @@ test("the presence frame decides which of the three the banner says", (t) => {
   const root = stubDocument(t);
   const banner = mountStatusBanner(session());
 
-  banner.setPresence({ waiting: true, working: false });
+  banner.setPresence({ waiting: true, turn: REVIEWERS_TURN });
   assert.match(root.innerHTML, /agent is waiting/i);
 
-  banner.setPresence({ waiting: false, working: true });
+  banner.setPresence({ waiting: false, turn: AGENTS_TURN });
   assert.match(root.innerHTML, /agent is working on your feedback/i);
 
-  banner.setPresence({ waiting: false, working: false });
+  banner.setPresence({ waiting: false, turn: REVIEWERS_TURN });
   assert.match(root.innerHTML, /no agent is waiting/i);
 });
 

@@ -37,8 +37,8 @@ export function mountStatusBanner(session: SessionData): MountedStatusBanner {
     root.innerHTML = html;
   };
   return {
-    setPresence: ({ waiting, working }) =>
-      draw({ ...state, agentWaiting: waiting, agentWorking: working }),
+    setPresence: ({ waiting, turn }) =>
+      draw({ ...state, agentWaiting: waiting, agentWorking: turn.holder === "agent" }),
     setSession: (fresh) => draw({ ...state, status: fresh.status, review: fresh }),
     setEndedByReviewer: (sent) =>
       draw({

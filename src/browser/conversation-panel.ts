@@ -8,6 +8,7 @@ import type {
   FeedbackPrompt,
   RoundMark,
   SessionStatus,
+  Turn,
 } from "../session-store.ts";
 
 export interface PanelState {
@@ -20,18 +21,21 @@ export interface PanelState {
   status: SessionStatus;
   /** Every file of the review is ticked: there is nothing left to read. */
   allApproved: boolean;
-  /** An agent is off acting on feedback a poll already took away. */
-  agentWorking: boolean;
   /**
-   * The agent's per-comment answers (`poll --for <id> --note`), keyed by the
-   * comment's own id. Optional because only the live session carries them;
-   * everything else that builds a panel builds conversation and rounds.
+   * Whose move it is. The agent holding it takes Send away and nothing else:
+   * queueing, ending and typing stay live whatever it says.
+   */
+  turn: Turn;
+  /**
+   * The agent's per-comment answers (`say --for <id>`), keyed by the comment's
+   * own id. Optional because only the live session carries them; everything
+   * else that builds a panel builds conversation and rounds.
    */
   declarations?: Record<string, DeclaredAnswer>;
 }
 
 /** The compose row's half of that state, which is all `renderCompose` needs. */
-export type ComposeState = Pick<PanelState, "status" | "allApproved">;
+export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
 
 /**
  * Said once every file is ticked. Holds even with feedback still queued:
@@ -41,11 +45,23 @@ const APPROVED_EVERYTHING = "Every file is approved — Send & End when you are 
 
 /**
  * Named rather than spelled out twice: the mount patches these onto the very
- * element this markup produced, and drift would leave the button stuck on
- * "Sending…".
+ * elements this markup produced, and drift would leave a button stuck on
+ * "Sending…" or promising to send a queue it is about to drop.
  */
 export const SEND_LABEL = "Send to Agent";
 export const SENDING_LABEL = "Sending…";
+export const SEND_END_LABEL = "Send & End";
+/** Ending is never gated, but on the agent's turn it takes nothing with it. */
+export const END_ONLY_LABEL = "End without Sending";
+
+/**
+ * Whether Send is off. The one gate in the page, and it gates one control: an
+ * ended review is locked by its own status, and everything else is locked only
+ * while the agent holds the turn.
+ */
+export function sendIsLocked(state: ComposeState): boolean {
+  return state.status === "ended" || state.turn.holder === "agent";
+}
 
 /**
  * The whole right-hand panel. Drawn once at mount; afterwards only
@@ -64,7 +80,7 @@ export function renderScroll(state: PanelState): string {
   const current = currentRound(state.rounds);
   return `
   <section class="lsr-conversation">
-  ${renderConversation(state)}${renderWorking(state)}
+  ${renderConversation(state)}${renderTurnLine(state)}
   </section>
   <section class="lsr-queue">
   ${state.pending.length === 0 ? `<p class="lsr-empty">Nothing queued — select diff text to add feedback.</p>` : state.pending.map((pill, index) => renderPill(pill, index, current)).join("\n  ")}
@@ -78,9 +94,11 @@ export function composeNote(state: ComposeState): string {
 }
 
 /**
- * Compose box and send buttons, disabled once ended. The `role="status"`
- * region is always in the markup, only filled/emptied: a region added on
- * demand is announced by no screen reader reliably.
+ * Compose box and send buttons. Ending is never gated — not by the turn, not by
+ * anything but the review already being over — so only Send carries the turn's
+ * lock, and the end button says what it will do instead of being taken away.
+ * The `role="status"` region is always in the markup, only filled/emptied: a
+ * region added on demand is announced by no screen reader reliably.
  */
 export function renderCompose(state: ComposeState): string {
   const ended = state.status === "ended";
@@ -88,26 +106,52 @@ export function renderCompose(state: ComposeState): string {
   <p class="lsr-complete" role="status">${escapeHtml(composeNote(state))}</p>
   <textarea id="lsr-general-comment" placeholder="General comment — Enter sends…"${ended ? " disabled" : ""}></textarea>
   <div class="lsr-compose-actions">
-    <button type="button" id="lsr-send" class="lsr-primary"${ended ? " disabled" : ""}>${SEND_LABEL}</button>
-    <button type="button" id="lsr-send-end" class="lsr-secondary"${ended ? " disabled" : ""}>Send &amp; End</button>
+    <button type="button" id="lsr-send" class="lsr-primary"${sendIsLocked(state) ? " disabled" : ""}>${SEND_LABEL}</button>
+    <button type="button" id="lsr-send-end" class="lsr-secondary"${ended ? " disabled" : ""}>${escapeHtml(endLabel(state))}</button>
   </div>
   ${ended ? `<p class="lsr-ended">This review has ended.</p>` : ""}
 `;
 }
 
 /**
- * "Agent working" indicator at the foot of the conversation, where the answer
- * will appear — after Send the eye is here, not on the header's corner.
+ * What ending does from here. On the agent's turn the queue is not the
+ * reviewer's to send, so the press ends the review and leaves the pills behind
+ * — said on the button, because learning it from the conversation afterwards is
+ * how a reviewer loses six comments.
+ */
+export function endLabel(state: ComposeState): string {
+  return state.turn.holder === "agent" && state.status !== "ended"
+    ? END_ONLY_LABEL
+    : SEND_END_LABEL;
+}
+
+/**
+ * Whose move it is, at the foot of the conversation, where the answer will
+ * appear — after Send the eye is here, not on the header's corner. The
+ * reviewer's own turn says nothing: Send is live and the page is theirs.
  * Silent once ended: the closing summary is about to cover the page.
  */
-function renderWorking(state: PanelState): string {
-  if (!state.agentWorking || state.status === "ended") return "";
+function renderTurnLine(state: PanelState): string {
+  if (state.turn.holder !== "agent" || state.status === "ended") return "";
   // Decorative; the sentence beside them carries the meaning.
   return `
   <p class="lsr-working">
     <span class="lsr-working-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-    the agent is working on your feedback
+    ${escapeHtml(turnLineText(state.turn))}
   </p>`;
+}
+
+/**
+ * The two things the agent's turn can mean. They gate identically — `mode` is
+ * presentational — but a reviewer waiting on a silence is owed the difference
+ * between "it has your words" and "it is writing the code", which is the whole
+ * point of the plan `work` declares.
+ */
+function turnLineText(turn: Turn): string {
+  if (turn.mode !== "working") return "the agent has your feedback";
+  return turn.note === undefined
+    ? "the agent is implementing your feedback"
+    : `implementing: ${turn.note}`;
 }
 
 /**

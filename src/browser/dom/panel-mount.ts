@@ -1,8 +1,10 @@
 import {
   composeNote,
+  endLabel,
   renderCompose,
   renderPanel,
   renderScroll,
+  sendIsLocked,
   SEND_LABEL,
   SENDING_LABEL,
   type PanelState,
@@ -13,7 +15,7 @@ import type { LinePlace } from "./line-numbers.ts";
 import { stampPills, unstampedPill } from "../queued-pill.ts";
 import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
 import { saveLater } from "./save-later.ts";
-import type { ConversationEntry, FeedbackPrompt } from "../../session-store.ts";
+import type { ConversationEntry, FeedbackPrompt, Turn } from "../../session-store.ts";
 import { sendFeedback, type SessionData } from "./session-api.ts";
 
 export interface MountedPanel {
@@ -22,8 +24,8 @@ export interface MountedPanel {
   update(session: SessionData): void;
   /** Every file of the review is ticked, or one of them no longer is. */
   setAllApproved(allApproved: boolean): void;
-  /** An agent took the feedback away, or came back for more. */
-  setWorking(working: boolean): void;
+  /** The turn moved: the agent took the feedback away, or handed it back. */
+  setTurn(turn: Turn): void;
   /**
    * The reviewer said done from somewhere other than the panel's own button:
    * the same send as Send & End, queue and comment included, so there is one
@@ -78,15 +80,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
   // Last visit's unsent queue, restored before the first draw so pills are
   // simply there.
   const remembered = readMemory(storage, key);
-  const state: PanelState = {
-    pending: remembered.pending,
-    conversation: session.conversation,
-    rounds: session.rounds,
-    declarations: session.declarations,
-    status: session.status,
-    allApproved: false,
-    agentWorking: false,
-  };
+  const state = openingState(session, remembered.pending);
   root.innerHTML = renderPanel(state);
   const view: PanelView = {
     options,
@@ -109,6 +103,8 @@ export function mountPanel(options: PanelOptions): MountedPanel {
   // Newest talk and the current-round line are at the bottom; opening at the
   // top would hide both behind an unsuspected scroll.
   toBottom(view.scrollHost);
+  // Once at mount: the row is then always what `lockControls` says it is.
+  lockControls(view);
 
   root.addEventListener("click", (event) => handleClick(view, event));
   root.addEventListener("input", (event) => {
@@ -138,18 +134,38 @@ export function mountPanel(options: PanelOptions): MountedPanel {
       state.allApproved = allApproved;
       drawNote(view);
     },
-    setWorking(working: boolean) {
-      if (working === state.agentWorking) return;
-      state.agentWorking = working;
+    setTurn(turn: Turn) {
+      if (sameTurn(turn, state.turn)) return;
+      state.turn = turn;
       // Full redraw for one line at the foot: `draw` follows the panel to the
       // bottom, so the line lands where the eye already is.
       draw(view);
+      // Patched, never re-rendered: the compose row holds a half-typed comment,
+      // and a turn moving under it is exactly when one exists.
+      lockControls(view);
     },
     end() {
       // Not awaited, as the button's own press is not: the send reports
       // through `onEnd`, and a failure leaves the controls full to press again.
       void send(view, true);
     },
+  };
+}
+
+/**
+ * What the panel opens on. The turn is read off the page's own session rather
+ * than waited for over SSE: a reload must show the lock the server already has
+ * written down, not a live Send that goes away one round trip later.
+ */
+function openingState(session: SessionData, pending: PanelState["pending"]): PanelState {
+  return {
+    pending,
+    conversation: session.conversation,
+    rounds: session.rounds,
+    declarations: session.declarations,
+    status: session.status,
+    allApproved: false,
+    turn: session.turn,
   };
 }
 
@@ -240,9 +256,9 @@ function handleComposeKey(view: PanelView, event: KeyboardEvent): void {
   // Compared against the box: only the compose box sends on Enter.
   const field = generalCommentBox(view.options.root);
   if (field === null || event.target !== field) return;
-  // Browsers send no keystrokes from a disabled box; this makes the lock a
-  // panel property, not an element state.
-  if (view.sending) return;
+  // The box stays live on the agent's turn — typing is not sending — so Enter
+  // is gated here rather than by the element, as the send lock is.
+  if (sendRefused(view)) return;
   const action = enterAction(event);
   if (action === "newline") {
     event.preventDefault();
@@ -262,10 +278,8 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   const { options, state } = view;
   // One press at a time: a second mid-wire would send the same prompts twice.
   if (view.sending) return;
-  const prompts = withGeneralComment(options.root, state.pending);
-  // Ending may carry nothing (all approved, nothing to say is the happy
-  // path); sending is only ever about prompts — with none there is no send.
-  if (prompts.length === 0 && !ended) return;
+  const prompts = onTheWire(view, ended);
+  if (prompts === undefined) return;
   // Conversation before the send, so the echo below can tell whether it is
   // still the one it was written for.
   const before = state.conversation;
@@ -279,6 +293,8 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // with a dead SSE stream; the `feedback` event brings the server's copy —
   // the truth, and all another tab ever sees.
   echoSent(state, before, prompts);
+  // Cleared even when nothing went out: the review is over, and pills offered
+  // back on the next load would be pills with nowhere to go.
   state.pending = [];
   clearGeneralComment(options.root);
   // Both halves at once, ahead of the delayed write: a reload must not offer
@@ -293,21 +309,61 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   if (ended) options.onEnd(prompts);
 }
 
-/**
- * Locks the compose row during a send. Patched into existing elements:
- * re-rendering would replace the textarea and lose a comment typed mid-flight
- * — the very thing the lock prevents.
- */
 function setSending(view: PanelView, sending: boolean): void {
   view.sending = sending;
-  // An ended review stays locked: lifting the send lock hands nothing back.
-  const locked = sending || view.state.status === "ended";
-  for (const id of ["#lsr-send", "#lsr-send-end", "#lsr-general-comment"]) {
-    const control = composeControl(view, id);
-    if (control) control.disabled = locked;
-  }
-  const button = composeControl(view, "#lsr-send");
-  if (button) button.textContent = sending ? SENDING_LABEL : SEND_LABEL;
+  lockControls(view);
+}
+
+/**
+ * What this press puts on the wire, or nothing when there is no press to make.
+ * Ending is never gated and sending always is, so a locked end is exactly what
+ * the button says: it ends, and the queue stays queued rather than going out on
+ * somebody else's turn. An unlocked send is only ever about prompts — with none
+ * there is no send — while an end may carry nothing at all, which is the happy
+ * path of a review where everything was approved.
+ */
+function onTheWire(view: PanelView, ended: boolean): FeedbackPrompt[] | undefined {
+  const locked = sendIsLocked(view.state);
+  if (locked && !ended) return undefined;
+  const prompts = locked ? [] : withGeneralComment(view.options.root, view.state.pending);
+  return prompts.length === 0 && !ended ? undefined : prompts;
+}
+
+/**
+ * Whether a Send would be refused: one is already in flight, or it is not the
+ * reviewer's turn. The button's `disabled` and Enter's own guard read this one
+ * answer, so the two cannot come apart.
+ */
+function sendRefused(view: PanelView): boolean {
+  return view.sending || sendIsLocked(view.state);
+}
+
+/**
+ * The compose row's controls as the panel's own state has them. Patched into
+ * existing elements: re-rendering would replace the textarea and lose a comment
+ * typed mid-flight — the very thing the lock prevents.
+ *
+ * Send is the only control a turn can take away: ending stays pressable in
+ * every state (it says so on itself), and typing and queueing are never gated.
+ */
+function lockControls(view: PanelView): void {
+  const frozen = view.sending || view.state.status === "ended";
+  patch(view, "#lsr-send", sendRefused(view), view.sending ? SENDING_LABEL : SEND_LABEL);
+  patch(view, "#lsr-send-end", frozen, endLabel(view.state));
+  patch(view, "#lsr-general-comment", frozen);
+}
+
+/** One control as the panel's state has it; a missing control is not an error. */
+function patch(view: PanelView, id: string, disabled: boolean, label?: string): void {
+  const control = composeControl(view, id);
+  if (!control) return;
+  control.disabled = disabled;
+  if (label !== undefined) control.textContent = label;
+}
+
+/** Two turns worth redrawing for: holder, mode and the plan the banner names. */
+function sameTurn(one: Turn, other: Turn): boolean {
+  return one.holder === other.holder && one.mode === other.mode && one.note === other.note;
 }
 
 /** One of the compose row's controls as the last draw of the row left it. */

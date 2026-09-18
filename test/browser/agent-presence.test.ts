@@ -2,33 +2,50 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readPresence } from "../../src/browser/agent-presence.ts";
 
-test("reads both halves of a presence frame", () => {
-  assert.deepEqual(readPresence(`{"waiting":true,"working":false}`), {
-    waiting: true,
-    working: false,
-  });
-  assert.deepEqual(readPresence(`{"waiting":false,"working":true}`), {
-    waiting: false,
-    working: true,
-  });
+const NOBODY = { waiting: false, turn: { holder: "reviewer", at: "" } };
+
+test("reads the waiter and the turn out of one frame", () => {
+  assert.deepEqual(
+    readPresence(`{"waiting":true,"working":false,"turn":{"holder":"reviewer","at":"T0"}}`),
+    { waiting: true, turn: { holder: "reviewer", at: "T0" } },
+  );
+  assert.deepEqual(
+    readPresence(
+      `{"waiting":false,"working":true,"turn":{"holder":"agent","mode":"working","at":"T1","note":"rewriting the parser"}}`,
+    ),
+    {
+      waiting: false,
+      turn: { holder: "agent", mode: "working", at: "T1", note: "rewriting the parser" },
+    },
+  );
 });
 
-test("anything but an explicit true is read as nobody there", () => {
-  // The frame is text off a socket: a truthy-looking value read as presence
-  // would tell the reviewer somebody is listening when nobody is.
+test("anything but an explicit agent turn leaves the turn with the reviewer", () => {
+  // The frame is text off a socket, and the turn is what takes Send away: a
+  // garbled frame may only ever hand it back, never lock the page on nobody's word.
   for (const data of [
-    `{"waiting":"true","working":"true"}`,
-    `{"waiting":1,"working":1}`,
+    `{"waiting":"true","turn":"agent"}`,
+    `{"waiting":1,"turn":{"holder":"nobody"}}`,
     `{}`,
     `null`,
     `not json at all`,
   ]) {
-    assert.deepEqual(readPresence(data), { waiting: false, working: false }, data);
+    assert.deepEqual(readPresence(data), NOBODY, data);
   }
 });
 
-test("a frame from a server that knows nothing of working still says who waits", () => {
-  // Old server, new page: the field is simply absent, which is not a claim
-  // that no agent is working — but it is the only safe reading of one.
-  assert.deepEqual(readPresence(`{"waiting":true}`), { waiting: true, working: false });
+test("a turn with a mode nobody knows still locks Send", () => {
+  // `mode` is presentational: the holder is what gates, so an unreadable mode
+  // costs a sentence at the foot of the panel, never the lock itself.
+  assert.deepEqual(readPresence(`{"turn":{"holder":"agent","mode":"napping","at":"T2"}}`), {
+    waiting: false,
+    turn: { holder: "agent", at: "T2" },
+  });
+});
+
+test("a frame from a server that knows nothing of turns still says who waits", () => {
+  assert.deepEqual(readPresence(`{"waiting":true}`), {
+    waiting: true,
+    turn: { holder: "reviewer", at: "" },
+  });
 });
