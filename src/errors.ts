@@ -24,6 +24,7 @@ export type ReviewErrorCode =
   | "session_ended"
   | "declaration_invalid"
   | "turn_not_yours"
+  | "turn_still_yours"
   | "ambiguous_session"
   | "invalid_arguments"
   | "intent_missing"

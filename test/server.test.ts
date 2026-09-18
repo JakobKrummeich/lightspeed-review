@@ -1333,6 +1333,54 @@ test("work on an ended review points at the only command that reopens one", asyn
   });
 });
 
+/**
+ * Parking is the agent handing the turn back, so a `wait` from one that is
+ * mid-edit would unlock Send under it: the reviewer fires at a half-written
+ * branch, and neither side ever finds out why. Refused at the door instead.
+ */
+test("a wait from an agent that declared work is refused, and the turn stays put", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await takeTheTurn(url, key);
+    await postWork(url, key, { plan: "splitting the helper out" });
+
+    const response = await fetch(`${url}/api/poll?key=${key}`, {
+      signal: AbortSignal.timeout(2_000),
+    });
+
+    assert.equal(response.status, 422);
+    const body = (await response.json()) as { error: { code: string }; help: string[] };
+    assert.equal(body.error.code, "turn_still_yours");
+    // Both legal moves, and both give the turn up deliberately before they block.
+    assert.match(body.help.join(" "), /lightspeed start feature-auth main --wait/);
+    assert.match(body.help.join(" "), /lightspeed ask "<question>" feature-auth main/);
+    assert.partialDeepStrictEqual(store.get(key)?.turn, {
+      holder: "agent",
+      mode: "working",
+      note: "splitting the helper out",
+    });
+  });
+});
+
+/** The other side of the same rule: an agent that only read the feedback and
+ * came back for more is listening, not editing, so parking still hands back. */
+test("a wait from an agent that only read the feedback still hands the turn back", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await takeTheTurn(url, key);
+    assert.equal(store.get(key)?.turn.holder, "agent");
+
+    const parks = await parkWatch(url, key);
+    const parked = new AbortController();
+    void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
+    await parks.until(/"waiting":true/);
+    parks.close();
+
+    assert.equal(store.get(key)?.turn.holder, "reviewer");
+    parked.abort();
+  });
+});
+
 test("work without a plan is a 400, and on an unknown session a 404", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);

@@ -275,6 +275,8 @@ const ARGUMENT_ERROR_CODES = [
   // A move made out of turn is a wrong command line like any other: the fixing
   // command is in the error's own `help[]`, and exit 2 says "read it, don't retry".
   "turn_not_yours",
+  // Waiting while still holding the turn is the same mistake from the other end.
+  "turn_still_yours",
 ];
 
 function exitCodeFor(error: unknown): number {

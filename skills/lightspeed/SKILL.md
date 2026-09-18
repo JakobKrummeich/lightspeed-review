@@ -18,6 +18,14 @@ A review has exactly one turn holder. It is the reviewer's until your
 disabled, so a round cannot change under you mid-edit; their queue and their
 End are never disabled, so they are never stuck behind you.
 
+Do not `wait` twice on one turn. A `wait` that parks gives the turn
+back — it says you are listening, not editing — so once you have declared
+`work`, a second `wait` is refused with `turn_still_yours` and exit 2
+rather than unlocking Send while you are still editing. Give the turn up
+deliberately instead: `start <branch> [base] --wait` to publish what you
+changed and block on the next round, or `ask` to hand it back with a
+question.
+
 Every answer this CLI prints carries `turn` and `round`. Read `turn`
 before choosing the next command; the `help[]` under it lists the moves that
 are legal from where you are.
@@ -117,7 +125,9 @@ comment. An annotation carries:
   by design.
 - `work` is the only command that requires the turn. Running it without one
   answers `turn_not_yours` and exits 2, with the fixing command in its
-  `help[]` — read it rather than retrying.
+  `help[]` — read it rather than retrying. `wait` is the mirror of it:
+  run while you hold the turn and are working, it answers
+  `turn_still_yours` and exits 2 the same way.
 - `Send & End` from the reviewer ends the review; `wait` reports
   `ended: true`. `start` on an ended review is refused with
   `session_ended`. When the reviewer asks for another round — and only then —

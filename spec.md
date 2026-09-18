@@ -79,16 +79,34 @@ Developer working in TUI with Pi agent:
 > Queue always. End always. Send only on your turn.
 
 A session has exactly one turn holder at a time, persisted on the record as
-`turn: {holder: "reviewer" | "agent", mode?: "reading" | "working", at, note?}`.
-A session written before the turn existed reads as the reviewer's — that is the
-state in which everything is allowed.
+`turn: {holder: "reviewer", at}` or `turn: {holder: "agent", mode: "reading" |
+"working", at, note?}`. A session written before the turn existed reads as the
+reviewer's — that is the state in which everything is allowed.
 
 **The turn moves to the agent on delivery, and on nothing else.** Not on the
 reviewer's Send: words nobody is waiting for queue server-side, and the reviewer
 keeps sending. Only feedback handed to a live, blocking `wait` takes the turn,
 because only then is there an agent that has actually read it. It comes back when
-the agent asks a question, publishes a round, or ends the review — and, if the
-delivery never reaches the agent, when the prompts are requeued.
+the agent asks a question, publishes a round, or ends the review; when a `wait`
+parks on a review with nothing queued, which is the agent saying it is listening
+rather than editing; and when an undelivered batch is recovered.
+
+**Parking hands the turn back only from `reading`.** An agent that declared
+`work` is refused: a second `wait` from mid-edit would unlock Send under it, and
+the reviewer would fire at a half-written branch with neither side finding out
+why. The poll answers `turn_still_yours` (exit 2) naming the two moves that give
+the turn up deliberately — `start <branch> [base] --wait`, which publishes what
+the work produced, and `ask`, which hands it back with a question.
+
+**A delivery is not finished until the agent says it arrived.** The server
+cannot see this for itself: the answer's bytes reach the client's kernel whether
+anything reads them or not, so a `wait` killed mid-delivery is indistinguishable
+on the wire from one that read every word. The drained batch is held on the
+record as `delivering: {id, prompts, at}` and the id rides out on the poll
+payload; the client confirms with `POST /api/session/:key/delivered`, and a poll
+that arrives with a batch still in flight puts it back at the head of the queue
+first. It is persisted rather than held in memory because a `serve` restart in
+that window would otherwise lose the feedback for good.
 
 There is **no timer, no staleness unlock and no override**. A reload changes
 nothing: the page reads the turn off the record it is served with. An agent that
@@ -119,9 +137,11 @@ reports progress mid-edit is still mid-edit, and a `say` that handed the turn
 back would make the `work` the same agent runs next an illegal move.
 
 Every answer the CLI prints carries `turn` and `round`, and closes with the moves
-that are legal from there. `work` is the only endpoint gated on the turn, because
-it is the only one that claims to hold it; refused, it answers `turn_not_yours`
-on stdout with exit 2, naming the `wait` that would earn it.
+that are legal from there. Two endpoints are gated on the turn, one from each
+end: `work` is refused with `turn_not_yours` when the agent does not hold it — it
+is the only command that claims to — and the poll is refused with
+`turn_still_yours` when the agent holds it and is working. Both answer on stdout
+with exit 2, naming the command that would make the move legal.
 
 ## Commands
 

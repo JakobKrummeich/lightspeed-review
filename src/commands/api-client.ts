@@ -82,7 +82,11 @@ export function parseBody(status: number, body: string, key?: string): unknown {
  * set stays true — and listed as a set rather than one hardcoded code, which is
  * how `turn_not_yours` first reached agents as `internal_error`: a bug in
  * lightspeed, they read, instead of an illegal move they could fix. */
-const DOMAIN_ERROR_CODES = new Set<ReviewErrorCode>(["declaration_invalid", "turn_not_yours"]);
+const DOMAIN_ERROR_CODES = new Set<ReviewErrorCode>([
+  "declaration_invalid",
+  "turn_not_yours",
+  "turn_still_yours",
+]);
 
 function isDomainCode(code: unknown): code is ReviewErrorCode {
   return typeof code === "string" && DOMAIN_ERROR_CODES.has(code as ReviewErrorCode);

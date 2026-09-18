@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { drainPending, type PollPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import type { Delivery, FeedbackPrompt, SessionRecord } from "../session-store.ts";
-import { agentReading, reviewerTurn, turnFacts } from "../turn.ts";
+import { agentReading, reviewerTurn, turnFacts, turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
 import type { WakeReason } from "./streams.ts";
@@ -44,6 +44,12 @@ export function handlePoll(
   const key = context.requestUrl(request).searchParams.get("key") ?? undefined;
   const session = requireSession(context.store, response, key);
   if (!session) return;
+  // Parking hands the turn back, so a `wait` from an agent that is still
+  // editing would take the review off it. Refused before anything else here.
+  if (session.turn.holder === "agent" && session.turn.mode === "working") {
+    sendJson(response, 422, stillYours(session));
+    return;
+  }
   // An idle poll may wait for hours: no timer of this server's may close it,
   // and TCP keepalive keeps the connection known to both ends.
   holdSocketOpen(request.socket);
@@ -183,12 +189,38 @@ function withoutDelivery(session: SessionRecord): SessionRecord {
 
 /**
  * The turn back to the reviewer, published even when it was already theirs: the
- * frame is also how a page learns an agent has arrived on the wire.
+ * frame is also how a page learns an agent has arrived on the wire. Only a
+ * reading agent hands back — one that declared `work` is refused at the door,
+ * above, rather than quietly stripped of the turn it is editing under.
  */
 function handTurnBack(context: ServerContext, key: string): void {
   const session = context.store.get(key);
-  if (session && session.turn.holder === "agent") {
+  if (session && session.turn.holder === "agent" && session.turn.mode === "reading") {
     context.store.save({ ...session, turn: reviewerTurn(new Date().toISOString()) });
   }
   context.transport.publishPresence(key);
+}
+
+/**
+ * A `wait` from an agent that is mid-edit. Parking would hand the review back
+ * under it — the reviewer's Send goes live while the branch is half-written —
+ * so the poll is refused with the two moves that are actually legal from here:
+ * publish the round the work produced, or ask a question, both of which give
+ * the turn up deliberately before they block.
+ */
+function stillYours(session: SessionRecord): unknown {
+  const target = `${session.branch} ${session.base}`;
+  return {
+    error: {
+      code: "turn_still_yours",
+      message: `the turn is still yours (turn: ${turnLabel(session)}) — there is nothing to wait for`,
+      detail:
+        "you declared this work with `lightspeed work`, so the reviewer is waiting on you;" +
+        " waiting here would hand them the turn while you are still editing",
+    },
+    help: [
+      `Run \`lightspeed start ${target} --wait\` to publish what you changed and block on the next round`,
+      `Run \`lightspeed ask "<question>" ${target}\` to give the turn back with a question and wait for the answer`,
+    ],
+  };
 }

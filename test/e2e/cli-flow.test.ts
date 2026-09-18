@@ -155,6 +155,14 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     assert.equal(said.code, 0, said.stdout);
     assert.match(said.stdout, /^turn: "?agent working"?$/m);
 
+    // A second wait on a turn the agent is still working under would hand Send
+    // back mid-edit, so it is refused before it can park — in the agent's own
+    // error shape, exit 2, naming the two moves that give the turn up on purpose.
+    const waitedAgain = await runCli(["wait", "feature", "main"], repoRoot);
+    assert.equal(waitedAgain.code, 2, waitedAgain.stdout);
+    assert.match(waitedAgain.stdout, /^ {2}code: turn_still_yours$/m);
+    assert.match(waitedAgain.stdout, /--wait/);
+
     const ended = await runCli(["end", "feature", "main"], repoRoot);
     assert.equal(ended.code, 0, ended.stdout);
     assert.match(ended.stdout, /^ {2}status: ended$/m);
