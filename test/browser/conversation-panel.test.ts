@@ -387,3 +387,88 @@ test("comments in one card stand apart: each prompt is its own block", () => {
 
   assert.match(html, /<div class="lsr-prompt">/);
 });
+
+/** The agent's question and the reviewer's answer, as `ask` leaves them. */
+const question: FeedbackPrompt = {
+  type: "message",
+  comment: "should the retry be per-request or per-batch?",
+  kind: "question",
+};
+
+function asked(...after: ConversationEntry[]): ConversationEntry[] {
+  return [
+    { role: "agent", at: "2025-01-01T00:05:00.000Z", roundIndex: 0, prompts: [question] },
+    ...after,
+  ];
+}
+
+test("a question the agent asked is drawn as a card, not as one more remark", () => {
+  const html = renderScroll(panelState({ conversation: asked() }));
+
+  assert.match(html, /<div class="lsr-prompt" data-kind="question">/);
+  assert.match(html, /the agent is asking/);
+  assert.match(html, /per-request or per-batch/);
+});
+
+test("the open question carries its own answer box and its own press", () => {
+  const html = renderScroll(panelState({ conversation: asked() }));
+
+  assert.match(html, /class="lsr-answer-box"/);
+  assert.match(html, /class="lsr-answer-send"/);
+  // The box says what the press does, because it is not the button beneath it:
+  // it sends this text and leaves the queue alone.
+  assert.match(html, /sends this alone/);
+});
+
+/** A question is open while nothing has been said after it. Once the reviewer
+ * answers, the agent has stopped waiting, and a box still sitting there would
+ * invite an answer to a question nobody is listening for. */
+test("an answered question keeps its card and loses its box", () => {
+  const html = renderScroll(
+    panelState({
+      conversation: asked({
+        role: "reviewer",
+        at: "2025-01-01T00:06:00.000Z",
+        roundIndex: 0,
+        prompts: [{ type: "message", comment: "per-batch" }],
+      }),
+    }),
+  );
+
+  assert.match(html, /data-kind="question"/);
+  assert.match(html, /the agent is asking/);
+  assert.doesNotMatch(html, /lsr-answer-box/);
+});
+
+test("an ended review answers nothing, whatever was left hanging", () => {
+  const html = renderScroll(panelState({ status: "ended", conversation: asked() }));
+
+  assert.doesNotMatch(html, /lsr-answer-box/);
+});
+
+/** Only questions are cards. An ordinary `say` is the agent reporting, and a
+ * card around every sentence would make the one that blocks it unfindable. */
+test("what the agent merely said is not drawn as a question", () => {
+  const html = renderScroll(panelState({ conversation: delivered }));
+
+  assert.doesNotMatch(html, /data-kind="question"/);
+  assert.doesNotMatch(html, /lsr-answer-box/);
+});
+
+test("a question escapes like everything else the agent writes", () => {
+  const html = renderScroll(
+    panelState({
+      conversation: [
+        {
+          role: "agent",
+          at: "2025-01-01T00:05:00.000Z",
+          roundIndex: 0,
+          prompts: [{ type: "message", comment: "<script>alert(1)</script>", kind: "question" }],
+        },
+      ],
+    }),
+  );
+
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /&lt;script&gt;/);
+});

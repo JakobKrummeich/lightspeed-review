@@ -1067,3 +1067,103 @@ test("a press on a comment without an anchor still names the file", (t) => {
 
   assert.deepEqual(jumps, [{ file: "src/api.ts", anchor: undefined }]);
 });
+
+/** The conversation `ask` leaves behind: a question, and nothing said after it. */
+const asked: ConversationEntry = {
+  role: "agent",
+  at: "2025-01-01T00:05:00.000Z",
+  roundIndex: 0,
+  prompts: [{ type: "message", comment: "per-request or per-batch?", kind: "question" }],
+};
+
+/** The open question's own box, which lives in the scroll and not the compose row. */
+function answerOf(root: FakeNode): FakeNode | null {
+  return root.querySelector(".lsr-answer-box");
+}
+
+test("answering the question sends that text and nothing else", async (t) => {
+  const { root, panel } = mount(t, session({ conversation: [asked] }));
+  const sent = stubFetch(t);
+  // A queue and a half-typed general comment, both of which must survive: the
+  // reviewer was answering a question, not finishing their review.
+  panel.queue([annotation]);
+  root.querySelector("#lsr-general-comment")!.value = "still writing this one";
+  answerOf(root)!.value = "per-batch";
+
+  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
+  await tick(0);
+
+  assert.deepEqual(sent, [
+    {
+      path: "/api/session/key/feedback",
+      prompts: [{ type: "message", comment: "per-batch" }],
+      ended: false,
+    },
+  ]);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 1, "the queue is still queued");
+  assert.equal(root.querySelector("#lsr-general-comment")?.value, "still writing this one");
+});
+
+test("Enter in the answer box is the same one press", async (t) => {
+  const { root } = mount(t, session({ conversation: [asked] }));
+  const sent = stubFetch(t);
+  const field = answerOf(root)!;
+  field.value = "per-batch";
+
+  root.dispatch("keydown", keydown(field, { key: "Enter" }));
+  await tick(0);
+
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0]?.prompts, [{ type: "message", comment: "per-batch" }]);
+});
+
+test("an empty answer box sends nothing, as an empty compose box does", async (t) => {
+  const { root } = mount(t, session({ conversation: [asked] }));
+  const sent = stubFetch(t);
+  answerOf(root)!.value = "   ";
+
+  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
+  await tick(0);
+
+  assert.deepEqual(sent, []);
+});
+
+/** The answer is the last word, so the question above it is answered — and the
+ * box goes without waiting for the server's own copy to come back over SSE. */
+test("the box goes once the answer is on the wire", async (t) => {
+  const { root } = mount(t, session({ conversation: [asked] }));
+  stubFetch(t);
+  answerOf(root)!.value = "per-batch";
+
+  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
+  await tick(0);
+
+  assert.equal(answerOf(root), null);
+  assert.match(root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "", /per-batch/);
+});
+
+/** Every redraw replaces the scroll, and queueing a pill mid-answer is the
+ * ordinary way that happens. The half-written answer must outlive it. */
+test("a pill queued mid-answer does not cost the reviewer their sentence", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [asked] }));
+  answerOf(root)!.value = "per-batch, becau";
+
+  panel.queue([annotation]);
+
+  assert.equal(answerOf(root)?.value, "per-batch, becau");
+});
+
+/** One gate over everything that sends. The turn cannot move under an open
+ * question in practice, but the press must read the same answer Send does. */
+test("the answer press obeys the one rule the rest of the panel obeys", async (t) => {
+  const { root, panel } = mount(t, session({ conversation: [asked] }));
+  const sent = stubFetch(t);
+  answerOf(root)!.value = "per-batch";
+  panel.setTurn(READING);
+
+  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
+  await tick(0);
+
+  assert.deepEqual(sent, []);
+  assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);
+});

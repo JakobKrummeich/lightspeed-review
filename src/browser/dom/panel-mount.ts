@@ -12,11 +12,20 @@ import {
 import { currentRound } from "../conversation-rounds.ts";
 import { enterAction, typeNewline } from "./enter-key.ts";
 import type { LinePlace } from "./line-numbers.ts";
-import { stampPills, unstampedPill } from "../queued-pill.ts";
+import {
+  answerBox,
+  clearGeneralComment,
+  deliver,
+  echoSent,
+  generalCommentBox,
+  restoreAnswer,
+  withGeneralComment,
+} from "./panel-wire.ts";
+import { stampPills } from "../queued-pill.ts";
 import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
 import { saveLater } from "./save-later.ts";
-import type { ConversationEntry, FeedbackPrompt, Turn } from "../../session-store.ts";
-import { sendFeedback, type SessionData } from "./session-api.ts";
+import type { FeedbackPrompt, Turn } from "../../session-store.ts";
+import type { SessionData } from "./session-api.ts";
 
 export interface MountedPanel {
   /** Adds annotations queued from the diff and redraws the panel. */
@@ -111,7 +120,11 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     if (event.target !== generalCommentBox(root)) return;
     rememberDraft.soon();
   });
-  root.addEventListener("keydown", (event) => handleComposeKey(view, event));
+  // Both guard their own box, so neither can act on the other's Enter.
+  root.addEventListener("keydown", (event) => {
+    handleComposeKey(view, event);
+    handleAnswerKey(view, event);
+  });
 
   return {
     queue(prompts: FeedbackPrompt[]) {
@@ -173,7 +186,12 @@ function draw(view: PanelView): void {
   const { options, state, scrollHost } = view;
   // Measured before the write: the write changes the height.
   const following = atBottom(scrollHost);
+  // The answer box lives inside the scroll, so every redraw replaces it. A pill
+  // queued mid-answer is the ordinary way that happens, and it must not cost the
+  // reviewer the sentence they were writing.
+  const answering = answerBox(options.root)?.value ?? "";
   if (scrollHost) scrollHost.innerHTML = renderScroll(state);
+  restoreAnswer(options.root, answering);
   if (following) toBottom(scrollHost);
   options.onPending(state.pending.length);
   // Queue stored on every change, no delay: a pill is one gesture, and the
@@ -228,6 +246,10 @@ function handleClick(view: PanelView, event: Event): void {
     draw(view);
     return;
   }
+  if (target.classList.contains("lsr-answer-send")) {
+    void answer(view);
+    return;
+  }
   if (target.id === "lsr-send" || target.id === "lsr-send-end") {
     void send(view, target.id === "lsr-send-end");
   }
@@ -272,6 +294,47 @@ function handleComposeKey(view: PanelView, event: KeyboardEvent): void {
   event.preventDefault();
   if (field.value.trim() === "") return;
   void send(view, false);
+}
+
+/** Enter answers the question, exactly as it sends from the compose box. */
+function handleAnswerKey(view: PanelView, event: KeyboardEvent): void {
+  const field = answerBox(view.options.root);
+  if (field === null || event.target !== field) return;
+  if (sendRefused(view)) return;
+  const action = enterAction(event);
+  if (action === "newline") {
+    event.preventDefault();
+    typeNewline(field);
+    return;
+  }
+  if (action !== "submit") return;
+  event.preventDefault();
+  void answer(view);
+}
+
+/**
+ * The reviewer answering the agent's question. One press, and only the words in
+ * that box go out: the queue stays queued and the general comment stays typed,
+ * which is the whole reason `ask` is a verb of its own. Nothing here ends the
+ * review and nothing here moves the turn — the agent's blocked `wait` takes it
+ * on delivery, the same way it takes every other send.
+ */
+async function answer(view: PanelView): Promise<void> {
+  if (sendRefused(view)) return;
+  const field = answerBox(view.options.root);
+  const said = field?.value.trim() ?? "";
+  if (said === "") return;
+  const prompts: FeedbackPrompt[] = [{ type: "message", comment: said }];
+  const before = view.state.conversation;
+  setSending(view, true);
+  if (await deliver(view.options.key, prompts, false)) {
+    // Echoed like any other send, which is also what takes the box away: the
+    // answer is now the last word, so the question above it is no longer open.
+    echoSent(view.state, before, prompts);
+    if (field) field.value = "";
+    draw(view);
+  }
+  setSending(view, false);
 }
 
 async function send(view: PanelView, ended: boolean): Promise<void> {
@@ -351,6 +414,10 @@ function lockControls(view: PanelView): void {
   patch(view, "#lsr-send", sendRefused(view), view.sending ? SENDING_LABEL : SEND_LABEL);
   patch(view, "#lsr-send-end", frozen, endLabel(view.state));
   patch(view, "#lsr-general-comment", frozen);
+  // The question card is in the scroll, not the compose row, but it sends, so it
+  // answers to the same one gate rather than to a rule of its own.
+  const answering = view.scrollHost?.querySelector<HTMLButtonElement>(".lsr-answer-send");
+  if (answering) answering.disabled = sendRefused(view);
 }
 
 /** One control as the panel's state has it; a missing control is not an error. */
@@ -372,55 +439,4 @@ function composeControl(
   id: string,
 ): HTMLButtonElement | HTMLTextAreaElement | null {
   return view.composeHost?.querySelector<HTMLButtonElement | HTMLTextAreaElement>(id) ?? null;
-}
-
-/**
- * Echoes the sent prompts onto the conversation, stamped like the server
- * stamps them. Empty sends append nothing (a bare "reviewer" turn reads as
- * lost words). Stands down if the conversation moved since the send began:
- * the server writes feedback before publishing `feedback`, so a fresh read
- * already carries these words and echoing would double them; a read that
- * raced ahead is one round trip from the one that does — a beat late beats double.
- */
-function echoSent(state: PanelState, before: ConversationEntry[], prompts: FeedbackPrompt[]): void {
-  if (prompts.length === 0 || state.conversation !== before) return;
-  state.conversation = [
-    ...state.conversation,
-    {
-      role: "reviewer",
-      at: new Date().toISOString(),
-      roundIndex: currentRound(state.rounds),
-      prompts,
-    },
-  ];
-}
-
-/** False means the prompts never left the page, so nothing may be cleared. */
-async function deliver(key: string, prompts: FeedbackPrompt[], ended: boolean): Promise<boolean> {
-  try {
-    await sendFeedback(key, prompts, ended);
-    return true;
-  } catch {
-    console.error("lightspeed: feedback was not delivered — nothing was cleared");
-    return false;
-  }
-}
-
-function generalCommentBox(root: HTMLElement): HTMLTextAreaElement | null {
-  return root.querySelector<HTMLTextAreaElement>("#lsr-general-comment");
-}
-
-/**
- * What goes on the wire: pills minus the page's round stamps (the server
- * records arrival rounds itself), plus the comment box as one more message.
- */
-function withGeneralComment(root: HTMLElement, pending: PanelState["pending"]): FeedbackPrompt[] {
-  const prompts = pending.map(unstampedPill);
-  const comment = generalCommentBox(root)?.value.trim() ?? "";
-  return comment ? [...prompts, { type: "message", comment }] : prompts;
-}
-
-function clearGeneralComment(root: HTMLElement): void {
-  const box = generalCommentBox(root);
-  if (box) box.value = "";
 }

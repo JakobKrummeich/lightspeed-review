@@ -53,6 +53,8 @@ export const SENDING_LABEL = "Sending…";
 export const SEND_END_LABEL = "Send & End";
 /** Ending is never gated, but on the agent's turn it takes nothing with it. */
 export const END_ONLY_LABEL = "End without Sending";
+/** The question card's own press. One word, because it does one thing. */
+export const ANSWER_LABEL = "Answer";
 
 /**
  * Whether Send is off. The one gate in the page, and it gates one control: an
@@ -155,17 +157,40 @@ function turnLineText(turn: Turn): string {
 }
 
 /**
+ * The question the reviewer still owes an answer to, or none. A question is open
+ * while nothing has been said after it: the agent asked and then blocked, so the
+ * next words in the conversation are the answer, whatever else they are about.
+ * Identity, not a flag — the renderer below asks "is this that prompt?" and two
+ * questions with the same words are still two questions.
+ */
+function openQuestion(state: PanelState): FeedbackPrompt | undefined {
+  if (state.status === "ended") return undefined;
+  const last = state.conversation.at(-1);
+  if (last?.role !== "agent") return undefined;
+  const asked = last.prompts.at(-1);
+  return asked?.type === "message" && asked.kind === "question" ? asked : undefined;
+}
+
+/** What an entry needs from the panel's state, so the walk below passes one thing. */
+interface EntryContext {
+  declarations?: Record<string, DeclaredAnswer>;
+  /** The one question drawn with a live answer box, by identity. */
+  open?: FeedbackPrompt;
+}
+
+/**
  * History ruled into rounds. A conversation that never crossed a round
  * boundary stays a plain stream: one label over everything is furniture.
  */
 function renderConversation(state: PanelState): string {
   const segments = roundSegments(state.conversation, state.rounds);
   const ruled = segments.length > 1;
+  const context: EntryContext = { declarations: state.declarations, open: openQuestion(state) };
   const parts: string[] = [];
   for (const segment of segments) {
     if (ruled) parts.push(renderRoundMark(segment));
     for (const entry of segment.entries) {
-      parts.push(renderEntry(entry, segment, state.declarations));
+      parts.push(renderEntry(entry, segment, context));
     }
   }
   return parts.join("\n  ");
@@ -193,19 +218,48 @@ function roundState(segment: RoundSegment): "current" | "earlier" {
 function renderEntry(
   entry: ConversationEntry,
   segment: RoundSegment,
-  declarations?: Record<string, DeclaredAnswer>,
+  context: EntryContext,
 ): string {
   return `<article class="lsr-entry" data-round-state="${roundState(segment)}" data-role="${entry.role}">
     <header class="lsr-entry-role">${entry.role}</header>
-    ${entry.prompts.map((prompt) => renderPrompt(prompt, declarations)).join("\n    ")}
+    ${entry.prompts.map((prompt) => renderPrompt(prompt, context)).join("\n    ")}
   </article>`;
 }
 
-function renderPrompt(
-  prompt: FeedbackPrompt,
-  declarations?: Record<string, DeclaredAnswer>,
-): string {
-  return `<div class="lsr-prompt">${renderPromptBody(prompt)}${renderAnswer(prompt, declarations)}</div>`;
+function renderPrompt(prompt: FeedbackPrompt, context: EntryContext): string {
+  const asked = isQuestion(prompt);
+  return `<div class="lsr-prompt"${asked ? ` data-kind="question"` : ""}>${renderQuestionLabel(asked)}${renderPromptBody(prompt)}${renderAnswerBox(prompt === context.open)}${renderAnswer(prompt, context.declarations)}</div>`;
+}
+
+function isQuestion(prompt: FeedbackPrompt): boolean {
+  return prompt.type === "message" && prompt.kind === "question";
+}
+
+/**
+ * A question wears its label even once answered. The card is how a reviewer
+ * scrolling back tells the sentence they were asked from the sentences the agent
+ * merely said — and a card that lost its label on being answered would make the
+ * history read as if nobody had ever asked anything.
+ */
+function renderQuestionLabel(asked: boolean): string {
+  return asked ? `<p class="lsr-question-label">the agent is asking</p>\n    ` : "";
+}
+
+/**
+ * The answer box under the open question, and the reason `ask` exists as its own
+ * verb: the reviewer answers in one press, and the queue they have been building
+ * stays queued. Sending the queue along would make answering a question cost
+ * them six half-finished comments.
+ *
+ * Only the open question gets one. An answered question with a box under it
+ * would invite an answer to a question the agent has stopped waiting on.
+ */
+function renderAnswerBox(open: boolean): string {
+  if (!open) return "";
+  return `\n    <div class="lsr-answer">
+    <textarea class="lsr-answer-box" placeholder="Answer — sends this alone…" aria-label="Answer the agent's question"></textarea>
+    <button type="button" class="lsr-answer-send">${ANSWER_LABEL}</button>
+    </div>`;
 }
 
 /**

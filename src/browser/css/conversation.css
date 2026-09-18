@@ -181,6 +181,52 @@
 }
 
 /*
+ * A question the agent put to the reviewer, and the one prompt in the panel
+ * that is owed something back. It is drawn as a card rather than as another
+ * line of talk because a reviewer scrolling a long conversation reads the
+ * agent's turns as reports and skims them — and skimming the one sentence that
+ * is blocking the agent is exactly how a review stalls with both ends waiting.
+ * The accent rules its edge, as it rules every place the agent speaks.
+ */
+.lsr-prompt[data-kind="question"] {
+  border-left: 2px solid var(--lsr-accent);
+  padding-left: var(--lsr-space-3);
+}
+
+/*
+ * Kept even once answered: it is what tells the sentence the agent was asking
+ * from the sentences it was merely saying, and history read back without it
+ * would look as though nobody had ever asked anything.
+ */
+.lsr-question-label {
+  margin: 0 0 var(--lsr-space-1);
+  color: var(--lsr-accent);
+  font-size: var(--lsr-size-label);
+  line-height: var(--lsr-leading-tight);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/*
+ * The answer box, under the question it answers rather than down in the compose
+ * row: the reviewer replies where they are reading, and the press sends that
+ * box alone — whatever they have queued stays queued.
+ */
+.lsr-answer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lsr-space-2);
+  margin-top: var(--lsr-space-2);
+}
+
+/* Two lines, not the compose box's four: this answers one sentence, and a tall
+ * box inside a card would push the conversation under it off the screen. */
+.lsr-answer-box {
+  min-height: 3rem;
+}
+
+/*
  * The agent's declared answer to this very comment, set inside the reviewer's
  * prompt under the words it answers. The accent rules its left edge the way
  * violet rules the reviewer's quote in the replay: one hue for "the agent
