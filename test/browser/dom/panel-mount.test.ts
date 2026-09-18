@@ -147,7 +147,7 @@ test("an agent reply leaves the half-written comment and its textarea untouched"
 });
 
 test("a per-comment answer arriving with an update lands under its comment", (t) => {
-  // `poll --for --note` publishes a session change; the redraw must show the declaration live,
+  // `say --for` publishes a session change; the redraw must show the declaration live,
   // not only on the next visit's mount.
   const { root, panel } = mount(t);
   const asked: ConversationEntry = {

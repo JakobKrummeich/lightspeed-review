@@ -251,7 +251,7 @@ function renderAnswerBox(open: boolean): string {
 }
 
 /**
- * The agent's declared answer (`poll --for <id> --note`), rendered inside the
+ * The agent's declared answer (`say "<text>" --for <id>`), rendered inside the
  * prompt it answers. Files-only declarations show nothing: "I touched these"
  * is the between-rounds diff's story.
  */

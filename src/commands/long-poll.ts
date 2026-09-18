@@ -83,7 +83,7 @@ function portIsNotServing(state: PortState, port: number, failure: unknown): Rev
     message: `port ${port} neither accepted a connection nor refused one`,
     detail: `${detail}; the machine answered nothing at all on that port`,
     suggestions: [
-      "Re-run `lightspeed poll <branch> [base]` in the foreground",
+      "Re-run `lightspeed wait <branch> [base]` in the foreground",
       "Run `lightspeed stop` and then `lightspeed start <branch> [base]` if it keeps failing",
     ],
   });

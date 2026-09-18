@@ -131,7 +131,7 @@ test("reconnection is unbounded while the server is still answering for itself",
 });
 
 test("a reply and then a poll: the wait gets its own connection and survives", async () => {
-  // The bug report's sequence — `poll --agent-reply` posts, then waits — against a server whose
+  // The bug report's sequence — a `say` posts, then a `wait` blocks — against a server whose
   // idle keep-alive expires between the two: the poll takes its own connection and holds it.
   const harness = await pollServer({ keepAliveTimeoutMs: 50 });
   await apiRequest(`http://127.0.0.1:${harness.port}/api/session/abc/reply`, jsonPost({ c: 1 }));

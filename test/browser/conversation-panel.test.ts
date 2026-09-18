@@ -69,7 +69,7 @@ test("renders delivered conversation entries with their author", () => {
 });
 
 test("the agent's answer to a specific comment appears under that comment", () => {
-  // `poll --for --note` answers one comment by id; the panel must show the declaration with the
+  // `say "<text>" --for <id>` answers one comment by id; the panel must show the declaration with the
   // words it answers, not only in the replay.
   const withId: FeedbackPrompt = { ...annotation, id: "evt_1" };
   const other: FeedbackPrompt = { ...annotation, id: "evt_2", comment: "rename this" };

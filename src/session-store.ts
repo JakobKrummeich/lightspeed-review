@@ -194,7 +194,7 @@ export interface SessionRecord {
   groups: DiffGroup[];
   /** Everything already delivered, oldest first. */
   conversation: ConversationEntry[];
-  /** Queued by the browser, not yet handed to a `poll`. */
+  /** Queued by the browser, not yet handed to a `wait`. */
   pending: FeedbackPrompt[];
   /** Paths ticked `approved`; reset whenever `start` re-groups. */
   approved: string[];

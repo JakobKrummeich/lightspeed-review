@@ -208,7 +208,7 @@ test("feedback is stamped with the round it was sent in", () => {
 });
 
 test("an agent's summary is stamped with the round it opened, not the one it answers", () => {
-  // Workflow is fix, `start`, then `poll --agent-reply`: the summary lands after its round is
+  // Workflow is fix, `start`, then `say`: the summary lands after its round is
   // open, and stamping the on-screen round puts it under that round's own line.
   const answered = withFeedback(
     session(1),

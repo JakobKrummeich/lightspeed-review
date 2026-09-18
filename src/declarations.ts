@@ -2,13 +2,13 @@ import type { DiffNames } from "./git-file.ts";
 import type { DeclaredAnswer, SessionRecord } from "./session-store.ts";
 
 /**
- * The agent's answer to one reviewer comment (id from `poll` output): a note
+ * The agent's answer to one reviewer comment (id from `wait` output): a note
  * and/or the files it led to. This file owns the whole server path — shape
  * check, session validation, session update. Only the agent knows these facts,
  * so nothing here fills one in: absence renders as "unknown", never a guess.
  */
 export interface CommentDeclaration {
-  /** The annotation's id, as `poll` printed it. */
+  /** The annotation's id, as `wait` printed it. */
   id: string;
   /** The per-comment answer; absent when the files speak for themselves. */
   note?: string;
@@ -101,7 +101,7 @@ function entryProblems(
     return [
       {
         id: declaration.id,
-        reason: "no reviewer comment has this id; ids come from `lightspeed poll` output",
+        reason: "no reviewer comment has this id; ids come from `lightspeed wait` output",
       },
     ];
   }
