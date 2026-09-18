@@ -151,11 +151,9 @@ export function mountPanel(options: PanelOptions): MountedPanel {
       if (sameTurn(turn, state.turn)) return;
       state.turn = turn;
       // Full redraw for one line at the foot: `draw` follows the panel to the
-      // bottom, so the line lands where the eye already is.
+      // bottom, so the line lands where the eye already is. It re-locks the
+      // controls, which is what a moved turn is about.
       draw(view);
-      // Patched, never re-rendered: the compose row holds a half-typed comment,
-      // and a turn moving under it is exactly when one exists.
-      lockControls(view);
     },
     end() {
       // Not awaited, as the button's own press is not: the send reports
@@ -197,6 +195,10 @@ function draw(view: PanelView): void {
   // Queue stored on every change, no delay: a pill is one gesture, and the
   // thing a reload must not lose.
   updateMemory(options.storage, options.key, { pending: state.pending });
+  // The answer button is rendered by the scroll above, so every redraw hands
+  // back a fresh, live one. Re-locked here rather than at each call site: a
+  // draw that forgot was a live Answer on the agent's turn.
+  lockControls(view);
 }
 
 /**
@@ -217,7 +219,13 @@ function toBottom(scrollHost: HTMLElement | null): void {
 function setStatus(view: PanelView, status: SessionData["status"]): void {
   if (status === view.state.status) return;
   view.state.status = status;
+  // Carried across the re-render, as the answer box is across a redraw: the row
+  // is replaced, and the words in it are the reviewer's whether they went out or
+  // not. An end that sent nothing keeps them for the round after the reopen.
+  const typed = generalCommentBox(view.options.root)?.value ?? "";
   if (view.composeHost) view.composeHost.innerHTML = renderCompose(view.state);
+  const box = generalCommentBox(view.options.root);
+  if (box) box.value = typed;
   // The fresh row knows nothing of a send in flight, and the status change the
   // send itself causes must not hand the buttons back early.
   setSending(view, view.sending);
@@ -356,13 +364,17 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // with a dead SSE stream; the `feedback` event brings the server's copy —
   // the truth, and all another tab ever sees.
   echoSent(state, before, prompts);
-  // Cleared even when nothing went out: the review is over, and pills offered
-  // back on the next load would be pills with nowhere to go.
-  state.pending = [];
-  clearGeneralComment(options.root);
-  // Both halves at once, ahead of the delayed write: a reload must not offer
-  // to send what the server now owns.
-  updateMemory(options.storage, options.key, { pending: [], draft: "" });
+  // Cleared only for what actually went out. An end on the agent's turn sends
+  // nothing — the button says `End without Sending` and the round card promises
+  // the queue — so the pills and the half-typed comment stay exactly where the
+  // reviewer left them, to go out when the review is reopened.
+  if (prompts.length > 0) {
+    state.pending = [];
+    clearGeneralComment(options.root);
+    // Both halves at once, ahead of the delayed write: a reload must not offer
+    // to send what the server now owns.
+    updateMemory(options.storage, options.key, { pending: [], draft: "" });
+  }
   draw(view);
   if (ended) setStatus(view, "ended");
   // After the status: lifting the send lock must never reopen a closed review.

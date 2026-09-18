@@ -316,9 +316,10 @@ test("Enter is the same Send, so the same turn takes it away", (t) => {
 });
 
 test("ending on the agent's turn ends the review and leaves the queue queued", async (t) => {
-  const { root, panel, ended } = mount(t);
+  const { root, panel, ended, storage, box } = mount(t);
   const sent = stubFetch(t);
   panel.queue([annotation]);
+  type(root, box()!, "and one more thing");
   panel.setTurn(working("rewriting the parser"));
 
   root.dispatch("click", { target: root.querySelector("#lsr-send-end") });
@@ -328,6 +329,15 @@ test("ending on the agent's turn ends the review and leaves the queue queued", a
   // turn. Send only on your turn: the pills do not ride out with it.
   assert.deepEqual(sent, [{ path: "/api/session/key/feedback", prompts: [], ended: true }]);
   assert.equal(ended(), true);
+  // And the button said `End without Sending`, so what was not sent is still
+  // there: on the page, and on disk for the reload after a reopen. Dropping it
+  // would be the one thing the label promised would not happen.
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 1, "the queue is still queued");
+  assert.equal(box()?.value, "and one more thing");
+  await stored();
+  const remembered = readMemory(storage, "key");
+  assert.equal(remembered.pending.length, 1);
+  assert.equal(remembered.draft, "and one more thing");
 });
 
 test("a reviewer reading an earlier round is not yanked back down by a reply", (t) => {
@@ -1151,6 +1161,23 @@ test("a pill queued mid-answer does not cost the reviewer their sentence", (t) =
   panel.queue([annotation]);
 
   assert.equal(answerOf(root)?.value, "per-batch, becau");
+});
+
+/**
+ * Every redraw replaces the scroll, and the Answer button with it, so a button
+ * rendered fresh is a live one. The lock has to be re-applied by the draw
+ * itself; left to the call sites, the first one that forgot put a live Answer
+ * in front of the reviewer on the agent's turn.
+ */
+test("a redraw on the agent's turn hands back an Answer that is still disabled", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [asked] }));
+  panel.setTurn(READING);
+  assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);
+
+  // A pill queued from the diff: the ordinary way the scroll is redrawn.
+  panel.queue([annotation]);
+
+  assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);
 });
 
 /** One gate over everything that sends. The turn cannot move under an open
