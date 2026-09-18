@@ -53,7 +53,7 @@ export function parseWaitArgs(args: string[]): WaitArgs {
 export async function runWait(input: WaitInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const result = (await longPoll({
-    url: `${serverOrigin(input.port)}/api/poll?key=${key}`,
+    origin: serverOrigin(input.port),
     key,
     port: input.port,
   })) as PollPayload;

@@ -46,6 +46,23 @@ export interface AgentTurn {
   note?: string;
 }
 
+/**
+ * One batch of prompts handed to a poll and not yet confirmed by the agent that
+ * asked for them. TCP cannot say whether an answer was read: the bytes reach the
+ * OS whether the client is reading or already gone, so the only witness that a
+ * delivery landed is the agent saying so (`POST /api/session/:key/delivered`).
+ * Until it does, the batch is held here and the next poll puts it back — which
+ * is why it is persisted and not kept in memory: a `serve` restart in that
+ * window would otherwise be the one way feedback is lost for good.
+ */
+export interface Delivery {
+  /** Minted per handover and echoed back, so a stale ack confirms nothing. */
+  id: string;
+  /** Exactly what was drained, in written order, to put back at the head. */
+  prompts: FeedbackPrompt[];
+  at: string;
+}
+
 /** Which version of the file the annotated lines belong to. */
 export type AnnotationSide = "old" | "new";
 
@@ -209,6 +226,11 @@ export interface SessionRecord {
   conversation: ConversationEntry[];
   /** Queued by the browser, not yet handed to a `wait`. */
   pending: FeedbackPrompt[];
+  /**
+   * Handed to a poll and not yet confirmed. Absent is the steady state: nothing
+   * is in flight, and every prompt the review owes the agent is in `pending`.
+   */
+  delivering?: Delivery;
   /** Paths ticked `approved`; reset whenever `start` re-groups. */
   approved: string[];
   /**

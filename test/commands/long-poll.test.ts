@@ -87,7 +87,7 @@ async function pollServer(options: HarnessOptions = {}): Promise<Harness> {
 
 function pollFor(harness: Harness): Promise<unknown> {
   return longPoll({
-    url: `http://127.0.0.1:${harness.port}/api/poll?key=abc`,
+    origin: `http://127.0.0.1:${harness.port}`,
     key: "abc",
     port: harness.port,
     probeBackoffMs: [5, 5],
@@ -167,7 +167,7 @@ test("nothing listening is reported as server_not_running once the probes are sp
   await assert.rejects(
     () =>
       longPoll({
-        url: "http://127.0.0.1:1/api/poll?key=abc",
+        origin: "http://127.0.0.1:1",
         key: "abc",
         port: 1,
         probeBackoffMs: [5, 5],
@@ -190,7 +190,7 @@ test("a port held by something that is not a review server is named, not waited 
   await assert.rejects(
     () =>
       longPoll({
-        url: `http://127.0.0.1:${port}/api/poll?key=abc`,
+        origin: `http://127.0.0.1:${port}`,
         key: "abc",
         port,
         probeBackoffMs: [5, 5],

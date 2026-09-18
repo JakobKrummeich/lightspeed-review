@@ -35,7 +35,7 @@ export async function runAsk(input: AskInput): Promise<StructuredOutput> {
     key,
   );
   const result = (await longPoll({
-    url: `${origin}/api/poll?key=${key}`,
+    origin,
     key,
     port: input.port,
   })) as PollPayload;

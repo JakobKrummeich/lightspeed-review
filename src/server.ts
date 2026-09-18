@@ -21,7 +21,7 @@ import {
   handleStatic,
 } from "./server/handlers-review.ts";
 import { handleCreateSession, handleEnd } from "./server/handlers-session.ts";
-import { handleEvents, handlePoll } from "./server/handlers-stream.ts";
+import { handleDelivered, handleEvents, handlePoll } from "./server/handlers-stream.ts";
 import { handleWork } from "./server/handlers-turn.ts";
 import { messageOf, sendJson } from "./server/http.ts";
 import type { LedgerReport } from "./server/ledger-log.ts";
@@ -154,6 +154,7 @@ function buildRoutes(context: ServerContext): Route[] {
     { method: "POST", pattern: "/api/session/:key/approved", handler: bind(handleApproved) },
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
     { method: "POST", pattern: "/api/session/:key/reply", handler: bind(handleAgentReply) },
+    { method: "POST", pattern: "/api/session/:key/delivered", handler: bind(handleDelivered) },
     { method: "POST", pattern: "/api/session/:key/work", handler: bind(handleWork) },
     { method: "POST", pattern: "/api/session/:key/end", handler: bind(handleEnd) },
     { method: "GET", pattern: "/api/poll", handler: bind(handlePoll) },

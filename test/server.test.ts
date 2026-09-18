@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
@@ -1238,11 +1239,33 @@ async function postWork(url: string, key: string, body: unknown): Promise<Respon
   });
 }
 
+/**
+ * A poll the way a healthy `wait` makes one: takes the answer, then confirms the
+ * handover. Without the confirmation the server must assume the prompts were
+ * lost — it cannot see whether anything read them — and hands them out again on
+ * the next poll, which is right for a dead agent and wrong for a test pretending
+ * to be a live one.
+ */
+async function pollAndAck(url: string, key: string): Promise<Record<string, unknown>> {
+  const answer = await fetch(`${url}/api/poll?key=${key}`, {
+    signal: AbortSignal.timeout(2_000),
+  });
+  const payload = (await answer.json()) as Record<string, unknown>;
+  if (typeof payload.delivery === "string") {
+    await fetch(`${url}/api/session/${key}/delivered`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ delivery: payload.delivery }),
+    });
+  }
+  return payload;
+}
+
 /** Delivery is the only thing that hands the turn over, so it is what every
  * `work` test has to do first. */
 async function takeTheTurn(url: string, key: string): Promise<void> {
   await postFeedback(url, key, { prompts: [annotation], ended: false });
-  await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+  await pollAndAck(url, key);
 }
 
 test("work names the plan on the turn the agent is already holding", async () => {
@@ -1647,13 +1670,117 @@ test("feedback drained for a poll whose connection died is still there for the n
       await posting;
 
       // Bounded so feedback lost into the dead connection fails the test instead of parking forever.
-      const answer = await fetch(`${url}/api/poll?key=${key}`, {
-        signal: AbortSignal.timeout(2_000),
-      });
-      const polled = (await answer.json()) as { prompts: unknown[] };
+      const polled = await pollAndAck(url, key);
       assert.partialDeepStrictEqual(polled.prompts, [annotation], `killFirst: ${killFirst}`);
+      // Confirmed, so nothing is in flight and nothing is queued: the feedback
+      // is where it belongs and the next pass starts from a clean review.
       assert.deepEqual(store.get(key)?.pending, []);
+      assert.equal(store.get(key)?.delivering, undefined);
     }
+  });
+});
+
+/**
+ * A client that asks for the feedback and throws the answer away: it never reads
+ * the socket and destroys it, which is what an agent killed mid-delivery does.
+ * Nothing on the server's side can tell this from an agent that read every word
+ * — measured, `writableFinished`, the `end()` callback and `socket.bytesWritten`
+ * are identical for both — which is why a delivery is not safe until the agent
+ * says it arrived.
+ */
+async function deliverIntoTheVoid(url: string, key: string): Promise<void> {
+  const target = new URL(url);
+  await new Promise<void>((resolve) => {
+    const socket = connect(Number(target.port), target.hostname, () => {
+      socket.write(
+        `GET /api/poll?key=${key} HTTP/1.1\r\nHost: ${target.host}\r\nConnection: close\r\n\r\n`,
+      );
+      socket.pause();
+      setTimeout(() => {
+        socket.destroy();
+        resolve();
+      }, 120);
+    });
+    socket.on("error", () => resolve());
+  });
+}
+
+function postDelivered(url: string, key: string, body: unknown): Promise<Response> {
+  return fetch(`${url}/api/session/${key}/delivered`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+test("feedback drained onto a connection nobody read is handed out again", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+
+    await deliverIntoTheVoid(url, key);
+
+    // Drained off the queue, but not gone: unconfirmed, so the review still owes it.
+    assert.deepEqual(store.get(key)?.pending, []);
+    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation]);
+
+    const polled = await pollAndAck(url, key);
+    assert.partialDeepStrictEqual(polled.prompts, [annotation]);
+    assert.equal(store.get(key)?.delivering, undefined);
+    assert.equal(store.get(key)?.turn.holder, "agent");
+  });
+});
+
+/**
+ * The other half of the same rule: a handover the agent confirmed is spent. Left
+ * unconfirmed forever it would be re-delivered on every poll, and the agent
+ * would read the same comment once per round for the rest of the review.
+ */
+test("a delivery the agent confirmed is not handed out a second time", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    const polled = await pollAndAck(url, key);
+    assert.match(String(polled.delivery), /^evt_/);
+    assert.equal(store.get(key)?.delivering, undefined);
+
+    // The next wait finds an empty review and parks, rather than being answered
+    // with the words the agent is already acting on.
+    const parks = await parkWatch(url, key);
+    const parked = new AbortController();
+    void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
+    assert.match(await parks.until(/"waiting":true/), /"waiting":true/);
+    parked.abort();
+    parks.close();
+  });
+});
+
+test("an acknowledgement that names no handover in flight confirms nothing", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    const polled = await pollAndAck(url, key);
+
+    // A retried acknowledgement, or one from a process that died two rounds ago:
+    // it takes nothing away, so a delivery in flight is never cleared by a stale id.
+    const again = await postDelivered(url, key, { delivery: polled.delivery });
+
+    assert.equal(again.status, 200);
+    assert.deepEqual(await again.json(), { confirmed: false });
+    assert.equal(store.get(key)?.delivering, undefined);
+  });
+});
+
+test("an acknowledgement without an id is a 400, and a delivery stays in flight", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    await deliverIntoTheVoid(url, key);
+
+    const refused = await postDelivered(url, key, { delivery: 7 });
+
+    assert.equal(refused.status, 400);
+    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation]);
   });
 });
 
@@ -1823,7 +1950,7 @@ test("presence says an agent is working once a poll has carried the feedback off
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
 
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
 
     assert.match(await stream.until(/event: presence/), /"waiting":false,"working":true/);
     stream.close();
@@ -1853,7 +1980,7 @@ test("an agent asking for more feedback is an agent that is no longer working", 
     const stream = await openStream(url, key);
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
     await stream.until(/"working":true/);
 
     // An agent that skips the reply and polls again has finished with what it took;
@@ -1877,7 +2004,7 @@ test("the agent asking a question gives the reviewer the turn back", async () =>
     const stream = await openStream(url, key);
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
     await stream.until(/"working":true/);
 
     const response = await postReply(url, key, {
@@ -1902,7 +2029,7 @@ test("the agent saying something leaves the turn where it is", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
 
     const response = await postReply(url, key, { comment: "wrapped it in a transaction" });
 
@@ -1918,7 +2045,7 @@ test("a round opened on what the agent did leaves nobody working", async () => {
     const stream = await openStream(url, key);
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
     await stream.until(/"working":true/);
 
     await postSession(url);
@@ -1934,7 +2061,7 @@ test("a review that ends leaves nobody working, whoever ended it", async () => {
     const stream = await openStream(url, key);
     await stream.until(/event: presence/);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
     await stream.until(/"working":true/);
 
     await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
@@ -1986,7 +2113,7 @@ test("delivery moves the turn to the agent, and the session file says so", async
     const { key } = await postSession(url);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
 
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
 
     assert.partialDeepStrictEqual(store.get(key)?.turn, { holder: "agent", mode: "reading" });
   });
@@ -2016,7 +2143,7 @@ test("a delivery whose connection died gives the turn back with the prompts", as
     await postFeedback(url, key, { prompts: [annotation], ended: false });
 
     // Bounded so prompts lost into the dead connection fail the test rather than parking it.
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
     assert.equal(store.get(key)?.turn.holder, "agent");
   });
 });
@@ -2025,7 +2152,7 @@ test("a server restarted over the same sessions publishes the turn the last run 
   const { server, url, store } = await startServer();
   const { key } = await postSession(url);
   await postFeedback(url, key, { prompts: [annotation], ended: false });
-  await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+  await pollAndAck(url, key);
   await server.stop();
 
   const restarted = createReviewServer({ store, port: 0 });
@@ -2047,7 +2174,7 @@ test("a poll carrying the reviewer's last word marks nobody working", async () =
     const { key } = await postSession(url);
     await postFeedback(url, key, { prompts: [annotation], ended: true });
 
-    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    await pollAndAck(url, key);
 
     // Stream opened after the poll: its first frame is the state as it stands.
     const stream = await openStream(url, key);

@@ -119,6 +119,16 @@ function spokenWords(value: unknown): string | undefined {
   return value;
 }
 
+/**
+ * `delivered`: the id of the handover the agent is confirming. Untrusted like
+ * every body here — an unreadable one is absent, and confirms nothing.
+ */
+export async function readDelivered(request: IncomingMessage): Promise<string | undefined> {
+  const delivery = (await readJsonSafely<{ delivery?: unknown }>(request))?.delivery;
+  if (typeof delivery !== "string" || delivery === "") return undefined;
+  return delivery;
+}
+
 /** `work`: the plan the agent is about to go quiet over. */
 export async function readWork(request: IncomingMessage): Promise<string | undefined> {
   const plan = (await readJsonSafely<{ plan?: unknown }>(request))?.plan;

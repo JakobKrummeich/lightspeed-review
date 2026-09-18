@@ -59,6 +59,12 @@ export interface PollPayload {
   turn?: TurnLabel;
   round?: number;
   /**
+   * Transport, not review: the id of this handover, which the client echoes to
+   * `POST /api/session/:key/delivered` to say the prompts arrived. Absent when
+   * nothing was handed over, and never printed — no agent acts on it.
+   */
+  delivery?: string;
+  /**
    * Only on an ended payload, and absent from one an older server wrote: a
    * reader must treat its absence as "not stated", never as "nothing approved".
    */

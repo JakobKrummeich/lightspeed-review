@@ -1,13 +1,14 @@
 import { request as httpRequest } from "node:http";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
-import { parseBody } from "./api-client.ts";
+import { apiRequest, jsonPost, parseBody } from "./api-client.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
-  url: string;
-  /** Named in the 404 message; the poll is always about one session. */
-  key?: string;
+  /** `http://127.0.0.1:<port>`; both the poll and its acknowledgement hang off it. */
+  origin: string;
+  /** The session waited on, named in the 404 message and in both URLs. */
+  key: string;
   /** Probed when a connection fails, to tell "gone" from "hiccup". */
   port: number;
   /** Waits between port probes after a failure. Injected by tests. */
@@ -37,12 +38,39 @@ export async function longPoll(input: LongPollInput): Promise<unknown> {
   const retry = retries(input);
   for (;;) {
     try {
-      return await pollOnce(input.url, input.key);
+      const answer = await pollOnce(`${input.origin}/api/poll?key=${input.key}`, input.key);
+      await confirmDelivery(input, answer);
+      return answer;
     } catch (error) {
       // An answer about the review (unknown session, ended, stopping) is final.
       if (error instanceof ReviewError) throw error;
       await retry(error);
     }
+  }
+}
+
+/**
+ * Tells the server the handover arrived. The server cannot see this for itself:
+ * the bytes reach the kernel whether or not anything reads them, so without the
+ * acknowledgement it must assume every delivery may have been lost. One place
+ * for both blocking commands — `wait` and `ask` come through here.
+ *
+ * Best effort, because the prompts are already in this process's hands: a
+ * failed acknowledgement costs one re-delivery on the next poll, while a failed
+ * `wait` would cost the agent the feedback it is holding.
+ */
+async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<void> {
+  if (typeof answer !== "object" || answer === null) return;
+  const { delivery } = answer as { delivery?: unknown };
+  if (typeof delivery !== "string") return;
+  try {
+    await apiRequest(
+      `${input.origin}/api/session/${input.key}/delivered`,
+      jsonPost({ delivery }),
+      input.key,
+    );
+  } catch {
+    // The next poll re-delivers; nothing here is worth failing the wait over.
   }
 }
 
