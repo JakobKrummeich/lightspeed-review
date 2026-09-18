@@ -1793,6 +1793,79 @@ test("a poll that died holding the feedback leaves the agent reading as working"
   });
 });
 
+test("the presence frame names whose turn it is, not just that somebody is working", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+    const stream = await openStream(url, key);
+
+    // The page must be able to draw the three Send states apart, and `working`
+    // alone cannot say whether the agent is reading or editing.
+    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
+    stream.close();
+  });
+});
+
+test("delivery moves the turn to the agent, and the session file says so", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+
+    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+
+    assert.partialDeepStrictEqual(store.get(key)?.turn, { holder: "agent", mode: "reading" });
+  });
+});
+
+test("feedback nobody is waiting for queues and leaves the turn with the reviewer", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+
+    // The reviewer's Send never hands the turn over — only delivery to a live
+    // `wait` does — so sending into an empty room keeps Send live.
+    assert.equal(store.get(key)?.turn.holder, "reviewer");
+    assert.equal(store.get(key)?.pending.length, 1);
+  });
+});
+
+test("a delivery whose connection died gives the turn back with the prompts", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    const watch = await parkWatch(url, key);
+    const poll = await parkedPoll(url, key, () => watch.until(/"waiting":true/));
+    watch.close();
+
+    poll.kill();
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+
+    // Bounded so prompts lost into the dead connection fail the test rather than parking it.
+    await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+    assert.equal(store.get(key)?.turn.holder, "agent");
+  });
+});
+
+test("a server restarted over the same sessions publishes the turn the last run left", async () => {
+  const { server, url, store } = await startServer();
+  const { key } = await postSession(url);
+  await postFeedback(url, key, { prompts: [annotation], ended: false });
+  await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+  await server.stop();
+
+  const restarted = createReviewServer({ store, port: 0 });
+  const second = (await restarted.start()).url;
+  try {
+    const stream = await openStream(second, key);
+
+    // An in-memory flag would have handed Send back to the reviewer here, with
+    // the agent still editing and no way for either side to find out.
+    assert.match(await stream.until(/event: presence/), /"working":true/);
+    stream.close();
+  } finally {
+    await restarted.stop();
+  }
+});
+
 test("a poll carrying the reviewer's last word marks nobody working", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);

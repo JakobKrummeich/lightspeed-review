@@ -58,6 +58,7 @@ function reviewed(overrides: Partial<SessionRecord> = {}): SessionRecord {
     branch: "work",
     base: "main",
     status: "feedback",
+    turn: { holder: "reviewer", at: "2025-01-02T00:00:00.000Z" },
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-02T00:00:00.000Z",
     groups: [],

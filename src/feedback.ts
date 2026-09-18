@@ -1,6 +1,7 @@
 import { parsePrompt } from "./feedback-prompt.ts";
 import { approvalPaths, type ApprovalPaths } from "./review-files.ts";
 import type { FeedbackPrompt, ReviewCloser, SessionRecord } from "./session-store.ts";
+import { reviewerTurn } from "./turn.ts";
 
 export interface FeedbackRequest {
   prompts: FeedbackPrompt[];
@@ -59,9 +60,11 @@ export interface PollPayload {
 }
 
 /**
- * Queued in `pending` for the next poll to drain; kept in `conversation` as the
- * history that survives draining. A `Send & End` with nothing queued adds no
- * turn: an empty "reviewer" entry reads as words lost, not words never said.
+ * Queued in `pending` for the next `wait` to drain; kept in `conversation` as
+ * the history that survives draining. A `Send & End` with nothing queued adds no
+ * entry: an empty "reviewer" entry reads as words lost, not words never said.
+ * The turn does not move here — the reviewer's Send never hands it over, only
+ * delivery to a live `wait` does — except on the end, which owes nobody a move.
  */
 export function withFeedback(
   session: SessionRecord,
@@ -71,7 +74,7 @@ export function withFeedback(
   return {
     ...session,
     // `Send & End` only comes from the browser, so an end through here is a person's.
-    ...(feedback.ended ? closedBy(session, "reviewer") : {}),
+    ...(feedback.ended ? { ...closedBy(session, "reviewer"), turn: reviewerTurn(now) } : {}),
     pending: [...session.pending, ...feedback.prompts],
     conversation:
       feedback.prompts.length === 0
@@ -85,7 +88,7 @@ export function withFeedback(
   };
 }
 
-/** `poll --agent-reply`: the agent answers the reviewer mid-review. */
+/** `lightspeed say` / `lightspeed ask`: the agent speaks mid-review. */
 export function withAgentReply(
   session: SessionRecord,
   comment: string,
@@ -97,15 +100,16 @@ export function withAgentReply(
       ...session.conversation,
       { role: "agent", at: now, ...currentRound(session), prompts: [{ type: "message", comment }] },
     ],
+    turn: reviewerTurn(now),
     updatedAt: now,
   };
 }
 
 /**
  * Stamped at append time: afterwards nothing but the clock ties a message to a
- * round. It is the round on screen, not the round the words are about — an
- * `--agent-reply` answering round 2 lands after fix+`start`, so it stamps round
- * 3, the diff the reviewer reads alongside it. No rounds stamps nothing, not round 0.
+ * round. It is the round on screen, not the round the words are about — a `say`
+ * answering round 2 lands after fix+`start`, so it stamps round 3, the diff the
+ * reviewer reads alongside it. No rounds stamps nothing, not round 0.
  */
 function currentRound(session: SessionRecord): { roundIndex?: number } {
   const roundIndex = session.rounds.at(-1)?.index;
@@ -113,7 +117,7 @@ function currentRound(session: SessionRecord): { roundIndex?: number } {
 }
 
 /**
- * Hands the queued prompts to one poller. An ended session always answers so a
+ * Hands the queued prompts to one waiter. An ended session always answers so a
  * waiting agent is never left blocking on a review that is over; an open one
  * with nothing queued answers with `undefined`, meaning "keep waiting".
  */

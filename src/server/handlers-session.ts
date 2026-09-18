@@ -8,6 +8,7 @@ import { closedBy } from "../feedback.ts";
 import { sessionKey } from "../paths.ts";
 import { nextSessionRecord, withClosedRound } from "../rounds/session-round.ts";
 import type { SessionRecord } from "../session-store.ts";
+import { reviewerTurn } from "../turn.ts";
 import { loadAssets } from "../static-assets.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
@@ -44,8 +45,9 @@ export async function handleCreateSession(
   context.store.save(record);
   const ledger = logRound(context.log, record, round, now);
   logOutcomes(context.log, record, round, now);
-  // A round opens on finished work: whatever the last poll took away has landed.
-  context.transport.setWorking(key, false);
+  // A round opens on finished work: whatever the last `wait` took away has
+  // landed, so the turn is the reviewer's (`nextSessionRecord` writes it).
+  context.transport.publishPresence(key);
   context.transport.publish(key, "session", { reason: "updated" });
   sendJson(response, 200, {
     key,
@@ -84,6 +86,7 @@ export function handleEnd(
       ...session,
       status: "ended",
       ...closedBy(session, "agent"),
+      turn: reviewerTurn(now),
       updatedAt: now,
     }),
   );
@@ -99,7 +102,8 @@ export function announceRoundEnd(
   now: string,
 ): void {
   logRoundEnd(context.log, session, now);
-  // Nothing is outstanding on a review that is over, whichever side closed it.
-  context.transport.setWorking(session.key, false);
+  // Nothing is outstanding on a review that is over, whichever side closed it:
+  // both routes write the reviewer's turn before they get here.
+  context.transport.publishPresence(session.key);
   context.transport.publish(session.key, "session", { reason: "ended" });
 }

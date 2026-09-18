@@ -42,6 +42,7 @@ function session(rounds: SessionRound[]): SessionRecord {
     branch: "feat",
     base: "main",
     status: "open",
+    turn: { holder: "reviewer", at: NOW },
     createdAt: NOW,
     updatedAt: NOW,
     groups: [],

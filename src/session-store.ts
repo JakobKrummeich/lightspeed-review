@@ -14,6 +14,25 @@ export type SessionStatus = "open" | "feedback" | "ended";
  */
 export type ReviewCloser = "reviewer" | "agent";
 
+/**
+ * Whose move it is. Exactly one holder per session, and the whole rule is one
+ * line: queue always, end always, send only on your turn. Persisted rather than
+ * held in memory because a `serve` restart that silently handed Send back would
+ * let the reviewer fire at an agent that is still editing.
+ */
+export interface Turn {
+  holder: "reviewer" | "agent";
+  /**
+   * Only while the agent holds it, and presentational only: `reading` and
+   * `working` gate identically. `reading` is set on delivery, `working` by the
+   * agent's own `work "<plan>"`.
+   */
+  mode?: "reading" | "working";
+  at: string;
+  /** The plan `work` declared, which the reviewer's banner names. */
+  note?: string;
+}
+
 /** Which version of the file the annotated lines belong to. */
 export type AnnotationSide = "old" | "new";
 
@@ -67,6 +86,12 @@ export type AnnotationPrompt = {
 export interface MessagePrompt {
   type: "message";
   comment: string;
+  /**
+   * `lightspeed ask`: the agent put a question to the reviewer, so the panel
+   * draws an answer box under it. Absent is an ordinary message, never a
+   * question nobody answered.
+   */
+  kind?: "question";
 }
 
 export type FeedbackPrompt = AnnotationPrompt | MessagePrompt;
@@ -150,6 +175,11 @@ export interface SessionRecord {
   baseCommit?: string;
   headCommit?: string;
   status: SessionStatus;
+  /**
+   * Whose move it is. Never optional to a reader: a session file written before
+   * turns existed opens with the reviewer holding it — see `parseSession`.
+   */
+  turn: Turn;
   /**
    * Set when `status` becomes `ended`, dropped on reopen. Absent on older
    * sessions reads as "nobody wrote it down", not as either party.
@@ -235,6 +265,11 @@ function parseSession(contents: string, key: string): SessionRecord {
   // rewrite the file: what a reader gets is the order the review is drawn in.
   return {
     ...parsed,
+    // A session from before turns existed opens with the reviewer holding it:
+    // the safe direction for a missing answer is the one that leaves Send live,
+    // since a lock nobody can lift is a review nobody can finish. Stamped at the
+    // last write, which is the only moment the file can vouch for.
+    turn: parsed.turn ?? { holder: "reviewer", at: parsed.updatedAt },
     groups: trailSweeps(parsed.groups.map((group) => ({ ...group, tier: group.tier ?? "study" }))),
     rounds: parsed.rounds.map((round) => ({ ...round, approvedAtEnd: round.approvedAtEnd ?? [] })),
   };

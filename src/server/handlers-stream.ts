@@ -3,9 +3,10 @@
  * long poll. Both register with `SessionTransport`.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { drainPending } from "../feedback.ts";
+import { drainPending, type PollPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import type { FeedbackPrompt } from "../session-store.ts";
+import { agentReading, reviewerTurn } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { sendJson } from "./http.ts";
 import type { WakeReason } from "./streams.ts";
@@ -32,7 +33,7 @@ export function handleEvents(
 
 /**
  * Long-poll: blocks until the reviewer sends. No timeout and no heartbeat —
- * the agent is expected to run `poll` in the foreground and wait.
+ * the agent is expected to run `wait` in the foreground and wait.
  */
 export function handlePoll(
   context: ServerContext,
@@ -59,11 +60,12 @@ export function handlePoll(
     }
   };
   context.transport.addPoller(session.key, wake);
-  // A parked agent is done with the last feedback even if it skipped the reply;
-  // saying "working" would outlast the work by a whole round. Said after the
-  // poller is on the books: `setWorking` publishes presence itself, and the other
-  // order announced a waiterless review for one frame — just as an agent arrived.
-  context.transport.setWorking(session.key, false);
+  // Parking is the agent handing the turn back: it is listening, not editing,
+  // and a lock that outlasted the work by a whole round is exactly the stale
+  // Send this design exists to prevent. Done after the poller is on the books,
+  // because the other order announced a waiterless review for one frame — just
+  // as an agent arrived.
+  handTurnBack(context, session.key);
   request.on("close", () => {
     context.transport.removePoller(session.key, wake);
     context.transport.publishPresence(session.key);
@@ -82,28 +84,55 @@ function deliverFeedback(context: ServerContext, key: string, response: ServerRe
   const session = context.store.get(key);
   const drained = session && drainPending(session);
   if (!drained) return false;
-  context.store.save(drained.session);
+  const handedOver = handsOverTurn(drained.payload);
+  context.store.save(
+    handedOver
+      ? { ...drained.session, turn: agentReading(new Date().toISOString()) }
+      : drained.session,
+  );
   response.on("close", () => {
     if (!response.writableFinished) requeue(context, key, drained.payload.prompts);
   });
   sendJson(response, 200, drained.payload);
-  // Agent is off acting on the reviewer's words — the banner says so. An ended
-  // review or a promptless payload is not work anybody is doing.
-  if (drained.payload.prompts.length > 0 && !drained.payload.ended) {
-    context.transport.setWorking(key, true);
-  }
+  if (handedOver) context.transport.publishPresence(key);
   return true;
+}
+
+/**
+ * Delivery is the one move that takes the turn, and it happens here rather than
+ * on the reviewer's Send: words nobody was waiting for stay queued and the
+ * reviewer keeps sending. An ended review or a promptless payload hands nothing
+ * over, so it takes nothing.
+ */
+function handsOverTurn(payload: PollPayload): boolean {
+  return payload.prompts.length > 0 && !payload.ended;
 }
 
 /**
  * Drained prompts whose bytes never landed, put back at the head of the queue
  * (written order, before anything sent since) and offered to whoever waits now.
+ * The turn rolls back with them: the agent that took them never read a word.
  */
 function requeue(context: ServerContext, key: string, prompts: FeedbackPrompt[]): void {
-  // The agent that took the prompts is gone: nobody works this review until another poll.
-  context.transport.setWorking(key, false);
   const session = context.store.get(key);
   if (!session || prompts.length === 0) return;
-  context.store.save({ ...session, pending: [...prompts, ...session.pending] });
+  context.store.save({
+    ...session,
+    pending: [...prompts, ...session.pending],
+    turn: reviewerTurn(new Date().toISOString()),
+  });
+  context.transport.publishPresence(key);
   context.transport.wakePollers(key);
+}
+
+/**
+ * The turn back to the reviewer, published even when it was already theirs: the
+ * frame is also how a page learns an agent has arrived on the wire.
+ */
+function handTurnBack(context: ServerContext, key: string): void {
+  const session = context.store.get(key);
+  if (session && session.turn.holder === "agent") {
+    context.store.save({ ...session, turn: reviewerTurn(new Date().toISOString()) });
+  }
+  context.transport.publishPresence(key);
 }

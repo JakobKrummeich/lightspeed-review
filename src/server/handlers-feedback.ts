@@ -103,8 +103,9 @@ export async function handleAgentReply(
   context.store.save(updated);
   logAgentReply(context.log, session, reply.comment, now);
   logDeclarations(context.log, session, reply.declarations, now);
-  // The answer is the end of the work the last poll went off with.
-  context.transport.setWorking(session.key, false);
+  // The answer is the end of the work the last delivery went off with, so the
+  // turn goes back with it (`withAgentReply`).
+  context.transport.publishPresence(session.key);
   context.transport.publish(session.key, "session", { reason: "agent_reply" });
   sendJson(response, 200, { delivered: true, declared: reply.declarations.length });
 }

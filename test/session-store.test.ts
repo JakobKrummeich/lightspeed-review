@@ -43,6 +43,7 @@ function sessionRecord(overrides: Partial<SessionRecord> = {}): SessionRecord {
     pending: [],
     approved: [],
     rounds: [],
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
     ...overrides,
   };
 }
@@ -272,6 +273,47 @@ test("a session file with a group that has no files reports session_corrupt", ()
   });
 
   assert.throws(() => store.get("a3f8c21b9e4d5f60"), corruptWith(/files/));
+});
+
+test("a session file written before turns existed opens with the reviewer holding it", () => {
+  const dir = stateDir();
+  const store = new SessionStore(dir);
+  store.save(sessionRecord({ updatedAt: "2025-02-03T09:00:00.000Z" }));
+  const withoutTurn: Partial<SessionRecord> = sessionRecord({
+    updatedAt: "2025-02-03T09:00:00.000Z",
+  });
+  delete withoutTurn.turn;
+  writeRaw(dir, withoutTurn);
+
+  // Stamped at the last write: nothing else in the file can say when the turn
+  // was last anybody's, and a lock nobody could lift would strand the review.
+  assert.deepEqual(store.get("a3f8c21b9e4d5f60")?.turn, {
+    holder: "reviewer",
+    at: "2025-02-03T09:00:00.000Z",
+  });
+});
+
+test("a turn the agent holds survives the store being reopened", () => {
+  const dir = stateDir();
+  new SessionStore(dir).save(
+    sessionRecord({
+      turn: {
+        holder: "agent",
+        mode: "working",
+        at: "2025-02-03T09:00:00.000Z",
+        note: "rewriting the parser",
+      },
+    }),
+  );
+
+  // A `serve` restart reads the file again; an in-memory flag would have
+  // unlocked Send under an agent still editing.
+  assert.deepEqual(new SessionStore(dir).get("a3f8c21b9e4d5f60")?.turn, {
+    holder: "agent",
+    mode: "working",
+    at: "2025-02-03T09:00:00.000Z",
+    note: "rewriting the parser",
+  });
 });
 
 test("a corrupt session file reports session_corrupt instead of vanishing", () => {

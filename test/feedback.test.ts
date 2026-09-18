@@ -43,6 +43,7 @@ function session(rounds: number): SessionRecord {
     branch: "work",
     base: "main",
     status: "open",
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-01T00:00:00.000Z",
     groups: [],
@@ -228,6 +229,53 @@ test("a session with no rounds stamps nothing rather than inventing a round", ()
   const updated = withAgentReply(session(0), "fixed", "2025-01-02T01:00:00.000Z");
 
   assert.equal("roundIndex" in (updated.conversation.at(-1) ?? {}), false);
+});
+
+/** The agent mid-work: the turn is the one thing a reviewer's Send must not take. */
+function agentsTurn(): SessionRecord {
+  return {
+    ...session(1),
+    turn: {
+      holder: "agent",
+      mode: "working",
+      at: "2025-01-02T00:00:00.000Z",
+      note: "splitting the helper out",
+    },
+  };
+}
+
+test("sending feedback to an agent that holds the turn leaves the turn where it is", () => {
+  const updated = withFeedback(
+    agentsTurn(),
+    { prompts: [{ type: "message", comment: "one more" }], ended: false },
+    "2025-01-02T01:00:00.000Z",
+  );
+
+  // Queueing is never gated, and queueing is all this is: only delivery to a
+  // live `wait` hands the turn over.
+  assert.deepEqual(updated.turn, agentsTurn().turn);
+  assert.equal(updated.pending.length, 1);
+});
+
+test("ending the review returns the turn, whoever was holding it", () => {
+  const updated = withFeedback(
+    agentsTurn(),
+    { prompts: [], ended: true },
+    "2025-01-03T00:00:00.000Z",
+  );
+
+  assert.deepEqual(updated.turn, { holder: "reviewer", at: "2025-01-03T00:00:00.000Z" });
+});
+
+test("the agent speaking gives the turn back to the reviewer", () => {
+  const replied = withAgentReply(
+    agentsTurn(),
+    "wrapped it in a transaction",
+    "2025-01-02T02:00:00.000Z",
+  );
+
+  // The plan goes with it: a banner naming work nobody is doing is worse than none.
+  assert.deepEqual(replied.turn, { holder: "reviewer", at: "2025-01-02T02:00:00.000Z" });
 });
 
 test("an end from the browser is recorded as the reviewer's", () => {

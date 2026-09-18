@@ -13,6 +13,7 @@ import type {
   SessionRound,
   SessionStatus,
 } from "../session-store.ts";
+import { reviewerTurn } from "../turn.ts";
 
 /** What `start` posts: the diff of one round, as the CLI resolved it. */
 export interface CreateSessionRequest {
@@ -66,6 +67,9 @@ export function nextSessionRecord(
     baseCommit: payload.baseCommit,
     headCommit: payload.headCommit,
     ...carriedOver(existing, stamp.now, payload.reopen === true),
+    // A round opens on work that is done: whatever the agent took away has
+    // landed on the branch the reviewer is about to read, so the turn is theirs.
+    turn: reviewerTurn(stamp.now),
     updatedAt: stamp.now,
     // Ordered again on the way in, although the grouping already did it: a body
     // is whatever a client posted, and this record is what the ledger's round

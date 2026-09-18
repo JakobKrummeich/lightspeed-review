@@ -63,7 +63,9 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   // Read whole so every request serves one build; a build under a running server
   // dates the page, never splits it. Re-read only on round open — see `refreshAssets`.
   const assets = loadAssets(staticDir);
-  const transport = new SessionTransport();
+  // Reads the turn off the store rather than holding one: the presence frame is
+  // then whatever the last write said, restart or no restart.
+  const transport = new SessionTransport((key) => options.store.get(key)?.turn);
   /** One id source per server: it orders every record this run writes. */
   const nextId = createIdSource();
   let server: Server | undefined;
