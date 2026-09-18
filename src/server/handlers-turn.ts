@@ -24,6 +24,20 @@ export async function handleWork(
     badRequest(response, "expected JSON {plan: string}");
     return;
   }
+  // Before the turn, because an ended review has no turn to hold: the record
+  // still names whoever held it last, and reading that first wrote a plan onto
+  // an ended session — and told the agent it did not hold the turn. Answered the
+  // way `reply` and `approved` answer, so one ended review reads the same from
+  // every command.
+  if (session.status === "ended") {
+    sendJson(response, 409, {
+      error: {
+        code: "session_ended",
+        message: "this review is ended; there is no silence left to declare",
+      },
+    });
+    return;
+  }
   if (session.turn.holder !== "agent") {
     sendJson(response, 422, turnRejection(session));
     return;
@@ -44,22 +58,16 @@ export async function handleWork(
  * fixing command names this session so nothing has to be guessed from the error.
  */
 function turnRejection(session: SessionRecord): unknown {
-  const target = `${session.branch} ${session.base}`;
-  const ended = session.status === "ended";
   return {
     error: {
       code: "turn_not_yours",
-      message: ended
-        ? "this review is ended, so there is no turn to take"
-        : `you do not hold the turn (turn: ${turnLabel(session)}) — nothing has been sent to you yet`,
-      detail: ended
-        ? "an ended review holds no turn at all, and waiting for one would return `ended`" +
-          " forever: only the reviewer opens another round"
-        : "the turn moves to you when the reviewer's feedback is delivered to a blocking" +
-          " `lightspeed wait`, and never before",
+      message: `you do not hold the turn (turn: ${turnLabel(session)}) — nothing has been sent to you yet`,
+      detail:
+        "the turn moves to you when the reviewer's feedback is delivered to a blocking" +
+        " `lightspeed wait`, and never before",
     },
     // The same list the commands print: a refusal must not name a move another
-    // answer calls illegal. Only a reviewer's turn or an ended review get here.
-    help: legalMoves(turnLabel(session), target),
+    // answer calls illegal. An ended review never reaches here — it is a 409.
+    help: legalMoves("reviewer", `${session.branch} ${session.base}`),
   };
 }

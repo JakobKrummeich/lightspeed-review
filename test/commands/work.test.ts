@@ -159,18 +159,22 @@ test("work without the turn is refused, with the command that earns it", async (
   });
 });
 
-test("work on an ended review points at the only command that reopens one", async () => {
-  const record = session({ status: "ended", turn: { holder: "reviewer", at: AT } });
-  await withServer(record, async ({ port }) => {
+/** The turn on an ended record is whoever held it last, not a move anyone can
+ * make: `work` from that agent used to be written onto the closed session. It is
+ * refused as ended, the way `say` and `ask` are refused. */
+test("work on an ended review is refused as ended, and declares nothing", async () => {
+  const record = session({ status: "ended", turn: { holder: "agent", mode: "reading", at: AT } });
+  await withServer(record, async ({ port, store }) => {
     await assert.rejects(
       () => runWork({ repoRoot: REPO, branch: BRANCH, base: BASE, port, plan: "carrying on" }),
       (error: unknown) => {
         assert.ok(error instanceof ReviewError);
-        assert.equal(error.code, "turn_not_yours");
+        assert.equal(error.code, "session_ended");
         assert.match(error.suggestions.join("\n"), /--reopen/);
         return true;
       },
     );
+    assert.deepEqual(store.get(KEY)?.turn, { holder: "agent", mode: "reading", at: AT });
   });
 });
 

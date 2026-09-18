@@ -232,11 +232,11 @@ test("a reviewer's Send & End closes the review; only --reopen starts a new roun
     assert.match(waited.stdout, /^ {2}approved: 0$/m);
     assert.match(waited.stdout, /^ {2}unapproved: 1$/m);
 
-    // An ended review holds no turn, so the one move that claims one is refused
-    // — in the agent's own error shape, with the command that would earn it.
+    // An ended review is refused as ended by every command that speaks into one,
+    // `work` included — not as a turn the agent failed to hold.
     const illegal = await runCli(["work", "carrying on regardless", "feature", "main"], repoRoot);
-    assert.equal(illegal.code, 2, illegal.stdout);
-    assert.match(illegal.stdout, /^ {2}code: turn_not_yours$/m);
+    assert.equal(illegal.code, 1, illegal.stdout);
+    assert.match(illegal.stdout, /^ {2}code: session_ended$/m);
     assert.match(illegal.stdout, /--reopen/);
 
     // The agent may not quietly open round two on a review the reviewer ended.

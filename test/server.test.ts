@@ -1340,19 +1340,29 @@ test("work without the turn is refused, with the command that earns it", async (
   });
 });
 
-/** An ended review has no turn to take, so the help must not send the agent into
- * a `wait` that returns "ended" forever. */
-test("work on an ended review points at the only command that reopens one", async () => {
-  await withServer(async ({ url }) => {
+/**
+ * An ended review is ended before it is anybody's turn: the record still names
+ * whoever held the turn last, so a `work` from the agent that held it was
+ * written onto the closed session — and answered `turn_not_yours`, which is not
+ * what was wrong. Every command answers an ended review with the same 409.
+ */
+test("work on an ended review is refused as ended, and declares nothing", async () => {
+  await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
+    // Delivered first, so the turn on the record is the agent's when it ends.
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    await pollAndAck(url, key);
     await postFeedback(url, key, { prompts: [], ended: true });
+    const closed = store.get(key)?.turn;
 
     const response = await postWork(url, key, { plan: "carrying on regardless" });
 
-    assert.equal(response.status, 422);
-    const body = (await response.json()) as { error: { code: string }; help: string[] };
-    assert.equal(body.error.code, "turn_not_yours");
-    assert.match(body.help.join(" "), /--reopen/);
+    assert.equal(response.status, 409);
+    const body = (await response.json()) as { error: { code: string } };
+    assert.equal(body.error.code, "session_ended");
+    // The closed record is untouched: no plan written onto a review nobody reads.
+    assert.deepEqual(store.get(key)?.turn, closed);
+    assert.equal(store.get(key)?.status, "ended");
   });
 });
 
