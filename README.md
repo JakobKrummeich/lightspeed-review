@@ -471,9 +471,16 @@ whose stdout is the markdown document itself; its failures are still TOON.
 
 A review has exactly one turn holder. It is the reviewer's until a blocking
 `lightspeed wait` is handed their feedback; it is the agent's from that moment
-until the agent asks a question, publishes a new round or ends the review.
-Delivery is the only thing that hands it over — not the press of Send, because
-feedback nobody is waiting for simply queues.
+until the agent asks a question, publishes a new round, ends the review, or
+waits again on a review with nothing queued — parking says the agent is
+listening rather than editing. Delivery is the only thing that hands it over —
+not the press of Send, because feedback nobody is waiting for simply queues.
+
+A delivery is not finished until the agent's client confirms it arrived. The
+server cannot see that for itself: the answer's bytes reach the client's kernel
+whether anything reads them or not, so a `wait` killed mid-delivery looks
+exactly like one that read every word. The batch is held on the session until
+the confirmation lands, and the next `wait` is handed it again.
 
 While the agent holds it the reviewer's **Send** is disabled, so a round cannot
 change under an agent mid-edit. Their queue, their typing and their **End** are
@@ -482,8 +489,11 @@ is no timer and no override: an agent that died holding the turn is restarted in
 the terminal it came from.
 
 Every answer the CLI prints carries `turn` and `round`, and its `help[]` lists
-the moves that are legal from there. `work` is the one command that can be
-refused — `turn_not_yours`, exit 2, naming the `wait` that would earn the turn.
+the moves that are legal from there. Two commands can be refused over the turn,
+one from each end: `work` without it answers `turn_not_yours`, naming the `wait`
+that would earn it, and a second `wait` from an agent that declared `work`
+answers `turn_still_yours` — parking would hand Send back mid-edit — naming
+`start … --wait` and `ask`, which give the turn up deliberately. Both exit 2.
 
 ## Intent
 
