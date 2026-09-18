@@ -40,18 +40,13 @@ function readTurn(value: unknown): Turn {
   const plan = text(note);
   return {
     holder: "agent",
-    ...readMode(mode),
+    // A mode nobody knows reads as `reading`, not as a hole: `mode` only decides
+    // which sentence the panel writes, the holder beside it still takes Send
+    // away, and "the agent has your feedback" is the claim that assumes least.
+    mode: mode === "working" ? "working" : "reading",
     at: stamped,
     ...(plan === undefined ? {} : { note: plan }),
   };
-}
-
-/**
- * A mode nobody knows is dropped, not refused: `mode` only decides which
- * sentence the panel writes, and the holder beside it still takes Send away.
- */
-function readMode(mode: unknown): Pick<Turn, "mode"> {
-  return mode === "reading" || mode === "working" ? { mode } : {};
 }
 
 function text(value: unknown): string | undefined {

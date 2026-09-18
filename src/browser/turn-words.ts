@@ -3,7 +3,7 @@
  * header banner and the foot of the conversation both say it, and two copies
  * would drift — which a reviewer reads as two different things happening.
  */
-import type { Turn } from "../session-store.ts";
+import type { AgentTurn } from "../session-store.ts";
 
 /**
  * The two things the agent's turn can mean. They gate identically — `mode` is
@@ -12,7 +12,7 @@ import type { Turn } from "../session-store.ts";
  * point of the plan `work` declares. The plan is the agent's own text and is
  * escaped by every caller.
  */
-export function agentTurnText(turn: Turn): string {
+export function agentTurnText(turn: AgentTurn): string {
   if (turn.mode !== "working") return "the agent has your feedback";
   return turn.note === undefined
     ? "the agent is implementing your feedback"

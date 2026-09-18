@@ -36,10 +36,11 @@ test("anything but an explicit agent turn leaves the turn with the reviewer", ()
 
 test("a turn with a mode nobody knows still locks Send", () => {
   // `mode` is presentational: the holder is what gates, so an unreadable mode
-  // costs a sentence at the foot of the panel, never the lock itself.
+  // costs a sentence at the foot of the panel, never the lock itself. It reads
+  // as `reading` — the claim that assumes least about what the agent is doing.
   assert.deepEqual(readPresence(`{"turn":{"holder":"agent","mode":"napping","at":"T2"}}`), {
     waiting: false,
-    turn: { holder: "agent", at: "T2" },
+    turn: { holder: "agent", mode: "reading", at: "T2" },
   });
 });
 

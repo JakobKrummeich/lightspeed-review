@@ -430,7 +430,10 @@ function patch(view: PanelView, id: string, disabled: boolean, label?: string): 
 
 /** Two turns worth redrawing for: holder, mode and the plan the banner names. */
 function sameTurn(one: Turn, other: Turn): boolean {
-  return one.holder === other.holder && one.mode === other.mode && one.note === other.note;
+  if (one.holder !== other.holder) return false;
+  // The reviewer's turn says nothing else; only the agent's carries a mode.
+  if (one.holder !== "agent" || other.holder !== "agent") return true;
+  return one.mode === other.mode && one.note === other.note;
 }
 
 /** One of the compose row's controls as the last draw of the row left it. */

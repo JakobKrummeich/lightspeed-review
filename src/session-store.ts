@@ -19,15 +19,28 @@ export type ReviewCloser = "reviewer" | "agent";
  * line: queue always, end always, send only on your turn. Persisted rather than
  * held in memory because a `serve` restart that silently handed Send back would
  * let the reviewer fire at an agent that is still editing.
+ *
+ * A union on `holder` so the fields that only mean something on one side cannot
+ * be read on the other: there is no such thing as a reviewer's `mode`, and an
+ * agent's turn always has one. Readers branch on `holder` and get the rest.
  */
-export interface Turn {
-  holder: "reviewer" | "agent";
+export type Turn = ReviewerTurn | AgentTurn;
+
+/** Send is live and nothing is owed to the reviewer. */
+export interface ReviewerTurn {
+  holder: "reviewer";
+  at: string;
+}
+
+/** The agent's move. Send is off until it hands the turn back. */
+export interface AgentTurn {
+  holder: "agent";
   /**
-   * Only while the agent holds it, and presentational only: `reading` and
-   * `working` gate identically. `reading` is set on delivery, `working` by the
-   * agent's own `work "<plan>"`.
+   * Presentational only: `reading` and `working` gate identically. `reading` is
+   * set on delivery, `working` by the agent's own `work "<plan>"`. Required, so
+   * no reader has to decide what an agent's turn with no mode would mean.
    */
-  mode?: "reading" | "working";
+  mode: "reading" | "working";
   at: string;
   /** The plan `work` declared, which the reviewer's banner names. */
   note?: string;
