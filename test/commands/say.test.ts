@@ -306,8 +306,8 @@ test("an answer saying the review ended points at the only command that reopens 
 
     assert.equal(output.turn, "ended");
     assert.deepEqual(output.help, [
-      "Only the reviewer reopens a review: run `lightspeed start feature-auth main --reopen`" +
-        " when they ask for a new round",
+      'Run `lightspeed start feature-auth main --reopen --intent "<why>"`' +
+        " once the reviewer asks for one",
     ]);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

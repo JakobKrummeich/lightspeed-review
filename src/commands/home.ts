@@ -64,8 +64,15 @@ export function helpWork(target: string): string {
   );
 }
 
+/** `--intent` is required on every round, not only the first, so the line that
+ * sends an agent back to `start` carries it: without it the command it just read
+ * exits 2 with `intent_missing`, which is a wasted turn this text caused. */
 export function helpNextRound(target: string): string {
-  return `Address the feedback, commit, then run \`lightspeed start ${target}\` to show the updated diff`;
+  return (
+    `Address the feedback, commit, then run \`lightspeed start ${target}` +
+    ' --intent "<why this branch exists>"` to show the updated diff —' +
+    " --intent is required on every round"
+  );
 }
 
 /** The same move made by an agent that is going to block on what it publishes:
@@ -73,8 +80,8 @@ export function helpNextRound(target: string): string {
  * the move offered to an agent mid-edit, where a bare `wait` is refused. */
 export function helpPublishAndWait(target: string): string {
   return (
-    `Run \`lightspeed start ${target} --wait\` to publish what you changed and block on the` +
-    " next round"
+    `Run \`lightspeed start ${target} --wait --intent "<why this branch exists>"\`` +
+    " to publish what you changed and block on the next round"
   );
 }
 
@@ -88,8 +95,8 @@ export const HELP_END = helpEnd("<branch> [base]");
  * so every command that meets an ended session says so the same way. */
 export function helpReopen(target: string): string {
   return (
-    "Only the reviewer reopens a review: run" +
-    ` \`lightspeed start ${target} --reopen\` when they ask for a new round`
+    `Run \`lightspeed start ${target} --reopen --intent "<why>"\`` +
+    " once the reviewer asks for one"
   );
 }
 
