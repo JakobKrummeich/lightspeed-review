@@ -85,19 +85,22 @@ test("a missing or blank message is refused, naming what the verb wanted", () =>
   rejects(["   "], { verb: "say" }, /say needs something to say/);
 });
 
-test("the example in the error names a plan for work and text for everything else", () => {
-  assert.throws(
-    () => parseVerb([], { verb: "work" }, "the plan you are about to go quiet over"),
-    (error: unknown) => {
-      assert.match((error as { suggestions: string[] }).suggestions[0]!, /work "<plan>"/);
-      return true;
-    },
-  );
-  assert.throws(
-    () => parseVerb([], { verb: "ask" }, "the question to put to the reviewer"),
-    (error: unknown) => {
-      assert.match((error as { suggestions: string[] }).suggestions[0]!, /ask "<text>"/);
-      return true;
-    },
-  );
+/**
+ * N3: the placeholder the error prints is the one `--help` prints. `ask` asked
+ * for a `<text>` here and a `<question>` there, which is two names for the one
+ * argument an agent has to get right.
+ */
+test("the example in the error names the verb's own argument", () => {
+  const names = (spec: Parameters<typeof parseVerb>[1]): string => {
+    try {
+      parseVerb([], spec, "something");
+    } catch (error) {
+      return (error as { suggestions: string[] }).suggestions[0]!;
+    }
+    throw new Error("a missing message must be refused");
+  };
+
+  assert.match(names({ verb: "work", placeholder: "plan" }), /work "<plan>"/);
+  assert.match(names({ verb: "ask", placeholder: "question" }), /ask "<question>"/);
+  assert.match(names({ verb: "say" }), /say "<text>"/);
 });

@@ -18,6 +18,12 @@ export interface VerbSpec {
   value?: readonly string[];
   /** Flags that stand alone. */
   boolean?: readonly string[];
+  /**
+   * What the verb calls its message in `<angle brackets>`, worded the same here
+   * and in `--help`: `ask` once asked for a `<text>` in its error and a
+   * `<question>` in its help, which is two names for one argument.
+   */
+  placeholder?: string;
 }
 
 /** What every speaking verb reads off its command line. */
@@ -65,7 +71,7 @@ function unknownFlag(spec: VerbSpec, flag: string): Error {
 function requireMessage(spec: VerbSpec, message: string | undefined, wanted: string): string {
   if (message !== undefined && message.trim() !== "") return message;
   throw validationError(`${spec.verb} needs ${wanted}`, [
-    `Run \`lightspeed ${spec.verb} "<${spec.verb === "work" ? "plan" : "text"}>" [branch] [base]\``,
+    `Run \`lightspeed ${spec.verb} "<${spec.placeholder ?? "text"}>" [branch] [base]\``,
     `Run \`lightspeed ${spec.verb} --help\` for two examples`,
   ]);
 }

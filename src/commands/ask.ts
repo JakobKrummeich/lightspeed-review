@@ -16,7 +16,11 @@ export interface AskInput {
 }
 
 export function parseAskArgs(args: string[]): VerbArgs {
-  return parseVerb(args, { verb: "ask" }, "the question to put to the reviewer");
+  return parseVerb(
+    args,
+    { verb: "ask", placeholder: "question" },
+    "the question to put to the reviewer",
+  );
 }
 
 /**

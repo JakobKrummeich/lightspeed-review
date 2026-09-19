@@ -15,7 +15,11 @@ export interface WorkInput {
 }
 
 export function parseWorkArgs(args: string[]): VerbArgs {
-  return parseVerb(args, { verb: "work" }, "the plan you are about to go quiet over");
+  return parseVerb(
+    args,
+    { verb: "work", placeholder: "plan" },
+    "the plan you are about to go quiet over",
+  );
 }
 
 /**

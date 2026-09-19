@@ -179,3 +179,16 @@ test("asking in an unknown session fails with session_not_found instead of block
     );
   });
 });
+
+/** N3: the two places an agent reads what `ask` takes must not disagree — the
+ * missing-argument error said `<text>` while `ask --help` said `<question>`. */
+test("the missing-question error names a question, the same as `ask --help`", () => {
+  assert.throws(
+    () => parseAskArgs([]),
+    (error: unknown) => {
+      assert.match((error as Error).message, /ask needs the question to put to the reviewer/);
+      assert.match((error as { suggestions: string[] }).suggestions[0]!, /ask "<question>"/);
+      return true;
+    },
+  );
+});
