@@ -107,7 +107,7 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
       repoRoot,
     );
     assert.equal(started.code, 0, started.stdout);
-    assert.match(started.stdout, /^ {2}status: open$/m);
+    assert.match(started.stdout, /^turn: reviewer$/m);
     // The loop below only holds because no model was consulted.
     assert.match(started.stdout, /^ {2}mode: skipped$/m);
     const { key, url } = parseStartStdout(started.stdout);
@@ -132,7 +132,6 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     // Queued feedback answers a later wait immediately: no waiting, no races.
     const waited = await runCli(["wait", "feature", "main"], repoRoot);
     assert.equal(waited.code, 0, waited.stdout);
-    assert.match(waited.stdout, /^status: feedback$/m);
     assert.match(waited.stdout, /^ended: false$/m);
     assert.match(waited.stdout, /prefer a named constant/);
     // Delivery is the only thing that hands the turn over, and the answer says so.
@@ -165,7 +164,7 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
 
     const ended = await runCli(["end", "feature", "main"], repoRoot);
     assert.equal(ended.code, 0, ended.stdout);
-    assert.match(ended.stdout, /^ {2}status: ended$/m);
+    assert.match(ended.stdout, /^turn: ended$/m);
 
     // An ended session answers a wait at once: who closed it, what approval evidence remains.
     const afterEnd = await runCli(["wait", "feature", "main"], repoRoot);
@@ -250,7 +249,7 @@ test("a reviewer's Send & End closes the review; only --reopen starts a new roun
       repoRoot,
     );
     assert.equal(reopened.code, 0, reopened.stdout);
-    assert.match(reopened.stdout, /^ {2}status: open$/m);
+    assert.match(reopened.stdout, /^turn: reviewer$/m);
   } finally {
     await shutdownServer(port);
   }

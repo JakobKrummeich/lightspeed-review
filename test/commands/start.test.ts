@@ -121,7 +121,6 @@ test("creates the session and reports it with diff aggregates and group sizes", 
       base: BASE,
       intents: INTENTS,
       url: `http://127.0.0.1:${config.port}/session/${key}`,
-      status: "open",
     });
     assert.deepEqual(output.diff, extracted.stats);
     assert.deepEqual(output.groups, [
@@ -404,7 +403,7 @@ test("--reopen starts a new round on a review the reviewer asked to continue", a
       reopen: true,
     });
 
-    assert.equal((output.session as { status: string }).status, "open");
+    assert.equal(output.turn, "reviewer");
     assert.equal(store.get(key)?.rounds.length, 2);
   });
 });

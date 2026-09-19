@@ -27,7 +27,8 @@ export async function runEnd(input: EndInput): Promise<StructuredOutput> {
   const target = `${input.branch} ${input.base}`;
   return {
     ...turnBlock(closed),
-    session: { key, branch: input.branch, base: input.base, status: "ended" },
+    // No `status`: `turn: ended` above is the same fact, said once.
+    session: { key, branch: input.branch, base: input.base },
     message: "the review session is closed; the browser shows it as ended",
     help: legalMoves("ended", target),
   };

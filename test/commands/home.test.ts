@@ -39,13 +39,13 @@ test("a stored session becomes a row carrying its turn, round and queue", () => 
     }),
   ]);
 
-  // Rounds are counted from one on screen, and the note the banner shows is
-  // the reviewer's business, not a row's.
+  // Rounds are counted from one on screen. `status` is not a column: `turn`
+  // says whose move it is and `pending` how much is queued, while `feedback`
+  // went on being printed for rounds after that feedback was read.
   assert.deepEqual(summaries, [
     {
       branch: "feature-auth",
       base: "main",
-      status: "feedback",
       turn: "agent working",
       round: 2,
       pending: 1,
@@ -75,7 +75,6 @@ test("empty state offers exactly the start command as next step", () => {
 const row = (over: Partial<SessionSummary> = {}): SessionSummary => ({
   branch: "feature-auth",
   base: "main",
-  status: "open",
   turn: "reviewer",
   round: 1,
   pending: 0,
@@ -88,7 +87,6 @@ test("active sessions are listed as uniform rows", () => {
     row({
       branch: "fix-billing",
       base: "develop",
-      status: "feedback",
       turn: "agent working",
       round: 2,
       pending: 3,

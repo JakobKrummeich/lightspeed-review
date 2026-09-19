@@ -119,7 +119,6 @@ test("the answer is reported in the shape wait reports one", async () => {
 
     assert.equal(output.turn, "agent reading");
     assert.equal(output.round, 1);
-    assert.equal(output.status, "feedback");
     assert.equal(output.ended, false);
     assert.match(
       (output.help as string[]).join("\n"),

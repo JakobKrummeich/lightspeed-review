@@ -6,7 +6,6 @@ import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
 export interface SessionSummary {
   branch: string;
   base: string;
-  status: string;
   /**
    * Whose move it is, so the home view answers "may I send?" and "am I owed a
    * turn?" without a second command. `pending` beside it is what the reviewer
@@ -131,7 +130,6 @@ export function sessionSummaries(sessions: SessionRecord[]): SessionSummary[] {
     .map((session) => ({
       branch: session.branch,
       base: session.base,
-      status: session.status,
       turn: turnLabel(session),
       round: roundNumber(session),
       pending: session.pending.length,

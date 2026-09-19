@@ -84,7 +84,10 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
   return {
     ...turnBlock(result),
     ...(input.asked === undefined ? {} : { asked: input.asked }),
-    status: result.status,
+    // `status` is not printed: `turn` names the holder and `ended` says whether
+    // there is one, while the record's own word went stale between rounds —
+    // `feedback` long after the feedback was read. Two fields for one fact is a
+    // reconciliation an agent should never be asked to make.
     ended: result.ended,
     ...promptBlock(result, input.full ?? false),
     ...endedFacts(result),

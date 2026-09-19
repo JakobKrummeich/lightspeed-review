@@ -115,9 +115,23 @@ test("returns the queued prompts once the reviewer sends", async () => {
   await withServer(session({ pending: [annotation], status: "feedback" }), async ({ port }) => {
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
 
-    assert.equal(output.status, "feedback");
     assert.equal(output.ended, false);
     assert.deepEqual(output.prompts, [annotation]);
+  });
+});
+
+/**
+ * N4: `status` restated what `turn` and `ended` already say, and said it out of
+ * date — a session reads `feedback` for rounds after the feedback was consumed.
+ * Two fields to reconcile where one is authoritative is how an agent reads a
+ * round as unfinished.
+ */
+test("the answer states the turn, not a second stale word for it", async () => {
+  await withServer(session({ pending: [annotation], status: "feedback" }), async ({ port }) => {
+    const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
+
+    assert.equal(output.turn, "agent reading");
+    assert.ok(!("status" in output));
   });
 });
 

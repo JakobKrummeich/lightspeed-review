@@ -218,14 +218,16 @@ function startOutput({
     // A round opens on the reviewer's move: nothing has been sent to the agent
     // yet, so it holds no turn and nothing but `wait` will give it one.
     ...turnBlock(created),
-    // Intents echoed back so the agent sees what the reviewer will read, in order.
+    // Intents echoed back so the agent sees what the reviewer will read, in
+    // order. The server's `status` is not among them: `turn` above already names
+    // whose move it is, and the word this block used to print stayed `feedback`
+    // for rounds after that feedback was read.
     session: {
       key: created.key,
       branch,
       base,
       intents,
       url: created.url,
-      status: created.status,
     },
     ledger,
     diff: extracted.stats,
