@@ -175,11 +175,22 @@ comment. An annotation carries:
 
 ## Setup
 
-The repository needs `.lightspeed.conf.json` in its root:
+The repository needs `.lightspeed.conf.json` in its root.
+Run `lightspeed init --config` to write one:
 
 ```json
-{ "model": "<provider/model>", "thinking": "off" }
+{ "model": "anthropic/claude-sonnet-4-5", "thinking": "off" }
 ```
+
+`model` is never defaulted and no command lists the ids. Name one you can
+reach:
+- `anthropic/claude-sonnet-4-5`
+- `anthropic/claude-haiku-4-5`
+- `openai/gpt-5`
+
+A model nobody has does not fail the run: the round opens with
+`grouping.mode: fallback`, the whole diff as one group, and a `fix` line
+naming the key to change.
 
 Optional keys: `port` (4388), `stateDir` (`~/.lightspeed`),
 `feedbackLog` (`on`), `classify` — two glob lists,

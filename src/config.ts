@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { ClassifyConfig } from "./classify.ts";
 import { ReviewError } from "./errors.ts";
 import { adoptFormerStateDir, expandHome } from "./paths.ts";
@@ -147,6 +147,32 @@ export const STARTER_CONFIG: Pick<LightspeedConfig, "model" | "thinking"> = {
 
 const CREATE_HELP = `Create ${CONFIG_FILENAME} with {"model": "${STARTER_CONFIG.model}", "thinking": "${STARTER_CONFIG.thinking}"}`;
 
+/**
+ * Models an agent can reach out of the box, named because `model` is the one key
+ * nothing defaults and nothing in the CLI resolves: there is no `models`
+ * command, so `<provider/model>` is a placeholder an agent can only guess at —
+ * and a guess that looks right (`anthropic/claude-sonnet-4`) degrades every
+ * review to one group without failing.
+ */
+export const REACHABLE_MODELS = [
+  "anthropic/claude-sonnet-4-5",
+  "anthropic/claude-haiku-4-5",
+  "openai/gpt-5",
+];
+
+/** The two lines that turn "there is no config" into a configured repository. */
+export const HELP_WRITE_CONFIG = "Run `lightspeed init --config` to write it here";
+
+export const HELP_SET_MODEL =
+  `Then set \`model\` to a provider/model you can reach: ${orList(REACHABLE_MODELS)};` +
+  " run `lightspeed login <provider>` (human, once per machine) if none of them authenticate";
+
+function orList(items: string[]): string {
+  const quoted = items.map((item) => `\`${item}\``);
+  const last = quoted.pop() ?? "";
+  return quoted.length === 0 ? last : `${quoted.join(", ")} or ${last}`;
+}
+
 function invalid(message: string, detail?: string): ReviewError {
   return new ReviewError({
     code: "config_invalid",
@@ -213,6 +239,29 @@ export interface LedgerConfig {
   feedbackLog: FeedbackLogMode;
 }
 
+/** What a command needs when it never reaches a model. */
+export interface ServiceConfig extends LedgerConfig {
+  port: number;
+}
+
+/**
+ * The config as the model-free half of the CLI reads it. `wait`, `ask`, `say`,
+ * `work`, `approvals`, `end`, `serve` and `stop` talk to a port and a store and
+ * to nothing else, so requiring `model` of them made a missing config refuse
+ * the commands an agent needs exactly when it cannot write one — mid-review, on
+ * a machine that is not its own. A file that exists is still validated whole:
+ * lenient about the model, never about the file.
+ */
+export function loadServiceConfig(directory: string): ServiceConfig {
+  const raw = readConfigFileIfAny(join(directory, CONFIG_FILENAME));
+  rejectUnknownKeys(raw);
+  return {
+    port: readPort(raw.port),
+    stateDir: resolveStateDir(raw.stateDir),
+    feedbackLog: readFeedbackLog(raw.feedbackLog),
+  };
+}
+
 /**
  * Ledger is global across repos: needs no repository or config file, but a
  * config that exists is fully validated — a typo'd `stateDir` must not silently
@@ -249,9 +298,10 @@ function readConfigFile(path: string): Record<string, unknown> {
   } catch {
     throw new ReviewError({
       code: "config_missing",
-      message: `${CONFIG_FILENAME} not found in repo root`,
-      detail: "lightspeed requires explicit `model` and `thinking`",
-      suggestions: [CREATE_HELP],
+      message: `${CONFIG_FILENAME} not found in ${dirname(path)}`,
+      detail:
+        "`model` and `thinking` are never defaulted: the grouping model is a cost you must choose",
+      suggestions: [HELP_WRITE_CONFIG, HELP_SET_MODEL],
     });
   }
   let parsed: unknown;

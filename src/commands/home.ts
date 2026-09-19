@@ -1,3 +1,4 @@
+import { REACHABLE_MODELS } from "../config.ts";
 import type { StructuredOutput } from "../output.ts";
 import type { SessionRecord } from "../session-store.ts";
 import { roundNumber, turnLabel, type HelpForm, type TurnLabel } from "../turn.ts";
@@ -244,8 +245,8 @@ export interface HomeInput {
  */
 const HELP_INIT_CONFIG =
   "Run `lightspeed init --config` to write .lightspeed.conf.json here, then set `model`" +
-  " to a provider/model you can reach — `anthropic/claude-sonnet-4-5`," +
-  " `anthropic/claude-haiku-4-5` and `openai/gpt-5` all work";
+  ` to a provider/model you can reach — ${REACHABLE_MODELS.map((model) => `\`${model}\``).join(", ")}` +
+  " all work";
 
 const HELP_START_ONCE_CONFIGURED =
   'Run `lightspeed start <branch> [base] --intent "<why this branch exists>"`' +

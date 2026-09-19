@@ -24,7 +24,14 @@ import { parseWorkArgs, runWork } from "./commands/work.ts";
 import { parseSkillArgs, runSkill } from "./commands/skill.ts";
 import { parseStartArgs, runStart } from "./commands/start.ts";
 import { runStop } from "./commands/stop.ts";
-import { defaultStateDir, loadConfig, loadLedgerConfig, type LightspeedConfig } from "./config.ts";
+import {
+  defaultStateDir,
+  loadConfig,
+  loadLedgerConfig,
+  loadServiceConfig,
+  type LightspeedConfig,
+  type ServiceConfig,
+} from "./config.ts";
 import { ReviewError, exitCodeFor, invocationError } from "./errors.ts";
 import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
@@ -83,15 +90,26 @@ const topLevelHelp = `${renderToon({
   help: [TURN_RULE, HELP_START, HELP_WAIT, HELP_END],
 })}\n`;
 
-/** Everything a command needs before it can talk to a session or the server. */
-function repoContext(): { repoRoot: string; config: LightspeedConfig } {
+/**
+ * Everything a command needs before it can talk to a session or the server —
+ * and nothing more. `model` and `thinking` are read only by the one command
+ * that sends a diff to a model: gating `wait` or `end` on a model they never
+ * call made a missing config refuse the review loop itself.
+ */
+function repoContext(): { repoRoot: string; config: ServiceConfig } {
+  const repoRoot = findRepoRoot(process.cwd());
+  return { repoRoot, config: loadServiceConfig(repoRoot) };
+}
+
+/** The strict read, for the one command whose work is the model's. */
+function groupingContext(): { repoRoot: string; config: LightspeedConfig } {
   const repoRoot = findRepoRoot(process.cwd());
   return { repoRoot, config: loadConfig(repoRoot) };
 }
 
 interface SessionContext extends ResolvedSession {
   repoRoot: string;
-  config: LightspeedConfig;
+  config: ServiceConfig;
 }
 
 /**
@@ -143,7 +161,7 @@ async function startCommand(args: string[]): Promise<StructuredOutput> {
       ],
     });
   }
-  const { repoRoot, config } = repoContext();
+  const { repoRoot, config } = groupingContext();
   return await runStart({
     repoRoot,
     branch,

@@ -1,5 +1,6 @@
 import { DEFAULT_PATH_LIMIT } from "./commands/approvals.ts";
 import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./commands/home.ts";
+import { REACHABLE_MODELS } from "./config.ts";
 
 /** Where the generated skill lives, relative to the repository root. */
 export const SKILL_PATH = "skills/lightspeed/SKILL.md";
@@ -194,11 +195,20 @@ const RULES = `## Rules
 
 const SETUP = `## Setup
 
-The repository needs \`.lightspeed.conf.json\` in its root:
+The repository needs \`.lightspeed.conf.json\` in its root.
+Run \`lightspeed init --config\` to write one:
 
 \`\`\`json
-{ "model": "<provider/model>", "thinking": "off" }
+{ "model": "${REACHABLE_MODELS[0]}", "thinking": "off" }
 \`\`\`
+
+\`model\` is never defaulted and no command lists the ids. Name one you can
+reach:
+${REACHABLE_MODELS.map((model) => `- \`${model}\``).join("\n")}
+
+A model nobody has does not fail the run: the round opens with
+\`grouping.mode: fallback\`, the whole diff as one group, and a \`fix\` line
+naming the key to change.
 
 Optional keys: \`port\` (4388), \`stateDir\` (\`~/.lightspeed\`),
 \`feedbackLog\` (\`on\`), \`classify\` — two glob lists,

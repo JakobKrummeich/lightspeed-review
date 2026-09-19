@@ -186,6 +186,26 @@ test("a session the server does not know is named the same way as one on disk", 
   assert.match(stdout, /lightspeed wait feature\/greeting main/);
 });
 
+/**
+ * B2: `approvals` reads a session file and nothing else, but the strict config
+ * load gated it on a `model` it never uses — so a repo without a config could
+ * not be asked what the reviewer had ticked.
+ */
+test("a command that needs no model answers in a repository with no config", async () => {
+  const repoRoot = newRepo("lsr-cli-nomodel-");
+  const home = mkdtempSync(join(tmpdir(), "lsr-cli-nomodel-home-"));
+  storeSession(join(home, ".lightspeed"), repoRoot, "feature/greeting");
+
+  const { stdout, code } = await runCli(["approvals", "feature/greeting", "main"], repoRoot, {
+    ...process.env,
+    HOME: home,
+  });
+
+  assert.equal(code, 0);
+  assert.doesNotMatch(stdout, /config_missing/);
+  assert.match(stdout, /^ {2}branch: feature\/greeting$/m);
+});
+
 test("a failing command reports code, message and help as TOON on stdout, exit 1", async () => {
   const outsideAnyRepo = mkdtempSync(join(tmpdir(), "lsr-cli-"));
 

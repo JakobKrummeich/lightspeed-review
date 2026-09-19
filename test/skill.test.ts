@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { HELP_START, BLOCKS_IN_FOREGROUND, TURN_RULE } from "../src/commands/home.ts";
+import { REACHABLE_MODELS } from "../src/config.ts";
 import { renderSkill, SKILL_PATH } from "../src/skill.ts";
 
 const skill = renderSkill();
@@ -41,6 +42,18 @@ test("the skill never names the command that was replaced", () => {
 
 test("the skill quotes the CLI's own start guidance rather than a second copy", () => {
   assert.ok(skill.includes(HELP_START));
+});
+
+/**
+ * B2: the Setup section told the agent to write `"model": "<provider/model>"`
+ * — a placeholder nothing here resolves. There is no `models` command, so the
+ * skill is the only place a real id can come from, and a guessed one degrades
+ * every review to a single group without failing.
+ */
+test("the skill's setup names models that exist instead of a placeholder", () => {
+  assert.doesNotMatch(skill, /<provider\/model>/);
+  for (const model of REACHABLE_MODELS) assert.ok(skill.includes(model), model);
+  assert.match(skill, /lightspeed init --config/);
 });
 
 test("the skill says an ended review is refused, and how the reviewer asks for more", () => {
