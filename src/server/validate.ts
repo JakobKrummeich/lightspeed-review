@@ -159,16 +159,20 @@ export function declarationRejection(
  * The way out, and it has to be a command the CLI accepts: a rejection whose
  * escape hatch named `--note` cost the agent a second turn on `unknown flag
  * --note`. Only a rejection that is entirely about one comment's files can be
- * re-sent without them, so only that one is offered the shortcut; anything else
- * is a bad id or an empty entry, which stripping nothing fixes.
+ * re-sent without them, so only that one keeps the `--for`; anything else is a
+ * bad id or an empty entry, which only dropping the claim fixes.
+ *
+ * Neither branch restates the detail. Where an id comes from is already in the
+ * problem's own reason, and a `help[]` that says it again is a line an agent
+ * pays for twice and learns from once.
  */
 function wayOut(problems: DeclarationProblem[], target: string): [string, ...string[]] {
   const ids = new Set(problems.map((problem) => problem.id));
   const [id] = ids;
   if (id === undefined || ids.size > 1 || problems.some((problem) => problem.kind !== "files")) {
     return [
-      "Ids come from the annotations in `lightspeed wait` output",
-      "Fix the declaration and re-send the whole reply; no part of it was delivered",
+      `Say it without the claim: \`lightspeed say "<text>" ${target}\``,
+      "Or re-send the whole reply with a declaration that parses; nothing of this one was stored",
     ];
   }
   return [

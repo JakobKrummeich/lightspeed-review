@@ -1215,8 +1215,12 @@ test("a file claim made before the next round is carried out by its own help", a
   });
 });
 
-/** A bad id cannot be re-sent without the claim: the id is the claim. */
-test("a rejection that is not about files keeps pointing at where ids come from", async () => {
+/**
+ * N5: `help[0]` used to repeat the detail almost word for word — the detail
+ * already says where ids come from — so the two lines an agent read cost the
+ * tokens of two and carried the information of one. Help says what to run.
+ */
+test("a rejection that is not about files offers commands, not its own detail again", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);
 
@@ -1224,8 +1228,12 @@ test("a rejection that is not about files keeps pointing at where ids come from"
       declarations: [{ id: "evt_ghost", note: "fixed" }],
     });
 
-    const body = (await response.json()) as { help: string[] };
-    assert.match(body.help[0]!, /^Ids come from the annotations in `lightspeed wait` output$/);
+    const body = (await response.json()) as { error: { detail: string }; help: string[] };
+    assert.match(body.error.detail, /ids come from `lightspeed wait` output/);
+    assert.deepEqual(body.help, [
+      'Say it without the claim: `lightspeed say "<text>" feature-auth main`',
+      "Or re-send the whole reply with a declaration that parses; nothing of this one was stored",
+    ]);
   });
 });
 
