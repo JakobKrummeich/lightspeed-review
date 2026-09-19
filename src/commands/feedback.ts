@@ -1,5 +1,5 @@
 import type { FeedbackLogMode } from "../config.ts";
-import { validationError } from "../errors.ts";
+import { invocationError } from "../errors.ts";
 import { repoRows, selectItems, verdictCounts, type ExportItem } from "../ledger/export.ts";
 import { ledgerFor, type LedgerReadResult } from "../ledger/store.ts";
 import type { StructuredOutput } from "../output.ts";
@@ -114,7 +114,7 @@ function populatedSummary(
 }
 
 function unknownSubcommand(name: string) {
-  return validationError(`unknown feedback subcommand ${name}`, [
+  return invocationError("unknown_command", `unknown feedback subcommand ${name}`, [
     `Known subcommands: ${FEEDBACK_SUBCOMMANDS.join(", ")}`,
     "Run `lightspeed feedback` for the ledger summary",
   ]);

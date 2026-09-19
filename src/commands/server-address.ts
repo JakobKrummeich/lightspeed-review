@@ -47,13 +47,55 @@ export async function diagnosePort(
   return state;
 }
 
-/** Whether the thing on the port is ours. `/health` is the whole test; the request
- * is bounded because a non-HTTP process holding the port would wait forever. */
-export async function reviewServerIsUp(port: number): Promise<boolean> {
+/** What `/health` says about the server on the port. `version` is absent from
+ * one old enough not to state it — which is itself the answer. */
+export interface ServerHealth {
+  version?: string;
+}
+
+/**
+ * The server on the port, if it is ours. `/health` is the whole test; the
+ * request is bounded because a non-HTTP process holding the port would wait
+ * forever. `undefined` means "not our server", never "our server, unknown
+ * version": the two lead to different commands.
+ */
+export async function serverHealth(port: number): Promise<ServerHealth | undefined> {
   try {
     const response = await fetch(`${serverOrigin(port)}/health`, {
       signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
     });
+    // An answer at all is the test for "ours", as it always was. The version is
+    // read out of it where there is one: a server old enough not to state it is
+    // exactly the server a caller needs to hear about, and calling it "not ours"
+    // would send the agent to free a port that is not the problem.
+    return response.ok ? { ...statedVersion(await response.text()) } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function statedVersion(body: string): ServerHealth {
+  try {
+    const parsed = JSON.parse(body) as { version?: unknown };
+    return typeof parsed.version === "string" ? { version: parsed.version } : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Whether the thing on the port is ours, whatever version it is. */
+export async function reviewServerIsUp(port: number): Promise<boolean> {
+  return (await serverHealth(port)) !== undefined;
+}
+
+/**
+ * Shuts the server on the port down. False means nothing was listening — the
+ * desired end state either way. Lives here rather than in `stop`, because a
+ * stale server is replaced by the same request `stop` makes.
+ */
+export async function requestShutdown(port: number): Promise<boolean> {
+  try {
+    const response = await fetch(`${serverOrigin(port)}/api/shutdown`, { method: "POST" });
     return response.ok;
   } catch {
     return false;

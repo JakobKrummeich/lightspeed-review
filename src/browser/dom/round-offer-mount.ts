@@ -5,9 +5,11 @@ import type { SessionData } from "./session-api.ts";
 export interface MountedRoundOffer {
   /**
    * A round arrived mid-read. Session held whole, not refetched on take: what
-   * is offered has to be what arrives.
+   * is offered has to be what arrives. `queued` is what the reviewer has not
+   * sent yet, which the offer names — it is the thing they would expect a new
+   * round to cost them.
    */
-  offer(fresh: SessionData): void;
+  offer(fresh: SessionData, queued: number): void;
   /** The round went on screen by another route, so there is nothing to offer. */
   clear(): void;
   /**
@@ -46,9 +48,9 @@ export function mountRoundOffer(options: RoundOfferOptions): MountedRoundOffer {
     onTake(taken);
   });
   return {
-    offer(fresh: SessionData) {
+    offer(fresh: SessionData, queued: number) {
       held = fresh;
-      root.textContent = roundOfferLabel(currentRound(fresh.rounds), filesIn(fresh));
+      root.textContent = roundOfferLabel(currentRound(fresh.rounds), filesIn(fresh), queued);
       root.hidden = false;
     },
     clear,

@@ -59,7 +59,7 @@ function mounted(t: TestContext): {
     page,
     tick,
     ended,
-    open: (queued = 0) => popup.open(queued),
+    open: (queued = 0, sendsQueue = true) => popup.open(queued, sendsQueue),
     close: () => popup.close(),
     click: (selector: string) => {
       const target = root.querySelector(selector);

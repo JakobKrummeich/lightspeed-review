@@ -13,19 +13,30 @@ export function renderToon(output: StructuredOutput): string {
 }
 
 /**
- * Default cap for diff/selection text in CLI output, in characters. Chosen so a
- * poll result stays readable in an agent transcript; `--full` lifts it.
+ * Cap for one reviewer selection in CLI output, in characters — about fifty
+ * tokens. It used to be 2000, which let a single selection cost 372 tokens of a
+ * `wait` answer: the selection is a pointer to code the agent has on disk, so
+ * enough of it to recognise the passage is all it is for. The reviewer's
+ * `comment` is never cut — those are their own words, and the one part of a
+ * prompt that exists nowhere else.
  */
-export const CONTENT_LIMIT = 2_000;
+export const SELECTION_LIMIT = 200;
 
 /**
- * Keeps one reviewer selection from burying a whole poll result. The browser
- * always shows the full text; the CLI says how much it held back and how to
- * ask for all of it.
+ * How many prompts one answer carries. A round the reviewer spent an hour on
+ * can queue dozens; handing an agent all of them at once is a context it cannot
+ * act on either, and the answer says how many it is holding back.
  */
-export function truncateContent(value: string, limit = CONTENT_LIMIT): string {
+export const PROMPT_LIMIT = 20;
+
+/**
+ * Keeps one reviewer selection from burying a whole `wait` result. The browser
+ * always shows the full text; the CLI says how much it held back, where the
+ * rest can be read, and how to ask for all of it here.
+ */
+export function truncateContent(value: string, limit: number, rest: string): string {
   if (value.length <= limit) return value;
-  return `${value.slice(0, limit)}\n(truncated, ${value.length} chars — use --full)`;
+  return `${value.slice(0, limit)}\n(truncated, ${value.length} chars — use --full; ${rest})`;
 }
 
 const INTERNAL_ERROR_HELP = ["Re-run the command; if it persists this is a lightspeed bug"];

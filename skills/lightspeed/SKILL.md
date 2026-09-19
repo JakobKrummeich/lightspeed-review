@@ -8,6 +8,40 @@ description: Get a human review of a branch diff. Use when work is ready for rev
 Semantic diff review: a reviewer reads your branch diff in a browser, selects
 the lines they care about and sends comments back to you, one round at a time.
 
+## The turn
+
+> Queue always. End always. Send only on your turn.
+
+A review has exactly one turn holder. It is the reviewer's until your
+`wait` is handed their feedback; it is yours from that moment until you
+`ask`, `start` or `end`. While you hold it the reviewer's Send is
+disabled, so a round cannot change under you mid-edit; their queue and their
+End are never disabled, so they are never stuck behind you.
+
+Do not `wait` twice on one turn. A `wait` that parks gives the turn
+back — it says you are listening, not editing — so once you have declared
+`work`, a second `wait` is refused with `turn_still_yours` and exit 2
+rather than unlocking Send while you are still editing. Give the turn up
+deliberately instead: `start <branch> [base] --wait` to publish what you
+changed and block on the next round, or `ask` to hand it back with a
+question.
+
+Every answer this CLI prints carries `turn` and `round`. Read `turn`
+before choosing the next command; the `help[]` under it lists the moves that
+are legal from where you are. The first answer of each round spells them out;
+every answer after it in the same round gives the same list as a one-line
+`Next:` reminder, because by then you have the long form above in your own
+transcript.
+
+| command | turn after | blocks |
+| --- | --- | --- |
+| `start` | reviewer | no, unless `--wait` |
+| `wait` | yours, on delivery | **yes** |
+| `ask` | reviewer, then yours on their answer | **yes** |
+| `say` | unchanged | no |
+| `work` | yours, and the banner names your plan | no |
+| `end` | ended | no |
+
 ## The loop
 
 1. **Show the diff.**
@@ -28,20 +62,38 @@ the lines they care about and sends comments back to you, one round at a time.
    ```
 
    Omitting it fails with `intent_missing` before any git or model work.
-2. **Wait for feedback.**
-   > Run `lightspeed poll <branch> [base]` in the foreground to wait for reviewer feedback — it blocks until the reviewer sends, so never background it or wrap it in a timeout
+2. **Wait for the turn.**
+   > Run `lightspeed wait <branch> [base]` in the foreground to take the turn when the reviewer sends — it blocks until the reviewer sends, so never background it or wrap it in a timeout
 
-   A poll that is backgrounded or timed out loses the reviewer's feedback.
-3. **Address what came back.** Each prompt names the file, the group and the
+   A `wait` that is backgrounded or timed out loses the reviewer's feedback.
+   It returns when they send, and the turn is yours from that moment.
+3. **Say what you are doing, before you go quiet.**
+   `lightspeed work "<plan>" <branch> [base]` puts your plan in the
+   reviewer's banner for as long as the silence lasts. It is not a lock you
+   take — you already hold the turn — it is the reason they are waiting.
+4. **Address what came back.** Each prompt names the file, the group and the
    exact text the reviewer selected — see **What a prompt says** below for the
-   fields that pin it down. Fix, commit, then run `start` again:
-   it is idempotent, re-groups the fresh diff and keeps the conversation.
-   Files the reviewer already approved come back ticked and dimmed unless you
-   touched them, so each round shows the reviewer only what is new work.
-4. **Keep the reviewer in the loop.** Reply while you work with
-   `lightspeed poll <branch> [base] --agent-reply "<summary>"`.
-5. **Close it.**
-   > Run `lightspeed end <branch> [base]` to close a session
+   fields that pin it down. Answer a single comment by name, without blocking
+   and without giving the turn up:
+
+   ```sh
+   lightspeed say "now one transaction" --for evt_0abc123de_0007
+   ```
+
+   `--files` may be added to that line, but only for files a round you have
+   already published changed — it is a claim the server checks against the
+   between-round diff, not a note. Naming a file you have only just edited is
+   refused with `declaration_invalid`: say it without `--files` now, or
+   commit, run `start` again and re-send the same line with it.
+
+   If something is unclear, `lightspeed ask "<question>"` hands the turn back
+   and blocks on the answer — cheaper than guessing and rewriting a round.
+5. **Publish the next round.** Fix, commit, then run `start` again: it is
+   idempotent, re-groups the fresh diff and keeps the conversation. Files the
+   reviewer already approved come back ticked and dimmed unless you touched
+   them, so each round shows the reviewer only what is new work.
+6. **Close it.**
+   > Run `lightspeed end <branch> [base]` to close the session
 
 ## What a prompt says
 
@@ -75,15 +127,27 @@ comment. An annotation carries:
   `+`/`-` marker; a clipped line is quoted as the file has it.
 - The anchor can be missing entirely when the diff printed no line numbers for
   the selection; `selected_text` is then all you have.
+- A long `selected_text` is cut at 200 characters and says
+  where the rest is — the anchor above points into your own checkout. The
+  `comment` is never cut. A round that queues more than 20
+  prompts reports `omitted`; read the rest with `--full` before you act.
 
 ## Rules
 
-- Run `poll` in the foreground, every time. It has no timeout by design.
-- `Send & End` from the reviewer ends the review; poll reports `ended: true`.
-  `start` on an ended review is refused with `session_ended`. When the reviewer
-  asks for another round — and only then — run
-  `lightspeed start <branch> [base] --reopen`.
-- An ended poll is not by itself an approval. Read `approval.verdict`:
+- Run `wait` and `ask` in the foreground, every time. They have no timeout
+  by design.
+- `work` is the only command that requires the turn. Running it without one
+  answers `turn_not_yours` and exits 2, with the fixing command in its
+  `help[]` — read it rather than retrying. `wait` is the mirror of it:
+  run while you hold the turn and are working, it answers
+  `turn_still_yours` and exits 2 the same way.
+- `Send & End` from the reviewer ends the review; `wait` reports
+  `ended: true`. `start`, `say`, `ask` and `work` on an ended review
+  are all refused with `session_ended`: there is nobody left to read the
+  words, and an ended review holds no turn to declare work on. When
+  the reviewer asks for another round — and only then — run
+  `lightspeed start <branch> [base] --reopen --intent "<why>"`.
+- An ended `wait` is not by itself an approval. Read `approval.verdict`:
   `signed-off` (every file approved), `partial` (some approved, some not),
   `none` (nothing approved) or `empty` (the review held no files). Only
   `signed-off` is a sign-off; a review may be ended with nothing approved at
@@ -98,9 +162,10 @@ comment. An annotation carries:
 - `lightspeed approvals [branch] [base]` names those files — which were
   approved, which were swept, which nobody signed off on. Run it only when
   something turns on which file; the verdict and counts answer most reviews on
-  their own. It prints the first 50 paths of each list; the
-  `count` block beside them is read off the whole review either way, and
-  `--full` prints every path when a list was cut. `endedBy` is
+  their own. It prints the first 50 paths of each list, and
+  only the lists that name something; the `counts` block beside them is read
+  off the whole review either way, and `--full` prints every path when a list
+  was cut. `endedBy` is
   `reviewer` or `agent` — whether a person closed it or an agent's own
   `lightspeed end` did — and is absent when the session does not say.
   The `help[]` line echoes the verdict and otherwise adds only what those
@@ -115,11 +180,22 @@ comment. An annotation carries:
 
 ## Setup
 
-The repository needs `.lightspeed.conf.json` in its root:
+The repository needs `.lightspeed.conf.json` in its root.
+Run `lightspeed init --config` to write one:
 
 ```json
-{ "model": "<provider/model>", "thinking": "off" }
+{ "model": "anthropic/claude-sonnet-4-5", "thinking": "off" }
 ```
+
+`model` is never defaulted and no command lists the ids. Name one you can
+reach:
+- `anthropic/claude-sonnet-4-5`
+- `anthropic/claude-haiku-4-5`
+- `openai/gpt-5`
+
+A model nobody has does not fail the run: the round opens with
+`grouping.mode: fallback`, the whole diff as one group, and a `fix` line
+naming the key to change.
 
 Optional keys: `port` (4388), `stateDir` (`~/.lightspeed`),
 `feedbackLog` (`on`), `classify` — two glob lists,
@@ -132,8 +208,9 @@ their own terminal; an agent must never run it.
 
 ## Output
 
-Every command answers TOON on stdout with a `help[]` block of next steps, and
-every failure answers `error: {code, message, detail}` plus `help[]` — exit 2
-when the command line itself is wrong (unknown command, subcommand or flag, a
-missing or unparseable argument), exit 1 for everything else. Run
-`lightspeed <command> --help` for a command's flags.
+Every command answers TOON on stdout, led by `turn` and `round` and closed
+by a `help[]` block naming the moves that are legal from there. Every failure
+answers `error: {code, message, detail}` plus `help[]` — exit 2 when the
+command line itself is wrong (unknown command, subcommand or flag, a missing or
+unparseable argument), exit 1 for everything else. Run
+`lightspeed <command> --help` for a command's flags and two worked examples.

@@ -207,8 +207,8 @@ function withNewline(text: string): string {
 /**
  * The round reply for fallback cards: everything the agent said since the
  * reviewer's last words of the commented round. Read by position, not stamp
- * alone — replies land on both sides of the round boundary (`poll
- * --agent-reply` carries the old stamp, post-`start` the new); what they share
+ * alone — replies land on both sides of the round boundary (a `say` carries
+ * the old stamp, one after `start` the new); what they share
  * is coming after the comments they answer.
  */
 export function agentRoundReply(

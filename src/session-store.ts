@@ -4,15 +4,66 @@ import type { DiffFileStatus, DiffGroup } from "./diff-extract.ts";
 import { trailSweeps } from "./group-tier.ts";
 import type { GroupingMode } from "./llm/grouping.ts";
 import { ReviewError } from "./errors.ts";
+import { startCall } from "./commands/home.ts";
 import { sessionFilePath, sessionsDirPath } from "./paths.ts";
 
 export type SessionStatus = "open" | "feedback" | "ended";
 
 /**
  * Who closed the review: reviewer `Send & End` or agent `lightspeed end`. An
- * agent polling an ended review must be able to tell whether a person looked at all.
+ * agent whose `wait` returns on an ended review must be able to tell whether a
+ * person looked at all.
  */
 export type ReviewCloser = "reviewer" | "agent";
+
+/**
+ * Whose move it is. Exactly one holder per session, and the whole rule is one
+ * line: queue always, end always, send only on your turn. Persisted rather than
+ * held in memory because a `serve` restart that silently handed Send back would
+ * let the reviewer fire at an agent that is still editing.
+ *
+ * A union on `holder` so the fields that only mean something on one side cannot
+ * be read on the other: there is no such thing as a reviewer's `mode`, and an
+ * agent's turn always has one. Readers branch on `holder` and get the rest.
+ */
+export type Turn = ReviewerTurn | AgentTurn;
+
+/** Send is live and nothing is owed to the reviewer. */
+export interface ReviewerTurn {
+  holder: "reviewer";
+  at: string;
+}
+
+/** The agent's move. Send is off until it hands the turn back. */
+export interface AgentTurn {
+  holder: "agent";
+  /**
+   * Presentational only: `reading` and `working` gate identically. `reading` is
+   * set on delivery, `working` by the agent's own `work "<plan>"`. Required, so
+   * no reader has to decide what an agent's turn with no mode would mean.
+   */
+  mode: "reading" | "working";
+  at: string;
+  /** The plan `work` declared, which the reviewer's banner names. */
+  note?: string;
+}
+
+/**
+ * One batch of prompts handed to a poll and not yet confirmed by the agent that
+ * asked for them. TCP cannot say whether an answer was read: the bytes reach the
+ * OS whether the client is reading or already gone, so the only witness that a
+ * delivery landed is the agent saying so (`POST /api/session/:key/delivered`).
+ * Until it does, the batch is held here and the next poll puts it back — which
+ * is why it is persisted and not kept in memory: a `serve` restart in that
+ * window would otherwise be the one way feedback is lost for good.
+ */
+export interface Delivery {
+  /** Minted per handover and echoed back, so a stale ack confirms nothing. */
+  id: string;
+  /** Exactly what was drained, in written order, to put back at the head. */
+  prompts: FeedbackPrompt[];
+  at: string;
+}
 
 /** Which version of the file the annotated lines belong to. */
 export type AnnotationSide = "old" | "new";
@@ -51,7 +102,7 @@ export type AnchorFields =
 export type AnnotationPrompt = {
   type: "annotation";
   /**
-   * Server-minted id this comment goes by everywhere (poll output, declarations,
+   * Server-minted id this comment goes by everywhere (`wait` output, declarations,
    * ledger). Minted on acceptance: a queued prompt has none — `parsePrompt`
    * strips whatever a client claims — and pre-id prompts never get one, which
    * reads as "unknown", not as any particular comment.
@@ -67,6 +118,12 @@ export type AnnotationPrompt = {
 export interface MessagePrompt {
   type: "message";
   comment: string;
+  /**
+   * `lightspeed ask`: the agent put a question to the reviewer, so the panel
+   * draws an answer box under it. Absent is an ordinary message, never a
+   * question nobody answered.
+   */
+  kind?: "question";
 }
 
 export type FeedbackPrompt = AnnotationPrompt | MessagePrompt;
@@ -151,6 +208,11 @@ export interface SessionRecord {
   headCommit?: string;
   status: SessionStatus;
   /**
+   * Whose move it is. Never optional to a reader: a session file written before
+   * turns existed opens with the reviewer holding it — see `parseSession`.
+   */
+  turn: Turn;
+  /**
    * Set when `status` becomes `ended`, dropped on reopen. Absent on older
    * sessions reads as "nobody wrote it down", not as either party.
    */
@@ -164,8 +226,13 @@ export interface SessionRecord {
   groups: DiffGroup[];
   /** Everything already delivered, oldest first. */
   conversation: ConversationEntry[];
-  /** Queued by the browser, not yet handed to a `poll`. */
+  /** Queued by the browser, not yet handed to a `wait`. */
   pending: FeedbackPrompt[];
+  /**
+   * Handed to a poll and not yet confirmed. Absent is the steady state: nothing
+   * is in flight, and every prompt the review owes the agent is in `pending`.
+   */
+  delivering?: Delivery;
   /** Paths ticked `approved`; reset whenever `start` re-groups. */
   approved: string[];
   /**
@@ -178,6 +245,14 @@ export interface SessionRecord {
    * past from it, so it is never optional: absent is rejected, not "no history".
    */
   rounds: SessionRound[];
+  /**
+   * The round, as `round:` prints it, whose full `help[]` an answer has already
+   * carried. Persisted because every CLI invocation is a fresh process: there is
+   * nowhere else "this agent has already been told the moves" could live across
+   * one. Absent reads as "not yet told", which is the safe direction — the cost
+   * of being wrong is a repeated help block, not a lost move.
+   */
+  helpShownRound?: number;
   /**
    * What the agent said each comment led to, keyed by `AnnotationPrompt.id`;
    * newest declaration wins, which makes redeclaring idempotent. On the session,
@@ -235,6 +310,11 @@ function parseSession(contents: string, key: string): SessionRecord {
   // rewrite the file: what a reader gets is the order the review is drawn in.
   return {
     ...parsed,
+    // A session from before turns existed opens with the reviewer holding it:
+    // the safe direction for a missing answer is the one that leaves Send live,
+    // since a lock nobody can lift is a review nobody can finish. Stamped at the
+    // last write, which is the only moment the file can vouch for.
+    turn: parsed.turn ?? { holder: "reviewer", at: parsed.updatedAt },
     groups: trailSweeps(parsed.groups.map((group) => ({ ...group, tier: group.tier ?? "study" }))),
     rounds: parsed.rounds.map((round) => ({ ...round, approvedAtEnd: round.approvedAtEnd ?? [] })),
   };
@@ -255,7 +335,7 @@ function sessionCorrupt(key: string, message: string, detail: string): ReviewErr
     message,
     detail,
     suggestions: [
-      `Delete \`sessions/${key}.json\` in your state directory and re-run \`lightspeed start <branch> [base]\``,
+      `Delete \`sessions/${key}.json\` in your state directory and re-run \`${startCall("<branch> [base]")}\``,
     ],
   });
 }

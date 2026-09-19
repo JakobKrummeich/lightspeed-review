@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { ReviewError, validationError } from "../../errors.ts";
+import { ReviewError, invocationError } from "../../errors.ts";
 import { EXPORT_FORMATS, type ExportFormat } from "../../ledger/export.ts";
 import type { LedgerStore } from "../../ledger/store.ts";
 import { scanArgs } from "../args.ts";
@@ -91,7 +91,7 @@ function missingValue(flag: string): Error {
 }
 
 export function unknownFlag(flag: string, allowed: readonly string[]): Error {
-  return validationError(`unknown flag ${flag}`, [
+  return invocationError("unknown_flag", `unknown flag ${flag}`, [
     `Known here: ${allowed.join(", ")}`,
     "Run `lightspeed feedback --help` for every subcommand and flag",
   ]);

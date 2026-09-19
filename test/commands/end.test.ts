@@ -27,6 +27,7 @@ function session(overrides: Partial<SessionRecord> = {}): SessionRecord {
     pending: [],
     approved: [],
     rounds: [],
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
     ...overrides,
   };
 }
@@ -51,7 +52,10 @@ test("closes the session and reports it as ended", async () => {
     const output = await runEnd({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
 
     assert.equal(store.get(sessionKey(REPO, BRANCH, BASE))?.status, "ended");
-    assert.equal((output.session as { status: string }).status, "ended");
+    // The turn says it is over; a second word for the same fact is one an agent
+    // has to reconcile, and the one that goes stale.
+    assert.equal(output.turn, "ended");
+    assert.ok(!("status" in (output.session as object)));
     assert.ok((output.help as string[]).some((line) => line.includes("start feature-auth main")));
   });
 });

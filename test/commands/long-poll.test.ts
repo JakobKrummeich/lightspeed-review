@@ -87,7 +87,7 @@ async function pollServer(options: HarnessOptions = {}): Promise<Harness> {
 
 function pollFor(harness: Harness): Promise<unknown> {
   return longPoll({
-    url: `http://127.0.0.1:${harness.port}/api/poll?key=abc`,
+    origin: `http://127.0.0.1:${harness.port}`,
     key: "abc",
     port: harness.port,
     probeBackoffMs: [5, 5],
@@ -131,7 +131,7 @@ test("reconnection is unbounded while the server is still answering for itself",
 });
 
 test("a reply and then a poll: the wait gets its own connection and survives", async () => {
-  // The bug report's sequence — `poll --agent-reply` posts, then waits — against a server whose
+  // The bug report's sequence — a `say` posts, then a `wait` blocks — against a server whose
   // idle keep-alive expires between the two: the poll takes its own connection and holds it.
   const harness = await pollServer({ keepAliveTimeoutMs: 50 });
   await apiRequest(`http://127.0.0.1:${harness.port}/api/session/abc/reply`, jsonPost({ c: 1 }));
@@ -167,14 +167,21 @@ test("nothing listening is reported as server_not_running once the probes are sp
   await assert.rejects(
     () =>
       longPoll({
-        url: "http://127.0.0.1:1/api/poll?key=abc",
+        origin: "http://127.0.0.1:1",
         key: "abc",
+        target: "feature-auth main",
         port: 1,
         probeBackoffMs: [5, 5],
       }),
     (error: ReviewError) => {
       assert.equal(error.code, "server_not_running");
       assert.match(error.detail ?? "", /nothing accepted a connection on port 1/);
+      // The review is the one the wait was already pointed at, and `start`
+      // refuses to run without the intent this line now carries.
+      assert.match(
+        error.suggestions.join(" "),
+        /lightspeed start feature-auth main --intent "<why this branch exists>"/,
+      );
       return true;
     },
   );
@@ -190,7 +197,7 @@ test("a port held by something that is not a review server is named, not waited 
   await assert.rejects(
     () =>
       longPoll({
-        url: `http://127.0.0.1:${port}/api/poll?key=abc`,
+        origin: `http://127.0.0.1:${port}`,
         key: "abc",
         port,
         probeBackoffMs: [5, 5],

@@ -172,12 +172,33 @@ test("diffStats counts binary files in binary_skipped", () => {
   assert.equal(stats.binary_skipped, 1);
 });
 
-test("extractDiff reports git_ref_not_found for an unknown branch", () => {
+/**
+ * S6: git's own stderr went straight past the output layer, so an agent reading
+ * `2>&1` — the common case — got three lines of `fatal:` prose in front of the
+ * TOON and failed to parse a failure that was already reported. The same three
+ * lines were inside `detail` all along, where one of them is enough.
+ */
+test("extractDiff reports git_ref_not_found naming both refs and the way back", () => {
   const repoRoot = gitRepoWithBranch();
 
   assert.throws(
-    () => extractDiff(repoRoot, "does-not-exist", "main"),
-    (error: unknown) => error instanceof ReviewError && error.code === "git_ref_not_found",
+    () => extractDiff(repoRoot, "no/such/branch", "main"),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "git_ref_not_found");
+      assert.equal(error.message, "git could not diff main...no/such/branch");
+      // git's own wording, down to the full stop: the line is quoted, not retyped.
+      assert.equal(
+        error.detail,
+        "fatal: ambiguous argument 'main...no/such/branch':" +
+          " unknown revision or path not in the working tree.",
+      );
+      assert.deepEqual(error.suggestions, [
+        "Check both refs exist: `git rev-parse no/such/branch` and `git rev-parse main`",
+        'Then re-run `lightspeed start no/such/branch main --intent "<why this branch exists>"`',
+      ]);
+      return true;
+    },
   );
 });
 

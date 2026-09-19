@@ -7,7 +7,7 @@ import {
   SEND_LABEL,
   type PanelState,
 } from "../../src/browser/conversation-panel.ts";
-import type { ConversationEntry, FeedbackPrompt } from "../../src/session-store.ts";
+import type { ConversationEntry, FeedbackPrompt, Turn } from "../../src/session-store.ts";
 
 const annotation: FeedbackPrompt = {
   type: "annotation",
@@ -27,6 +27,9 @@ const delivered: ConversationEntry[] = [
   },
 ];
 
+const REVIEWERS_TURN: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
+const AGENTS_TURN: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
+
 const oneRound = [{ index: 0, at: "2025-01-01T00:00:00.000Z" }];
 const twoRounds = [...oneRound, { index: 1, at: "2025-01-02T00:00:00.000Z" }];
 
@@ -38,7 +41,7 @@ function panelState(over: Partial<PanelState> = {}): PanelState {
     rounds: oneRound,
     status: "open",
     allApproved: false,
-    agentWorking: false,
+    turn: REVIEWERS_TURN,
     ...over,
   };
 }
@@ -66,7 +69,7 @@ test("renders delivered conversation entries with their author", () => {
 });
 
 test("the agent's answer to a specific comment appears under that comment", () => {
-  // `poll --for --note` answers one comment by id; the panel must show the declaration with the
+  // `say "<text>" --for <id>` answers one comment by id; the panel must show the declaration with the
   // words it answers, not only in the replay.
   const withId: FeedbackPrompt = { ...annotation, id: "evt_1" };
   const other: FeedbackPrompt = { ...annotation, id: "evt_2", comment: "rename this" };
@@ -189,7 +192,7 @@ test("the redrawn half holds the history and the queue and nothing the reviewer 
 });
 
 test("the compose half is rendered on its own so a redraw never has to touch it", () => {
-  const html = renderCompose({ status: "open", allApproved: false });
+  const html = renderCompose({ status: "open", allApproved: false, turn: REVIEWERS_TURN });
 
   assert.match(html, /<textarea[^>]*id="lsr-general-comment"/);
   assert.match(html, /id="lsr-send"[^>]*>Send to Agent</);
@@ -200,13 +203,13 @@ test("the compose half is rendered on its own so a redraw never has to touch it"
 test("the label in the compose markup is the constant the panel patches back", () => {
   // The row is rendered once and patched in place: the in-flight label the mount writes must be
   // the same string this markup came out with.
-  const html = renderCompose({ status: "open", allApproved: false });
+  const html = renderCompose({ status: "open", allApproved: false, turn: REVIEWERS_TURN });
 
   assert.match(html, new RegExp(`id="lsr-send"[^>]*>${SEND_LABEL}<`));
 });
 
 test("an approved review says so above the button that finishes it", () => {
-  const html = renderCompose({ status: "open", allApproved: true });
+  const html = renderCompose({ status: "open", allApproved: true, turn: REVIEWERS_TURN });
 
   assert.match(html, /Every file is approved/);
   assert.ok(
@@ -218,26 +221,27 @@ test("an approved review says so above the button that finishes it", () => {
 test("the live region is in the markup whether or not it has anything to say", () => {
   // A role="status" element inserted with its text is announced by no screen reader reliably;
   // text arriving in an existing region is.
-  const quiet = renderCompose({ status: "open", allApproved: false });
+  const quiet = renderCompose({ status: "open", allApproved: false, turn: REVIEWERS_TURN });
 
   // Read off the tag, not one spelling of it: the claim is "there and empty", not attribute order.
   const region = /<p[^>]*role="status"[^>]*>([\s\S]*?)<\/p>/;
   assert.equal(region.exec(quiet)?.[1], "");
   assert.match(
-    region.exec(renderCompose({ status: "open", allApproved: true }))?.[1] ?? "",
+    region.exec(renderCompose({ status: "open", allApproved: true, turn: REVIEWERS_TURN }))?.[1] ??
+      "",
     /^Every file is approved/,
   );
 });
 
 test("an ended review is nudged toward nothing, whatever its ticks say", () => {
-  const html = renderCompose({ status: "ended", allApproved: true });
+  const html = renderCompose({ status: "ended", allApproved: true, turn: REVIEWERS_TURN });
 
   assert.doesNotMatch(html, /Every file is approved/);
   assert.match(html, /This review has ended/);
 });
 
 test("an ended compose half refuses input on its own", () => {
-  const html = renderCompose({ status: "ended", allApproved: false });
+  const html = renderCompose({ status: "ended", allApproved: false, turn: REVIEWERS_TURN });
 
   assert.match(html, /<textarea[^>]*disabled/);
   assert.match(html, /id="lsr-send"[^>]*disabled/);
@@ -308,9 +312,9 @@ test("the round line is a separator to a screen reader, named as one", () => {
 });
 
 test("an agent away with the feedback is said at the foot of the conversation", () => {
-  const html = renderScroll(panelState({ conversation: delivered, agentWorking: true }));
+  const html = renderScroll(panelState({ conversation: delivered, turn: AGENTS_TURN }));
 
-  assert.match(html, /the agent is working on your feedback/);
+  assert.match(html, /the agent has your feedback/);
   assert.ok(
     html.indexOf("lsr-working") > html.indexOf("done, wrapped it"),
     "it waits where the next answer will be written, under everything said so far",
@@ -322,7 +326,7 @@ test("an agent away with the feedback is said at the foot of the conversation", 
 });
 
 test("the breathing dots are hidden from a reader the sentence already tells", () => {
-  const html = renderScroll(panelState({ agentWorking: true }));
+  const html = renderScroll(panelState({ turn: AGENTS_TURN }));
 
   assert.match(html, /class="lsr-working-dots" aria-hidden="true"/);
 });
@@ -333,7 +337,7 @@ test("nobody is said to be working when nobody is", () => {
 
 test("an ended review says nothing about work still going on", () => {
   // The agent may still be running when the review ends, but nobody here waits on it any more.
-  const html = renderScroll(panelState({ status: "ended", agentWorking: true }));
+  const html = renderScroll(panelState({ status: "ended", turn: AGENTS_TURN }));
 
   assert.doesNotMatch(html, /lsr-working/);
 });
@@ -382,4 +386,92 @@ test("comments in one card stand apart: each prompt is its own block", () => {
   const html = renderPanel(panelState({ conversation: delivered }));
 
   assert.match(html, /<div class="lsr-prompt">/);
+});
+
+/** The agent's question and the reviewer's answer, as `ask` leaves them. */
+const question: FeedbackPrompt = {
+  type: "message",
+  comment: "should the retry be per-request or per-batch?",
+  kind: "question",
+};
+
+function asked(...after: ConversationEntry[]): ConversationEntry[] {
+  return [
+    { role: "agent", at: "2025-01-01T00:05:00.000Z", roundIndex: 0, prompts: [question] },
+    ...after,
+  ];
+}
+
+test("a question the agent asked is drawn as a card, not as one more remark", () => {
+  const html = renderScroll(panelState({ conversation: asked() }));
+
+  assert.match(html, /<div class="lsr-prompt" data-kind="question">/);
+  assert.match(html, /the agent is asking/);
+  assert.match(html, /per-request or per-batch/);
+});
+
+test("the open question carries its own answer box and its own press", () => {
+  const html = renderScroll(panelState({ conversation: asked() }));
+
+  assert.match(html, /class="lsr-answer-box"/);
+  assert.match(html, /class="lsr-answer-send"/);
+  // The box says what the press does, because it is not the button beneath it:
+  // it sends this text and leaves the queue alone.
+  assert.match(html, /sends this alone/);
+});
+
+/** A question is open while nothing has been said after it. Once the reviewer
+ * answers, the agent has stopped waiting, and a box still sitting there would
+ * invite an answer to a question nobody is listening for. */
+test("an answered question keeps its card and loses its box", () => {
+  const html = renderScroll(
+    panelState({
+      conversation: asked({
+        role: "reviewer",
+        at: "2025-01-01T00:06:00.000Z",
+        roundIndex: 0,
+        prompts: [{ type: "message", comment: "per-batch" }],
+      }),
+    }),
+  );
+
+  assert.match(html, /data-kind="question"/);
+  assert.match(html, /the agent is asking/);
+  assert.doesNotMatch(html, /lsr-answer-box/);
+});
+
+test("an ended review answers nothing, whatever was left hanging", () => {
+  const html = renderScroll(panelState({ status: "ended", conversation: asked() }));
+
+  assert.doesNotMatch(html, /lsr-answer-box/);
+});
+
+/** Only questions are cards. An ordinary `say` is the agent reporting, and a
+ * card around every sentence would make the one that blocks it unfindable. */
+test("what the agent merely said is not drawn as a question", () => {
+  const html = renderScroll(panelState({ conversation: delivered }));
+
+  assert.doesNotMatch(html, /data-kind="question"/);
+  assert.doesNotMatch(html, /lsr-answer-box/);
+});
+
+test("a question escapes like everything else the agent writes", () => {
+  const html = renderScroll(
+    panelState({
+      conversation: [
+        {
+          role: "agent",
+          at: "2025-01-01T00:05:00.000Z",
+          roundIndex: 0,
+          prompts: [{ type: "message", comment: "<script>alert(1)</script>", kind: "question" }],
+        },
+      ],
+    }),
+  );
+
+  // Case-insensitive and open-ended: `<SCRIPT>` and `<script src=x>` are the
+  // same escape, and a regexp that only knows the exact lower-case tag would
+  // pass while the panel served one of the others.
+  assert.doesNotMatch(html, /<script/i);
+  assert.match(html, /&lt;script&gt;/);
 });

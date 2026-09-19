@@ -17,8 +17,8 @@ const execFileAsync = promisify(execFile);
 const cliPath = fileURLToPath(new URL("../../src/cli.ts", import.meta.url));
 
 /**
- * A poll with nothing to say blocks forever by design; the kill-switch never fires on the green
- * path (each poll runs once an answer is queued) but a regression must fail, not hang the runner.
+ * A wait with nothing to say blocks forever by design; the kill-switch never fires on the green
+ * path (each wait runs once an answer is queued) but a regression must fail, not hang the runner.
  */
 const CLI_TIMEOUT_MS = 30_000;
 
@@ -98,7 +98,7 @@ function parseStartStdout(stdout: string): { key: string; url: string } {
   return { key, url };
 }
 
-test("the full loop: start, reviewer feedback over HTTP, poll, end, poll, stop", async () => {
+test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, wait, stop", async () => {
   const port = await freePort();
   const repoRoot = repoWithOneFileDiff(port);
   try {
@@ -107,7 +107,7 @@ test("the full loop: start, reviewer feedback over HTTP, poll, end, poll, stop",
       repoRoot,
     );
     assert.equal(started.code, 0, started.stdout);
-    assert.match(started.stdout, /^ {2}status: open$/m);
+    assert.match(started.stdout, /^turn: reviewer$/m);
     // The loop below only holds because no model was consulted.
     assert.match(started.stdout, /^ {2}mode: skipped$/m);
     const { key, url } = parseStartStdout(started.stdout);
@@ -129,25 +129,50 @@ test("the full loop: start, reviewer feedback over HTTP, poll, end, poll, stop",
     });
     assert.equal(feedback.status, 200);
 
-    // Queued feedback answers a later poll immediately: no waiting, no races.
-    const polled = await runCli(["poll", "feature", "main"], repoRoot);
-    assert.equal(polled.code, 0, polled.stdout);
-    assert.match(polled.stdout, /^status: feedback$/m);
-    assert.match(polled.stdout, /^ended: false$/m);
-    assert.match(polled.stdout, /prefer a named constant/);
-    // The minted id is what `poll --for <id>` declarations name later.
-    assert.match(polled.stdout, /evt_[a-z0-9]+_\d+/);
+    // Queued feedback answers a later wait immediately: no waiting, no races.
+    const waited = await runCli(["wait", "feature", "main"], repoRoot);
+    assert.equal(waited.code, 0, waited.stdout);
+    assert.match(waited.stdout, /^ended: false$/m);
+    assert.match(waited.stdout, /prefer a named constant/);
+    // Delivery is the only thing that hands the turn over, and the answer says so.
+    assert.match(waited.stdout, /^turn: "?agent reading"?$/m);
+    assert.match(waited.stdout, /^round: 1$/m);
+    // The minted id is what `say --for <id>` declarations name later.
+    const commentId = /evt_[a-z0-9]+_\d+/.exec(waited.stdout)?.[0];
+    assert.ok(commentId, waited.stdout);
+
+    // Holding the turn, the agent may declare the silence it is about to keep.
+    const working = await runCli(["work", "rename it to MAX_RETRIES", "feature", "main"], repoRoot);
+    assert.equal(working.code, 0, working.stdout);
+    assert.match(working.stdout, /^turn: "?agent working"?$/m);
+
+    // `say --for` pins the answer under the comment it answers and keeps the turn.
+    const said = await runCli(
+      ["say", "renamed it", "feature", "main", "--for", commentId],
+      repoRoot,
+    );
+    assert.equal(said.code, 0, said.stdout);
+    assert.match(said.stdout, /^turn: "?agent working"?$/m);
+
+    // A second wait on a turn the agent is still working under would hand Send
+    // back mid-edit, so it is refused before it can park — in the agent's own
+    // error shape, exit 2, naming the two moves that give the turn up on purpose.
+    const waitedAgain = await runCli(["wait", "feature", "main"], repoRoot);
+    assert.equal(waitedAgain.code, 2, waitedAgain.stdout);
+    assert.match(waitedAgain.stdout, /^ {2}code: turn_still_yours$/m);
+    assert.match(waitedAgain.stdout, /--wait/);
 
     const ended = await runCli(["end", "feature", "main"], repoRoot);
     assert.equal(ended.code, 0, ended.stdout);
-    assert.match(ended.stdout, /^ {2}status: ended$/m);
+    assert.match(ended.stdout, /^turn: ended$/m);
 
-    // An ended session answers a poll at once: who closed it, what approval evidence remains.
-    const afterEnd = await runCli(["poll", "feature", "main"], repoRoot);
+    // An ended session answers a wait at once: who closed it, what approval evidence remains.
+    const afterEnd = await runCli(["wait", "feature", "main"], repoRoot);
     assert.equal(afterEnd.code, 0, afterEnd.stdout);
     assert.match(afterEnd.stdout, /^ended: true$/m);
     assert.match(afterEnd.stdout, /^endedBy: agent$/m);
-    // The earlier poll took the only comment, so this one has nothing — said, not left blank.
+    assert.match(afterEnd.stdout, /^turn: ended$/m);
+    // The earlier wait took the only comment, so this one has nothing — said, not left blank.
     assert.match(afterEnd.stdout, /^prompts: 0$/m);
     assert.match(afterEnd.stdout, /^message: no feedback was queued when this review ended$/m);
     // A verdict and counts. The paths cost the agent context it did not ask for, so they
@@ -160,12 +185,13 @@ test("the full loop: start, reviewer feedback over HTTP, poll, end, poll, stop",
 
     const named = await runCli(["approvals", "feature", "main"], repoRoot);
     assert.equal(named.code, 0, named.stdout);
-    assert.match(named.stdout, /^ {2}approved\[1\]: app\.ts$/m);
-    assert.match(named.stdout, /^ {2}unapproved: \[\]$/m);
-    assert.match(named.stdout, /^ {2}swept: \[\]$/m);
+    assert.match(named.stdout, /^approved\[1\]: app\.ts$/m);
+    // The lists that name nothing are not printed: their counts already say so.
+    assert.doesNotMatch(named.stdout, /^unapproved/m);
+    assert.doesNotMatch(named.stdout, /^swept/m);
     // A one-file review is printed whole, so the counts beside it report no cut.
     assert.match(named.stdout, /^ {2}total: 1$/m);
-    assert.match(named.stdout, /^ {2}has_more: false$/m);
+    assert.doesNotMatch(named.stdout, /omitted/);
     assert.doesNotMatch(named.stdout, /--full/);
 
     const stopped = await runCli(["stop"], repoRoot);
@@ -196,15 +222,22 @@ test("a reviewer's Send & End closes the review; only --reopen starts a new roun
     });
     assert.equal(sendAndEnd.status, 200);
 
-    // One poll gets both: the comment and the ending — nothing approved, which must not read as sign-off.
-    const polled = await runCli(["poll", "feature", "main"], repoRoot);
-    assert.equal(polled.code, 0, polled.stdout);
-    assert.match(polled.stdout, /^ended: true$/m);
-    assert.match(polled.stdout, /^endedBy: reviewer$/m);
-    assert.match(polled.stdout, /prefer a named constant/);
-    assert.match(polled.stdout, /^ {2}verdict: none$/m);
-    assert.match(polled.stdout, /^ {2}approved: 0$/m);
-    assert.match(polled.stdout, /^ {2}unapproved: 1$/m);
+    // One wait gets both: the comment and the ending — nothing approved, which must not read as sign-off.
+    const waited = await runCli(["wait", "feature", "main"], repoRoot);
+    assert.equal(waited.code, 0, waited.stdout);
+    assert.match(waited.stdout, /^ended: true$/m);
+    assert.match(waited.stdout, /^endedBy: reviewer$/m);
+    assert.match(waited.stdout, /prefer a named constant/);
+    assert.match(waited.stdout, /^ {2}verdict: none$/m);
+    assert.match(waited.stdout, /^ {2}approved: 0$/m);
+    assert.match(waited.stdout, /^ {2}unapproved: 1$/m);
+
+    // An ended review is refused as ended by every command that speaks into one,
+    // `work` included — not as a turn the agent failed to hold.
+    const illegal = await runCli(["work", "carrying on regardless", "feature", "main"], repoRoot);
+    assert.equal(illegal.code, 1, illegal.stdout);
+    assert.match(illegal.stdout, /^ {2}code: session_ended$/m);
+    assert.match(illegal.stdout, /--reopen/);
 
     // The agent may not quietly open round two on a review the reviewer ended.
     const refused = await runCli(["start", "feature", "--intent", "again", "--no-open"], repoRoot);
@@ -217,7 +250,7 @@ test("a reviewer's Send & End closes the review; only --reopen starts a new roun
       repoRoot,
     );
     assert.equal(reopened.code, 0, reopened.stdout);
-    assert.match(reopened.stdout, /^ {2}status: open$/m);
+    assert.match(reopened.stdout, /^turn: reviewer$/m);
   } finally {
     await shutdownServer(port);
   }

@@ -2,24 +2,38 @@
  * The server's push transport: SSE streams to browser pages and long-poll
  * waiters per session. Every collection lives behind this class so handlers
  * cannot mutate shared transport state directly — half of presence is derived
- * from the pollers, and the half that cannot be is only set through a method.
+ * from the pollers, and the other half is read off the stored turn.
  */
 import type { ServerResponse } from "node:http";
+import type { Turn } from "../session-store.ts";
 import { sseFrame } from "./http.ts";
 
 export type WakeReason = "feedback" | "shutdown";
 
+/**
+ * A parked poller. Answering takes what was queued, so it says whether it did:
+ * the queue is one batch and it belongs to one agent.
+ */
+export type Waker = (reason: WakeReason) => boolean;
+
+/** The stored turn of one session, or none when no such session is on disk. */
+export type TurnReader = (key: string) => Turn | undefined;
+
 export class SessionTransport {
   private readonly streams = new Map<string, Set<ServerResponse>>();
   /** Long-polling agents, woken when their session receives feedback or the server stops. */
-  private readonly pollers = new Map<string, Set<(reason: WakeReason) => void>>();
+  private readonly pollers = new Map<string, Set<Waker>>();
+
   /**
-   * Sessions whose feedback an agent took and has not answered. Not derivable
-   * like waiting: a working agent is by definition not connected. A dead agent
-   * leaves the flag standing — indistinguishable from thinking hard, and no
-   * heartbeat to time out against; the next poll, reply, round or end clears it.
+   * The turn is session state, not transport state: it is read here rather than
+   * held here so a `serve` restart publishes the lock the last run left, and so
+   * no handler has to remember to announce a turn it just wrote.
    */
-  private readonly working = new Set<string>();
+  private readonly turnOf: TurnReader;
+
+  constructor(turnOf: TurnReader) {
+    this.turnOf = turnOf;
+  }
 
   subscribe(key: string, response: ServerResponse): void {
     const listeners = this.streams.get(key) ?? new Set<ServerResponse>();
@@ -35,19 +49,28 @@ export class SessionTransport {
   }
 
   /** Several agents may wait on one session; each is parked under its wake call. */
-  addPoller(key: string, wake: (reason: WakeReason) => void): void {
-    const waiting = this.pollers.get(key) ?? new Set<(reason: WakeReason) => void>();
+  addPoller(key: string, wake: Waker): void {
+    const waiting = this.pollers.get(key) ?? new Set<Waker>();
     waiting.add(wake);
     this.pollers.set(key, waiting);
   }
 
-  removePoller(key: string, wake: (reason: WakeReason) => void): void {
+  removePoller(key: string, wake: Waker): void {
     this.pollers.get(key)?.delete(wake);
   }
 
-  /** Copied first: a woken poller removes itself from the set as it answers. */
+  /**
+   * Copied first: a woken poller removes itself from the set as it answers. The
+   * loop stops at the one that takes the feedback, and goes on past the ones
+   * that cannot — a poller whose connection died takes nothing. Stopping is the
+   * whole of "whoever loses the race stays parked": a delivery is not spent
+   * until the agent confirms it, so a second poller woken after the first would
+   * otherwise be handed the batch that is still in flight to the first.
+   */
   wakePollers(key: string): void {
-    for (const wake of [...(this.pollers.get(key) ?? [])]) wake("feedback");
+    for (const wake of [...(this.pollers.get(key) ?? [])]) {
+      if (wake("feedback")) return;
+    }
   }
 
   /** Pushes an SSE event to every browser watching one session. */
@@ -55,25 +78,23 @@ export class SessionTransport {
     for (const response of this.streams.get(key) ?? []) response.write(sseFrame(event, data));
   }
 
-  /** Whether an agent is currently blocked in `poll` for this session. */
+  /** Who is on the review now: a waiter on the wire, and whose turn it is. */
   publishPresence(key: string): void {
     for (const response of this.streams.get(key) ?? []) response.write(this.presenceFrame(key));
   }
 
   /**
-   * Publishing is part of the change, not something callers remember: a flag no
-   * page was told about would leave the banner saying something stale.
+   * Two facts, and no third derived from them: `waiting` is a live connection
+   * and can only be counted here, `turn` is read off the record so the banner
+   * and the gate on Send cannot disagree about who holds the review. A dead
+   * agent leaves the turn standing — indistinguishable from thinking hard, and
+   * there is no heartbeat to tell them apart; recovery is out of band.
    */
-  setWorking(key: string, working: boolean): void {
-    if (working) this.working.add(key);
-    else this.working.delete(key);
-    this.publishPresence(key);
-  }
-
   private presenceFrame(key: string): string {
+    const turn = this.turnOf(key);
     return sseFrame("presence", {
       waiting: (this.pollers.get(key)?.size ?? 0) > 0,
-      working: this.working.has(key),
+      ...(turn === undefined ? {} : { turn }),
     });
   }
 

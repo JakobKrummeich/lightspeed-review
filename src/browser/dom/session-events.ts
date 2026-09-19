@@ -38,9 +38,16 @@ export interface Wired {
   panel: MountedPanel;
   banner: MountedStatusBanner;
   railControl: MountedRail;
+  /** The finish card, which says what its own end press will carry. */
+  finish: TurnAware;
   refreshReplay(fresh: SessionData): void;
   /** Where the reviewer stands in the round on screen, asked at the moment. */
   place(): ReviewerPlace;
+}
+
+/** Anything outside the panel that has to be told the turn moved. */
+export interface TurnAware {
+  setTurn(turn: SessionData["turn"]): void;
 }
 
 /**
@@ -72,8 +79,11 @@ export function wireSessionEvents(wired: Wired): void {
   events.addEventListener("session", () => {
     void fetchSession(page.key).then((fresh) => {
       if (waits(wired, fresh)) {
-        offer.offer(fresh);
-        popup.offer(fresh);
+        // Asked at the moment, not remembered: the queue is whatever it is when
+        // the round lands, and both mouths must name the same number.
+        const queued = wired.place().queued;
+        offer.offer(fresh, queued);
+        popup.offer(fresh, queued);
         return;
       }
       // Whatever was offered is on screen now, or older than what is.
@@ -94,12 +104,14 @@ export function wireSessionEvents(wired: Wired): void {
       live.conversation = fresh.conversation;
     });
   });
-  // Both ends hear it: the header states presence in words, the panel shows
-  // the working half where the eye is after Send.
+  // Everything that speaks for the turn hears it at once: the header states it
+  // in words, the panel gates Send on it, and the finish card promises to carry
+  // the queue only when the queue can still go anywhere.
   events.addEventListener("presence", (event: MessageEvent<string>) => {
     const presence = readPresence(event.data);
     banner.setPresence(presence);
-    panel.setWorking(presence.working);
+    panel.setTurn(presence.turn);
+    wired.finish.setTurn(presence.turn);
   });
 }
 

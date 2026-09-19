@@ -14,14 +14,14 @@ export interface ScanSpec {
   /** The error an unknown flag-like token raises, thrown where the token was met. */
   onUnknown: (flag: string) => Error;
   /** What a value flag with nothing to eat does. Absent, the hit is recorded
-   * valueless and the caller decides (`start` drops it, `poll` raises errors that
+   * valueless and the caller decides (`start` drops it, `say` raises errors that
    * depend on earlier flags); a factory throws at the flag itself (`feedback`). */
   onMissingValue?: (flag: string) => Error;
   /** Whether a flag-like token can be a value. `"any"` (default) eats whatever comes
-   * next — a poll note may be "-1 on that"; `"bare"` refuses, so `--since --format`
+   * next — a `say --for` note may be "-1 on that"; `"bare"` refuses, so `--since --format`
    * is a missing value, not a value. */
   values?: "any" | "bare";
-  /** What marks an unknown token as flag-like: `poll` only `--x` (a branch named
+  /** What marks an unknown token as flag-like: the agent verbs only `--x` (a branch named
    * `-x` stays positional), `feedback` any `-x`. */
   flagPrefix?: "-" | "--";
 }

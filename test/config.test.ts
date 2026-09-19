@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
-import { loadConfig, loadLedgerConfig } from "../src/config.ts";
+import { loadConfig, loadLedgerConfig, loadServiceConfig } from "../src/config.ts";
 import { ReviewError } from "../src/errors.ts";
 
 function repoWithConfig(contents: string | undefined): string {
@@ -14,9 +14,9 @@ function repoWithConfig(contents: string | undefined): string {
   return repoRoot;
 }
 
-function loadError(contents: string | undefined): ReviewError {
+function loadError(contents: string | undefined, repoRoot = repoWithConfig(contents)): ReviewError {
   try {
-    loadConfig(repoWithConfig(contents));
+    loadConfig(repoRoot);
   } catch (error) {
     assert.ok(error instanceof ReviewError, `expected ReviewError, got ${String(error)}`);
     return error;
@@ -72,16 +72,64 @@ test("a retired groupingThreshold still loads, and decides nothing", () => {
   assert.ok(!("groupingThreshold" in config));
 });
 
-test("missing config file fails fast with config_missing", () => {
-  const error = loadError(undefined);
+/**
+ * B2: the error named no command that writes the file, and told the agent to
+ * put `<provider/model>` in it — a placeholder nothing in the CLI, the help or
+ * the skill resolves into a real id. Two turns, then a guessed model that
+ * degrades grouping silently.
+ */
+test("missing config file names the directory, the command and a model that exists", () => {
+  const repoRoot = repoWithConfig(undefined);
+
+  const error = loadError(undefined, repoRoot);
 
   assert.equal(error.code, "config_missing");
-  assert.match(error.message, /\.lightspeed\.conf\.json/);
-  assert.ok(error.suggestions.length > 0);
+  assert.equal(error.message, `.lightspeed.conf.json not found in ${repoRoot}`);
+  assert.equal(
+    error.detail,
+    "`model` and `thinking` are never defaulted: the grouping model is a cost you must choose",
+  );
+  assert.equal(error.suggestions.length, 2);
+  assert.match(error.suggestions[0]!, /^Run `lightspeed init --config` to write it here$/);
+  assert.match(error.suggestions[1]!, /anthropic\/claude-sonnet-4-5/);
+  assert.match(error.suggestions[1]!, /anthropic\/claude-haiku-4-5/);
+  assert.match(error.suggestions[1]!, /openai\/gpt-5/);
+  assert.match(error.suggestions[1]!, /lightspeed login <provider>/);
 });
 
 test("unparseable JSON reports config_invalid", () => {
   assert.equal(loadError("{ not json").code, "config_invalid");
+});
+
+/**
+ * `wait`, `end` and `approvals` touch no model, so demanding one of them made a
+ * missing config gate the two commands an agent needs precisely when it cannot
+ * write one — mid-review, on someone else's machine.
+ */
+test("a command that never reaches a model reads a config that does not exist", () => {
+  const config = loadServiceConfig(repoWithConfig(undefined));
+
+  assert.equal(config.port, 4388);
+  assert.equal(config.stateDir, join(homedir(), ".lightspeed"));
+  assert.equal(config.feedbackLog, "on");
+});
+
+test("a config with no model still hands over the port and the store it names", () => {
+  const repoRoot = repoWithConfig(JSON.stringify({ port: 4400, stateDir: "/tmp/lsr-service" }));
+
+  const config = loadServiceConfig(repoRoot);
+
+  assert.equal(config.port, 4400);
+  assert.equal(config.stateDir, "/tmp/lsr-service");
+});
+
+/** Lenient about `model`, not about the file: a config that cannot be read is
+ * still a config the agent must fix, whichever command found it. */
+test("a broken config file is still broken for the commands that need no model", () => {
+  assert.throws(
+    () => loadServiceConfig(repoWithConfig("{ not json")),
+    (error: unknown) => error instanceof ReviewError && error.code === "config_invalid",
+  );
 });
 
 test("missing model reports config_invalid naming the key", () => {

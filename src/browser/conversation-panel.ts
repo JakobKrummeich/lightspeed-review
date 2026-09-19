@@ -1,5 +1,6 @@
 import { escapeHtml } from "../escape-html.ts";
 import { currentRound, roundSegments, type RoundSegment } from "./conversation-rounds.ts";
+import { agentTurnText } from "./turn-words.ts";
 import { stalePillRound, type QueuedPill } from "./queued-pill.ts";
 import type {
   ConversationEntry,
@@ -8,6 +9,7 @@ import type {
   FeedbackPrompt,
   RoundMark,
   SessionStatus,
+  Turn,
 } from "../session-store.ts";
 
 export interface PanelState {
@@ -20,18 +22,21 @@ export interface PanelState {
   status: SessionStatus;
   /** Every file of the review is ticked: there is nothing left to read. */
   allApproved: boolean;
-  /** An agent is off acting on feedback a poll already took away. */
-  agentWorking: boolean;
   /**
-   * The agent's per-comment answers (`poll --for <id> --note`), keyed by the
-   * comment's own id. Optional because only the live session carries them;
-   * everything else that builds a panel builds conversation and rounds.
+   * Whose move it is. The agent holding it takes Send away and nothing else:
+   * queueing, ending and typing stay live whatever it says.
+   */
+  turn: Turn;
+  /**
+   * The agent's per-comment answers (`say --for <id>`), keyed by the comment's
+   * own id. Optional because only the live session carries them; everything
+   * else that builds a panel builds conversation and rounds.
    */
   declarations?: Record<string, DeclaredAnswer>;
 }
 
 /** The compose row's half of that state, which is all `renderCompose` needs. */
-export type ComposeState = Pick<PanelState, "status" | "allApproved">;
+export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
 
 /**
  * Said once every file is ticked. Holds even with feedback still queued:
@@ -41,11 +46,25 @@ const APPROVED_EVERYTHING = "Every file is approved — Send & End when you are 
 
 /**
  * Named rather than spelled out twice: the mount patches these onto the very
- * element this markup produced, and drift would leave the button stuck on
- * "Sending…".
+ * elements this markup produced, and drift would leave a button stuck on
+ * "Sending…" or promising to send a queue it is about to drop.
  */
 export const SEND_LABEL = "Send to Agent";
 export const SENDING_LABEL = "Sending…";
+export const SEND_END_LABEL = "Send & End";
+/** Ending is never gated, but on the agent's turn it takes nothing with it. */
+export const END_ONLY_LABEL = "End without Sending";
+/** The question card's own press. One word, because it does one thing. */
+export const ANSWER_LABEL = "Answer";
+
+/**
+ * Whether Send is off. The one gate in the page, and it gates one control: an
+ * ended review is locked by its own status, and everything else is locked only
+ * while the agent holds the turn.
+ */
+export function sendIsLocked(state: ComposeState): boolean {
+  return state.status === "ended" || state.turn.holder === "agent";
+}
 
 /**
  * The whole right-hand panel. Drawn once at mount; afterwards only
@@ -64,7 +83,7 @@ export function renderScroll(state: PanelState): string {
   const current = currentRound(state.rounds);
   return `
   <section class="lsr-conversation">
-  ${renderConversation(state)}${renderWorking(state)}
+  ${renderConversation(state)}${renderTurnLine(state)}
   </section>
   <section class="lsr-queue">
   ${state.pending.length === 0 ? `<p class="lsr-empty">Nothing queued — select diff text to add feedback.</p>` : state.pending.map((pill, index) => renderPill(pill, index, current)).join("\n  ")}
@@ -78,9 +97,11 @@ export function composeNote(state: ComposeState): string {
 }
 
 /**
- * Compose box and send buttons, disabled once ended. The `role="status"`
- * region is always in the markup, only filled/emptied: a region added on
- * demand is announced by no screen reader reliably.
+ * Compose box and send buttons. Ending is never gated — not by the turn, not by
+ * anything but the review already being over — so only Send carries the turn's
+ * lock, and the end button says what it will do instead of being taken away.
+ * The `role="status"` region is always in the markup, only filled/emptied: a
+ * region added on demand is announced by no screen reader reliably.
  */
 export function renderCompose(state: ComposeState): string {
   const ended = state.status === "ended";
@@ -88,26 +109,61 @@ export function renderCompose(state: ComposeState): string {
   <p class="lsr-complete" role="status">${escapeHtml(composeNote(state))}</p>
   <textarea id="lsr-general-comment" placeholder="General comment — Enter sends…"${ended ? " disabled" : ""}></textarea>
   <div class="lsr-compose-actions">
-    <button type="button" id="lsr-send" class="lsr-primary"${ended ? " disabled" : ""}>${SEND_LABEL}</button>
-    <button type="button" id="lsr-send-end" class="lsr-secondary"${ended ? " disabled" : ""}>Send &amp; End</button>
+    <button type="button" id="lsr-send" class="lsr-primary"${sendIsLocked(state) ? " disabled" : ""}>${SEND_LABEL}</button>
+    <button type="button" id="lsr-send-end" class="lsr-secondary"${ended ? " disabled" : ""}>${escapeHtml(endLabel(state))}</button>
   </div>
   ${ended ? `<p class="lsr-ended">This review has ended.</p>` : ""}
 `;
 }
 
 /**
- * "Agent working" indicator at the foot of the conversation, where the answer
- * will appear — after Send the eye is here, not on the header's corner.
+ * What ending does from here. On the agent's turn the queue is not the
+ * reviewer's to send, so the press ends the review and leaves the pills behind
+ * — said on the button, because learning it from the conversation afterwards is
+ * how a reviewer loses six comments.
+ */
+export function endLabel(state: ComposeState): string {
+  return state.turn.holder === "agent" && state.status !== "ended"
+    ? END_ONLY_LABEL
+    : SEND_END_LABEL;
+}
+
+/**
+ * Whose move it is, at the foot of the conversation, where the answer will
+ * appear — after Send the eye is here, not on the header's corner. The
+ * reviewer's own turn says nothing: Send is live and the page is theirs.
  * Silent once ended: the closing summary is about to cover the page.
  */
-function renderWorking(state: PanelState): string {
-  if (!state.agentWorking || state.status === "ended") return "";
+function renderTurnLine(state: PanelState): string {
+  if (state.turn.holder !== "agent" || state.status === "ended") return "";
   // Decorative; the sentence beside them carries the meaning.
   return `
   <p class="lsr-working">
     <span class="lsr-working-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-    the agent is working on your feedback
+    ${escapeHtml(agentTurnText(state.turn))}
   </p>`;
+}
+
+/**
+ * The question the reviewer still owes an answer to, or none. A question is open
+ * while nothing has been said after it: the agent asked and then blocked, so the
+ * next words in the conversation are the answer, whatever else they are about.
+ * Identity, not a flag — the renderer below asks "is this that prompt?" and two
+ * questions with the same words are still two questions.
+ */
+function openQuestion(state: PanelState): FeedbackPrompt | undefined {
+  if (state.status === "ended") return undefined;
+  const last = state.conversation.at(-1);
+  if (last?.role !== "agent") return undefined;
+  const asked = last.prompts.at(-1);
+  return asked?.type === "message" && asked.kind === "question" ? asked : undefined;
+}
+
+/** What an entry needs from the panel's state, so the walk below passes one thing. */
+interface EntryContext {
+  declarations?: Record<string, DeclaredAnswer>;
+  /** The one question drawn with a live answer box, by identity. */
+  open?: FeedbackPrompt;
 }
 
 /**
@@ -117,11 +173,12 @@ function renderWorking(state: PanelState): string {
 function renderConversation(state: PanelState): string {
   const segments = roundSegments(state.conversation, state.rounds);
   const ruled = segments.length > 1;
+  const context: EntryContext = { declarations: state.declarations, open: openQuestion(state) };
   const parts: string[] = [];
   for (const segment of segments) {
     if (ruled) parts.push(renderRoundMark(segment));
     for (const entry of segment.entries) {
-      parts.push(renderEntry(entry, segment, state.declarations));
+      parts.push(renderEntry(entry, segment, context));
     }
   }
   return parts.join("\n  ");
@@ -149,23 +206,52 @@ function roundState(segment: RoundSegment): "current" | "earlier" {
 function renderEntry(
   entry: ConversationEntry,
   segment: RoundSegment,
-  declarations?: Record<string, DeclaredAnswer>,
+  context: EntryContext,
 ): string {
   return `<article class="lsr-entry" data-round-state="${roundState(segment)}" data-role="${entry.role}">
     <header class="lsr-entry-role">${entry.role}</header>
-    ${entry.prompts.map((prompt) => renderPrompt(prompt, declarations)).join("\n    ")}
+    ${entry.prompts.map((prompt) => renderPrompt(prompt, context)).join("\n    ")}
   </article>`;
 }
 
-function renderPrompt(
-  prompt: FeedbackPrompt,
-  declarations?: Record<string, DeclaredAnswer>,
-): string {
-  return `<div class="lsr-prompt">${renderPromptBody(prompt)}${renderAnswer(prompt, declarations)}</div>`;
+function renderPrompt(prompt: FeedbackPrompt, context: EntryContext): string {
+  const asked = isQuestion(prompt);
+  return `<div class="lsr-prompt"${asked ? ` data-kind="question"` : ""}>${renderQuestionLabel(asked)}${renderPromptBody(prompt)}${renderAnswerBox(prompt === context.open)}${renderAnswer(prompt, context.declarations)}</div>`;
+}
+
+function isQuestion(prompt: FeedbackPrompt): boolean {
+  return prompt.type === "message" && prompt.kind === "question";
 }
 
 /**
- * The agent's declared answer (`poll --for <id> --note`), rendered inside the
+ * A question wears its label even once answered. The card is how a reviewer
+ * scrolling back tells the sentence they were asked from the sentences the agent
+ * merely said — and a card that lost its label on being answered would make the
+ * history read as if nobody had ever asked anything.
+ */
+function renderQuestionLabel(asked: boolean): string {
+  return asked ? `<p class="lsr-question-label">the agent is asking</p>\n    ` : "";
+}
+
+/**
+ * The answer box under the open question, and the reason `ask` exists as its own
+ * verb: the reviewer answers in one press, and the queue they have been building
+ * stays queued. Sending the queue along would make answering a question cost
+ * them six half-finished comments.
+ *
+ * Only the open question gets one. An answered question with a box under it
+ * would invite an answer to a question the agent has stopped waiting on.
+ */
+function renderAnswerBox(open: boolean): string {
+  if (!open) return "";
+  return `\n    <div class="lsr-answer">
+    <textarea class="lsr-answer-box" placeholder="Answer — sends this alone…" aria-label="Answer the agent's question"></textarea>
+    <button type="button" class="lsr-answer-send">${ANSWER_LABEL}</button>
+    </div>`;
+}
+
+/**
+ * The agent's declared answer (`say "<text>" --for <id>`), rendered inside the
  * prompt it answers. Files-only declarations show nothing: "I touched these"
  * is the between-rounds diff's story.
  */

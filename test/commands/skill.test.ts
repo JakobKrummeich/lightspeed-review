@@ -16,7 +16,10 @@ test("codex, opencode and vscode get plain markdown without frontmatter", () => 
   for (const agent of ["codex", "opencode", "vscode"]) {
     const output = runSkill({ agent });
     assert.ok(output.startsWith("# lightspeed\n"), agent);
-    assert.ok(!output.includes("---"), `${agent} carries no frontmatter`);
+    // Frontmatter is a leading `---` block, not any `---` anywhere: the body has a
+    // markdown table in it, whose separator row is dashes too.
+    assert.doesNotMatch(output, /^---$/m, `${agent} carries no frontmatter`);
+    assert.doesNotMatch(output, /^name: lightspeed$/m, agent);
     assert.match(output, /## The loop/, agent);
     assert.match(output, /Use when work is ready for review/, agent);
   }

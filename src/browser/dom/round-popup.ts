@@ -10,8 +10,9 @@ import type { SessionData } from "./session-api.ts";
 export const FOLD_MS = 260;
 
 export interface MountedRoundPopup {
-  /** A round is waiting and the reviewer has not been asked about it yet. */
-  offer(fresh: SessionData): void;
+  /** A round is waiting and the reviewer has not been asked about it yet.
+   * `queued` is their unsent comment count, which the card promises to keep. */
+  offer(fresh: SessionData, queued: number): void;
   /** The round went on screen by another route: nothing to announce. */
   clear(): void;
 }
@@ -54,7 +55,7 @@ export function mountRoundPopup(options: RoundPopupOptions): MountedRoundPopup {
   };
   options.root.addEventListener("click", (event) => pressed(view, event));
   return {
-    offer: (fresh) => offerRound(view, fresh),
+    offer: (fresh, queued) => offerRound(view, fresh, queued),
     clear: () => clearPopup(view),
   };
 }
@@ -66,7 +67,7 @@ function pressed(view: PopupView, event: Event): void {
   if (target.classList.contains("lsr-round-stay")) dismiss(view);
 }
 
-function offerRound(view: PopupView, fresh: SessionData): void {
+function offerRound(view: PopupView, fresh: SessionData, queued: number): void {
   const round = currentRound(fresh.rounds);
   if (round === view.announced) {
     // Not news twice — but a card still up keeps the newest copy, so its take
@@ -80,7 +81,7 @@ function offerRound(view: PopupView, fresh: SessionData): void {
   // newer round's card.
   settle(view);
   delete view.options.root.dataset.state;
-  view.options.root.innerHTML = renderRoundPopup(round, filesIn(fresh));
+  view.options.root.innerHTML = renderRoundPopup(round, filesIn(fresh), queued);
   if (view.options.root.hidden) document.addEventListener("keydown", view.onKey);
   view.options.root.hidden = false;
 }

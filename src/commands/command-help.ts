@@ -4,7 +4,13 @@ import { destinationHelp, INIT_SCOPES } from "../skill-install.ts";
 import { SKILL_AGENTS } from "../skill.ts";
 import { renderToon, type StructuredOutput } from "../output.ts";
 import { HELP_RESTART_AGENT } from "./init.ts";
-import { BLOCKS_IN_FOREGROUND } from "./home.ts";
+import { BLOCKS_IN_FOREGROUND, TURN_RULE } from "./home.ts";
+
+/** The two positionals every agent verb ends with, worded once. */
+const SESSION_ARGUMENTS = {
+  "[branch]": "branch under review; omit it when the repo has one live session",
+  "[base]": "base branch, defaults to main",
+};
 
 /** Per-command `--help`, kept next to the commands so a new flag and its docs are
  * one edit apart. Rendered as TOON: agents read help the same way they read results. */
@@ -19,6 +25,7 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
         " given to the grouping model",
       "--no-open": "create the session without opening a browser",
       "--reopen": "open a new round on a review the reviewer ended, once they ask for one",
+      "--wait": "block on the round you just published instead of returning at once",
       "--base <ref>": "base branch, when it is not given positionally",
       "--model <name>": "grouping model for this run, overriding .lightspeed.conf.json",
     },
@@ -27,39 +34,73 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
       'lightspeed start feature-auth --intent "issue #412: log out every device on password change" --intent "drop the legacy /login handler"',
     ],
   },
-  poll: {
-    command: "poll",
-    description: `Wait for reviewer feedback. Run it in the foreground: ${BLOCKS_IN_FOREGROUND}`,
-    arguments: {
-      "[branch]": "branch under review; omit it when the repo has one live session",
-      "[base]": "base branch, defaults to main",
-    },
+  wait: {
+    command: "wait",
+    description:
+      `Block until the reviewer sends, and take the turn when they do.` +
+      ` Run it in the foreground: ${BLOCKS_IN_FOREGROUND}`,
+    arguments: SESSION_ARGUMENTS,
     flags: {
-      '--agent-reply "<summary>"': "answer the reviewer before waiting again",
-      "--for <id>":
-        "repeatable, with --agent-reply: declare what one comment led to," +
-        " by the id poll printed with it; --note and --files after it describe it",
-      '--note "<answer>"': "the answer to the comment of the --for before it",
-      "--files <a,b>": "comma-separated paths that comment changed, for the --for before it",
       "--full": "print reviewer selections in full instead of truncating them",
     },
+    turn:
+      `reviewer while it blocks, yours on delivery. Run it while you hold the turn and` +
+      ` are working and it is refused with \`turn_still_yours\` and exit 2 — publish the` +
+      ` round or \`ask\` instead, which give the turn up deliberately. ${TURN_RULE}`,
+    examples: ["lightspeed wait feature-auth main", "lightspeed wait feature-auth main --full"],
+  },
+  ask: {
+    command: "ask",
+    description:
+      "Put a question to the reviewer and block on their answer. The question is drawn" +
+      " as a card with its own answer box, so answering it costs the reviewer one press" +
+      ` and leaves whatever they have queued queued. ${BLOCKS_IN_FOREGROUND}`,
+    arguments: { "<question>": "what to ask, first and in quotes", ...SESSION_ARGUMENTS },
+    turn: "back to the reviewer, then yours again when they answer",
     examples: [
-      "lightspeed poll feature-auth main",
-      'lightspeed poll feature-auth main --agent-reply "wrapped it in a transaction"',
-      'lightspeed poll feature-auth main --agent-reply "addressed all three"' +
-        ' --for evt_0abc123de_0007 --note "now one transaction" --files src/api/users.ts' +
-        ' --for evt_0abc123de_0008 --note "intentional: the index covers it"',
+      'lightspeed ask "should the retry be per-request or per-batch?" feature-auth main',
+      'lightspeed ask "you said drop the legacy handler — including its tests?"',
+    ],
+  },
+  say: {
+    command: "say",
+    description:
+      "Say something without blocking and without giving the turn up. `--for` pins the" +
+      " whole answer under the comment it answers, where the reviewer is already looking",
+    arguments: { "<text>": "what to say, first and in quotes", ...SESSION_ARGUMENTS },
+    flags: {
+      "--for <id>": "the comment this answers, by the id `wait` printed with it",
+      "--files <a,b>":
+        "comma-separated paths that comment led to changes in; needs --for, and names" +
+        " only files a round you have already published changed — commit and re-run" +
+        " `start` before claiming one",
+    },
+    turn: "unchanged: speaking is free, and an agent mid-edit is still mid-edit",
+    examples: [
+      'lightspeed say "good catch — all three are one transaction now" feature-auth main',
+      'lightspeed say "one transaction now, in the round I just published" --for evt_0abc123de_0008 --files src/db/index.ts',
+    ],
+  },
+  work: {
+    command: "work",
+    description:
+      "Declare the silence you are about to keep. The reviewer's banner names the plan" +
+      " instead of saying you have their feedback, until you speak again",
+    arguments: { "<plan>": "what you are about to do, first and in quotes", ...SESSION_ARGUMENTS },
+    turn:
+      "yours already — `work` says what you are doing with it, it does not take it." +
+      " Running it without the turn is `turn_not_yours` and exit 2",
+    examples: [
+      'lightspeed work "wrapping the three writes in one transaction" feature-auth main',
+      'lightspeed work "splitting the helper out, then re-running the suite"',
     ],
   },
   approvals: {
     command: "approvals",
     description:
-      "Name the files behind poll's counts: approved, swept, unapproved." +
+      "Name the files behind the counts `wait` reports: approved, swept, unapproved." +
       " Run it when something turns on which file, not by default",
-    arguments: {
-      "[branch]": "branch under review; omit it when the repo has one live session",
-      "[base]": "base branch, defaults to main",
-    },
+    arguments: SESSION_ARGUMENTS,
     flags: {
       "--full":
         `print every path instead of the first ${DEFAULT_PATH_LIMIT} of each list;` +
@@ -70,11 +111,9 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
   end: {
     command: "end",
     description: "Close a review session from the agent side",
-    arguments: {
-      "[branch]": "branch under review; omit it when the repo has one live session",
-      "[base]": "base branch, defaults to main",
-    },
-    examples: ["lightspeed end feature-auth main"],
+    arguments: SESSION_ARGUMENTS,
+    turn: "ended. Never gated: ending is the one move both sides can always make",
+    examples: ["lightspeed end feature-auth main", "lightspeed end"],
   },
   serve: {
     command: "serve",

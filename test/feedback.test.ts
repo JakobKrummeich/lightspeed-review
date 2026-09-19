@@ -43,6 +43,7 @@ function session(rounds: number): SessionRecord {
     branch: "work",
     base: "main",
     status: "open",
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-01T00:00:00.000Z",
     groups: [],
@@ -207,7 +208,7 @@ test("feedback is stamped with the round it was sent in", () => {
 });
 
 test("an agent's summary is stamped with the round it opened, not the one it answers", () => {
-  // Workflow is fix, `start`, then `poll --agent-reply`: the summary lands after its round is
+  // Workflow is fix, `start`, then `say`: the summary lands after its round is
   // open, and stamping the on-screen round puts it under that round's own line.
   const answered = withFeedback(
     session(1),
@@ -228,6 +229,71 @@ test("a session with no rounds stamps nothing rather than inventing a round", ()
   const updated = withAgentReply(session(0), "fixed", "2025-01-02T01:00:00.000Z");
 
   assert.equal("roundIndex" in (updated.conversation.at(-1) ?? {}), false);
+});
+
+/** The agent mid-work: the turn is the one thing a reviewer's Send must not take. */
+function agentsTurn(): SessionRecord {
+  return {
+    ...session(1),
+    turn: {
+      holder: "agent",
+      mode: "working",
+      at: "2025-01-02T00:00:00.000Z",
+      note: "splitting the helper out",
+    },
+  };
+}
+
+test("sending feedback to an agent that holds the turn leaves the turn where it is", () => {
+  const updated = withFeedback(
+    agentsTurn(),
+    { prompts: [{ type: "message", comment: "one more" }], ended: false },
+    "2025-01-02T01:00:00.000Z",
+  );
+
+  // Queueing is never gated, and queueing is all this is: only delivery to a
+  // live `wait` hands the turn over.
+  assert.deepEqual(updated.turn, agentsTurn().turn);
+  assert.equal(updated.pending.length, 1);
+});
+
+test("ending the review returns the turn, whoever was holding it", () => {
+  const updated = withFeedback(
+    agentsTurn(),
+    { prompts: [], ended: true },
+    "2025-01-03T00:00:00.000Z",
+  );
+
+  assert.deepEqual(updated.turn, { holder: "reviewer", at: "2025-01-03T00:00:00.000Z" });
+});
+
+/**
+ * `say` is free speech, not a handover: an agent that reported progress mid-edit
+ * is still mid-edit, and a `say` that returned the turn would make the `work`
+ * the agent runs next an illegal move.
+ */
+test("the agent saying something keeps the turn it is holding", () => {
+  const held = agentsTurn();
+
+  const replied = withAgentReply(held, "wrapped it in a transaction", "2025-01-02T02:00:00.000Z");
+
+  assert.deepEqual(replied.turn, held.turn);
+  assert.equal(replied.conversation.at(-1)?.prompts[0]?.comment, "wrapped it in a transaction");
+});
+
+/** A question is the one thing an agent cannot go on without, so asking it is a
+ * handover: the reviewer now owns the move, and the plan goes with the turn —
+ * a banner naming work nobody is doing is worse than none. */
+test("the agent asking a question gives the turn back to the reviewer", () => {
+  const replied = withAgentReply(
+    agentsTurn(),
+    "per-request or per-batch?",
+    "2025-01-02T02:00:00.000Z",
+    "question",
+  );
+
+  assert.deepEqual(replied.turn, { holder: "reviewer", at: "2025-01-02T02:00:00.000Z" });
+  assert.partialDeepStrictEqual(replied.conversation.at(-1)?.prompts[0], { kind: "question" });
 });
 
 test("an end from the browser is recorded as the reviewer's", () => {

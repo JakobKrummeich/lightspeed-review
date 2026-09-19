@@ -1,13 +1,17 @@
 import { request as httpRequest } from "node:http";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
-import { parseBody } from "./api-client.ts";
+import { apiRequest, jsonPost, parseBody, type SessionRef } from "./api-client.ts";
+import { startCall } from "./home.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
-  url: string;
-  /** Named in the 404 message; the poll is always about one session. */
-  key?: string;
+  /** `http://127.0.0.1:<port>`; both the poll and its acknowledgement hang off it. */
+  origin: string;
+  /** The session waited on, named in the 404 message and in both URLs. */
+  key: string;
+  /** `<branch> <base>`, for the commands an error about this review suggests. */
+  target?: string;
   /** Probed when a connection fails, to tell "gone" from "hiccup". */
   port: number;
   /** Waits between port probes after a failure. Injected by tests. */
@@ -37,7 +41,9 @@ export async function longPoll(input: LongPollInput): Promise<unknown> {
   const retry = retries(input);
   for (;;) {
     try {
-      return await pollOnce(input.url, input.key);
+      const answer = await pollOnce(`${input.origin}/api/poll?key=${input.key}`, about(input));
+      await confirmDelivery(input, answer);
+      return answer;
     } catch (error) {
       // An answer about the review (unknown session, ended, stopping) is final.
       if (error instanceof ReviewError) throw error;
@@ -46,16 +52,42 @@ export async function longPoll(input: LongPollInput): Promise<unknown> {
   }
 }
 
+/**
+ * Tells the server the handover arrived. The server cannot see this for itself:
+ * the bytes reach the kernel whether or not anything reads them, so without the
+ * acknowledgement it must assume every delivery may have been lost. One place
+ * for both blocking commands — `wait` and `ask` come through here.
+ *
+ * Best effort, because the prompts are already in this process's hands: a
+ * failed acknowledgement costs one re-delivery on the next poll, while a failed
+ * `wait` would cost the agent the feedback it is holding.
+ */
+async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<void> {
+  if (typeof answer !== "object" || answer === null) return;
+  const { delivery } = answer as { delivery?: unknown };
+  if (typeof delivery !== "string") return;
+  try {
+    await apiRequest(
+      `${input.origin}/api/session/${input.key}/delivered`,
+      jsonPost({ delivery }),
+      about(input),
+    );
+  } catch {
+    // The next poll re-delivers; nothing here is worth failing the wait over.
+  }
+}
+
 /** After a broken connection: is there still a server to wait for — wait longer or
  * report the port. Failure count lives here so `longPoll` stays a plain loop. */
 function retries(input: LongPollInput): (failure: unknown) => Promise<void> {
   let failures = 0;
   return async (failure: unknown) => {
+    const named = input.target ?? "<branch> [base]";
     const state = await diagnosePort(input.port, input.probeBackoffMs);
-    if (state !== "open") throw portIsNotServing(state, input.port, failure);
+    if (state !== "open") throw portIsNotServing(state, input.port, failure, named);
     failures += 1;
     if (failures >= FAILURES_BEFORE_HEALTH_CHECK && !(await reviewServerIsUp(input.port))) {
-      throw notAReviewServer(input.port, failure);
+      throw notAReviewServer(input.port, failure, named);
     }
     await sleep(reconnectDelay(failures, input.reconnectDelayMs));
   };
@@ -68,14 +100,19 @@ function reconnectDelay(failures: number, first: number | undefined): number {
 }
 
 /** Only a port that refuses connections, and keeps refusing, is "no server". */
-function portIsNotServing(state: PortState, port: number, failure: unknown): ReviewError {
+function portIsNotServing(
+  state: PortState,
+  port: number,
+  failure: unknown,
+  target: string,
+): ReviewError {
   const detail = messageOf(failure);
   if (state === "refused") {
     return new ReviewError({
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepted a connection on port ${port}`,
-      suggestions: ["Run `lightspeed start <branch> [base]` to start the review server"],
+      suggestions: [`Run \`${startCall(target)}\` to start the review server`],
     });
   }
   return new ReviewError({
@@ -83,28 +120,32 @@ function portIsNotServing(state: PortState, port: number, failure: unknown): Rev
     message: `port ${port} neither accepted a connection nor refused one`,
     detail: `${detail}; the machine answered nothing at all on that port`,
     suggestions: [
-      "Re-run `lightspeed poll <branch> [base]` in the foreground",
-      "Run `lightspeed stop` and then `lightspeed start <branch> [base]` if it keeps failing",
+      `Re-run \`lightspeed wait ${target}\` in the foreground`,
+      `Run \`lightspeed stop\` and then \`${startCall(target)}\` if it keeps failing`,
     ],
   });
 }
 
 /** Something holds the port and it is not ours: waiting on it would never end. */
-function notAReviewServer(port: number, failure: unknown): ReviewError {
+function notAReviewServer(port: number, failure: unknown, target: string): ReviewError {
   return new ReviewError({
     code: "server_unreachable",
     message: `port ${port} is held by something that is not a review server`,
     detail: `${messageOf(failure)}; the port accepts connections but /health does not answer`,
     suggestions: [
       `Set a free \`port\` in .lightspeed.conf.json instead of ${port}`,
-      "Stop whatever is listening there and run `lightspeed start <branch> [base]` again",
+      `Stop whatever is listening there and run \`${startCall(target)}\` again`,
     ],
   });
 }
 
 /** One attempt on a connection of its own, every timeout off: the server answers
  * when the reviewer sends, which may be hours. */
-function pollOnce(url: string, key: string | undefined): Promise<unknown> {
+function about(input: LongPollInput): SessionRef {
+  return { key: input.key, ...(input.target === undefined ? {} : { target: input.target }) };
+}
+
+function pollOnce(url: string, ref: SessionRef): Promise<unknown> {
   return new Promise<unknown>((resolve, reject) => {
     const request = httpRequest(
       url,
@@ -116,7 +157,7 @@ function pollOnce(url: string, key: string | undefined): Promise<unknown> {
         response.on("data", (chunk: string) => (body += chunk));
         response.on("error", fail);
         response.on("end", () => {
-          const answer = parseBody(response.statusCode ?? 0, body, key);
+          const answer = parseBody(response.statusCode ?? 0, body, ref);
           if (answer instanceof ReviewError) fail(answer);
           else resolve(answer);
         });

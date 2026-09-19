@@ -5,7 +5,10 @@ import { commandHelp, commandSummary } from "../../src/commands/command-help.ts"
 test("every command the CLI registers has help", () => {
   const commands = [
     "start",
-    "poll",
+    "wait",
+    "ask",
+    "say",
+    "work",
     "approvals",
     "end",
     "serve",
@@ -39,11 +42,27 @@ test("a command without a help entry is summarised as its own --help", () => {
   assert.equal(commandSummary("nonsense"), "Run `lightspeed nonsense --help`");
 });
 
-test("poll help repeats that it blocks in the foreground", () => {
-  const help = commandHelp("poll") ?? "";
+test("wait help repeats that it blocks in the foreground", () => {
+  const help = commandHelp("wait") ?? "";
 
   assert.match(help, /foreground/);
   assert.match(help, /never background it or wrap it in a timeout/);
+});
+
+/** The verbs are only usable if their help states where the turn lands, since
+ * that is what decides which command is legal next. */
+test("every speaking verb's help names what it does to the turn", () => {
+  assert.match(commandHelp("wait") ?? "", /^turn: .*yours on delivery/m);
+  assert.match(commandHelp("ask") ?? "", /^turn: .*back to the reviewer/m);
+  assert.match(commandHelp("say") ?? "", /^turn: .*unchanged/m);
+  assert.match(commandHelp("work") ?? "", /^turn: /m);
+});
+
+/** Two examples each: one plain, one with the flag that command exists for. */
+test("every speaking verb's help shows two examples", () => {
+  for (const verb of ["wait", "ask", "say", "work"]) {
+    assert.match(commandHelp(verb) ?? "", /^examples\[2\]:/m, verb);
+  }
 });
 
 test("feedback help documents every subcommand and the list flags", () => {
@@ -100,4 +119,16 @@ test("start help lists its flags", () => {
   assert.match(help, /--no-open/);
   assert.match(help, /--base/);
   assert.match(help, /--model/);
+});
+
+/**
+ * B4: `--files` only ever names files a published round changed, and `say --help`
+ * showed it beside a comment id with nothing to say the round has to come first —
+ * which is the dead end the CLI then refuses with `declaration_invalid`.
+ */
+test("say help says --files needs a published round, in the flag and in the example", () => {
+  const help = commandHelp("say") ?? "";
+
+  assert.match(help, /--files <a,b>.*published/);
+  assert.match(help, /lightspeed say .*published.*--for evt_\w+ --files /);
 });

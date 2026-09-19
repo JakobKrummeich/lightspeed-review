@@ -55,6 +55,7 @@ function session(round: number, paths: string[]): SessionData {
     })),
     pending: [],
     status: "feedback",
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
   };
 }
 
@@ -88,9 +89,9 @@ function mounted(t: TestContext): {
     page,
     taken,
     dismissed,
-    offer: (round, paths = ["src/a.ts"]) => {
+    offer: (round, paths = ["src/a.ts"], queued = 0) => {
       const fresh = session(round, paths);
-      popup.offer(fresh);
+      popup.offer(fresh, queued);
       return fresh;
     },
     clear: () => popup.clear(),

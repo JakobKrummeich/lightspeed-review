@@ -1,13 +1,19 @@
 import { renderClosingSummary, type ClosedReview } from "./closing-summary.ts";
 import { escapeHtml } from "../escape-html.ts";
-import type { SessionStatus } from "../session-store.ts";
+import type { SessionStatus, Turn } from "../session-store.ts";
+import { agentTurnText } from "./turn-words.ts";
 
 export interface StatusState {
   status: SessionStatus;
-  /** True while an agent is blocked in `poll` for this session. */
+  /** True while an agent is blocked in `wait` for this session. */
   agentWaiting: boolean;
-  /** True while an agent is off acting on feedback a poll already took away. */
-  agentWorking: boolean;
+  /**
+   * Whose move it is, as the server has it written down. The banner is the one
+   * place a reviewer looks to answer "is anything happening?", so it says which
+   * of the two the agent's turn is — reading their feedback, or off implementing
+   * a plan it named.
+   */
+  turn: Turn;
   /**
    * The review itself, carried whatever the status: a page loaded on a
    * long-ended review must show the same summary as the tab open at closing.
@@ -37,16 +43,19 @@ function statusLine(status: SessionStatus): string {
 
 /**
  * All three states stated: "nobody is listening" is as much news as somebody
- * is. Working wins over waiting when both are reported — a second parked
- * agent is nothing the reviewer can act on.
+ * is. The turn wins over waiting when both are reported — a second parked agent
+ * is nothing the reviewer can act on, and the agent holding their feedback is.
  */
 function presenceLine(state: StatusState): string {
-  const label = presenceLabel(state);
-  return `<p class="lsr-presence" data-waiting="${state.agentWaiting}" data-working="${state.agentWorking}">${label}</p>`;
+  // The holder, not "is the agent working": a reading agent is not working, and
+  // the attribute said it was. Escaped because on the agent's turn the text
+  // carries the plan `work` declared, which is the agent's own words.
+  const turn = state.turn.holder;
+  return `<p class="lsr-presence" data-waiting="${state.agentWaiting}" data-turn="${turn}">${escapeHtml(presenceLabel(state))}</p>`;
 }
 
 function presenceLabel(state: StatusState): string {
-  if (state.agentWorking) return "the agent is working on your feedback";
+  if (state.turn.holder === "agent") return agentTurnText(state.turn);
   return state.agentWaiting
     ? "an agent is waiting for your feedback"
     : "no agent is waiting — send anyway, the feedback is queued";

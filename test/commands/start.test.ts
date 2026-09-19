@@ -121,7 +121,6 @@ test("creates the session and reports it with diff aggregates and group sizes", 
       base: BASE,
       intents: INTENTS,
       url: `http://127.0.0.1:${config.port}/session/${key}`,
-      status: "open",
     });
     assert.deepEqual(output.diff, extracted.stats);
     assert.deepEqual(output.groups, [
@@ -167,7 +166,36 @@ test("reports why grouping was skipped so the agent can see the LLM was not used
   });
 });
 
-test("tells the agent to poll in the foreground for this branch pair", async () => {
+/** The edit that buys the grouping back rides out with the round that lost it:
+ * `start` exits 0 either way, so this line is the only warning there is. */
+test("a degraded grouping carries the fix beside the reason", async () => {
+  await withHarness(async ({ config, deps }) => {
+    const output = await runStart({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      intents: INTENTS,
+      config,
+      deps: {
+        ...deps,
+        groupDiff: async ({ files }) => ({
+          groups: [{ name: "All Changes", rationale: "ungrouped", files }],
+          mode: "fallback",
+          reason: "unknown model `anthropic/claude-sonnet-4` — the diff is one group",
+          fix: "set `model` in .lightspeed.conf.json to a model you can reach",
+        }),
+      },
+    });
+
+    assert.deepEqual(output.grouping, {
+      mode: "fallback",
+      reason: "unknown model `anthropic/claude-sonnet-4` — the diff is one group",
+      fix: "set `model` in .lightspeed.conf.json to a model you can reach",
+    });
+  });
+});
+
+test("tells the agent to wait in the foreground for this branch pair", async () => {
   await withHarness(async ({ config, deps }) => {
     const output = await runStart({
       repoRoot: REPO,
@@ -179,8 +207,12 @@ test("tells the agent to poll in the foreground for this branch pair", async () 
     });
 
     const help = output.help as string[];
-    assert.ok(help.some((line) => line.includes(`poll ${BRANCH} ${BASE}`)));
+    assert.ok(help.some((line) => line.includes(`wait ${BRANCH} ${BASE}`)));
     assert.ok(help.some((line) => /foreground/.test(line)));
+    // The help has to say what `wait` is for, not only that it blocks: it is the
+    // one command that ever hands the agent the turn.
+    assert.ok(help.some((line) => /returns them and the turn/.test(line)));
+    assert.ok(help.some((line) => line.includes(`end ${BRANCH} ${BASE}`)));
   });
 });
 
@@ -400,7 +432,7 @@ test("--reopen starts a new round on a review the reviewer asked to continue", a
       reopen: true,
     });
 
-    assert.equal((output.session as { status: string }).status, "open");
+    assert.equal(output.turn, "reviewer");
     assert.equal(store.get(key)?.rounds.length, 2);
   });
 });
@@ -437,7 +469,84 @@ test("reads the branch pair and flags off the command line", () => {
     open: true,
     model: undefined,
     reopen: false,
+    wait: false,
     intents: [],
+  });
+});
+
+/** `--wait` is `start` and the block that follows it in one line, for the agent
+ * with nothing to do until the reviewer sends. */
+test("--wait is off unless the command line says so", () => {
+  assert.equal(parseStartArgs(["feature-auth"]).wait, false);
+  assert.equal(parseStartArgs(["feature-auth", "--wait"]).wait, true);
+});
+
+/** Waits for something a blocked command does on another tick. */
+async function until(ready: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (ready()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error("the blocked command never got there");
+}
+
+function postFeedback(port: number, key: string, body: unknown): Promise<Response> {
+  return fetch(`http://127.0.0.1:${port}/api/session/${key}/feedback`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * B5: `--wait` printed nothing at all until the reviewer sent — no key, no url,
+ * nothing to hand the person whose turn it is. The publish block goes out the
+ * moment the round exists, and the answer follows it on the same stdout.
+ */
+test("--wait prints the round it published before it blocks on the reviewer", async () => {
+  await withHarness(async ({ config, deps, store }) => {
+    const written: string[] = [];
+    const key = sessionKey(REPO, BRANCH, BASE);
+
+    const running = runStart({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      intents: INTENTS,
+      config,
+      deps: { ...deps, write: (text) => written.push(text) },
+      wait: true,
+    });
+    await until(() => written.length > 0);
+
+    // Nothing has been sent yet: this is the block an agent can act on while
+    // the reviewer still has the turn.
+    assert.equal(store.get(key)?.pending.length, 0);
+    assert.equal(store.get(key)?.turn.holder, "reviewer");
+    const published = written.join("");
+    assert.match(published, /^turn: reviewer$/m);
+    assert.match(published, /^round: 1$/m);
+    assert.match(published, new RegExp(`^ {2}key: ${key}$`, "m"));
+    assert.match(
+      published,
+      new RegExp(`^ {2}url: "?http://127.0.0.1:${config.port}/session/`, "m"),
+    );
+    assert.match(published, /^ {2}files_changed: 2$/m);
+    assert.match(
+      published,
+      /^message: "?published; now blocking on the reviewer — give them the url above"?$/m,
+    );
+    // Never the move it is making: the command is the wait.
+    assert.doesNotMatch(published, /lightspeed wait/);
+
+    await postFeedback(config.port, key, {
+      prompts: [{ type: "message", comment: "looks good" }],
+      ended: false,
+    });
+    const answer = await running;
+
+    assert.equal(answer.turn, "agent reading");
+    assert.deepEqual(answer.prompts, [{ type: "message", comment: "looks good" }]);
   });
 });
 
@@ -520,6 +629,7 @@ test("--base names the base branch when it is not positional", () => {
     open: true,
     model: undefined,
     reopen: false,
+    wait: false,
     intents: [],
   });
 });
@@ -530,7 +640,7 @@ test("an unknown flag is refused, with the flags that do exist", () => {
     (error: Error) => {
       assert.match(error.message, /unknown flag --no-opne/);
       assert.match((error as AxiError).suggestions.join(" "), /--intent/);
-      assert.equal((error as AxiError).code, "VALIDATION_ERROR");
+      assert.equal((error as AxiError).code, "unknown_flag");
       return true;
     },
   );
@@ -549,6 +659,7 @@ test("--no-open and --model are picked up wherever they appear", () => {
     open: false,
     model: "anthropic/opus",
     reopen: false,
+    wait: false,
     intents: [],
   });
 });

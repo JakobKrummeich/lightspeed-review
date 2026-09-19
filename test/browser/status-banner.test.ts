@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderStatusBanner, type StatusState } from "../../src/browser/status-banner.ts";
 import type { ClosedReview } from "../../src/browser/closing-summary.ts";
+import type { Turn } from "../../src/session-store.ts";
 
 const review: ClosedReview = {
   groups: [
@@ -26,9 +27,12 @@ const review: ClosedReview = {
   endedBy: "reviewer",
 };
 
+const REVIEWERS: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
+const READING: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
+
 /** An open review nobody is doing anything about, unless the case says so. */
 function banner(over: Partial<StatusState> = {}): StatusState {
-  return { status: "open", agentWaiting: false, agentWorking: false, review, ...over };
+  return { status: "open", agentWaiting: false, turn: REVIEWERS, review, ...over };
 }
 
 test("shows the session status", () => {
@@ -74,25 +78,73 @@ test("does not claim an agent is waiting on an ended review", () => {
   assert.doesNotMatch(html, /agent is waiting/i);
 });
 
-test("says the agent is working once it has taken the feedback away", () => {
-  const html = renderStatusBanner(banner({ agentWorking: true }));
+test("says the agent has the feedback once the turn is the agent's", () => {
+  const html = renderStatusBanner(banner({ turn: READING }));
 
-  assert.match(html, /data-working="true"/);
-  assert.match(html, /agent is working on your feedback/i);
+  assert.match(html, /data-turn="agent"/);
+  assert.match(html, /the agent has your feedback/i);
   assert.doesNotMatch(html, /no agent is waiting/i);
 });
 
-test("working beats waiting, since work is the more particular news", () => {
-  // A second agent parked on the poll while the first is off working says
-  // nothing the reviewer can act on; what became of their feedback does.
-  const html = renderStatusBanner(banner({ agentWaiting: true, agentWorking: true }));
+/** `work "<plan>"` is the agent buying silence with a reason. The banner is
+ * where that reason is spent: a reviewer watching a still page wants to know
+ * what is being done, not merely that something is. */
+test("a declared plan is named in the banner instead of the general sentence", () => {
+  const html = renderStatusBanner(
+    banner({
+      turn: {
+        holder: "agent",
+        mode: "working",
+        at: "2025-01-01T00:07:00.000Z",
+        note: "splitting the helper out",
+      },
+    }),
+  );
 
-  assert.match(html, /agent is working on your feedback/i);
+  assert.match(html, /implementing: splitting the helper out/);
+  assert.doesNotMatch(html, /has your feedback/);
+});
+
+test("work with no plan still says which of the two silences it is", () => {
+  const html = renderStatusBanner(
+    banner({ turn: { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" } }),
+  );
+
+  assert.match(html, /the agent is implementing your feedback/i);
+});
+
+/** The plan is the agent's own text, and it is written into the header. */
+test("a plan cannot inject markup into the header", () => {
+  const html = renderStatusBanner(
+    banner({
+      turn: {
+        holder: "agent",
+        mode: "working",
+        at: "2025-01-01T00:07:00.000Z",
+        note: "<script>alert(1)</script>",
+      },
+    }),
+  );
+
+  // Case-insensitive and open-ended: `<SCRIPT>` and `<script src=x>` are the
+  // same escape, and a regexp that only knows the exact lower-case tag would
+  // pass while the banner served one of the others.
+  assert.doesNotMatch(html, /<script/i);
+  assert.match(html, /&lt;script&gt;/);
+});
+
+test("the turn beats waiting, since what became of the feedback is the news", () => {
+  // A second agent parked on the wait while the first is off working says
+  // nothing the reviewer can act on; what became of their feedback does.
+  const html = renderStatusBanner(banner({ agentWaiting: true, turn: READING }));
+
+  assert.match(html, /the agent has your feedback/i);
   assert.doesNotMatch(html, /agent is waiting/i);
 });
 
 test("does not claim an agent is working on an ended review", () => {
-  const html = renderStatusBanner(banner({ status: "ended", agentWorking: true }));
+  const html = renderStatusBanner(banner({ status: "ended", turn: READING }));
 
   assert.doesNotMatch(html, /agent is working/i);
+  assert.doesNotMatch(html, /has your feedback/i);
 });

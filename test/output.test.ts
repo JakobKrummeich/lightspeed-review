@@ -7,20 +7,25 @@ import {
   renderToon,
   truncateContent,
 } from "../src/output.ts";
-import { ReviewError, validationError } from "../src/errors.ts";
+import { ReviewError, invocationError } from "../src/errors.ts";
 
 test("renderToon encodes a record as TOON", () => {
   assert.equal(renderToon({ status: "open", pending: 0 }), "status: open\npending: 0");
 });
 
 test("content shorter than the limit is passed through untouched", () => {
-  assert.equal(truncateContent("+const user = 1;", 100), "+const user = 1;");
+  assert.equal(truncateContent("+const user = 1;", 100, "a.txt has the rest"), "+const user = 1;");
 });
 
-test("long content is cut and says how much there was and how to see it all", () => {
-  const truncated = truncateContent("x".repeat(50), 10);
+/** A cut that does not say where the rest is is a loss; this one names the
+ * place the agent can read it in full without another round trip. */
+test("long content is cut and says how much there was and where the rest is", () => {
+  const truncated = truncateContent("x".repeat(50), 10, "lines 1-1 of a.txt have the rest");
 
-  assert.match(truncated, /^x{10}\n\(truncated, 50 chars — use --full\)$/);
+  assert.equal(
+    truncated,
+    `${"x".repeat(10)}\n(truncated, 50 chars — use --full; lines 1-1 of a.txt have the rest)`,
+  );
 });
 
 test("errorOutput nests code, message and detail under error", () => {
@@ -61,11 +66,14 @@ test("errorOutput renders unexpected non-Review errors as internal_error", () =>
   });
 });
 
-test("errorOutput keeps an SDK validation code so an unknown flag still exits 2", () => {
-  assert.deepEqual(errorOutput(validationError("unknown flag `--bogus`", ["Run `--help`"])), {
-    error: { code: "VALIDATION_ERROR", message: "unknown flag `--bogus`" },
-    help: ["Run `--help`"],
-  });
+test("a bad command line renders under the code for the mistake it is", () => {
+  assert.deepEqual(
+    errorOutput(invocationError("unknown_flag", "unknown flag `--bogus`", ["Run `--help`"])),
+    {
+      error: { code: "unknown_flag", message: "unknown flag `--bogus`" },
+      help: ["Run `--help`"],
+    },
+  );
 });
 
 test("a ReviewError always renders with a help block", () => {

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ReviewError } from "../src/errors.ts";
-import { resolveSession } from "../src/session-resolve.ts";
+import { missingSession, resolveSession } from "../src/session-resolve.ts";
 import type { SessionRecord } from "../src/session-store.ts";
 
 function session(overrides: Partial<SessionRecord>): SessionRecord {
@@ -18,9 +18,74 @@ function session(overrides: Partial<SessionRecord>): SessionRecord {
     pending: [],
     approved: [],
     rounds: [],
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
     ...overrides,
   };
 }
+
+/**
+ * S7: the 404 named the session key — a hash the agent has never seen printed
+ * anywhere it could have learned it — and offered a `<branch> [base]` template
+ * back. The two facts it must carry are what was asked for and what is there.
+ */
+test("a review nothing holds is named by its branch pair and its repository", () => {
+  const error = missingSession({
+    repoRoot: "/repo",
+    branch: "other/branch",
+    base: "main",
+    verb: "wait",
+    sessions: [session({ branch: "feature/greeting", base: "main" })],
+  });
+
+  assert.equal(error.code, "session_not_found");
+  assert.equal(error.message, "no review session for other/branch against main in /repo");
+  assert.equal(error.detail, "1 live session in this repo: feature/greeting against main");
+  assert.deepEqual(error.suggestions, [
+    'Run `lightspeed start other/branch main --intent "<why this branch exists>"` to open it',
+    "Or run `lightspeed wait feature/greeting main` for the session that exists",
+  ]);
+});
+
+test("the session that exists is offered to the command that was actually run", () => {
+  const error = missingSession({
+    repoRoot: "/repo",
+    branch: "other",
+    base: "main",
+    verb: "approvals",
+    sessions: [session({ branch: "feature/greeting", base: "develop" })],
+  });
+
+  assert.match(error.suggestions[1] ?? "", /lightspeed approvals feature\/greeting develop/);
+});
+
+test("several live sessions are all named, and none of them is guessed at", () => {
+  const error = missingSession({
+    repoRoot: "/repo",
+    branch: "other",
+    base: "main",
+    verb: "say",
+    sessions: [session({ branch: "one" }), session({ branch: "two", base: "develop" })],
+  });
+
+  assert.equal(error.detail, "2 live sessions in this repo: one against main, two against develop");
+  assert.match(error.suggestions[1] ?? "", /lightspeed say <branch> \[base\]/);
+});
+
+/** Ended reviews and other repositories' reviews are not sessions this command
+ * could have meant, so they are not offered as ones it might have. */
+test("a repository with nothing live says that, and offers only the way to open one", () => {
+  const error = missingSession({
+    repoRoot: "/repo",
+    branch: "other",
+    base: "main",
+    verb: "wait",
+    sessions: [session({ branch: "old", status: "ended" }), session({ repoRoot: "/elsewhere" })],
+  });
+
+  assert.equal(error.detail, "no live sessions in this repo");
+  assert.equal(error.suggestions.length, 1);
+  assert.match(error.suggestions[0] ?? "", /--intent/);
+});
 
 test("an explicit branch wins over anything stored", () => {
   const sessions = [session({ branch: "other" })];

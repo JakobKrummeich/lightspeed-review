@@ -1,13 +1,26 @@
-import { ReviewError } from "../errors.ts";
+import { ReviewError, type ReviewErrorCode } from "../errors.ts";
+import { helpReopen, startCall } from "./home.ts";
 import { diagnosePort } from "./server-address.ts";
+
+/**
+ * Which review a request is about, for the errors that name it. Both halves
+ * come off the command line the caller already parsed: an error that makes the
+ * agent retype what it just typed is an error that costs a turn.
+ */
+export interface SessionRef {
+  /** Session key, named in the 404 message. */
+  key: string;
+  /** `<branch> <base>`, for the commands an error suggests running. */
+  target?: string;
+}
 
 /** Talks to the review server for a command, mapping transport failures to codes
  * an agent can act on — no command interprets an HTTP status itself. */
 export async function apiRequest(
   url: string,
   init?: RequestInit,
-  /** Named in the 404 message when the request is about one session. */
-  key?: string,
+  /** The review this request is about, when it is about one. */
+  about?: SessionRef,
 ): Promise<unknown> {
   let response: Response;
   try {
@@ -15,36 +28,44 @@ export async function apiRequest(
   } catch (error) {
     throw await transportError(url, error);
   }
-  const answer = parseBody(response.status, await response.text(), key);
+  const answer = parseBody(response.status, await response.text(), about);
   if (answer instanceof ReviewError) throw answer;
   return answer;
 }
 
+/** The review a suggested command should name: the branch pair the caller
+ * already typed, or the form to type when a caller had none. */
+function target(about: SessionRef | undefined): string {
+  return about?.target ?? "<branch> [base]";
+}
+
 /** Statuses about the review rather than HTTP. Reached through `parseBody`, so
  * every client names them the same. */
-function errorForStatus(status: number, key?: string): ReviewError | undefined {
+function errorForStatus(status: number, about?: SessionRef): ReviewError | undefined {
   if (status === 404) {
     return new ReviewError({
       code: "session_not_found",
       message:
-        key === undefined ? "the review server knows no such session" : `no review session ${key}`,
-      suggestions: ["Run `lightspeed start <branch> [base]` to open the session first"],
+        about === undefined
+          ? "the review server knows no such session"
+          : `no review session ${about.key}`,
+      suggestions: [`Run \`${startCall(target(about))}\` to open the session first`],
     });
   }
   if (status === 409) {
     return new ReviewError({
       code: "session_ended",
       message: "the reviewer ended this review; only they ask for a new round",
-      suggestions: [
-        "Run `lightspeed start <branch> [base] --reopen` once the reviewer asks for one",
-      ],
+      // The session this command named, not a template of it: the branch and the
+      // base were on the command line that got here.
+      suggestions: [helpReopen(target(about))],
     });
   }
   if (status === 503) {
     return new ReviewError({
       code: "server_not_running",
       message: "the review server shut down while the command was waiting",
-      suggestions: ["Run `lightspeed start <branch> [base]` to restart the review server"],
+      suggestions: [`Run \`${startCall(target(about))}\` to restart the review server`],
     });
   }
   return undefined;
@@ -53,8 +74,8 @@ function errorForStatus(status: number, key?: string): ReviewError | undefined {
 /** The payload, or the error the status and body add up to. Shared with the long
  * poll, which reads the same statuses off its own connection — the two clients
  * must not drift on what a 500 or a non-JSON body means. */
-export function parseBody(status: number, body: string, key?: string): unknown {
-  const failure = errorForStatus(status, key);
+export function parseBody(status: number, body: string, about?: SessionRef): unknown {
+  const failure = errorForStatus(status, about);
   if (failure) return failure;
   if (status === 422) return domainError(body);
   if (status < 200 || status > 299) {
@@ -77,13 +98,29 @@ export function parseBody(status: number, body: string, key?: string): unknown {
   }
 }
 
-/** 422 is the server rejecting the request's content (today, a declaration) with a
- * structured error relayed as it stands — the server is the one place the rules are
- * spelt. A 422 whose body is not that shape is a bug. */
+/** The rules the server states as 422s, relayed to the agent under their own
+ * codes. Listed rather than accepted wholesale so the closed `ReviewErrorCode`
+ * set stays true — and listed as a set rather than one hardcoded code, which is
+ * how `turn_not_yours` first reached agents as `internal_error`: a bug in
+ * lightspeed, they read, instead of an illegal move they could fix. */
+const DOMAIN_ERROR_CODES = new Set<ReviewErrorCode>([
+  "declaration_invalid",
+  "turn_not_yours",
+  "turn_still_yours",
+]);
+
+function isDomainCode(code: unknown): code is ReviewErrorCode {
+  return typeof code === "string" && DOMAIN_ERROR_CODES.has(code as ReviewErrorCode);
+}
+
+/** 422 is the server rejecting the request's content — a declaration that names no
+ * comment, a `work` on a turn the agent does not hold — with a structured error
+ * relayed as it stands. The server is the one place those rules are spelt. A 422
+ * whose body is not that shape is a bug. */
 function domainError(body: string): ReviewError {
   const parsed = readErrorBody(body);
   const { code, message, detail } = parsed.error ?? {};
-  if (code !== "declaration_invalid" || typeof message !== "string") {
+  if (!isDomainCode(code) || typeof message !== "string") {
     return new ReviewError({
       code: "internal_error",
       message: "the review server answered 422 without a readable error",
@@ -98,7 +135,10 @@ function domainError(body: string): ReviewError {
     code,
     message,
     ...(typeof detail === "string" ? { detail } : {}),
-    suggestions: [help[0] ?? "Fix the declaration and re-send the whole reply", ...help.slice(1)],
+    suggestions: [
+      help[0] ?? "Fix what the message names and run the command again",
+      ...help.slice(1),
+    ],
   });
 }
 
@@ -127,7 +167,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepts a connection on port ${port}`,
-      suggestions: ["Run `lightspeed start <branch> [base]` to start the review server"],
+      suggestions: [`Run \`${startCall("<branch> [base]")}\` to start the review server`],
     });
   }
   return new ReviewError({
@@ -136,7 +176,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
     detail: `${detail}; the port is still reachable, so the server is there`,
     suggestions: [
       "Re-run the command; the connection failed, not the review",
-      "Run `lightspeed stop` and then `lightspeed start <branch> [base]` if it keeps failing",
+      `Run \`lightspeed stop\` and then \`${startCall("<branch> [base]")}\` if it keeps failing`,
     ],
   });
 }

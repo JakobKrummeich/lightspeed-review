@@ -48,6 +48,7 @@ function session(overrides: Partial<SessionRecord> = {}): SessionRecord {
     pending: [],
     approved: [],
     rounds: [],
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
     ...overrides,
   };
 }
@@ -84,19 +85,48 @@ test("names every file behind the counts, and which of them a lane swept", () =>
 
   const output = run(stateDir);
 
-  assert.deepEqual(output.approval, {
-    approved: ["src/auth.ts", "docs/api.md", "README.md"],
-    unapproved: ["src/errors.ts"],
-    swept: ["docs/api.md", "README.md"],
+  assert.deepEqual(output.approved, ["src/auth.ts", "docs/api.md", "README.md"]);
+  assert.deepEqual(output.unapproved, ["src/errors.ts"]);
+  assert.deepEqual(output.swept, ["docs/api.md", "README.md"]);
+  assert.deepEqual(output.counts, { approved: 3, unapproved: 1, swept: 2, total: 4 });
+});
+
+/**
+ * S8: 166 tokens for a three-file review, ~90 of them unactionable — every
+ * list printed empty beside its own count, `omitted: 0`, `has_more: false`,
+ * and a two-line explanation of `swept` on a review that swept nothing.
+ */
+test("a review with nothing ticked prints the counts and no empty lists", () => {
+  const stateDir = stateWith(
+    session({ groups: [group("Auth", "study", "src/tok.js", "src/tok.test.js", "a.txt")] }),
+  );
+
+  const output = run(stateDir);
+
+  assert.deepEqual(output.session, {
+    key: sessionKey(REPO, BRANCH, BASE),
+    branch: BRANCH,
+    base: BASE,
   });
-  assert.deepEqual(output.count, {
-    approved: 3,
-    unapproved: 1,
-    swept: 2,
-    total: 4,
-    omitted: 0,
-    has_more: false,
-  });
+  assert.deepEqual(output.counts, { approved: 0, unapproved: 3, swept: 0, total: 3 });
+  assert.deepEqual(output.unapproved, ["src/tok.js", "src/tok.test.js", "a.txt"]);
+  assert.ok(!("approved" in output));
+  assert.ok(!("swept" in output));
+  assert.ok(!("omitted" in asRecord(output.counts)));
+  assert.ok(!("has_more" in asRecord(output.counts)));
+  assert.deepEqual(output.help, [
+    "This review is still open: these are the ticks so far, not a verdict",
+  ]);
+});
+
+/** N4 here too: `turn` names whose move it is, and a second word for the same
+ * state goes stale between rounds. */
+test("the session block names the review and says nothing twice", () => {
+  const stateDir = stateWith(
+    session({ status: "ended", groups: [group("Auth", "study", "src/auth.ts")] }),
+  );
+
+  assert.ok(!("status" in asRecord(run(stateDir).session)));
 });
 
 test("a review too big to print stops at the cap and still counts every file", () => {
@@ -104,14 +134,13 @@ test("a review too big to print stops at the cap and still counts every file", (
 
   const output = run(stateDir);
 
-  assert.equal((asRecord(output.approval).unapproved as string[]).length, DEFAULT_PATH_LIMIT);
-  assert.deepEqual(output.count, {
+  assert.equal((output.unapproved as string[]).length, DEFAULT_PATH_LIMIT);
+  assert.deepEqual(output.counts, {
     approved: 0,
     unapproved: DEFAULT_PATH_LIMIT + 2,
     swept: 0,
     total: DEFAULT_PATH_LIMIT + 2,
     omitted: 2,
-    has_more: true,
   });
 });
 
@@ -120,9 +149,8 @@ test("--full names every path the cap held back", () => {
 
   const output = run(stateDir, true);
 
-  assert.equal((asRecord(output.approval).unapproved as string[]).length, DEFAULT_PATH_LIMIT + 2);
-  assert.equal(asRecord(output.count).omitted, 0);
-  assert.equal(asRecord(output.count).has_more, false);
+  assert.equal((output.unapproved as string[]).length, DEFAULT_PATH_LIMIT + 2);
+  assert.ok(!("omitted" in asRecord(output.counts)));
 });
 
 test("a listing the cap cut says which flag prints the rest", () => {
@@ -170,10 +198,10 @@ test("an ended review is answered as long as it is on disk, server or no server"
 
   const output = run(stateDir);
 
-  assert.equal((output.session as { status: string }).status, "ended");
+  assert.deepEqual(output.counts, { approved: 0, unapproved: 1, swept: 0, total: 1 });
   assert.equal(
     (output.help as string[])[0],
-    "This review is over; these are the ticks it ended on",
+    "This review is over: these are the ticks it ended on",
   );
 });
 
@@ -184,8 +212,18 @@ test("an open review's ticks are reported as a tally so far and not as a verdict
 
   assert.equal(
     (output.help as string[])[0],
-    "This review is still open, so these are the ticks so far and not a verdict",
+    "This review is still open: these are the ticks so far, not a verdict",
   );
+});
+
+/** The sentence is only worth its tokens where a lane actually swept something;
+ * on every other review it explained a count that read `0`. */
+test("nothing swept, nothing said about sweeping", () => {
+  const stateDir = stateWith(
+    session({ groups: [group("Auth", "study", "src/auth.ts")], approved: ["src/auth.ts"] }),
+  );
+
+  assert.ok(!(run(stateDir).help as string[]).some((line) => line.includes("`swept`")));
 });
 
 test("a swept file is named as accepted and not as read", () => {

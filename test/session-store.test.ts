@@ -43,6 +43,7 @@ function sessionRecord(overrides: Partial<SessionRecord> = {}): SessionRecord {
     pending: [],
     approved: [],
     rounds: [],
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
     ...overrides,
   };
 }
@@ -242,6 +243,22 @@ function corruptWith(fragment: RegExp): (error: unknown) => boolean {
     (error.suggestions ?? []).some((line) => line.includes("a3f8c21b9e4d5f60.json"));
 }
 
+/** The way out of a corrupt session is a fresh round, and `start` refuses to
+ * open one without `--intent`: a help line that omits it costs another turn. */
+test("the delete-and-restart line spells the start that would actually run", () => {
+  const dir = stateDir();
+  const store = new SessionStore(dir);
+  store.save(sessionRecord());
+  writeRaw(dir, { ...sessionRecord(), groups: undefined });
+
+  assert.throws(
+    () => store.get("a3f8c21b9e4d5f60"),
+    (error: unknown) =>
+      error instanceof ReviewError &&
+      error.suggestions.some((line) => /lightspeed start <branch> \[base\] --intent/.test(line)),
+  );
+});
+
 /** Writes `body` over the session file the other tests in here use. */
 function writeRaw(dir: string, body: unknown): void {
   writeFileSync(join(dir, "sessions", "a3f8c21b9e4d5f60.json"), JSON.stringify(body));
@@ -272,6 +289,47 @@ test("a session file with a group that has no files reports session_corrupt", ()
   });
 
   assert.throws(() => store.get("a3f8c21b9e4d5f60"), corruptWith(/files/));
+});
+
+test("a session file written before turns existed opens with the reviewer holding it", () => {
+  const dir = stateDir();
+  const store = new SessionStore(dir);
+  store.save(sessionRecord({ updatedAt: "2025-02-03T09:00:00.000Z" }));
+  const withoutTurn: Partial<SessionRecord> = sessionRecord({
+    updatedAt: "2025-02-03T09:00:00.000Z",
+  });
+  delete withoutTurn.turn;
+  writeRaw(dir, withoutTurn);
+
+  // Stamped at the last write: nothing else in the file can say when the turn
+  // was last anybody's, and a lock nobody could lift would strand the review.
+  assert.deepEqual(store.get("a3f8c21b9e4d5f60")?.turn, {
+    holder: "reviewer",
+    at: "2025-02-03T09:00:00.000Z",
+  });
+});
+
+test("a turn the agent holds survives the store being reopened", () => {
+  const dir = stateDir();
+  new SessionStore(dir).save(
+    sessionRecord({
+      turn: {
+        holder: "agent",
+        mode: "working",
+        at: "2025-02-03T09:00:00.000Z",
+        note: "rewriting the parser",
+      },
+    }),
+  );
+
+  // A `serve` restart reads the file again; an in-memory flag would have
+  // unlocked Send under an agent still editing.
+  assert.deepEqual(new SessionStore(dir).get("a3f8c21b9e4d5f60")?.turn, {
+    holder: "agent",
+    mode: "working",
+    at: "2025-02-03T09:00:00.000Z",
+    note: "rewriting the parser",
+  });
 });
 
 test("a corrupt session file reports session_corrupt instead of vanishing", () => {

@@ -6,7 +6,7 @@ An **AXI** (Agent eXperience Interface) CLI for reviewing LLM-agent code changes
 
 1. **Flat file lists in GitLab/GitHub are unreadable for large PRs** — An embedded LLM call groups and orders changed files semantically ("Schema changes", "API handlers", "Tests") so related changes appear together.
 
-2. **Giving targeted feedback to agents is tedious** — User selects any text in the diff (including deleted lines), types feedback in a popup, and it reaches the polling agent with the exact selected text + comment. No verbal file/line description needed.
+2. **Giving targeted feedback to agents is tedious** — User selects any text in the diff (including deleted lines), types feedback in a popup, and it reaches the waiting agent with the exact selected text + comment. No verbal file/line description needed.
 
 Built to [AXI principles](https://axi.md): TOON output, contextual disclosure, content-first, structured errors, long-poll feedback.
 
@@ -26,9 +26,10 @@ Developer working in TUI with Pi agent:
    └─ Opens browser with grouped diff view
    └─ Returns TOON: session key, url, group count, help[] next steps
 
-3. Agent: npx lightspeed poll feature-x main
+3. Agent: npx lightspeed wait feature-x main
    └─ Long-polls in the FOREGROUND, blocks until user sends feedback
       (help[] tells the agent never to background it or wrap it in a timeout)
+      Delivery is the only thing that hands the agent the turn.
 
 4. User reviews in browser:
    └─ Main area: grouped/ordered diffs, syntax highlighted
@@ -37,7 +38,7 @@ Developer working in TUI with Pi agent:
    └─ Bottom-right: general comment input + "Send" / "Send & End"
 
 5. User clicks "Send":
-   └─ Poll returns TOON feedback: selected text + comments
+   └─ `wait` returns TOON feedback: selected text + comments
    └─ Agent fixes code, commits
 
 6. Agent re-attaches: npx lightspeed start feature-x main
@@ -63,15 +64,89 @@ Developer working in TUI with Pi agent:
 | #   | Principle                          | Implementation                                                                                                                |
 | --- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **Token-efficient output**         | All CLI output in TOON via `axi-sdk-js` — except `skill`, whose stdout is the markdown document itself; its errors stay TOON  |
-| 2   | **Minimal default schemas**        | Session list: `{branch, base, status, pending}` — 4 fields. `--fields` for more                                               |
+| 2   | **Minimal default schemas**        | Session list: `{branch, base, status, turn, round, pending}` — 6 fields. `--fields` for more                                  |
 | 3   | **Content truncation**             | Diff content truncated in CLI output with `(truncated, N chars — use --full)`. Browser always shows full                      |
 | 4   | **Pre-computed aggregates**        | `total_files`, `total_groups`, `files_changed`, `insertions`, `deletions`, `pending_prompts` inline                           |
 | 5   | **Definitive empty states**        | `sessions: 0` + explicit `no active sessions` message, never silent empty                                                     |
 | 6   | **Structured errors & exit codes** | Errors as TOON on **stdout**, debug on stderr. Exit 0 ok, 1 error, 2 unknown flag. No interactive prompts. `start` idempotent |
 | 7   | **Ambient context**                | Ships an installable agent skill. **No session hooks** — YAGNI, dropped                                                       |
 | 8   | **Content first**                  | Bare `lightspeed` shows live sessions + `bin: ~/...` + description, not help                                                  |
-| 9   | **Contextual disclosure**          | Every output ends with `help[]` next-step command templates                                                                   |
+| 9   | **Contextual disclosure**          | Every output ends with `help[]` next-step command templates — the moves that are legal from the turn it just stated           |
 | 10  | **Consistent help**                | `--help` on every subcommand; top-level `--help` lists every command it answers                                               |
+
+## The turn
+
+> Queue always. End always. Send only on your turn.
+
+A session has exactly one turn holder at a time, persisted on the record as
+`turn: {holder: "reviewer", at}` or `turn: {holder: "agent", mode: "reading" |
+"working", at, note?}`. A session written before the turn existed reads as the
+reviewer's — that is the state in which everything is allowed.
+
+**The turn moves to the agent on delivery, and on nothing else.** Not on the
+reviewer's Send: words nobody is waiting for queue server-side, and the reviewer
+keeps sending. Only feedback handed to a live, blocking `wait` takes the turn,
+because only then is there an agent that has actually read it. It comes back when
+the agent asks a question, publishes a round, or ends the review; when a `wait`
+parks on a review with nothing queued, which is the agent saying it is listening
+rather than editing; and when an undelivered batch is recovered.
+
+**Parking hands the turn back only from `reading`.** An agent that declared
+`work` is refused: a second `wait` from mid-edit would unlock Send under it, and
+the reviewer would fire at a half-written branch with neither side finding out
+why. The poll answers `turn_still_yours` (exit 2) naming the moves that are legal
+from there, the two that give the turn up deliberately first — `start <branch>
+[base] --wait`, which publishes what the work produced, and `ask`, which hands
+it back with a question. They are the same list every command's `help[]` is
+built from, so a refusal cannot name a move an answer calls illegal.
+
+**A delivery is not finished until the agent says it arrived.** The server
+cannot see this for itself: the answer's bytes reach the client's kernel whether
+anything reads them or not, so a `wait` killed mid-delivery is indistinguishable
+on the wire from one that read every word. The drained batch is held on the
+record as `delivering: {id, prompts, at}` and the id rides out on the poll
+payload; the client confirms with `POST /api/session/:key/delivered`, and a poll
+that arrives with a batch still in flight puts it back at the head of the queue
+first. It is persisted rather than held in memory because a `serve` restart in
+that window would otherwise lose the feedback for good.
+
+There is **no timer, no staleness unlock and no override**. A reload changes
+nothing: the page reads the turn off the record it is served with. An agent that
+died holding the turn is recovered in the terminal it was started from, which is
+the only place that can know what happened to it.
+
+**What the lock actually takes away is Send, and only Send.** Queueing, typing,
+removing a pill and ending the review stay live whoever holds the turn. The end
+button says what it will do instead of being taken away: on the agent's turn it
+reads `End without Sending`, because the queue is not the reviewer's to send onto
+somebody else's turn.
+
+`mode` is presentational. `reading` and `working` gate identically; the
+difference is what the reviewer's banner says — "the agent has your feedback"
+versus the plan `work` declared, "implementing: splitting the helper out".
+
+| command | turn after                                 | blocks              |
+| ------- | ------------------------------------------ | ------------------- |
+| `start` | reviewer                                   | no, unless `--wait` |
+| `wait`  | the agent's, on delivery                   | **yes**             |
+| `ask`   | reviewer, then the agent's on their answer | **yes**             |
+| `say`   | unchanged                                  | no                  |
+| `work`  | the agent's, and the banner names the plan | no                  |
+| `end`   | ended                                      | no                  |
+
+`say` leaving the turn alone is the one thing worth spelling out: an agent that
+reports progress mid-edit is still mid-edit, and a `say` that handed the turn
+back would make the `work` the same agent runs next an illegal move.
+
+Every answer the CLI prints carries `turn` and `round`, and closes with the moves
+that are legal from there. Two endpoints are gated on the turn, one from each
+end: `work` is refused with `turn_not_yours` when the agent does not hold it — it
+is the only command that claims to — and the poll is refused with
+`turn_still_yours` when the agent holds it and is working. Both answer on stdout
+with exit 2, naming the command that would make the move legal. On an ended
+review `work` is refused `session_ended` (exit 1) like every other command that
+speaks into one: the record still names whoever held the turn last, but a review
+that is over holds no turn to claim.
 
 ## Commands
 
@@ -92,15 +167,55 @@ lightspeed start <branch> [base] --intent "<why>"
   # Idempotent: re-running updates existing session with fresh diff
   # --intent is REQUIRED and repeatable: why the branch exists, written by the
   #   calling agent. Missing → `intent_missing`, exit 2, before any git or LLM work
-  # Flags: --intent "<why>", --no-open, --base <ref>, --model <name>, --full
+  # Flags: --intent "<why>", --no-open, --reopen, --wait, --base <ref>, --model <name>
+  # --wait blocks on the round it just published, as `wait` does
 
-lightspeed poll <branch> [base]
+# The speaking verbs. What the agent has to say is always the FIRST positional:
+#   lightspeed <verb> "<message>" [branch] [base] [flags]
+# A verb whose subject hides behind a flag reads as optional, and the subject is
+# the point of the command.
+
+lightspeed wait [branch] [base]
   # Long-polls for feedback. Blocks until Send or Send & End.
   # Runs forever by default: no --timeout-ms, no heartbeat frames (matches lavish-axi).
-  # Flags: --agent-reply "..."
+  # The ONLY way the turn ever reaches the agent, and only on delivery.
+  # Flags: --full (print selections at their real length)
 
-lightspeed end <branch> [base]
+lightspeed ask "<question>" [branch] [base]
+  # Puts a question to the reviewer and blocks on the answer. The question is
+  #   drawn as a card with its own answer box: answering costs one press and
+  #   leaves whatever the reviewer has queued queued.
+  # Turn: back to the reviewer, then the agent's again when they answer.
+
+lightspeed say "<text>" [branch] [base]
+  # Says something without blocking. Does NOT move the turn: an agent that
+  #   reports progress mid-edit is still mid-edit.
+  # Flags: --for <id> (pin the whole answer under the comment it answers),
+  #        --files <a,b> (paths that comment led to changes in; needs --for)
+
+lightspeed work "<plan>" [branch] [base]
+  # Declares the silence the agent is about to keep. The reviewer's banner names
+  #   the plan instead of saying the agent has their feedback.
+  # The one endpoint gated on the turn: without it, `turn_not_yours`, exit 2.
+
+lightspeed approvals [branch] [base]
+  # Names the files behind the counts the ended `wait` reports: approved, swept,
+  #   unapproved. Run it when something turns on which file, not by default.
+  # Flags: --full (every path, not the first 50 of each list)
+
+lightspeed end [branch] [base]
   # Agent-initiated session end
+
+lightspeed serve
+  # Runs the review server in the foreground until it is stopped. `start` spawns
+  #   this in the background, so it is only needed for debugging
+
+lightspeed feedback [list | show <id> | prune --before <date>]
+  # Reads the durable feedback ledger. Bare, it summarises every recorded review
+  #   comment across repositories; `list` filters, `show` prints one in full,
+  #   `prune` deletes records older than a date, atomically
+  # Flags: --repo, --since, --cursor, --limit, --verdict, --file, --with-patches,
+  #   --max-bytes, --format toon|jsonl|md (list); --before, --dry-run (prune)
 
 lightspeed stop
   # Shut down background server
@@ -114,6 +229,12 @@ lightspeed login <provider>
 lightspeed logout <provider>
   # Delete lightspeed's own stored credential; reports whether an entry was
   #   removed. pi's auth.json is never touched
+
+lightspeed init --agent <id> [--scope global|project] [--config]
+  # Writes the integration instructions into the file one coding agent reads,
+  #   and a starter .lightspeed.conf.json with --config (never over one that
+  #   exists). Safe to re-run; --dry-run reports what it would write and changes
+  #   nothing. The agent must be restarted before it sees a skill written now
 
 lightspeed skill --agent <id>
   # Print the integration instructions in the dialect one coding agent expects;
@@ -142,14 +263,18 @@ Every command takes `<branch> [base]` explicitly — same pattern as lavish's `<
 ```
 bin: ~/.local/bin/lightspeed
 description: Semantic diff review with targeted agent feedback
-sessions[2]{branch,base,status,pending}:
-  feature-auth,main,open,0
-  fix-billing,develop,feedback,3
-help[3]:
-  Run `lightspeed start <branch> [base]` to open a review session
-  Run `lightspeed poll <branch> [base]` to wait for reviewer feedback — run it in the foreground and let it block; never background it or wrap it in a timeout
-  Run `lightspeed end <branch> [base]` to close a session
+sessions[2]{branch,base,status,turn,round,pending}:
+  feature-auth,main,open,reviewer,1,0
+  fix-billing,develop,feedback,agent working,2,3
+help[4]:
+  Queue always. End always. Send only on your turn.
+  Run `lightspeed start <branch> [base] --intent "<why this branch exists>"` to open a review session; repeat --intent once per reason
+  Run `lightspeed wait <branch> [base]` in the foreground to take the turn when the reviewer sends — it blocks until the reviewer sends, so never background it or wrap it in a timeout
+  Run `lightspeed end <branch> [base]` to close the session
 ```
+
+Every row states the turn, because the turn is what decides which command is
+legal next. So does every other answer the CLI prints — see below.
 
 ### Empty state (definitive)
 
@@ -183,16 +308,24 @@ groups[4]{name,files}:
   API Handlers,8
   Auth Middleware,5
   Tests,7
-help[2]:
-  Run `lightspeed poll feature-auth main` in the foreground to wait for reviewer feedback; it blocks until they send, so do not background it or add a timeout
-  Reviewer selects diff text and sends targeted comments; poll returns them
+  turn: reviewer
+help[3]:
+  Run `lightspeed wait feature-auth main` in the foreground to take the turn when the reviewer sends — it blocks until the reviewer sends, so never background it or wrap it in a timeout
+  The reviewer selects diff text and sends targeted comments; `wait` returns them and the turn
+  Run `lightspeed end feature-auth main` to close the session
 ```
 
-### poll (feedback)
+### wait (feedback, and the turn)
 
 One list only. The earlier duplicated `prompts[]` summary + `annotations[]` detail block is gone — it was redundant.
 
+`turn` and `round` lead, because they are what the next command has to be chosen
+against, and `help[]` closes with the moves that are legal from here: the whole
+protocol, learnable from one answer.
+
 ```
+turn: agent reading
+round: 2
 status: feedback
 ended: false
 prompts[3]:
@@ -212,9 +345,26 @@ prompts[3]:
     comment: Why removed? Billing still needs it
   - type: message
     comment: Overall good, fix the transaction issue
-help[2]:
-  Address the feedback, commit, then run `lightspeed start feature-auth main` to show updated diff
-  Run `lightspeed poll feature-auth main --agent-reply "<summary>"` in the foreground to reply and keep reviewing
+help[4]:
+  Run `lightspeed ask "<question>" feature-auth main` to put a question to the reviewer and wait for the answer — it blocks until the reviewer sends, so never background it or wrap it in a timeout
+  Run `lightspeed say "<text>" feature-auth main` to answer without blocking; add `--for <id>` to pin the answer under the comment it answers
+  Run `lightspeed work "<plan>" feature-auth main` before you start editing: the reviewer's banner names the plan for as long as you are quiet
+  Address the feedback, commit, then run `lightspeed start feature-auth main` to show the updated diff
+```
+
+### work refused (stdout, exit 2)
+
+The one illegal move in the protocol, answered with the move that makes it legal.
+The agent reads failures the way it reads results, so the refusal is structured
+and the fixing command names this session.
+
+```
+error:
+  code: turn_not_yours
+  message: you do not hold the turn (turn: reviewer) — nothing has been sent to you yet
+  detail: the turn moves to you when the reviewer's feedback is delivered to a blocking `lightspeed wait`, and never before
+help[1]:
+  Run `lightspeed wait feature-auth main` to block until the reviewer sends
 ```
 
 ### Structured error (stdout, exit 1)
@@ -237,7 +387,11 @@ src/
   commands/
     home.ts             → Content-first home view
     start.ts            → Diff + LLM group + open browser
-    poll.ts             → Long-poll feedback
+    wait.ts             → Long-poll feedback; the only command that takes the turn
+    ask.ts              → Question to the reviewer + the block on its answer
+    say.ts              → Unblocking speech; `--for` pins it under one comment
+    work.ts             → Declares the silence; the one turn-gated command
+    verb-args.ts        → The grammar those verbs share: message first, then session
     end.ts              → End session
   config.ts             → Loads .lightspeed.conf.json, fail-fast validation
   diff-extract.ts       → Git diff extraction + stats
@@ -247,7 +401,8 @@ src/
     prompts.ts          → System + user prompt templates (project-owned)
     schema.ts           → Typebox schema for grouping output + validator
     grouping.ts         → diff → LLM → validate → repair loop → DiffGroup[]
-  server.ts             → node:http: UI, feedback API, poll, SSE
+  turn.ts               → The turn: who holds it, and how every answer states it
+  server.ts             → node:http: UI, feedback API, long poll, SSE
   router.ts             → Tiny method+path router (~60 lines)
   session-store.ts      → JSON state (~/.lightspeed/)
   html-template.ts      → Review page HTML
@@ -492,7 +647,7 @@ Rules that make this unambiguous for an agent:
 - Selection is constrained to a single file block; cross-file selections are split into one annotation per file.
 - `group` is included as orienting context (which concern the reviewer was looking at).
 - One flat `prompts[]` array — annotations and messages in the order the reviewer queued them. No parallel `annotations[]` block.
-- A poll that returns none of them says so definitively: `prompts: 0` plus a message, never a bare `prompts: []`. Only an ended review can answer with nothing queued — an open poll keeps waiting until something is.
+- A `wait` that returns none of them says so definitively: `prompts: 0` plus a message, never a bare `prompts: []`. Only an ended review can answer with nothing queued — on an open one, `wait` keeps waiting until something is.
 
 ## Browser Layout
 
@@ -523,15 +678,19 @@ Selection popup:
 └─────────────────────────┘
 ```
 
-**A round waits for the reviewer.** An agent finishing mid-review used to replace the diff the instant it landed: the reviewer was thrown to the top of a review that had been re-cut under them, in the middle of a group, having asked for nothing. A new round now waits behind an offer in the header — `Round 2 is ready · 4 files`, drawn by `dom/round-offer-mount.ts` off the whole session it holds — and goes on screen only when it is pressed. What counts as being mid-review is `holdsRound` in `src/browser/round-offer.ts`: scrolled off the top, inside a chapter, or holding queued words. A reviewer showing none of the three has nothing to lose, so the round is applied silently, exactly as before; and an ended review is never held, because that is the review stopping rather than a round to be taken. One offer stands at a time and it is always the newest round: a reviewer who read through two of them is not owed two presses. Applying a round is one function (`applyRound` in `dom/session-events.ts`), reached from the event and from the press alike, so the two can never draw different reviews.
+**A round waits for the reviewer.** An agent finishing mid-review used to replace the diff the instant it landed: the reviewer was thrown to the top of a review that had been re-cut under them, in the middle of a group, having asked for nothing. A new round now waits behind an offer in the header — `Round 2 is ready · 4 files`, plus `· 2 comments kept` when the reviewer is holding unsent words, drawn by `dom/round-offer-mount.ts` off the whole session it holds — and goes on screen only when it is pressed. What counts as being mid-review is `holdsRound` in `src/browser/round-offer.ts`: scrolled off the top, inside a chapter, or holding queued words. A reviewer showing none of the three has nothing to lose, so the round is applied silently, exactly as before; and an ended review is never held, because that is the review stopping rather than a round to be taken. One offer stands at a time and it is always the newest round: a reviewer who read through two of them is not owed two presses. Applying a round is one function (`applyRound` in `dom/session-events.ts`), reached from the event and from the press alike, so the two can never draw different reviews.
 
-**The arrival is announced once.** The header's offer alone was missable — it appears in a corner nobody is reading — so a round that has to wait is also announced by a card over the review (`renderRoundPopup` in `round-offer.ts`, mounted by `dom/round-popup.ts`): the round by the number the reviewer counts, its size, and two honest answers — `Open round N`, or `Keep reading`, which is also what Esc says. Dismissing is not declining: the card folds itself into the header's offer — shrinking away toward the corner the offer lives in — the offer glows once in answer, and then a spark rides the button's border (`offset-path: border-box`) until it is pressed. That orbit is the page's one ongoing animation, allowed because it tells the reviewer nothing new — it holds the place they said they would come back to — and it ends with the offer, however the offer ends: taken from either mouth, or overtaken by the round going on screen. Each round is announced once — a dismissed card never returns for the same round, a newer round is fresh news even over the last card's fold — and taking from card or header clears both, so neither goes on standing for a round already on screen. Under `prefers-reduced-motion` the card is simply there and simply gone, and the spark does not exist.
+**The arrival is announced once.** The header's offer alone was missable — it appears in a corner nobody is reading — so a round that has to wait is also announced by a card over the review (`renderRoundPopup` in `round-offer.ts`, mounted by `dom/round-popup.ts`): the round by the number the reviewer counts, its size, the promise that their queue survives it (`Your 2 comments stay queued — they go out on your next send.`, said only when there is a queue to reassure anyone about), and two honest answers — `Open round N`, or `Keep reading`, which is also what Esc says. Dismissing is not declining: the card folds itself into the header's offer — shrinking away toward the corner the offer lives in — the offer glows once in answer, and then a spark rides the button's border (`offset-path: border-box`) until it is pressed. That orbit is the page's one ongoing animation, allowed because it tells the reviewer nothing new — it holds the place they said they would come back to — and it ends with the offer, however the offer ends: taken from either mouth, or overtaken by the round going on screen. Each round is announced once — a dismissed card never returns for the same round, a newer round is fresh news even over the last card's fold — and taking from card or header clears both, so neither goes on standing for a round already on screen. Under `prefers-reduced-motion` the card is simply there and simply gone, and the spark does not exist.
 
-**The wait is visible.** Presence — an agent parked on `poll`, an agent away with prompts a poll already took — is pushed down the SSE stream and stated in words in the header. The working half of it is also said where the reviewer actually is: a line with three breathing dots at the foot of the conversation, in the place the answer will be written, which is where the eye goes after Send. Both are rendered from the same presence frame — the panel is told by `panel.setWorking`, from the one listener that tells the banner — so neither can go on claiming work after the other has stopped. The line goes the moment the agent polls again, and it is never shown over an ended review. A reviewer who asked for less motion keeps the line, its dots up and still: the line is the news, and the movement was only what made it easy to catch.
+**The turn is visible, and it is the only thing Send is gated on.** The presence frame carries two separate facts: `waiting` — an agent is parked on `wait` right now — and `turn`, the review's own record of whose move it is. The header states one sentence off them, and the turn wins: "the agent has your feedback", or the plan `work` declared ("implementing: splitting the helper out"), or "an agent is waiting for your feedback", or "no agent is waiting — send anyway, the feedback is queued". The wording lives once, in `browser/turn-words.ts`, because the foot of the conversation says it too: a line with three breathing dots in the place the answer will be written, which is where the eye goes after Send. The served page states the turn as well — it is on the record, so a reload mid-silence is right in the first paint rather than one SSE frame later. A reviewer who asked for less motion keeps the line, its dots up and still: the line is the news, and the movement was only what made it easy to catch.
+
+**Send is off on the agent's turn; nothing else is.** The reviewer keeps queueing, keeps typing, keeps removing pills, and can always end the review. The end button changes its words rather than going away — `End without Sending` — because on the agent's turn the queue is not theirs to send, and finding that out from the conversation afterwards is how a reviewer loses six comments. The done card and the round card make the same promise in the other direction: what is queued stays queued.
+
+**A question is a card with its own box.** `lightspeed ask` puts a question into the conversation marked `kind: "question"`, and the panel draws it ruled in the accent, labelled "the agent is asking", with a textarea and one button under it. The press sends that text alone: the queue stays queued and the half-typed general comment stays typed — answering a question must not cost a reviewer six unfinished comments. A question is open while nothing has been said after it, which needs nothing stored: the agent asked and then blocked, so the next words in the conversation are the answer. The card keeps its label once answered; the box goes.
 
 **A comment leads back to its lines.** In the panel, an anchored comment is captioned by its file's basename alone — the full path waits in the tooltip, and the chapter name that used to trail it is gone: the chapter heading is on the diff, and repeating it under every comment glued a round's card into one unreadable block. The seams do the separating now — a hairline between the prompts of one turn, which is also what sets the round's closing message apart from the last anchored comment above it. The caption is a press: it enters the chapter holding the file as a real focus press (reported, remembered — a reload after a jump opens where it landed), unfolds the file if its own approval had shut it, and scrolls to the very line the anchor names, in either layout, falling back to the file when the diff on screen no longer prints that line and doing nothing at all for a file the round does not carry. The panel only says which file and where (`onJump`); getting there is the diff's craft (`reveal` in `dom/diff-mount.ts`, `findLine` in `dom/line-numbers.ts` — the inverse of the numbers a selection is anchored by).
 
-**An answer sits under its question.** The agent can answer one comment by its id (`poll --for <id> --note`), and the panel shows that answer inside the reviewer's own prompt, under the words it answers — labelled "the agent's answer", ruled in the accent the way the replay rules the reviewer's quote in violet. It arrives live: the reply publishes a session change, the page refetches, and the redraw carries the note. A declaration that named files but said nothing shows nothing — which files changed is the between-rounds replay's story, told with the diffs to back it.
+**An answer sits under its question.** The agent can answer one comment by its id (`say "<text>" --for <id>`), and the panel shows that answer inside the reviewer's own prompt, under the words it answers — labelled "the agent's answer", ruled in the accent the way the replay rules the reviewer's quote in violet. It arrives live: the reply publishes a session change, the page refetches, and the redraw carries the note. A declaration that named files but said nothing shows nothing — which files changed is the between-rounds replay's story, told with the diffs to back it.
 
 **Enter sends.** In both comment boxes — the popup's and the panel's — Enter is the button beneath it: it queues the annotation, or sends the general comment along with whatever is queued. Shift+Enter and Alt+Enter break the line, and so do Ctrl+Enter and Cmd+Enter, which browsers type nothing for and `src/browser/dom/enter-key.ts` therefore types itself. An Enter on an empty box does neither: nothing is sent, and no blank first line is typed, because the placeholder is what tells the reviewer Enter is waiting for a comment. Queued pills are sent by the button alone — a stray Enter in an empty box must not fire off a half-read review.
 
@@ -568,10 +727,10 @@ Only one state is stated on screen: `needs-reapproval` carries the amber pill `c
 ## Session Lifecycle
 
 1. **start** — creates or updates session (idempotent)
-2. **active** — browser open, agent polling
+2. **active** — browser open, agent blocked in `wait`
 3. **update** — re-run `start`: fresh diff, re-grouped, SSE reload, conversation preserved
 4. **Send** — feedback delivered, session stays active
-5. **Send & End** — final feedback + `ended: true`. Not an approval in itself: the ended poll payload carries `approval: {verdict, approved, unapproved, swept, total}` — counts, not paths, because the polling agent wrote the branch and already knows its files — and `endedBy`. `verdict` is `signed-off` | `partial` | `none` | `empty`, derived off the same account as the counts so the two cannot disagree; only `signed-off` is a sign-off, and `swept` counts the approvals a sweep lane took in one press, approved and unread. The ended `help[]` line carries only what those fields cannot — who closed it, that a sweep was involved, or that an older server reported no readable account — and never restates the counts. `lightspeed approvals [branch] [base]` names those files, and nothing runs it by default; it prints the first 50 paths of each list beside a `count` block read off the whole review, so a cut listing can never make a count lie, and `--full` prints every path. Agent must not reopen uninvited
+5. **Send & End** — final feedback + `ended: true`. Not an approval in itself: the ended `wait` payload carries `approval: {verdict, approved, unapproved, swept, total}` — counts, not paths, because the waiting agent wrote the branch and already knows its files — and `endedBy`. `verdict` is `signed-off` | `partial` | `none` | `empty`, derived off the same account as the counts so the two cannot disagree; only `signed-off` is a sign-off, and `swept` counts the approvals a sweep lane took in one press, approved and unread. The ended `help[]` line carries only what those fields cannot — who closed it, that a sweep was involved, or that an older server reported no readable account — and never restates the counts. `lightspeed approvals [branch] [base]` names those files, and nothing runs it by default; it prints the first 50 paths of each list beside a `count` block read off the whole review, so a cut listing can never make a count lie, and `--full` prints every path. Agent must not reopen uninvited
 6. **end** — agent-initiated close, which the payload marks `endedBy: agent`
 
 ## Testing Strategy
@@ -622,7 +781,7 @@ Only one state is stated on screen: `needs-reapproval` carries the amber pill `c
 3. Browser shows groups in LLM order, syntax-highlighted unified diffs
 4. User selects any diff text (including `-` lines) → popup → targeted feedback
 5. User types general comments in conversation panel
-6. `poll` returns TOON feedback with exact selected text + comment
+6. `wait` returns TOON feedback with exact selected text + comment, and the turn with it
 7. "Send" keeps session active; "Send & End" closes it
 8. Re-running `start` updates session with fresh diff + re-grouping, preserves conversation
 9. Multiple concurrent sessions work (different repos/branch pairs), disambiguated by explicit args
@@ -646,7 +805,7 @@ Only one state is stated on screen: `needs-reapproval` carries the amber pill `c
 11. **Ordering:** LLM returns an ordered array; position is the order, no `order` field
 12. **Grouping threshold:** ≤7 changed files → skip the LLM
 13. **Validation:** schema + coverage check, errors fed back into the same conversation, ≤2 repairs
-14. **Poll:** no `--timeout-ms`, no heartbeat; blocking foreground, forever
+14. **`wait`:** no `--timeout-ms`, no heartbeat; blocking foreground, forever
 15. **Hooks:** dropped. Skill only
 
 16. **HTTP layer (D1):** `node:http` + tiny router. Decided — no capability loss vs Express for this feature set
@@ -739,7 +898,7 @@ gone or the branch rebased. Hence code context is copied into the ledger, not re
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /api/sessions` (`start`)    | `round` (repo root/name/remote, branch, base, `base_commit`, `head_commit`, stats, groups) + one `round_file` per file (status, previous_path, blob shas, patch) |
 | `POST /api/session/:key/feedback` | `annotation` / `message`, one per prompt, anchored to round + file                                                                                               |
-| `poll --agent-reply`              | `agent_reply`                                                                                                                                                    |
+| `say` / `ask`                     | `agent_reply`                                                                                                                                                    |
 | `end` / reviewer "Send & End"     | `round_end` including the set of files ticked `approved`                                                                                                         |
 | next `start` on the same branch   | `outcome` per annotation of the previous round                                                                                                                   |
 

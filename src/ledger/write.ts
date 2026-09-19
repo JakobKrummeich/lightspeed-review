@@ -169,7 +169,7 @@ function annotationRecord(input: FeedbackInput, prompt: AnnotationPrompt): Ledge
   const context = sliceContext(input.readFile(prompt.file, side), prompt);
   return buildAnnotationRecord({
     // The server stamps the prompt's id before it queues it, so the record and
-    // the prompt the agent polls are the same comment under the same name.
+    // the prompt the agent is handed are the same comment under the same name.
     id: prompt.id ?? input.nextId("evt", now),
     at: now,
     round: roundOf(session),

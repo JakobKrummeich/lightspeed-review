@@ -1,4 +1,5 @@
 import { crossings } from "../approval-crossing.ts";
+import type { Turn } from "../../session-store.ts";
 import { mountDonePopup } from "./done-popup.ts";
 import type { MountedPanel } from "./panel-mount.ts";
 import type { MountedRail } from "./panel-rail.ts";
@@ -20,15 +21,18 @@ export interface FinishSide {
 export function wireFinish(root: HTMLElement): {
   onApproved(complete: boolean): void;
   setQueued(count: number): void;
+  /** Whose move it is: the card's end press carries the queue only on the reviewer's. */
+  setTurn(turn: Turn): void;
   attach(side: FinishSide): void;
 } {
   let side: FinishSide | undefined;
   let allApproved = false;
   let queued = 0;
+  let sendsQueue = true;
   const done = mountDonePopup({ root, onEnd: () => side?.panel.end() });
   const onCrossing = crossings(() => {
     side?.railControl.expand();
-    done.open(queued);
+    done.open(queued, sendsQueue);
   });
   return {
     onApproved: (complete) => {
@@ -41,6 +45,9 @@ export function wireFinish(root: HTMLElement): {
     },
     setQueued: (count) => {
       queued = count;
+    },
+    setTurn: (turn) => {
+      sendsQueue = turn.holder === "reviewer";
     },
     attach: (built) => {
       side = built;

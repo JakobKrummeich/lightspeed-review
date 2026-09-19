@@ -21,13 +21,15 @@ import {
   handleStatic,
 } from "./server/handlers-review.ts";
 import { handleCreateSession, handleEnd } from "./server/handlers-session.ts";
-import { handleEvents, handlePoll } from "./server/handlers-stream.ts";
+import { handleDelivered, handleEvents, handlePoll } from "./server/handlers-stream.ts";
+import { handleWork } from "./server/handlers-turn.ts";
 import { messageOf, sendJson } from "./server/http.ts";
 import type { LedgerReport } from "./server/ledger-log.ts";
 import { hostIsAllowed, originIsAllowed } from "./server/security.ts";
 import { SessionTransport } from "./server/streams.ts";
 import type { SessionStore } from "./session-store.ts";
 import { DEFAULT_STATIC_DIR, loadAssets } from "./static-assets.ts";
+import { CLI_VERSION } from "./version.ts";
 
 export type { CreateSessionRequest };
 export type { LedgerReport };
@@ -63,7 +65,9 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   // Read whole so every request serves one build; a build under a running server
   // dates the page, never splits it. Re-read only on round open — see `refreshAssets`.
   const assets = loadAssets(staticDir);
-  const transport = new SessionTransport();
+  // Reads the turn off the store rather than holding one: the presence frame is
+  // then whatever the last write said, restart or no restart.
+  const transport = new SessionTransport((key) => options.store.get(key)?.turn);
   /** One id source per server: it orders every record this run writes. */
   const nextId = createIdSource();
   let server: Server | undefined;
@@ -130,7 +134,10 @@ function buildRoutes(context: ServerContext): Route[] {
     {
       method: "GET",
       pattern: "/health",
-      handler: (_request, response) => sendJson(response, 200, { status: "ok" }),
+      // The version is the handshake: a client that reads a protocol this server
+      // does not speak must find that out before it blocks on an answer.
+      handler: (_request, response) =>
+        sendJson(response, 200, { status: "ok", version: CLI_VERSION }),
     },
     { method: "POST", pattern: "/api/sessions", handler: bind(handleCreateSession) },
     { method: "GET", pattern: "/session/:key", handler: bind(handleReviewPage) },
@@ -151,6 +158,8 @@ function buildRoutes(context: ServerContext): Route[] {
     { method: "POST", pattern: "/api/session/:key/approved", handler: bind(handleApproved) },
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
     { method: "POST", pattern: "/api/session/:key/reply", handler: bind(handleAgentReply) },
+    { method: "POST", pattern: "/api/session/:key/delivered", handler: bind(handleDelivered) },
+    { method: "POST", pattern: "/api/session/:key/work", handler: bind(handleWork) },
     { method: "POST", pattern: "/api/session/:key/end", handler: bind(handleEnd) },
     { method: "GET", pattern: "/api/poll", handler: bind(handlePoll) },
     { method: "POST", pattern: "/api/shutdown", handler: bind(handleShutdown) },

@@ -1,4 +1,4 @@
-import { ReviewError, validationError } from "../errors.ts";
+import { ReviewError, invocationError } from "../errors.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { approvalPaths, type ApprovalPaths } from "../review-files.ts";
@@ -53,15 +53,15 @@ export function parseApprovalsArgs(args: string[]): ApprovalsArgs {
 }
 
 function unknownApprovalsFlag(flag: string): Error {
-  return validationError(`unknown flag ${flag}`, [
+  return invocationError("unknown_flag", `unknown flag ${flag}`, [
     `Known here: ${APPROVALS_FLAGS.join(", ")}`,
     "Run `lightspeed approvals --help` for what each flag does",
   ]);
 }
 
 /**
- * The paths behind poll's counts, and the only place that prints them. Poll runs
- * on every round and its payload is read whether or not anyone needs a file
+ * The paths behind `wait`'s counts, and the only place that prints them. `wait`
+ * runs on every round and its payload is read whether or not anyone needs a file
  * list, so the lists live here, behind a command an agent runs when something
  * turns on which file — naming a swept change it wants read, or chasing what was
  * left unapproved. Read off the store rather than the server: a review is worth
@@ -81,18 +81,36 @@ export function runApprovals(input: ApprovalsInput): StructuredOutput {
   const paths = approvalPaths(session.groups, session.approved);
   const listed = listing(paths, input.full ?? false);
   return {
-    session: { key, branch: input.branch, base: input.base, status: session.status },
-    approval: listed.paths,
-    count: countBlock(paths, listed.omitted),
+    // No `status`: `turn` is where the state of a review is stated, and a second
+    // word for it went stale between rounds. Here it was stale and redundant at
+    // once — the help below already says whether this review is over.
+    session: { key, branch: input.branch, base: input.base },
+    counts: countBlock(paths, listed.omitted),
+    // Only the lists that name something. An empty list beside a count of 0 is
+    // the same fact twice, and three of them cost more than the answer.
+    ...namedPaths(listed.paths),
     help: [
       ...(listed.omitted > 0 ? [HELP_FULL] : []),
       session.status === "ended"
-        ? "This review is over; these are the ticks it ended on"
-        : "This review is still open, so these are the ticks so far and not a verdict",
-      "`swept` files were approved in a lane the review filed as bulk, so the tick says" +
-        " accepted and not read — ask the reviewer to read one when a change of yours needs it",
+        ? "This review is over: these are the ticks it ended on"
+        : "This review is still open: these are the ticks so far, not a verdict",
+      // Only where a lane actually swept something: on every other review this
+      // was two lines explaining a count that read 0.
+      ...(paths.swept.length > 0 ? [SWEPT_HELP] : []),
     ],
   };
+}
+
+const SWEPT_HELP =
+  "`swept` files were approved in a lane the review filed as bulk, so the tick says" +
+  " accepted and not read — ask the reviewer to read one when a change of yours needs it";
+
+/** The three lists, flattened to the ones with something in them: `unapproved[3]`
+ * reads as the answer, `approval: {approved: [], ...}` reads as a form. */
+function namedPaths(paths: Record<PathList, string[]>): StructuredOutput {
+  return Object.fromEntries(
+    PATH_LISTS.filter((name) => paths[name].length > 0).map((name) => [name, paths[name]]),
+  );
 }
 
 type PathList = "approved" | "unapproved" | "swept";
@@ -124,8 +142,8 @@ function listing(paths: ApprovalPaths, full: boolean): Listing {
 /**
  * The account itself, never cut. A capped list renders under a length that is
  * the page's and not the tick's, so the numbers an agent decides on live beside
- * it and are read off the whole review — the same four counts poll reports under
- * its verdict, which is why the two can be compared at all.
+ * it and are read off the whole review — the same four counts `wait` reports
+ * under its verdict, which is why the two can be compared at all.
  */
 function countBlock(paths: ApprovalPaths, omitted: number): StructuredOutput {
   return {
@@ -133,7 +151,9 @@ function countBlock(paths: ApprovalPaths, omitted: number): StructuredOutput {
     unapproved: paths.unapproved.length,
     swept: paths.swept.length,
     total: paths.total,
-    omitted,
-    has_more: omitted > 0,
+    // Only when the cap held something back: `omitted: 0` beside `has_more:
+    // false` was one fact said twice, on every review small enough to print
+    // whole — which is nearly all of them. The `--full` help line says the rest.
+    ...(omitted > 0 ? { omitted } : {}),
   };
 }

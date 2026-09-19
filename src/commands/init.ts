@@ -1,7 +1,7 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_FILENAME, STARTER_CONFIG } from "../config.ts";
-import { ReviewError, validationError } from "../errors.ts";
+import { ReviewError, invocationError } from "../errors.ts";
 import type { StructuredOutput } from "../output.ts";
 import {
   INIT_SCOPES,
@@ -257,14 +257,14 @@ function noGlobalTarget(agent: SkillAgent): ReviewError {
 }
 
 function unknownInitFlag(flag: string): Error {
-  return validationError(`unknown flag ${flag}`, [
+  return invocationError("unknown_flag", `unknown flag ${flag}`, [
     "Known here: --agent, --scope, --config, --dry-run",
     "Run `lightspeed init --help` for what they do",
   ]);
 }
 
 function missingValue(flag: string): Error {
-  return validationError(`${flag} needs a value`, [
+  return invocationError("argument_missing", `${flag} needs a value`, [
     `--agent takes one of ${SKILL_AGENTS.join(", ")}`,
     `--scope takes one of ${INIT_SCOPES.join(", ")}`,
   ]);

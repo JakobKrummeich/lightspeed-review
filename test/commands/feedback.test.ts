@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AxiError, exitCodeForError } from "axi-sdk-js";
+import { AxiError } from "axi-sdk-js";
 import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { commandHelp } from "../../src/commands/command-help.ts";
 import { FEEDBACK_SUBCOMMANDS, runFeedback } from "../../src/commands/feedback.ts";
 import { DEFAULT_LIST_LIMIT, DEFAULT_LIST_MAX_BYTES } from "../../src/commands/feedback/shared.ts";
-import { ReviewError } from "../../src/errors.ts";
+import { ReviewError, exitCodeFor } from "../../src/errors.ts";
 import {
   buildAnnotationRecord,
   buildMessageRecord,
@@ -632,7 +632,7 @@ test("list, show and prune refuse to work against a ledger that is off", () => {
 test("an unknown flag is a validation failure that exits 2", () => {
   assert.throws(
     () => feedback(["list", "--bogus"], seededState()),
-    (error: unknown) => error instanceof Error && exitCodeForError(error) === 2,
+    (error: unknown) => error instanceof Error && exitCodeFor(error) === 2,
   );
 });
 
@@ -641,7 +641,7 @@ test("an unknown subcommand exits 2 and names the ones that exist", () => {
     () => feedback(["lst"], seededState()),
     (error: unknown) =>
       error instanceof AxiError &&
-      exitCodeForError(error) === 2 &&
+      exitCodeFor(error) === 2 &&
       /list, show, prune/.test(error.suggestions.join(" ")),
   );
 });
@@ -649,7 +649,7 @@ test("an unknown subcommand exits 2 and names the ones that exist", () => {
 test("a flag where a subcommand belongs exits 2 rather than being read as one", () => {
   assert.throws(
     () => feedback(["--since", "30d"], seededState()),
-    (error: unknown) => error instanceof Error && exitCodeForError(error) === 2,
+    (error: unknown) => error instanceof Error && exitCodeFor(error) === 2,
   );
 });
 
