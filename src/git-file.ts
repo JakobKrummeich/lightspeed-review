@@ -25,6 +25,7 @@ export function readFileAtCommit(
     contents = execFileSync("git", ["show", `${commit}:${path}`], {
       cwd: repoRoot,
       maxBuffer: MAX_FILE_BYTES + 1,
+      stdio: ["ignore", "pipe", "ignore"],
     });
   } catch {
     return undefined;
@@ -58,6 +59,7 @@ export function listDiffNames(repoRoot: string, from: string, to: string): DiffN
     const out = execFileSync("git", ["diff", "--name-only", "--find-renames", "-z", from, to], {
       cwd: repoRoot,
       maxBuffer: MAX_FILE_BYTES + 1,
+      stdio: ["ignore", "pipe", "ignore"],
     });
     return { state: "files", files: out.toString("utf8").split("\0").filter(Boolean) };
   } catch {
@@ -80,6 +82,7 @@ export function readDiffBetween(
     const patch = execFileSync("git", ["diff", "--find-renames", from, to, "--", ...paths], {
       cwd: repoRoot,
       maxBuffer: MAX_FILE_BYTES + 1,
+      stdio: ["ignore", "pipe", "ignore"],
     });
     return { state: "patch", patch: patch.toString("utf8") };
   } catch (error) {

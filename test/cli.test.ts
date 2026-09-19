@@ -19,13 +19,16 @@ async function runCli(
   args: string[],
   cwd?: string,
   env?: NodeJS.ProcessEnv,
-): Promise<{ stdout: string; code: number }> {
+): Promise<{ stdout: string; stderr: string; code: number }> {
   try {
-    const { stdout } = await execFileAsync(process.execPath, [cliPath, ...args], { cwd, env });
-    return { stdout, code: 0 };
+    const { stdout, stderr } = await execFileAsync(process.execPath, [cliPath, ...args], {
+      cwd,
+      env,
+    });
+    return { stdout, stderr, code: 0 };
   } catch (error) {
-    const failure = error as { stdout?: string; code?: number };
-    return { stdout: failure.stdout ?? "", code: failure.code ?? 1 };
+    const failure = error as { stdout?: string; stderr?: string; code?: number };
+    return { stdout: failure.stdout ?? "", stderr: failure.stderr ?? "", code: failure.code ?? 1 };
   }
 }
 
@@ -204,6 +207,25 @@ test("a command that needs no model answers in a repository with no config", asy
   assert.equal(code, 0);
   assert.doesNotMatch(stdout, /config_missing/);
   assert.match(stdout, /^ {2}branch: feature\/greeting$/m);
+});
+
+/**
+ * S6 end to end: an agent captures `2>&1`, so anything git says on its own
+ * behalf lands in front of our TOON and breaks the parse. The failure is
+ * reported once, on stdout, in the shape every other failure has.
+ */
+test("a git failure says nothing on stderr that stdout has not already said", async () => {
+  const repoRoot = emptyRepo();
+
+  const { stdout, stderr, code } = await runCli(
+    ["start", "no/such/branch", "main", "--intent", "why", "--no-open"],
+    repoRoot,
+  );
+
+  assert.equal(code, 1);
+  assert.equal(stderr, "");
+  assert.match(stdout, /^ {2}code: git_ref_not_found$/m);
+  assert.match(stdout, /git rev-parse no\/such\/branch/);
 });
 
 test("a failing command reports code, message and help as TOON on stdout, exit 1", async () => {

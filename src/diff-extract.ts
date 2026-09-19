@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { ReviewError } from "./errors.ts";
+import { startCall } from "./commands/home.ts";
 import type { GroupTier } from "./group-tier.ts";
 
 export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "binary";
@@ -99,10 +100,21 @@ function branchCommitSubjects(repoRoot: string, branch: string, base: string): s
   return log === undefined ? [] : log.split("\n").filter((subject) => subject !== "");
 }
 
-/** A git command whose failure is not worth failing the review over. */
+/**
+ * A git command whose failure is not worth failing the review over — and whose
+ * complaint is not worth printing either: an inherited stderr writes prose in
+ * front of the TOON an agent is parsing, for a failure this function has
+ * already decided to swallow.
+ */
 function git(repoRoot: string, args: string[]): string | undefined {
   try {
-    return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim() || undefined;
+    return (
+      execFileSync("git", args, {
+        cwd: repoRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() || undefined
+    );
   } catch {
     return undefined;
   }
@@ -131,27 +143,42 @@ function ref(base: string, branch: string): string {
   return `${base}...${branch}`;
 }
 
+/**
+ * `stdio` is explicit because the default inherits stderr: git wrote its own
+ * three-line complaint to the terminal while we reported the same failure as
+ * TOON on stdout, so an agent capturing `2>&1` — the common case — parsed
+ * `fatal: ...` prose ahead of the answer. The complaint is captured, not
+ * silenced: its first line is the diagnosis, and it goes in `detail`.
+ */
 function runGitDiff(repoRoot: string, branch: string, base: string): string {
   try {
     return execFileSync("git", [...DIFF_ARGS, "--no-color", ref(base, branch)], {
       cwd: repoRoot,
       encoding: "utf8",
       maxBuffer: 512 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
-    const stderr = String(
-      (error as { stderr?: unknown }).stderr ?? (error as Error).message,
-    ).trim();
     throw new ReviewError({
       code: "git_ref_not_found",
       message: `git could not diff ${base}...${branch}`,
-      detail: stderr,
+      detail: firstLine(error),
       suggestions: [
-        "Check both refs exist: `git rev-parse <branch>` and `git rev-parse <base>`",
-        "Then re-run `lightspeed start <branch> [base]`",
+        `Check both refs exist: \`git rev-parse ${branch}\` and \`git rev-parse ${base}\``,
+        `Then re-run \`${startCall(`${branch} ${base}`)}\``,
       ],
     });
   }
+}
+
+/**
+ * Git's first line says what is wrong; the lines under it are the hint it gives
+ * a human at a terminal ("Use '--' to separate paths from revisions"), which
+ * costs an agent tokens to re-read the `help[]` it already has.
+ */
+function firstLine(error: unknown): string {
+  const said = String((error as { stderr?: unknown }).stderr ?? (error as Error).message).trim();
+  return said.split("\n")[0]?.trim() ?? said;
 }
 
 /** Splits a unified diff into one entry per file. */
