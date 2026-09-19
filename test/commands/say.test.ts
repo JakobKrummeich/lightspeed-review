@@ -235,6 +235,9 @@ test("a pinned answer lands as a declaration and adds no line to the conversatio
       files: ["src/api/users.ts"],
     });
 
+    // Both halves of the title, and neither is readable off the output: only
+    // `say --for` could have written this declaration, and only a second, wrong
+    // filing would add the same sentence to the conversation.
     assert.partialDeepStrictEqual(store.get(KEY)?.declarations, {
       evt_a: { note: "one transaction now", files: ["src/api/users.ts"] },
     });
@@ -263,9 +266,9 @@ test("a pin naming no comment of this review is refused whole", async () => {
         return true;
       },
     );
-    // Rejected whole: nothing of it was stored.
+    // Rejected whole: nothing of it was stored. That the server rejects it whole
+    // is its own test; what this one owes is that the CLI stored nothing either.
     assert.equal(store.get(KEY)?.declarations, undefined);
-    assert.equal(store.get(KEY)?.conversation.length, 1);
   });
 });
 

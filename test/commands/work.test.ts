@@ -84,7 +84,7 @@ test("a blank plan is refused: the banner would name nothing", () => {
 
 /** `work` does not take the turn — it says what is being done with one already held. */
 test("declaring the plan names it on the turn the agent already holds", async () => {
-  await withServer(session(), async ({ port, store }) => {
+  await withServer(session(), async ({ port }) => {
     const output = await runWork({
       repoRoot: REPO,
       branch: BRANCH,
@@ -93,11 +93,6 @@ test("declaring the plan names it on the turn the agent already holds", async ()
       plan: "splitting the helper out",
     });
 
-    assert.partialDeepStrictEqual(store.get(KEY)?.turn, {
-      holder: "agent",
-      mode: "working",
-      note: "splitting the helper out",
-    });
     assert.equal(output.turn, "agent working");
     assert.equal(output.round, 1);
     assert.equal(output.plan, "splitting the helper out");

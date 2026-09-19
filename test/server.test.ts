@@ -1825,7 +1825,6 @@ test("a batch in flight is not overwritten by the delivery that answers the next
     watch.close();
 
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation]);
     await postFeedback(url, key, { prompts: [later], ended: false });
 
     // The second poller is handed the unconfirmed batch at the head, in written

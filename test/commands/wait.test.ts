@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { helpAsk, helpNextRound, helpReopen, helpSay, helpWork } from "../../src/commands/home.ts";
 import { parseWaitArgs, runWait } from "../../src/commands/wait.ts";
 import { ReviewError } from "../../src/errors.ts";
+import { CONTENT_LIMIT } from "../../src/output.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore, type SessionRecord } from "../../src/session-store.ts";
@@ -170,8 +171,12 @@ test("a huge selection is truncated with a hint at how to see all of it", async 
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
 
     const [prompt] = output.prompts as [{ selected_text: string }];
-    assert.ok(prompt.selected_text.length < huge.selected_text.length);
-    assert.match(prompt.selected_text, /\(truncated, 5000 chars — use --full\)$/);
+    // The cut itself, not merely "shorter": one character off would satisfy that,
+    // and the point of the cut is that a page-long selection stays readable.
+    assert.equal(
+      prompt.selected_text,
+      `${"+".repeat(CONTENT_LIMIT)}\n(truncated, 5000 chars — use --full)`,
+    );
   });
 });
 

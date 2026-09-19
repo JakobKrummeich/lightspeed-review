@@ -95,9 +95,10 @@ test("the question is delivered as a question, and the answer comes back on the 
       question: "should I drop the retry?",
     });
 
-    const asked = store.get(KEY)?.conversation.at(0);
-    assert.equal(asked?.role, "agent");
-    assert.partialDeepStrictEqual(asked?.prompts, [
+    // The one thing only this test can prove: `ask` puts `kind: "question"` on
+    // the wire, which is what draws the card with its own answer box. The rest of
+    // what the record holds is the server's contract, and tested there.
+    assert.partialDeepStrictEqual(store.get(KEY)?.conversation.at(0)?.prompts, [
       { type: "message", comment: "should I drop the retry?", kind: "question" },
     ]);
     assert.deepEqual(output.prompts, [answer]);
