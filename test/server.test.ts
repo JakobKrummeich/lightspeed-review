@@ -1266,12 +1266,16 @@ async function postWork(url: string, key: string, body: unknown): Promise<Respon
  * to be a live one.
  */
 async function pollAndAck(url: string, key: string): Promise<Record<string, unknown>> {
-  const answer = await fetch(`${url}/api/poll?key=${key}`, {
-    signal: AbortSignal.timeout(2_000),
-  });
-  const payload = (await answer.json()) as Record<string, unknown>;
+  const payload = await pollOnce(url, key);
   await ackDelivery(url, key, payload);
   return payload;
+}
+
+/** One poll, answered and left unconfirmed — a `wait` that read the prompts and
+ * died, or one this test wants to acknowledge by hand. */
+async function pollOnce(url: string, key: string): Promise<Record<string, unknown>> {
+  const answer = await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
+  return (await answer.json()) as Record<string, unknown>;
 }
 
 /** The confirmation a live `wait` sends the moment the answer is in its hands. */
@@ -1892,6 +1896,39 @@ test("an acknowledgement that names no handover in flight confirms nothing", asy
   });
 });
 
+/**
+ * The id is the whole guard: an acknowledgement confirms the handover it names
+ * and no other. A `wait` that died mid-round and is retried from a shell, or a
+ * process two rounds out of date, would otherwise clear the batch a live agent
+ * is waiting on — and that batch is in neither `pending` nor `delivering` once
+ * it is cleared, which is feedback lost for good.
+ */
+test("an acknowledgement of a spent id leaves the handover in flight alone", async () => {
+  const later = { type: "message" as const, comment: "and one more thing" };
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    // Read but never confirmed, which is what a `wait` killed mid-round leaves.
+    const first = await pollOnce(url, key);
+    await postFeedback(url, key, { prompts: [later], ended: false });
+
+    // The next poll recovers the unconfirmed batch and hands both over under a
+    // new id, so the first id now names a handover that is no longer in flight.
+    const second = await pollOnce(url, key);
+    assert.notEqual(second.delivery, first.delivery);
+    const stale = await postDelivered(url, key, { delivery: first.delivery });
+
+    assert.deepEqual(await stale.json(), { confirmed: false });
+    assert.equal(store.get(key)?.delivering?.id, second.delivery);
+    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation, later]);
+
+    // And the id that is in flight still confirms, so nothing is stuck either.
+    const live = await postDelivered(url, key, { delivery: second.delivery });
+    assert.deepEqual(await live.json(), { confirmed: true });
+    assert.equal(store.get(key)?.delivering, undefined);
+  });
+});
+
 test("an acknowledgement without an id is a 400, and a delivery stays in flight", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
@@ -2318,6 +2355,13 @@ test("a poll carrying the reviewer's last word marks nobody working", async () =
   });
 });
 
+/**
+ * The gate is global — one check in front of the router, not a decoration each
+ * route remembers to wear — so a route added since is covered by the same test
+ * that covers the oldest one. `/delivered` is here because it mutates: a page
+ * that could confirm a handover could make the review forget feedback nobody
+ * read.
+ */
 test("a page on another origin cannot drive the review API", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
@@ -2330,6 +2374,18 @@ test("a page on another origin cannot drive the review API", async () => {
 
     assert.equal(response.status, 403);
     assert.deepEqual(store.get(key)?.pending, []);
+
+    // The same gate, in front of the endpoint that spends a handover.
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    const inFlight = await pollOnce(url, key);
+    const forged = await fetch(`${url}/api/session/${key}/delivered`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://evil.example.com" },
+      body: JSON.stringify({ delivery: inFlight.delivery }),
+    });
+
+    assert.equal(forged.status, 403);
+    assert.equal(store.get(key)?.delivering?.id, inFlight.delivery);
   });
 });
 
