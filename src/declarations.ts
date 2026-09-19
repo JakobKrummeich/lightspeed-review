@@ -22,9 +22,18 @@ export interface CommentDeclaration {
  */
 export type ReadRoundDiff = (from: string, to: string) => DiffNames;
 
+/**
+ * Which half of the declaration was rejected, and so which way out the error may
+ * offer. A `files` problem can be re-sent as words alone — drop `--files` and
+ * the answer still reaches the reviewer — while an `entry` problem is the id or
+ * the emptiness itself, which nothing can be stripped from.
+ */
+export type DeclarationProblemKind = "files" | "entry";
+
 /** One rejected entry and why, spelt for the error the agent reads. */
 export interface DeclarationProblem {
   id: string;
+  kind: DeclarationProblemKind;
   reason: string;
 }
 
@@ -82,7 +91,7 @@ export function validateDeclarations(
   const seen = new Set<string>();
   for (const declaration of declarations) {
     if (seen.has(declaration.id)) {
-      problems.push({ id: declaration.id, reason: "declared twice in one reply" });
+      problems.push({ id: declaration.id, kind: "entry", reason: "declared twice in one reply" });
       continue;
     }
     seen.add(declaration.id);
@@ -101,12 +110,19 @@ function entryProblems(
     return [
       {
         id: declaration.id,
+        kind: "entry",
         reason: "no reviewer comment has this id; ids come from `lightspeed wait` output",
       },
     ];
   }
   if (declaration.note === undefined && declaration.files.length === 0) {
-    return [{ id: declaration.id, reason: "declares nothing: give a note, files, or both" }];
+    return [
+      {
+        id: declaration.id,
+        kind: "entry",
+        reason: "declares nothing: give a note, files, or both",
+      },
+    ];
   }
   return declaredFileProblems(session, declaration, rounds.get(declaration.id), readDiff);
 }
@@ -142,14 +158,17 @@ function declaredFileProblems(
 ): DeclarationProblem[] {
   const { from, to } = roundCommits(session, madeInRound);
   if (from === undefined || to === undefined || declaration.files.length === 0) return [];
-  // Same commit both sides: no between-round diff yet. Said with the way out, not as "empty diff".
+  // Same commit both sides: the comment was made on the round the agent is still
+  // on, so nothing it has edited is in a published diff yet. Stated as the fact
+  // it is — the two ways out are the `help[]` this travels with, which is the one
+  // place that can name commands the CLI will actually accept.
   if (from === to) {
     return declaration.files.map((file) => ({
       id: declaration.id,
+      kind: "files" as const,
       reason:
-        `${file} cannot be checked yet: no round has been started since this comment` +
-        ` (still at ${shortCommit(to)}). Commit your changes and run \`lightspeed start\`` +
-        " before declaring files, or declare with --note only",
+        `${file} is not in any round yet (HEAD is still ${shortCommit(to)}, the commit this` +
+        " comment was made on). --files only names files a published round changed.",
     }));
   }
   const diff = readDiff(from, to);
@@ -159,6 +178,7 @@ function declaredFileProblems(
     .filter((file) => !changed.has(file))
     .map((file) => ({
       id: declaration.id,
+      kind: "files" as const,
       reason:
         `${file} is not in the between-round diff (${shortCommit(from)}..${shortCommit(to)});` +
         " declare only files that diff lists, by their exact paths",

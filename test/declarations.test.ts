@@ -143,7 +143,9 @@ test("one comment declared twice in one request is ambiguous, so it is rejected"
     changed([]),
   );
 
-  assert.deepEqual(problems, [{ id: "evt_a", reason: "declared twice in one reply" }]);
+  assert.deepEqual(problems, [
+    { id: "evt_a", kind: "entry", reason: "declared twice in one reply" },
+  ]);
 });
 
 test("a declared file the between-round diff never touched is rejected, whole", () => {
@@ -185,22 +187,45 @@ test("unknowable history accepts the declaration instead of guessing it wrong", 
   assert.deepEqual(problems, []);
 });
 
-test("declaring files before the next round says so and points at `start`", () => {
+/**
+ * B4: the way out this named was `--note`, a flag that does not exist, so the
+ * agent's next line was refused for a second time — `unknown flag --note`, exit
+ * 2 — by text the CLI wrote itself. The reason states the fact and leaves the
+ * commands to the `help[]` that carries this problem out.
+ */
+test("declaring files before the next round says what is wrong, in facts", () => {
   const session = reviewed();
   session.conversation[0]!.roundIndex = 1; // comment made in the current round
 
-  const problems = validateDeclarations(
-    session,
-    [{ id: "evt_a", files: ["src/api/users.ts"] }],
-    () => {
-      throw new Error("git must not be asked when both ends are one commit");
+  const problems = validateDeclarations(session, [{ id: "evt_a", files: ["src/tok.js"] }], () => {
+    throw new Error("git must not be asked when both ends are one commit");
+  });
+
+  assert.deepEqual(problems, [
+    {
+      id: "evt_a",
+      kind: "files",
+      reason:
+        "src/tok.js is not in any round yet (HEAD is still bbbbbbb, the commit this" +
+        " comment was made on). --files only names files a published round changed.",
     },
+  ]);
+});
+
+/** The two problems that are not about files: neither can be re-sent by dropping
+ * the claim, so neither may be offered that way out. */
+test("a problem says which half of the declaration it rejects", () => {
+  const unknownId = validateDeclarations(reviewed(), [{ id: "evt_ghost", files: [] }], changed([]));
+  const emptyEntry = validateDeclarations(reviewed(), [{ id: "evt_a", files: [] }], changed([]));
+  const untouched = validateDeclarations(
+    reviewed(),
+    [{ id: "evt_a", files: ["src/untouched.ts"] }],
+    changed(["src/api/users.ts"]),
   );
 
-  assert.equal(problems.length, 1);
-  assert.match(problems[0]?.reason ?? "", /no round has been started since this comment/);
-  assert.match(problems[0]?.reason ?? "", /lightspeed start/);
-  assert.match(problems[0]?.reason ?? "", /--note only/);
+  assert.equal(unknownId[0]?.kind, "entry");
+  assert.equal(emptyEntry[0]?.kind, "entry");
+  assert.equal(untouched[0]?.kind, "files");
 });
 
 test("rounds without recorded commits skip the file check rather than fail it", () => {

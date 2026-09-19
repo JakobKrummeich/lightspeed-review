@@ -115,7 +115,7 @@ export async function handleAgentReply(
     listDiffNames(session.repoRoot, from, to),
   );
   if (problems.length > 0) {
-    sendJson(response, 422, declarationRejection(problems));
+    sendJson(response, 422, declarationRejection(problems, `${session.branch} ${session.base}`));
     return;
   }
   const now = new Date().toISOString();

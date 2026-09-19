@@ -1182,6 +1182,52 @@ test("a declaration for an id no comment carries rejects the whole reply", async
   });
 });
 
+/**
+ * B4: the round the comment was made on is the round the agent is still on, so
+ * nothing it edited is in any published diff yet. The old escape hatch named
+ * `--note`, which is not a flag, so the agent's next line was refused too. Both
+ * ways out here are commands the CLI accepts.
+ */
+test("a file claim made before the next round is carried out by its own help", async () => {
+  await withServer(async ({ url, store }) => {
+    const created = await postSessionRaw(url, { ...sessionPayload, headCommit: "0440dba9c31" });
+    const { key } = (await created.json()) as { key: string };
+    await postFeedback(url, key, { prompts: [annotation], ended: false });
+    const id = (store.get(key)!.pending[0] as { id: string }).id;
+
+    const response = await postReply(url, key, {
+      declarations: [{ id, note: "renamed it", files: ["src/tok.js"] }],
+    });
+
+    assert.equal(response.status, 422);
+    const body = (await response.json()) as { error: { detail: string }; help: string[] };
+    assert.equal(
+      body.error.detail,
+      `${id}: src/tok.js is not in any round yet (HEAD is still 0440dba, the commit this` +
+        " comment was made on). --files only names files a published round changed.",
+    );
+    assert.deepEqual(body.help, [
+      `Say it without the claim now: \`lightspeed say "<text>" feature-auth main --for ${id}\``,
+      'Or commit, run `lightspeed start feature-auth main --intent "<why>"`,' +
+        " then re-send the same line with --files",
+    ]);
+  });
+});
+
+/** A bad id cannot be re-sent without the claim: the id is the claim. */
+test("a rejection that is not about files keeps pointing at where ids come from", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+
+    const response = await postReply(url, key, {
+      declarations: [{ id: "evt_ghost", note: "fixed" }],
+    });
+
+    const body = (await response.json()) as { help: string[] };
+    assert.match(body.help[0]!, /^Ids come from the annotations in `lightspeed wait` output$/);
+  });
+});
+
 test("a reply whose declarations are not even the right shape is a 400", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);

@@ -141,18 +141,41 @@ export async function readWork(request: IncomingMessage): Promise<string | undef
  * the agent fixes them all in one retry, and the retry is safe — nothing of a
  * rejected reply is stored.
  */
-export function declarationRejection(problems: DeclarationProblem[]): DomainErrorBody {
+export function declarationRejection(
+  problems: DeclarationProblem[],
+  target: string,
+): DomainErrorBody {
   return {
     error: {
       code: "declaration_invalid",
       message: `the reply was rejected whole: ${problems.length} declaration problem(s)`,
       detail: problems.map((problem) => `${problem.id}: ${problem.reason}`).join("; "),
     },
-    help: [
+    help: wayOut(problems, target),
+  };
+}
+
+/**
+ * The way out, and it has to be a command the CLI accepts: a rejection whose
+ * escape hatch named `--note` cost the agent a second turn on `unknown flag
+ * --note`. Only a rejection that is entirely about one comment's files can be
+ * re-sent without them, so only that one is offered the shortcut; anything else
+ * is a bad id or an empty entry, which stripping nothing fixes.
+ */
+function wayOut(problems: DeclarationProblem[], target: string): [string, ...string[]] {
+  const ids = new Set(problems.map((problem) => problem.id));
+  const [id] = ids;
+  if (id === undefined || ids.size > 1 || problems.some((problem) => problem.kind !== "files")) {
+    return [
       "Ids come from the annotations in `lightspeed wait` output",
       "Fix the declaration and re-send the whole reply; no part of it was delivered",
-    ],
-  };
+    ];
+  }
+  return [
+    `Say it without the claim now: \`lightspeed say "<text>" ${target} --for ${id}\``,
+    `Or commit, run \`lightspeed start ${target} --intent "<why>"\`,` +
+      " then re-send the same line with --files",
+  ];
 }
 
 export async function parseApproved(request: IncomingMessage): Promise<string[] | undefined> {

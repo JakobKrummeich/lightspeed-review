@@ -70,12 +70,15 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
     arguments: { "<text>": "what to say, first and in quotes", ...SESSION_ARGUMENTS },
     flags: {
       "--for <id>": "the comment this answers, by the id `wait` printed with it",
-      "--files <a,b>": "comma-separated paths that comment led to changes in; needs --for",
+      "--files <a,b>":
+        "comma-separated paths that comment led to changes in; needs --for, and names" +
+        " only files a round you have already published changed — commit and re-run" +
+        " `start` before claiming one",
     },
     turn: "unchanged: speaking is free, and an agent mid-edit is still mid-edit",
     examples: [
       'lightspeed say "good catch — all three are one transaction now" feature-auth main',
-      'lightspeed say "intentional: the index covers it" --for evt_0abc123de_0008 --files src/db/index.ts',
+      'lightspeed say "one transaction now, in the round I just published" --for evt_0abc123de_0008 --files src/db/index.ts',
     ],
   },
   work: {

@@ -120,3 +120,15 @@ test("start help lists its flags", () => {
   assert.match(help, /--base/);
   assert.match(help, /--model/);
 });
+
+/**
+ * B4: `--files` only ever names files a published round changed, and `say --help`
+ * showed it beside a comment id with nothing to say the round has to come first —
+ * which is the dead end the CLI then refuses with `declaration_invalid`.
+ */
+test("say help says --files needs a published round, in the flag and in the example", () => {
+  const help = commandHelp("say") ?? "";
+
+  assert.match(help, /--files <a,b>.*published/);
+  assert.match(help, /lightspeed say .*published.*--for evt_\w+ --files /);
+});

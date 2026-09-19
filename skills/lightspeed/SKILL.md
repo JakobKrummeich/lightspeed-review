@@ -74,8 +74,14 @@ are legal from where you are.
    and without giving the turn up:
 
    ```sh
-   lightspeed say "now one transaction" --for evt_0abc123de_0007 --files src/api/users.ts
+   lightspeed say "now one transaction" --for evt_0abc123de_0007
    ```
+
+   `--files` may be added to that line, but only for files a round you have
+   already published changed — it is a claim the server checks against the
+   between-round diff, not a note. Naming a file you have only just edited is
+   refused with `declaration_invalid`: say it without `--files` now, or
+   commit, run `start` again and re-send the same line with it.
 
    If something is unclear, `lightspeed ask "<question>"` hands the turn back
    and blocks on the answer — cheaper than guessing and rewriting a round.
@@ -133,7 +139,7 @@ comment. An annotation carries:
   are all refused with `session_ended`: there is nobody left to read the
   words, and an ended review holds no turn to declare work on. When
   the reviewer asks for another round — and only then — run
-  `lightspeed start <branch> [base] --reopen`.
+  `lightspeed start <branch> [base] --reopen --intent "<why>"`.
 - An ended `wait` is not by itself an approval. Read `approval.verdict`:
   `signed-off` (every file approved), `partial` (some approved, some not),
   `none` (nothing approved) or `empty` (the review held no files). Only
