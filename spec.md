@@ -38,7 +38,7 @@ Developer working in TUI with Pi agent:
    └─ Bottom-right: general comment input + "Send" / "Send & End"
 
 5. User clicks "Send":
-   └─ Poll returns TOON feedback: selected text + comments
+   └─ `wait` returns TOON feedback: selected text + comments
    └─ Agent fixes code, commits
 
 6. Agent re-attaches: npx lightspeed start feature-x main
@@ -94,9 +94,11 @@ rather than editing; and when an undelivered batch is recovered.
 **Parking hands the turn back only from `reading`.** An agent that declared
 `work` is refused: a second `wait` from mid-edit would unlock Send under it, and
 the reviewer would fire at a half-written branch with neither side finding out
-why. The poll answers `turn_still_yours` (exit 2) naming the two moves that give
-the turn up deliberately — `start <branch> [base] --wait`, which publishes what
-the work produced, and `ask`, which hands it back with a question.
+why. The poll answers `turn_still_yours` (exit 2) naming the moves that are legal
+from there, the two that give the turn up deliberately first — `start <branch>
+[base] --wait`, which publishes what the work produced, and `ask`, which hands
+it back with a question. They are the same list every command's `help[]` is
+built from, so a refusal cannot name a move an answer calls illegal.
 
 **A delivery is not finished until the agent says it arrived.** The server
 cannot see this for itself: the answer's bytes reach the client's kernel whether
@@ -141,7 +143,10 @@ that are legal from there. Two endpoints are gated on the turn, one from each
 end: `work` is refused with `turn_not_yours` when the agent does not hold it — it
 is the only command that claims to — and the poll is refused with
 `turn_still_yours` when the agent holds it and is working. Both answer on stdout
-with exit 2, naming the command that would make the move legal.
+with exit 2, naming the command that would make the move legal. On an ended
+review `work` is refused `session_ended` (exit 1) like every other command that
+speaks into one: the record still names whoever held the turn last, but a review
+that is over holds no turn to claim.
 
 ## Commands
 
@@ -193,8 +198,24 @@ lightspeed work "<plan>" [branch] [base]
   #   the plan instead of saying the agent has their feedback.
   # The one endpoint gated on the turn: without it, `turn_not_yours`, exit 2.
 
+lightspeed approvals [branch] [base]
+  # Names the files behind the counts the ended `wait` reports: approved, swept,
+  #   unapproved. Run it when something turns on which file, not by default.
+  # Flags: --full (every path, not the first 50 of each list)
+
 lightspeed end [branch] [base]
   # Agent-initiated session end
+
+lightspeed serve
+  # Runs the review server in the foreground until it is stopped. `start` spawns
+  #   this in the background, so it is only needed for debugging
+
+lightspeed feedback [list | show <id> | prune --before <date>]
+  # Reads the durable feedback ledger. Bare, it summarises every recorded review
+  #   comment across repositories; `list` filters, `show` prints one in full,
+  #   `prune` deletes records older than a date, atomically
+  # Flags: --repo, --since, --cursor, --limit, --verdict, --file, --with-patches,
+  #   --max-bytes, --format toon|jsonl|md (list); --before, --dry-run (prune)
 
 lightspeed stop
   # Shut down background server
@@ -208,6 +229,12 @@ lightspeed login <provider>
 lightspeed logout <provider>
   # Delete lightspeed's own stored credential; reports whether an entry was
   #   removed. pi's auth.json is never touched
+
+lightspeed init --agent <id> [--scope global|project] [--config]
+  # Writes the integration instructions into the file one coding agent reads,
+  #   and a starter .lightspeed.conf.json with --config (never over one that
+  #   exists). Safe to re-run; --dry-run reports what it would write and changes
+  #   nothing. The agent must be restarted before it sees a skill written now
 
 lightspeed skill --agent <id>
   # Print the integration instructions in the dialect one coding agent expects;
@@ -778,7 +805,7 @@ Only one state is stated on screen: `needs-reapproval` carries the amber pill `c
 11. **Ordering:** LLM returns an ordered array; position is the order, no `order` field
 12. **Grouping threshold:** ≤7 changed files → skip the LLM
 13. **Validation:** schema + coverage check, errors fed back into the same conversation, ≤2 repairs
-14. **Poll:** no `--timeout-ms`, no heartbeat; blocking foreground, forever
+14. **`wait`:** no `--timeout-ms`, no heartbeat; blocking foreground, forever
 15. **Hooks:** dropped. Skill only
 
 16. **HTTP layer (D1):** `node:http` + tiny router. Decided — no capability loss vs Express for this feature set
