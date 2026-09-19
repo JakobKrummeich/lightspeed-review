@@ -243,6 +243,22 @@ function corruptWith(fragment: RegExp): (error: unknown) => boolean {
     (error.suggestions ?? []).some((line) => line.includes("a3f8c21b9e4d5f60.json"));
 }
 
+/** The way out of a corrupt session is a fresh round, and `start` refuses to
+ * open one without `--intent`: a help line that omits it costs another turn. */
+test("the delete-and-restart line spells the start that would actually run", () => {
+  const dir = stateDir();
+  const store = new SessionStore(dir);
+  store.save(sessionRecord());
+  writeRaw(dir, { ...sessionRecord(), groups: undefined });
+
+  assert.throws(
+    () => store.get("a3f8c21b9e4d5f60"),
+    (error: unknown) =>
+      error instanceof ReviewError &&
+      error.suggestions.some((line) => /lightspeed start <branch> \[base\] --intent/.test(line)),
+  );
+});
+
 /** Writes `body` over the session file the other tests in here use. */
 function writeRaw(dir: string, body: unknown): void {
   writeFileSync(join(dir, "sessions", "a3f8c21b9e4d5f60.json"), JSON.stringify(body));

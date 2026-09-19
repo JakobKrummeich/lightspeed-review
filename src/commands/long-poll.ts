@@ -2,6 +2,7 @@ import { request as httpRequest } from "node:http";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import { apiRequest, jsonPost, parseBody, type SessionRef } from "./api-client.ts";
+import { startCall } from "./home.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
@@ -81,11 +82,12 @@ async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<v
 function retries(input: LongPollInput): (failure: unknown) => Promise<void> {
   let failures = 0;
   return async (failure: unknown) => {
+    const named = input.target ?? "<branch> [base]";
     const state = await diagnosePort(input.port, input.probeBackoffMs);
-    if (state !== "open") throw portIsNotServing(state, input.port, failure);
+    if (state !== "open") throw portIsNotServing(state, input.port, failure, named);
     failures += 1;
     if (failures >= FAILURES_BEFORE_HEALTH_CHECK && !(await reviewServerIsUp(input.port))) {
-      throw notAReviewServer(input.port, failure);
+      throw notAReviewServer(input.port, failure, named);
     }
     await sleep(reconnectDelay(failures, input.reconnectDelayMs));
   };
@@ -98,14 +100,19 @@ function reconnectDelay(failures: number, first: number | undefined): number {
 }
 
 /** Only a port that refuses connections, and keeps refusing, is "no server". */
-function portIsNotServing(state: PortState, port: number, failure: unknown): ReviewError {
+function portIsNotServing(
+  state: PortState,
+  port: number,
+  failure: unknown,
+  target: string,
+): ReviewError {
   const detail = messageOf(failure);
   if (state === "refused") {
     return new ReviewError({
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepted a connection on port ${port}`,
-      suggestions: ["Run `lightspeed start <branch> [base]` to start the review server"],
+      suggestions: [`Run \`${startCall(target)}\` to start the review server`],
     });
   }
   return new ReviewError({
@@ -113,21 +120,21 @@ function portIsNotServing(state: PortState, port: number, failure: unknown): Rev
     message: `port ${port} neither accepted a connection nor refused one`,
     detail: `${detail}; the machine answered nothing at all on that port`,
     suggestions: [
-      "Re-run `lightspeed wait <branch> [base]` in the foreground",
-      "Run `lightspeed stop` and then `lightspeed start <branch> [base]` if it keeps failing",
+      `Re-run \`lightspeed wait ${target}\` in the foreground`,
+      `Run \`lightspeed stop\` and then \`${startCall(target)}\` if it keeps failing`,
     ],
   });
 }
 
 /** Something holds the port and it is not ours: waiting on it would never end. */
-function notAReviewServer(port: number, failure: unknown): ReviewError {
+function notAReviewServer(port: number, failure: unknown, target: string): ReviewError {
   return new ReviewError({
     code: "server_unreachable",
     message: `port ${port} is held by something that is not a review server`,
     detail: `${messageOf(failure)}; the port accepts connections but /health does not answer`,
     suggestions: [
       `Set a free \`port\` in .lightspeed.conf.json instead of ${port}`,
-      "Stop whatever is listening there and run `lightspeed start <branch> [base]` again",
+      `Stop whatever is listening there and run \`${startCall(target)}\` again`,
     ],
   });
 }

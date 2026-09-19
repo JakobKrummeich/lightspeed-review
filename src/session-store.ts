@@ -4,6 +4,7 @@ import type { DiffFileStatus, DiffGroup } from "./diff-extract.ts";
 import { trailSweeps } from "./group-tier.ts";
 import type { GroupingMode } from "./llm/grouping.ts";
 import { ReviewError } from "./errors.ts";
+import { startCall } from "./commands/home.ts";
 import { sessionFilePath, sessionsDirPath } from "./paths.ts";
 
 export type SessionStatus = "open" | "feedback" | "ended";
@@ -334,7 +335,7 @@ function sessionCorrupt(key: string, message: string, detail: string): ReviewErr
     message,
     detail,
     suggestions: [
-      `Delete \`sessions/${key}.json\` in your state directory and re-run \`lightspeed start <branch> [base]\``,
+      `Delete \`sessions/${key}.json\` in your state directory and re-run \`${startCall("<branch> [base]")}\``,
     ],
   });
 }

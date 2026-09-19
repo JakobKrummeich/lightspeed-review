@@ -169,12 +169,19 @@ test("nothing listening is reported as server_not_running once the probes are sp
       longPoll({
         origin: "http://127.0.0.1:1",
         key: "abc",
+        target: "feature-auth main",
         port: 1,
         probeBackoffMs: [5, 5],
       }),
     (error: ReviewError) => {
       assert.equal(error.code, "server_not_running");
       assert.match(error.detail ?? "", /nothing accepted a connection on port 1/);
+      // The review is the one the wait was already pointed at, and `start`
+      // refuses to run without the intent this line now carries.
+      assert.match(
+        error.suggestions.join(" "),
+        /lightspeed start feature-auth main --intent "<why this branch exists>"/,
+      );
       return true;
     },
   );

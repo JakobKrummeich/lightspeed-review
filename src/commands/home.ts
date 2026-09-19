@@ -26,11 +26,18 @@ export interface SessionSummary {
   note?: string;
 }
 
-/** `--intent` is required, so the canonical help line carries it: only the agent
- * opening the review knows why the branch exists. */
-export const HELP_START =
-  'Run `lightspeed start <branch> [base] --intent "<why this branch exists>"`' +
-  " to open a review session; repeat --intent once per reason";
+/**
+ * The `start` command as it must be typed, for every line that sends an agent
+ * to it. `--intent` is not optional — a `start` without one exits 2 on
+ * `intent_missing` — so no help line may spell one without it, whatever else
+ * that line is about: a dead server, a corrupt session file, a 404.
+ */
+export function startCall(target: string): string {
+  return `lightspeed start ${target} --intent "<why this branch exists>"`;
+}
+
+/** The canonical help line, for the places that know no particular review. */
+export const HELP_START = `Run \`${startCall("<branch> [base]")}\` to open a review session; repeat --intent once per reason`;
 
 /** The one rule an agent must not get wrong, so it is worded once and repeated
  * verbatim everywhere a blocking command is mentioned. */

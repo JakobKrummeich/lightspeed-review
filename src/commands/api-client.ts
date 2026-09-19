@@ -1,5 +1,5 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
-import { helpReopen } from "./home.ts";
+import { helpReopen, startCall } from "./home.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /**
@@ -33,6 +33,12 @@ export async function apiRequest(
   return answer;
 }
 
+/** The review a suggested command should name: the branch pair the caller
+ * already typed, or the form to type when a caller had none. */
+function target(about: SessionRef | undefined): string {
+  return about?.target ?? "<branch> [base]";
+}
+
 /** Statuses about the review rather than HTTP. Reached through `parseBody`, so
  * every client names them the same. */
 function errorForStatus(status: number, about?: SessionRef): ReviewError | undefined {
@@ -43,7 +49,7 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
         about === undefined
           ? "the review server knows no such session"
           : `no review session ${about.key}`,
-      suggestions: ["Run `lightspeed start <branch> [base]` to open the session first"],
+      suggestions: [`Run \`${startCall(target(about))}\` to open the session first`],
     });
   }
   if (status === 409) {
@@ -52,14 +58,14 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
       message: "the reviewer ended this review; only they ask for a new round",
       // The session this command named, not a template of it: the branch and the
       // base were on the command line that got here.
-      suggestions: [helpReopen(about?.target ?? "<branch> [base]")],
+      suggestions: [helpReopen(target(about))],
     });
   }
   if (status === 503) {
     return new ReviewError({
       code: "server_not_running",
       message: "the review server shut down while the command was waiting",
-      suggestions: ["Run `lightspeed start <branch> [base]` to restart the review server"],
+      suggestions: [`Run \`${startCall(target(about))}\` to restart the review server`],
     });
   }
   return undefined;
@@ -161,7 +167,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepts a connection on port ${port}`,
-      suggestions: ["Run `lightspeed start <branch> [base]` to start the review server"],
+      suggestions: [`Run \`${startCall("<branch> [base]")}\` to start the review server`],
     });
   }
   return new ReviewError({
@@ -170,7 +176,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
     detail: `${detail}; the port is still reachable, so the server is there`,
     suggestions: [
       "Re-run the command; the connection failed, not the review",
-      "Run `lightspeed stop` and then `lightspeed start <branch> [base]` if it keeps failing",
+      `Run \`lightspeed stop\` and then \`${startCall("<branch> [base]")}\` if it keeps failing`,
     ],
   });
 }

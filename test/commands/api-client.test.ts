@@ -138,7 +138,28 @@ test("nothing listening is still reported as no server, once retried", async () 
     (error: ReviewError) => {
       assert.equal(error.code, "server_not_running");
       assert.match(error.detail ?? "", /nothing accepts a connection on port 1/);
+      assert.match(error.suggestions.join(" "), /lightspeed start <branch> \[base\] --intent/);
       return true;
     },
   );
+});
+
+/**
+ * `start` exits 2 without `--intent`, so a help line that spells `start` without
+ * it costs the turn it was written to save — and the review it names is the one
+ * on the command line the agent already typed.
+ */
+test("every start these failures suggest names this review and carries --intent", () => {
+  const about = { key: "abc", target: "feature-auth main" };
+
+  for (const status of [404, 503]) {
+    const parsed = parseBody(status, "", about);
+
+    assert.ok(parsed instanceof ReviewError, String(status));
+    assert.match(
+      parsed.suggestions.join(" "),
+      /lightspeed start feature-auth main --intent "<why this branch exists>"/,
+      String(status),
+    );
+  }
 });
