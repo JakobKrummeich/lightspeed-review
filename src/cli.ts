@@ -339,8 +339,22 @@ function unknownCommandOutput(command: string): string {
  * view takes is read off argv here and the SDK is handed the bare invocation it
  * knows. Alone on the line, because there is no command for it to modify.
  */
-const argv = process.argv.slice(2);
+const argv = withHelpAlias(process.argv.slice(2));
 const allRepos = argv.length === 1 && argv[0] === "--all";
+
+/**
+ * `help` is the word an agent types before it has read anything, and the answer
+ * used to be `Unknown command: help`: a turn spent discovering that this CLI
+ * spells it `--help`. Translated into the flag rather than registered as a
+ * command, so there is one help text and `help start` is `start --help`
+ * exactly — including the unknown-command error a name that is not a command
+ * still earns.
+ */
+function withHelpAlias(given: string[]): string[] {
+  if (given[0] !== "help") return given;
+  const [, name] = given;
+  return name === undefined ? ["--help"] : [name, "--help"];
+}
 
 exitQuietlyWhenReaderCloses();
 await runAxiCli({

@@ -205,6 +205,35 @@ test("--help lists every command the CLI answers", async () => {
   assert.match(stdout, /Queue always\. End always\. Send only on your turn\./);
 });
 
+/**
+ * `help` is what an agent types before it has read anything, and the answer to
+ * it used to be `Unknown command: help` — a turn spent learning the flag form
+ * of a word the CLI already understood.
+ */
+test("`help` is a word the CLI answers, not a command it does not have", async () => {
+  const { stdout, code } = await runCli(["help"]);
+
+  assert.equal(code, 0);
+  assert.match(stdout, /^commands:$/m);
+  assert.doesNotMatch(stdout, /error:/);
+});
+
+test("`help <command>` describes that command, the same as `<command> --help`", async () => {
+  const { stdout, code } = await runCli(["help", "start"]);
+
+  assert.equal(code, 0);
+  assert.match(stdout, /^command: start$/m);
+  assert.doesNotMatch(stdout, /error:/);
+});
+
+/** A word that is not a command is not made one by `help` in front of it. */
+test("`help nonsense` fails as the unknown command it names", async () => {
+  const { stdout, code } = await runCli(["help", "nonsense"]);
+
+  assert.equal(code, 2);
+  assert.match(stdout, /^ {2}message: "?Unknown command: nonsense"?$/m);
+});
+
 test("a subcommand's --help describes it instead of running it", async () => {
   const { stdout, code } = await runCli(["start", "--help"]);
 
