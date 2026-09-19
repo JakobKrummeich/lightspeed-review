@@ -26,16 +26,7 @@ export async function ensureServerRunning(options: EnsureServerOptions): Promise
   // Who owns the port decides everything: our own server of this version means
   // nothing to do, one of another version has to go, and anything else means
   // spawning would turn a clear conflict into a startup timeout.
-  if ((await probePort(options.port)) === "open") {
-    const health = await serverHealth(options.port);
-    if (health === undefined) throw portUnavailable(options.port);
-    if (health.version === CLI_VERSION) return;
-    // `start` is the command that spawns servers, so `start` is where a stale
-    // one is replaced rather than reported: an agent told to run `stop` here
-    // would spend a turn on a decision this command has already made. Waiting
-    // polls reconnect on their own while the port answers again.
-    await shutDownStale(options.port);
-  }
+  if (await portIsHeldByCurrentServer(options.port)) return;
   // The spawned server checks the bundle too, but detached with no stdio its error
   // is just a startup timeout. Asking here costs two stat calls and answers exactly.
   assertBundlePresent(options.staticDir ?? DEFAULT_STATIC_DIR);
@@ -50,6 +41,22 @@ export async function ensureServerRunning(options: EnsureServerOptions): Promise
       "Set a different `port` in .lightspeed.conf.json",
     ],
   });
+}
+
+/**
+ * Whether the port already holds what this command is for. A server of another
+ * version is shut down here rather than reported: `start` is the command that
+ * spawns servers, so an agent told to run `stop` would spend a turn on a
+ * decision this command has already made. Waiting polls reconnect on their own
+ * once the port answers again.
+ */
+async function portIsHeldByCurrentServer(port: number): Promise<boolean> {
+  if ((await probePort(port)) !== "open") return false;
+  const health = await serverHealth(port);
+  if (health === undefined) throw portUnavailable(port);
+  if (health.version === CLI_VERSION) return true;
+  await shutDownStale(port);
+  return false;
 }
 
 /**
