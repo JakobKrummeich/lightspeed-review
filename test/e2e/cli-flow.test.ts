@@ -185,12 +185,13 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
 
     const named = await runCli(["approvals", "feature", "main"], repoRoot);
     assert.equal(named.code, 0, named.stdout);
-    assert.match(named.stdout, /^ {2}approved\[1\]: app\.ts$/m);
-    assert.match(named.stdout, /^ {2}unapproved: \[\]$/m);
-    assert.match(named.stdout, /^ {2}swept: \[\]$/m);
+    assert.match(named.stdout, /^approved\[1\]: app\.ts$/m);
+    // The lists that name nothing are not printed: their counts already say so.
+    assert.doesNotMatch(named.stdout, /^unapproved/m);
+    assert.doesNotMatch(named.stdout, /^swept/m);
     // A one-file review is printed whole, so the counts beside it report no cut.
     assert.match(named.stdout, /^ {2}total: 1$/m);
-    assert.match(named.stdout, /^ {2}has_more: false$/m);
+    assert.doesNotMatch(named.stdout, /omitted/);
     assert.doesNotMatch(named.stdout, /--full/);
 
     const stopped = await runCli(["stop"], repoRoot);
