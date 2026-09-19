@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { git, newRepo } from "./helpers/git-repo.ts";
+import { sessionKey } from "../src/paths.ts";
+import { SessionStore } from "../src/session-store.ts";
 
 const execFileAsync = promisify(execFile);
 const cliPath = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
@@ -45,13 +47,79 @@ function emptyRepo(): string {
 }
 
 test("bare invocation prints the content-first home view", async () => {
-  const { stdout, code } = await runCli([], emptyRepo());
+  const repoRoot = emptyRepo();
+  const { stdout, code } = await runCli([], repoRoot);
 
   assert.equal(code, 0);
   assert.match(stdout, /^description: Semantic diff review with targeted agent feedback$/m);
+  assert.match(stdout, new RegExp(`^repo: ${repoRoot}$`, "m"));
   assert.match(stdout, /^sessions: 0$/m);
   assert.match(stdout, /^message: no active review sessions$/m);
   assert.match(stdout, /^help\[1\]:/m);
+});
+
+/** A session belonging to some other repository, in the state directory the
+ * repo under test reads. */
+function storeSession(stateDir: string, repoRoot: string, branch: string): void {
+  const at = "2025-01-01T00:00:00.000Z";
+  new SessionStore(stateDir).save({
+    key: sessionKey(repoRoot, branch, "main"),
+    repoRoot,
+    branch,
+    base: "main",
+    status: "open",
+    turn: { holder: "reviewer", at },
+    createdAt: at,
+    updatedAt: at,
+    groups: [],
+    conversation: [],
+    pending: [],
+    approved: [],
+    rounds: [{ index: 0, at, files: [], approvedAtEnd: [] }],
+  });
+}
+
+/**
+ * B1: the home view caught `config_missing` and reported `sessions: 0` with
+ * `start` as the next step — false twice over, and one wasted turn for every
+ * cold agent in every unconfigured repository.
+ */
+test("bare invocation in a repo with no config reports the config, not an empty review list", async () => {
+  const repoRoot = newRepo("lsr-cli-noconf-");
+  // No config names a state directory, so the view reads the default one —
+  // which is where the sessions it used to report as absent actually were.
+  const home = mkdtempSync(join(tmpdir(), "lsr-cli-home-dir-"));
+  storeSession(join(home, ".lightspeed"), "/somewhere/else", "feat/tokens");
+
+  const { stdout, code } = await runCli([], repoRoot, { ...process.env, HOME: home });
+
+  assert.equal(code, 0);
+  assert.match(stdout, new RegExp(`^repo: ${repoRoot}$`, "m"));
+  assert.match(stdout, /^config: missing$/m);
+  assert.match(
+    stdout,
+    /^message: .*no config in this repo, so no review can run here; 1 session lives in another repo/m,
+  );
+  assert.match(stdout, /lightspeed init --config/);
+});
+
+/** S1: `--all` is the only flag that comes before a command, and the SDK
+ * refuses a leading flag before it ever dispatches — so the CLI reads it
+ * itself. Proving it here proves the plumbing, not just the renderer. */
+test("--all lists other repositories' sessions, which the repo-scoped view names but omits", async () => {
+  const repoRoot = emptyRepo();
+  const stateDir = join(repoRoot, "state");
+  storeSession(stateDir, "/somewhere/else", "feat/tokens");
+
+  const scoped = await runCli([], repoRoot);
+  const all = await runCli(["--all"], repoRoot);
+
+  assert.equal(scoped.code, 0);
+  assert.match(scoped.stdout, /^sessions: 0$/m);
+  assert.match(scoped.stdout, /^elsewhere: 1 session in 1 other repo/m);
+  assert.equal(all.code, 0, all.stdout);
+  assert.match(all.stdout, /^sessions\[1\]\{repo,branch,base,turn,round,pending\}:$/m);
+  assert.match(all.stdout, /^ {2}\/somewhere\/else,feat\/tokens,main,reviewer,1,0$/m);
 });
 
 test("a failing command reports code, message and help as TOON on stdout, exit 1", async () => {

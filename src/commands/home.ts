@@ -4,6 +4,8 @@ import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
 
 /** One row of the home view session table. */
 export interface SessionSummary {
+  /** Which repository's review this is; `--all` only, where rows come from many. */
+  repo?: string;
   branch: string;
   base: string;
   /**
@@ -14,6 +16,14 @@ export interface SessionSummary {
   turn: TurnLabel;
   round: number;
   pending: number;
+  /**
+   * The plan a working agent declared, which is the one thing on the record
+   * only that agent knew. An agent resumed after compaction reads this view to
+   * find out where it was, and `agent working` alone names the state without
+   * the work. Present on every row or none: TOON draws a table only while the
+   * rows agree on their columns.
+   */
+  note?: string;
 }
 
 /** `--intent` is required, so the canonical help line carries it: only the agent
@@ -124,30 +134,153 @@ export function legalMoves(turn: TurnLabel, target: string): [string, ...string[
 }
 
 /** Stored sessions as home-view rows. Ended ones are history, not work. */
-export function sessionSummaries(sessions: SessionRecord[]): SessionSummary[] {
-  return sessions
-    .filter((session) => session.status !== "ended")
-    .map((session) => ({
-      branch: session.branch,
-      base: session.base,
-      turn: turnLabel(session),
-      round: roundNumber(session),
-      pending: session.pending.length,
-    }));
+export function sessionSummaries(
+  sessions: SessionRecord[],
+  options: { repo?: boolean } = {},
+): SessionSummary[] {
+  const live = sessions.filter((session) => session.status !== "ended");
+  // One shape for every row, decided once for the whole table rather than per
+  // row: a row that omits a key the next one has costs the table its columns.
+  const noted = live.some((session) => declaredPlan(session) !== "");
+  return live.map((session) => ({
+    ...(options.repo === true ? { repo: session.repoRoot } : {}),
+    branch: session.branch,
+    base: session.base,
+    turn: turnLabel(session),
+    round: roundNumber(session),
+    pending: session.pending.length,
+    ...(noted ? { note: declaredPlan(session) } : {}),
+  }));
 }
 
-/** Content-first: the session table is the content, `help[]` the disclosure.
- * Empty means a definitive `sessions: 0` + message, never an omitted key. */
-export function homeOutput(sessions: SessionSummary[]): StructuredOutput {
-  if (sessions.length === 0) {
+function declaredPlan(session: SessionRecord): string {
+  return session.turn.holder === "agent" ? (session.turn.note ?? "") : "";
+}
+
+/** Why no review can run in this directory, when none can. */
+export type HomeBlocker = "missing" | "invalid";
+
+/** Everything the home view is about: where it ran, whether a review can run
+ * there, and every session on the machine — the store is one directory for all
+ * of them, so which ones are this repository's is decided here. */
+export interface HomeInput {
+  /** The repository the command ran in; absent when it was not run in one. */
+  repoRoot?: string;
+  config?: HomeBlocker;
+  sessions: SessionRecord[];
+  /** `--all`: every repository's sessions, each under the repo it belongs to. */
+  all?: boolean;
+}
+
+/**
+ * The models an agent can reach out of the box, named because `model` is the
+ * one key a fresh config cannot default: a starter file with a provider the
+ * agent has no credential for fails at the first `start`, one round later.
+ */
+const HELP_INIT_CONFIG =
+  "Run `lightspeed init --config` to write .lightspeed.conf.json here, then set `model`" +
+  " to a provider/model you can reach — `anthropic/claude-sonnet-4-5`," +
+  " `anthropic/claude-haiku-4-5` and `openai/gpt-5` all work";
+
+const HELP_START_ONCE_CONFIGURED =
+  'Run `lightspeed start <branch> [base] --intent "<why this branch exists>"`' +
+  " once `model` names one";
+
+/**
+ * Content-first: the session table is the content, `help[]` the disclosure.
+ * Empty means a definitive `sessions: 0` + message, never an omitted key.
+ *
+ * A directory that cannot host a review says so before it says anything about
+ * sessions. That reading used to be thrown away in a bare catch, so the one
+ * view an agent opens knowing nothing answered `sessions: 0` and pointed at
+ * `start` — a command that fails the same way, one turn later.
+ */
+export function homeOutput(input: HomeInput): StructuredOutput {
+  const { repoRoot } = input;
+  // Ended reviews are history rather than work, and they are that everywhere:
+  // counted, they make one live session look like several — which takes its own
+  // moves off the help — and they tally repositories nobody can go back to.
+  const live = input.sessions.filter((session) => session.status !== "ended");
+  const mine = live.filter((session) => session.repoRoot === repoRoot);
+  const place = { repo: repoRoot ?? "none" };
+  if (repoRoot === undefined || input.config !== undefined) {
+    return { ...place, ...blocked(input, live.length - mine.length) };
+  }
+  return { ...place, ...listing(input, live, mine) };
+}
+
+/** The view a working repository gets: its own rows, what it is not showing,
+ * and the moves that follow from them. */
+function listing(input: HomeInput, live: SessionRecord[], mine: SessionRecord[]): StructuredOutput {
+  const all = input.all === true;
+  const rows = sessionSummaries(all ? live : mine, { repo: all });
+  const other = all || live.length === mine.length ? {} : { elsewhere: elsewhere(live, mine) };
+  if (rows.length === 0) {
+    return { sessions: 0, message: "no active review sessions", ...other, help: [HELP_START] };
+  }
+  return { sessions: rows, ...other, help: homeHelp(mine, all) };
+}
+
+/**
+ * Nothing can run here, so the sessions that exist are a footnote and the help
+ * is the one thing that changes that. The count is in the message rather than
+ * beside `--all`: those reviews are not reachable from a directory with no
+ * config, and saying so twice is the redundancy `status` was.
+ */
+function blocked(input: HomeInput, away: number): StructuredOutput {
+  const tail = livingElsewhere(away);
+  if (input.repoRoot === undefined) {
     return {
       sessions: 0,
-      message: "no active review sessions",
-      help: [HELP_START],
+      message: `not inside a git repository, so no review can run here${tail}`,
+      help: [
+        "Run `lightspeed` from inside the repository you want reviewed",
+        HELP_START_ONCE_CONFIGURED,
+      ],
     };
   }
+  const why =
+    input.config === "missing"
+      ? "no config in this repo, so no review can run here"
+      : "the config in this repo cannot be read, so no review can run here";
   return {
-    sessions,
-    help: [TURN_RULE, HELP_START, HELP_WAIT, HELP_END],
+    config: input.config,
+    sessions: 0,
+    message: `${why}${tail}`,
+    help: [HELP_INIT_CONFIG, HELP_START_ONCE_CONFIGURED],
   };
+}
+
+/** The sessions this view is not showing, and the flag that shows them. */
+function elsewhere(live: SessionRecord[], mine: SessionRecord[]): string {
+  const away = live.filter((session) => !mine.includes(session));
+  const repos = new Set(away.map((session) => session.repoRoot));
+  return (
+    `${plural(away.length, "session")} in ${plural(repos.size, "other repo")}` +
+    " — `lightspeed --all` lists them"
+  );
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** What is on disk but out of reach from here, or nothing at all to say. */
+function livingElsewhere(away: number): string {
+  if (away === 0) return "";
+  return away === 1
+    ? "; 1 session lives in another repo"
+    : `; ${away} sessions live in other repos`;
+}
+
+/**
+ * With one session to be about, the help is that session's own legal moves —
+ * the same list every command and every refusal is built from, so the home view
+ * cannot offer a `wait` the poll answers `turn_still_yours`. With several, no
+ * one set of moves is the answer, and the general four stand.
+ */
+function homeHelp(mine: SessionRecord[], all: boolean): [string, ...string[]] {
+  const only = mine.length === 1 && !all ? mine[0] : undefined;
+  if (only === undefined) return [TURN_RULE, HELP_START, HELP_WAIT, HELP_END];
+  return [TURN_RULE, ...legalMoves(turnLabel(only), `${only.branch} ${only.base}`)];
 }

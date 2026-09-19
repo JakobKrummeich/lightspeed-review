@@ -7,8 +7,7 @@ import {
   HELP_WAIT,
   TURN_RULE,
   homeOutput,
-  sessionSummaries,
-  type SessionSummary,
+  type HomeInput,
 } from "./commands/home.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
 import { parseAskArgs, runAsk } from "./commands/ask.ts";
@@ -25,14 +24,14 @@ import { parseWorkArgs, runWork } from "./commands/work.ts";
 import { parseSkillArgs, runSkill } from "./commands/skill.ts";
 import { parseStartArgs, runStart } from "./commands/start.ts";
 import { runStop } from "./commands/stop.ts";
-import { loadConfig, loadLedgerConfig, type LightspeedConfig } from "./config.ts";
+import { defaultStateDir, loadConfig, loadLedgerConfig, type LightspeedConfig } from "./config.ts";
 import { ReviewError, validationError } from "./errors.ts";
 import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
 import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
 import { resolveSession, type ResolvedSession } from "./session-resolve.ts";
-import { SessionStore } from "./session-store.ts";
+import { SessionStore, type SessionRecord } from "./session-store.ts";
 
 // Single-sourced from package.json; resolves the same from `src/cli.ts` and `dist/cli.mjs`.
 const require = createRequire(import.meta.url);
@@ -62,6 +61,12 @@ const commands = {
 
 const COMMAND_NAMES = Object.keys(commands);
 
+/** The home view's one flag; documented here because it is the only place a
+ * flag can appear before a command, and so the only place it can be missed. */
+const HELP_ALL =
+  "list live sessions from every repository, not just this one; bare `lightspeed`" +
+  " shows the repository you are in";
+
 /**
  * Every command is listed, `serve` and `login`/`logout` included: a help page
  * that hides a command the CLI still answers is how an agent burns a turn
@@ -74,6 +79,7 @@ const COMMAND_NAMES = Object.keys(commands);
 const topLevelHelp = `${renderToon({
   description,
   commands: Object.fromEntries(COMMAND_NAMES.map((name) => [name, commandSummary(name)])),
+  flags: { "--all": HELP_ALL },
   help: [TURN_RULE, HELP_START, HELP_WAIT, HELP_END],
 })}\n`;
 
@@ -255,10 +261,39 @@ function initCommand(args: string[]): StructuredOutput {
   return runInit({ ...parseInitArgs(args), home: homedir(), cwd: process.cwd() });
 }
 
-/** Home view must always render: a repo without config just shows no sessions. */
-function liveSessions(): SessionSummary[] {
+/**
+ * Home view must always render, so nothing here throws — but what stopped a
+ * review from running is the answer, not something to swallow. A bare catch
+ * turned a missing config into `sessions: 0`, which is the one reading that is
+ * both false and costs a turn: the sessions were on disk and the command it
+ * then offered fails the same way.
+ */
+function homeInput(all: boolean): HomeInput {
+  const repoRoot = repoRootOrNone(process.cwd());
+  if (repoRoot === undefined) return { sessions: storedSessions(defaultStateDir()), all };
   try {
-    return sessionSummaries(new SessionStore(repoContext().config.stateDir).list());
+    const { stateDir } = loadConfig(repoRoot);
+    return { repoRoot, sessions: storedSessions(stateDir), all };
+  } catch (error) {
+    // The store is a machine-wide directory a config only redirects, so an
+    // unreadable one still knows where to look: the default.
+    return {
+      repoRoot,
+      config: codeOf(error) === "config_missing" ? "missing" : "invalid",
+      sessions: storedSessions(defaultStateDir()),
+      all,
+    };
+  }
+}
+
+function codeOf(error: unknown): string | undefined {
+  return error instanceof ReviewError ? error.code : undefined;
+}
+
+/** A corrupt session file must not take the whole view down with it. */
+function storedSessions(stateDir: string): SessionRecord[] {
+  try {
+    return new SessionStore(stateDir).list();
   } catch {
     return [];
   }
@@ -299,8 +334,17 @@ function unknownCommandOutput(command: string): string {
   return `${renderToon(errorOutput(error))}\n`;
 }
 
+/**
+ * The SDK refuses a leading flag before it dispatches, so the one flag the home
+ * view takes is read off argv here and the SDK is handed the bare invocation it
+ * knows. Alone on the line, because there is no command for it to modify.
+ */
+const argv = process.argv.slice(2);
+const allRepos = argv.length === 1 && argv[0] === "--all";
+
 exitQuietlyWhenReaderCloses();
 await runAxiCli({
+  argv: allRepos ? [] : argv,
   description,
   // TOON errors on stdout so an agent parses failures like results, not prose off stderr.
   formatError: (error) => ({
@@ -312,5 +356,5 @@ await runAxiCli({
   getCommandHelp: commandHelp,
   renderUnknownCommand: unknownCommandOutput,
   commands,
-  home: () => homeOutput(liveSessions()),
+  home: () => homeOutput(homeInput(allRepos)),
 });
