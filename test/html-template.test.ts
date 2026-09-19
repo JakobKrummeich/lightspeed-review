@@ -58,7 +58,7 @@ test("the page renders the status banner so it is right before the bundle loads"
   // Only a live `wait` proves somebody is listening, and the record cannot say;
   // the page claims nobody until the stream says otherwise.
   assert.match(html, /data-waiting="false"/);
-  assert.match(html, /data-working="false"/);
+  assert.match(html, /data-turn="reviewer"/);
 });
 
 /** The turn is on the record, unlike presence — so a reviewer who reloads while
@@ -75,7 +75,7 @@ test("the served page already says what the agent is doing", () => {
     },
   });
 
-  assert.match(html, /data-working="true"/);
+  assert.match(html, /data-turn="agent"/);
   assert.match(html, /implementing: splitting the helper out/);
 });
 

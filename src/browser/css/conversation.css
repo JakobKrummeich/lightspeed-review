@@ -333,7 +333,7 @@
 
 /* Somebody is on the other end of the review, one way or the other. */
 .lsr-presence[data-waiting="true"],
-.lsr-presence[data-working="true"] {
+.lsr-presence[data-turn="agent"] {
   color: var(--lsr-accent);
 }
 

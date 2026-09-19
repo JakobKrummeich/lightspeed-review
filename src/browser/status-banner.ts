@@ -47,10 +47,11 @@ function statusLine(status: SessionStatus): string {
  * is nothing the reviewer can act on, and the agent holding their feedback is.
  */
 function presenceLine(state: StatusState): string {
-  const working = state.turn.holder === "agent";
-  // Escaped: on the agent's turn this carries the plan `work` declared, which
-  // is the agent's own text.
-  return `<p class="lsr-presence" data-waiting="${state.agentWaiting}" data-working="${working}">${escapeHtml(presenceLabel(state))}</p>`;
+  // The holder, not "is the agent working": a reading agent is not working, and
+  // the attribute said it was. Escaped because on the agent's turn the text
+  // carries the plan `work` declared, which is the agent's own words.
+  const turn = state.turn.holder;
+  return `<p class="lsr-presence" data-waiting="${state.agentWaiting}" data-turn="${turn}">${escapeHtml(presenceLabel(state))}</p>`;
 }
 
 function presenceLabel(state: StatusState): string {

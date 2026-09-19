@@ -81,7 +81,7 @@ test("does not claim an agent is waiting on an ended review", () => {
 test("says the agent has the feedback once the turn is the agent's", () => {
   const html = renderStatusBanner(banner({ turn: READING }));
 
-  assert.match(html, /data-working="true"/);
+  assert.match(html, /data-turn="agent"/);
   assert.match(html, /the agent has your feedback/i);
   assert.doesNotMatch(html, /no agent is waiting/i);
 });
