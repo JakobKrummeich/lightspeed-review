@@ -23,6 +23,13 @@ export interface WaitInput {
   base: string;
   port: number;
   full?: boolean;
+  /**
+   * The question this block is the answer to, when `ask` opened it. Echoed
+   * because the answer may arrive hours later, into an agent that no longer
+   * holds the sentence it sent — "env var, same as every other secret here"
+   * answers nothing on its own.
+   */
+  asked?: string;
 }
 
 const WAIT_FLAGS = ["--full"];
@@ -76,6 +83,7 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
   const target = `${input.branch} ${input.base}`.trimEnd();
   return {
     ...turnBlock(result),
+    ...(input.asked === undefined ? {} : { asked: input.asked }),
     status: result.status,
     ended: result.ended,
     ...promptBlock(result, input.full ?? false),

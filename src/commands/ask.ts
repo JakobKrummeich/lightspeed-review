@@ -43,5 +43,5 @@ export async function runAsk(input: AskInput): Promise<StructuredOutput> {
     key,
     port: input.port,
   })) as PollPayload;
-  return waitOutput(result, input);
+  return waitOutput(result, { ...input, asked: input.question });
 }

@@ -4,6 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseAskArgs, runAsk } from "../../src/commands/ask.ts";
+import { runWait } from "../../src/commands/wait.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer } from "../../src/server.ts";
@@ -124,6 +125,37 @@ test("the answer is reported in the shape wait reports one", async () => {
       (output.help as string[]).join("\n"),
       /lightspeed work "<plan>" feature-auth main/,
     );
+  });
+});
+
+/**
+ * N2: the answer arrives minutes or hours later, and an agent that was compacted
+ * in between reads "Env var, same as every other secret here" with no idea what
+ * it asked. The question rides back out with its answer.
+ */
+test("the answer carries the question it answers", async () => {
+  await withServer(session({ pending: [answer] }), async ({ port }) => {
+    const output = await runAsk({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      port,
+      question: "should the key live in env or in the config file?",
+    });
+
+    assert.equal(output.asked, "should the key live in env or in the config file?");
+    // Above the answer it belongs to, and never in place of it.
+    assert.deepEqual(Object.keys(output).slice(0, 3), ["turn", "round", "asked"]);
+    assert.deepEqual(output.prompts, [answer]);
+  });
+});
+
+/** Only `ask` has a question to echo; a plain `wait` must not grow an empty one. */
+test("a plain wait carries no question", async () => {
+  await withServer(session({ pending: [answer] }), async ({ port }) => {
+    const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
+
+    assert.ok(!("asked" in output));
   });
 });
 
