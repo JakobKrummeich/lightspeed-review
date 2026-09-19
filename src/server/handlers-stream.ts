@@ -199,13 +199,19 @@ function withoutDelivery(session: SessionRecord): SessionRecord {
 
 /**
  * The turn back to the reviewer, published even when it was already theirs: the
- * frame is also how a page learns an agent has arrived on the wire. Only a
- * reading agent hands back — one that declared `work` is refused at the door,
- * above, rather than quietly stripped of the turn it is editing under.
+ * frame is also how a page learns an agent has arrived on the wire. Parking is
+ * the agent saying it is listening rather than editing, which is why it hands
+ * back at all.
+ *
+ * An agent that declared `work` never reaches here: that poll is refused with
+ * `turn_still_yours` at the top of `handlePoll`, which runs to this call without
+ * awaiting, so the mode cannot change in between. Re-checking it here would be a
+ * second, quieter statement of that rule — and the one that would survive if the
+ * 422 were ever deleted, stripping a working agent of its turn in silence.
  */
 function handTurnBack(context: ServerContext, key: string): void {
   const session = context.store.get(key);
-  if (session && session.turn.holder === "agent" && session.turn.mode === "reading") {
+  if (session && session.turn.holder === "agent") {
     context.store.save({ ...session, turn: reviewerTurn(new Date().toISOString()) });
   }
   context.transport.publishPresence(key);
