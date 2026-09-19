@@ -63,6 +63,7 @@ export async function runWait(input: WaitInput): Promise<StructuredOutput> {
   const result = (await longPoll({
     origin: serverOrigin(input.port),
     key,
+    target: `${input.branch} ${input.base}`,
     port: input.port,
   })) as PollPayload;
   return waitOutput(result, input);

@@ -1,13 +1,26 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
+import { helpReopen } from "./home.ts";
 import { diagnosePort } from "./server-address.ts";
+
+/**
+ * Which review a request is about, for the errors that name it. Both halves
+ * come off the command line the caller already parsed: an error that makes the
+ * agent retype what it just typed is an error that costs a turn.
+ */
+export interface SessionRef {
+  /** Session key, named in the 404 message. */
+  key: string;
+  /** `<branch> <base>`, for the commands an error suggests running. */
+  target?: string;
+}
 
 /** Talks to the review server for a command, mapping transport failures to codes
  * an agent can act on — no command interprets an HTTP status itself. */
 export async function apiRequest(
   url: string,
   init?: RequestInit,
-  /** Named in the 404 message when the request is about one session. */
-  key?: string,
+  /** The review this request is about, when it is about one. */
+  about?: SessionRef,
 ): Promise<unknown> {
   let response: Response;
   try {
@@ -15,19 +28,21 @@ export async function apiRequest(
   } catch (error) {
     throw await transportError(url, error);
   }
-  const answer = parseBody(response.status, await response.text(), key);
+  const answer = parseBody(response.status, await response.text(), about);
   if (answer instanceof ReviewError) throw answer;
   return answer;
 }
 
 /** Statuses about the review rather than HTTP. Reached through `parseBody`, so
  * every client names them the same. */
-function errorForStatus(status: number, key?: string): ReviewError | undefined {
+function errorForStatus(status: number, about?: SessionRef): ReviewError | undefined {
   if (status === 404) {
     return new ReviewError({
       code: "session_not_found",
       message:
-        key === undefined ? "the review server knows no such session" : `no review session ${key}`,
+        about === undefined
+          ? "the review server knows no such session"
+          : `no review session ${about.key}`,
       suggestions: ["Run `lightspeed start <branch> [base]` to open the session first"],
     });
   }
@@ -35,9 +50,9 @@ function errorForStatus(status: number, key?: string): ReviewError | undefined {
     return new ReviewError({
       code: "session_ended",
       message: "the reviewer ended this review; only they ask for a new round",
-      suggestions: [
-        "Run `lightspeed start <branch> [base] --reopen` once the reviewer asks for one",
-      ],
+      // The session this command named, not a template of it: the branch and the
+      // base were on the command line that got here.
+      suggestions: [helpReopen(about?.target ?? "<branch> [base]")],
     });
   }
   if (status === 503) {
@@ -53,8 +68,8 @@ function errorForStatus(status: number, key?: string): ReviewError | undefined {
 /** The payload, or the error the status and body add up to. Shared with the long
  * poll, which reads the same statuses off its own connection — the two clients
  * must not drift on what a 500 or a non-JSON body means. */
-export function parseBody(status: number, body: string, key?: string): unknown {
-  const failure = errorForStatus(status, key);
+export function parseBody(status: number, body: string, about?: SessionRef): unknown {
+  const failure = errorForStatus(status, about);
   if (failure) return failure;
   if (status === 422) return domainError(body);
   if (status < 200 || status > 299) {

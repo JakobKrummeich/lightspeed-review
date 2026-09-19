@@ -66,15 +66,15 @@ function splitFiles(value: string | undefined): string[] {
  */
 export async function runSay(input: SayInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
+  const target = `${input.branch} ${input.base}`;
   const declarations = pinned(input);
   const answered = (await apiRequest(
     `${serverOrigin(input.port)}/api/session/${key}/reply`,
     jsonPost({
       ...(declarations.length === 0 ? { comment: input.text } : { declarations }),
     }),
-    key,
+    { key, target },
   )) as Partial<TurnFacts>;
-  const target = `${input.branch} ${input.base}`;
   return {
     ...turnBlock(answered),
     said: input.text,

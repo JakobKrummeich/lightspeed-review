@@ -181,6 +181,12 @@ async function publishRound(
       commits: extracted.commits,
       reopen: input.reopen === true,
     }),
+    // A round refused on an ended review is answered with the `--reopen` that
+    // would be allowed, named for the branch on this command line.
+    {
+      key: sessionKey(input.repoRoot, input.branch, input.base),
+      target: `${input.branch} ${input.base}`,
+    },
   )) as CreatedSession;
 }
 

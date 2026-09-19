@@ -315,6 +315,30 @@ test("an answer saying the review ended points at the only command that reopens 
   }
 });
 
+/**
+ * S10: the branch and the base were on the command line that reached this
+ * error, and every other path inlines them — only the reopen line asked the
+ * agent to fill in `<branch> [base]` from a command it had just run. The
+ * `--intent` is there for the same reason it is everywhere else: `start`
+ * refuses a round without one.
+ */
+test("a review that ended names this session in the command that reopens it", async () => {
+  await withServer(session({ status: "ended" }), async ({ port }) => {
+    await assert.rejects(
+      () => runSay({ repoRoot: REPO, branch: BRANCH, base: BASE, port, text: "one more thing" }),
+      (error: unknown) => {
+        assert.ok(error instanceof ReviewError);
+        assert.equal(error.code, "session_ended");
+        assert.deepEqual(error.suggestions, [
+          'Run `lightspeed start feature-auth main --reopen --intent "<why>"`' +
+            " once the reviewer asks for one",
+        ]);
+        return true;
+      },
+    );
+  });
+});
+
 test("speaking into an unknown session fails with session_not_found", async () => {
   await withServer(session(), async ({ port }) => {
     await assert.rejects(

@@ -19,12 +19,12 @@ export interface EndInput {
  */
 export async function runEnd(input: EndInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
+  const target = `${input.branch} ${input.base}`;
   const closed = (await apiRequest(
     `${serverOrigin(input.port)}/api/session/${key}/end`,
     { method: "POST" },
-    key,
+    { key, target },
   )) as Partial<TurnFacts>;
-  const target = `${input.branch} ${input.base}`;
   return {
     ...turnBlock(closed),
     // No `status`: `turn: ended` above is the same fact, said once.

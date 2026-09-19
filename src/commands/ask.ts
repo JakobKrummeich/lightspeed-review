@@ -33,14 +33,16 @@ export function parseAskArgs(args: string[]): VerbArgs {
 export async function runAsk(input: AskInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const origin = serverOrigin(input.port);
+  const target = `${input.branch} ${input.base}`;
   await apiRequest(
     `${origin}/api/session/${key}/reply`,
     jsonPost({ comment: input.question, kind: "question" }),
-    key,
+    { key, target },
   );
   const result = (await longPoll({
     origin,
     key,
+    target,
     port: input.port,
   })) as PollPayload;
   return waitOutput(result, { ...input, asked: input.question });

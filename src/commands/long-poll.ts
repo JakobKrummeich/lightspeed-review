@@ -1,7 +1,7 @@
 import { request as httpRequest } from "node:http";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
-import { apiRequest, jsonPost, parseBody } from "./api-client.ts";
+import { apiRequest, jsonPost, parseBody, type SessionRef } from "./api-client.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
@@ -9,6 +9,8 @@ export interface LongPollInput {
   origin: string;
   /** The session waited on, named in the 404 message and in both URLs. */
   key: string;
+  /** `<branch> <base>`, for the commands an error about this review suggests. */
+  target?: string;
   /** Probed when a connection fails, to tell "gone" from "hiccup". */
   port: number;
   /** Waits between port probes after a failure. Injected by tests. */
@@ -38,7 +40,7 @@ export async function longPoll(input: LongPollInput): Promise<unknown> {
   const retry = retries(input);
   for (;;) {
     try {
-      const answer = await pollOnce(`${input.origin}/api/poll?key=${input.key}`, input.key);
+      const answer = await pollOnce(`${input.origin}/api/poll?key=${input.key}`, about(input));
       await confirmDelivery(input, answer);
       return answer;
     } catch (error) {
@@ -67,7 +69,7 @@ async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<v
     await apiRequest(
       `${input.origin}/api/session/${input.key}/delivered`,
       jsonPost({ delivery }),
-      input.key,
+      about(input),
     );
   } catch {
     // The next poll re-delivers; nothing here is worth failing the wait over.
@@ -132,7 +134,11 @@ function notAReviewServer(port: number, failure: unknown): ReviewError {
 
 /** One attempt on a connection of its own, every timeout off: the server answers
  * when the reviewer sends, which may be hours. */
-function pollOnce(url: string, key: string | undefined): Promise<unknown> {
+function about(input: LongPollInput): SessionRef {
+  return { key: input.key, ...(input.target === undefined ? {} : { target: input.target }) };
+}
+
+function pollOnce(url: string, ref: SessionRef): Promise<unknown> {
   return new Promise<unknown>((resolve, reject) => {
     const request = httpRequest(
       url,
@@ -144,7 +150,7 @@ function pollOnce(url: string, key: string | undefined): Promise<unknown> {
         response.on("data", (chunk: string) => (body += chunk));
         response.on("error", fail);
         response.on("end", () => {
-          const answer = parseBody(response.statusCode ?? 0, body, key);
+          const answer = parseBody(response.statusCode ?? 0, body, ref);
           if (answer instanceof ReviewError) fail(answer);
           else resolve(answer);
         });
