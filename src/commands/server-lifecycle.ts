@@ -101,7 +101,7 @@ export async function assertServerCurrent(port: number, target: string): Promise
   if (health === undefined || health.version === CLI_VERSION) return;
   throw new ReviewError({
     code: "server_stale",
-    message: `the review server on port ${port} is version ${health.version ?? "older than 1.2.0"}, this CLI is ${CLI_VERSION}`,
+    message: `the review server on port ${port} is version ${health.version ?? "older than 2.0.0"}, this CLI is ${CLI_VERSION}`,
     detail:
       "it answers a protocol this CLI no longer reads — an older server sends no `turn`" +
       " and no `round`, which are the facts every command is chosen against",
