@@ -108,21 +108,44 @@ test("an unknown provider reports pi_model_unknown", async () => {
   );
 });
 
+/**
+ * S3: the detail blamed the reference's format — `model` must be
+ * `<provider>/<model-id>` — over a reference whose format was right, so the
+ * agent read a false diagnosis of the one thing it had got correct. A
+ * well-formed name no provider has is a name to change, not a form to fix.
+ */
 test("an unknown model id on a known provider reports pi_model_unknown", async () => {
   const { models } = fauxModels([fauxAssistantMessage("ok")]);
 
   await assert.rejects(
     () => call(models, [userMessage], "off", "faux/not-a-model"),
-    (error: unknown) => error instanceof ReviewError && error.code === "pi_model_unknown",
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "pi_model_unknown");
+      assert.equal(error.message, "unknown model `faux/not-a-model`");
+      assert.equal(
+        error.detail,
+        "set `model` in .lightspeed.conf.json to a model you can reach," +
+          " e.g. anthropic/claude-sonnet-4-5",
+      );
+      return true;
+    },
   );
 });
 
+/** A reference with no provider in it is the one case where the format really
+ * is what is wrong, so that is the case that says so. */
 test("a model without a provider prefix reports pi_model_unknown", async () => {
   const { models } = fauxModels([fauxAssistantMessage("ok")]);
 
   await assert.rejects(
     () => call(models, [userMessage], "off", "faux-1"),
-    (error: unknown) => error instanceof ReviewError && error.code === "pi_model_unknown",
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "pi_model_unknown");
+      assert.match(error.detail ?? "", /`model` must be `<provider>\/<model-id>`/);
+      return true;
+    },
   );
 });
 

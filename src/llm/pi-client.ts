@@ -17,6 +17,7 @@ import {
 import { loadPiProviders } from "./pi-models.ts";
 import { applyConfiguredProviders, applyPiProviders } from "./providers.ts";
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
+import { startCall } from "../commands/home.ts";
 
 export interface GroupingCallInput {
   /** `provider/model-id`, exactly as written in `.lightspeed.conf.json`. */
@@ -78,6 +79,13 @@ async function builtinModels(stateDir: string): Promise<MutableModels> {
   return models;
 }
 
+/**
+ * A reference with no provider in it is a format mistake; a well-formed one no
+ * provider has is a name to change. Told apart because the detail is what the
+ * agent acts on: answering `model` must be `<provider>/<model-id>` to
+ * `anthropic/claude-sonnet-4` blames the one part that was right, and the model
+ * that does not exist goes unnamed.
+ */
 function resolveModel(models: Models, reference: string): Model<Api> {
   const separator = reference.indexOf("/");
   const providerId = separator === -1 ? "" : reference.slice(0, separator);
@@ -85,11 +93,20 @@ function resolveModel(models: Models, reference: string): Model<Api> {
   const model = providerId === "" ? undefined : models.getModel(providerId, modelId);
   if (!model) {
     throw piError("pi_model_unknown", `unknown model \`${reference}\``, {
-      detail: "`model` must be `<provider>/<model-id>`, e.g. anthropic/claude-sonnet-4-5",
+      detail:
+        providerId === ""
+          ? "`model` must be `<provider>/<model-id>`, e.g. anthropic/claude-sonnet-4-5"
+          : MODEL_FIX,
     });
   }
   return model;
 }
+
+/** The one edit that turns grouping back on, worded as the edit and not as the
+ * rule: `model` is never defaulted, so there is always a line to change. */
+export const MODEL_FIX =
+  "set `model` in .lightspeed.conf.json to a model you can reach," +
+  " e.g. anthropic/claude-sonnet-4-5";
 
 /** pi-ai never throws for request failures — it returns a message with an error stop reason. */
 function rejectFailedReply(reply: AssistantMessage, input: GroupingCallInput): void {
@@ -187,7 +204,7 @@ function piError(
 ): ReviewError {
   const suggestions: [string, ...string[]] = options.suggestions ?? [
     "Check `model` and `thinking` in .lightspeed.conf.json",
-    "Then re-run `lightspeed start <branch> [base]`",
+    `Then re-run \`${startCall("<branch> [base]")}\``,
   ];
   return new ReviewError({
     code,

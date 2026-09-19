@@ -385,6 +385,57 @@ test("the fallback group lets its tests trail too", async () => {
   );
 });
 
+/**
+ * S3: `start` exits 0 on a model nobody has, so the whole of the product's
+ * ordering is lost quietly — and the reason printed was the format rule, over a
+ * reference whose format was right. What the agent needs is the name it got
+ * wrong, what that cost, and the one edit that buys it back.
+ */
+test("a model no provider has is named, with what it cost and what fixes it", async () => {
+  const { models } = modelsReplying([]);
+
+  const result = await groupDiff({
+    files: eightFiles,
+    config: config({ model: "anthropic/claude-sonnet-4" }),
+    intents: [],
+    models,
+  });
+
+  assert.equal(result.mode, "fallback");
+  assert.equal(
+    result.reason,
+    "unknown model `anthropic/claude-sonnet-4`" +
+      " — the diff is one group instead of semantic ones",
+  );
+  assert.equal(
+    result.fix,
+    "set `model` in .lightspeed.conf.json to a model you can reach," +
+      " e.g. anthropic/claude-sonnet-4-5",
+  );
+});
+
+/** Every other degradation still says what happened — and now says it without
+ * dropping the message the detail was only ever context for. */
+test("a provider failure names the request that failed as well as why", async () => {
+  const faux = fauxProvider();
+  const models = createModels();
+  models.setProvider(faux.provider);
+  faux.setResponses([
+    fauxAssistantMessage("", { stopReason: "error", errorMessage: "upstream 503" }),
+  ]);
+
+  const result = await groupDiff({
+    files: eightFiles,
+    config: config(),
+    intents: [],
+    models,
+  });
+
+  assert.match(result.reason ?? "", /faux\/faux-1/);
+  assert.match(result.reason ?? "", /upstream 503/);
+  assert.match(result.reason ?? "", /the diff is one group instead of semantic ones/);
+});
+
 test("a provider failure degrades to the fallback group instead of blocking review", async () => {
   const faux = fauxProvider();
   const models = createModels();

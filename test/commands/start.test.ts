@@ -166,6 +166,35 @@ test("reports why grouping was skipped so the agent can see the LLM was not used
   });
 });
 
+/** The edit that buys the grouping back rides out with the round that lost it:
+ * `start` exits 0 either way, so this line is the only warning there is. */
+test("a degraded grouping carries the fix beside the reason", async () => {
+  await withHarness(async ({ config, deps }) => {
+    const output = await runStart({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      intents: INTENTS,
+      config,
+      deps: {
+        ...deps,
+        groupDiff: async ({ files }) => ({
+          groups: [{ name: "All Changes", rationale: "ungrouped", files }],
+          mode: "fallback",
+          reason: "unknown model `anthropic/claude-sonnet-4` — the diff is one group",
+          fix: "set `model` in .lightspeed.conf.json to a model you can reach",
+        }),
+      },
+    });
+
+    assert.deepEqual(output.grouping, {
+      mode: "fallback",
+      reason: "unknown model `anthropic/claude-sonnet-4` — the diff is one group",
+      fix: "set `model` in .lightspeed.conf.json to a model you can reach",
+    });
+  });
+});
+
 test("tells the agent to wait in the foreground for this branch pair", async () => {
   await withHarness(async ({ config, deps }) => {
     const output = await runStart({

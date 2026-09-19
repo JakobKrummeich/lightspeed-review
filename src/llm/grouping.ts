@@ -9,7 +9,7 @@ import {
   buildRepairPrompt,
   type PreviousGroup,
 } from "./prompts.ts";
-import { runGroupingCall, type GroupingCallResult } from "./pi-client.ts";
+import { MODEL_FIX, runGroupingCall, type GroupingCallResult } from "./pi-client.ts";
 import { raiseToStudy } from "./reading-tier.ts";
 import { validateGroupingReply, type GroupingReply } from "./schema.ts";
 import { trailTests } from "./tests-last.ts";
@@ -27,6 +27,12 @@ export interface GroupingResult {
   mode: GroupingMode;
   /** Why the LLM was skipped or abandoned; absent when `mode` is `llm`. */
   reason?: string;
+  /**
+   * The edit that turns grouping back on, where one exists. `start` exits 0 on
+   * a degraded grouping — the review still opens — so this line is the whole of
+   * the warning an agent gets that the product's main feature is off.
+   */
+  fix?: string;
 }
 
 export interface GroupDiffInput {
@@ -63,12 +69,28 @@ export async function groupDiff(input: GroupDiffInput): Promise<GroupingResult> 
     return await groupWithModel(input);
   } catch (error) {
     if (error instanceof ReviewError && error.code === "pi_auth_missing") throw error;
-    return {
-      ...fallbackGroups(files),
-      mode: "fallback",
-      reason: error instanceof ReviewError ? (error.detail ?? error.message) : String(error),
-    };
+    return { ...fallbackGroups(files), mode: "fallback", ...degraded(error) };
   }
+}
+
+/** What the fallback costs, said the same way wherever it is reported. */
+const UNGROUPED = "the diff is one group instead of semantic ones";
+
+/**
+ * Why the grouping degraded, and what changes it back. The reason used to be
+ * `detail ?? message`, which threw the failure itself away: an unknown model
+ * printed the format rule — `model` must be `<provider>/<model-id>` — over a
+ * reference whose format was right, blaming the one part that was correct and
+ * never naming the model that does not exist. Single-file diffs skip the model
+ * altogether, so a review can run this way for rounds without anyone noticing.
+ */
+function degraded(error: unknown): { reason: string; fix?: string } {
+  if (!(error instanceof ReviewError)) return { reason: `${String(error)} — ${UNGROUPED}` };
+  if (error.code === "pi_model_unknown") {
+    return { reason: `${error.message} — ${UNGROUPED}`, fix: error.detail ?? MODEL_FIX };
+  }
+  const cause = error.detail === undefined ? error.message : `${error.message}: ${error.detail}`;
+  return { reason: `${cause} — ${UNGROUPED}` };
 }
 
 async function groupWithModel(input: GroupDiffInput): Promise<GroupingResult> {

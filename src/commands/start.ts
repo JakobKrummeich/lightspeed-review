@@ -251,6 +251,8 @@ function publishedRound({
     grouping: {
       mode: grouping.mode,
       ...(grouping.reason === undefined ? {} : { reason: grouping.reason }),
+      // The one edit that turns grouping back on, when the failure has one.
+      ...(grouping.fix === undefined ? {} : { fix: grouping.fix }),
     },
   };
 }
