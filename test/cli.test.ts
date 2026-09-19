@@ -156,11 +156,27 @@ test("start without --intent fails before it looks for a repository at all", asy
   assert.doesNotMatch(stdout, /git_repo_not_found/);
 });
 
-test("unknown flag before a command exits 2", async () => {
+/**
+ * Three mistakes, three recoveries, so three codes: an agent that branches on
+ * `error.code` had to re-read the message to tell a misspelt command from a
+ * misspelt flag from an argument it forgot, because all three answered
+ * `VALIDATION_ERROR`.
+ */
+test("unknown flag before a command exits 2, under a code that names the mistake", async () => {
   const { stdout, code } = await runCli(["--bogus"]);
 
   assert.equal(code, 2);
-  assert.match(stdout, /code: VALIDATION_ERROR/);
+  assert.match(stdout, /^ {2}code: unknown_flag$/m);
+  assert.match(stdout, /unknown flag --bogus/);
+  assert.match(stdout, /Flags come after the command/);
+});
+
+test("a forgotten argument is its own code, not the code an unknown flag has", async () => {
+  const { stdout, code } = await runCli(["ask"]);
+
+  assert.equal(code, 2);
+  assert.match(stdout, /^ {2}code: argument_missing$/m);
+  assert.match(stdout, /ask needs the question/);
 });
 
 /**
@@ -172,7 +188,7 @@ test("an unknown command fails in the same error shape as everything else", asyn
 
   assert.equal(code, 2);
   assert.match(stdout, /^error:$/m);
-  assert.match(stdout, /^ {2}code: VALIDATION_ERROR$/m);
+  assert.match(stdout, /^ {2}code: unknown_command$/m);
   assert.match(stdout, /^ {2}message: "?Unknown command: nonsense"?$/m);
   assert.match(stdout, /^help\[\d+\]/m);
   assert.match(stdout, /start, wait, ask, say, work, approvals/);
@@ -290,7 +306,7 @@ test("start rejects an unknown flag instead of running with it", async () => {
   const { stdout, code } = await runCli(["start", "feature", "main", "--no-opne", "--intent", "x"]);
 
   assert.equal(code, 2);
-  assert.match(stdout, /^ {2}code: VALIDATION_ERROR$/m);
+  assert.match(stdout, /^ {2}code: unknown_flag$/m);
   assert.match(stdout, /unknown flag --no-opne/);
   assert.doesNotMatch(stdout, /git_ref_not_found/);
 });
@@ -299,7 +315,7 @@ test("feedback rejects an unknown flag with exit 2", async () => {
   const { stdout, code } = await runCli(["feedback", "list", "--bogus"], emptyRepo());
 
   assert.equal(code, 2);
-  assert.match(stdout, /code: VALIDATION_ERROR/);
+  assert.match(stdout, /code: unknown_flag/);
 });
 
 test("a missing or unparseable argument exits 2 like an unknown flag does", async () => {

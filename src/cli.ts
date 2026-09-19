@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
-import { exitCodeForError, runAxiCli } from "axi-sdk-js";
+import { runAxiCli } from "axi-sdk-js";
 import {
   HELP_END,
   HELP_START,
@@ -25,7 +25,7 @@ import { parseSkillArgs, runSkill } from "./commands/skill.ts";
 import { parseStartArgs, runStart } from "./commands/start.ts";
 import { runStop } from "./commands/stop.ts";
 import { defaultStateDir, loadConfig, loadLedgerConfig, type LightspeedConfig } from "./config.ts";
-import { ReviewError, validationError } from "./errors.ts";
+import { ReviewError, exitCodeFor, invocationError } from "./errors.ts";
 import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
 import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
@@ -300,26 +300,6 @@ function storedSessions(stateDir: string): SessionRecord[] {
 }
 
 /**
- * Exit 2 = "the command line was wrong". The SDK only knows its own VALIDATION_ERROR,
- * so these map alongside it rather than as generic failures an agent would retry.
- */
-const ARGUMENT_ERROR_CODES = [
-  "invalid_arguments",
-  "intent_missing",
-  "agent_missing",
-  // A move made out of turn is a wrong command line like any other: the fixing
-  // command is in the error's own `help[]`, and exit 2 says "read it, don't retry".
-  "turn_not_yours",
-  // Waiting while still holding the turn is the same mistake from the other end.
-  "turn_still_yours",
-];
-
-function exitCodeFor(error: unknown): number {
-  if (error instanceof ReviewError && ARGUMENT_ERROR_CODES.includes(error.code)) return 2;
-  return exitCodeForError(error);
-}
-
-/**
  * A guessed command name is an agent's most common first failure, and the SDK's
  * own version of it renders `error` as a string with no code. Routing it through
  * `errorOutput` keeps one error schema across the whole CLI, and the real
@@ -327,7 +307,7 @@ function exitCodeFor(error: unknown): number {
  * which is already this CLI's code for a command line it could not read.
  */
 function unknownCommandOutput(command: string): string {
-  const error = validationError(`Unknown command: ${command}`, [
+  const error = invocationError("unknown_command", `Unknown command: ${command}`, [
     `Known commands: ${COMMAND_NAMES.join(", ")}`,
     "Run `lightspeed --help` for what each one does",
   ]);
@@ -356,19 +336,52 @@ function withHelpAlias(given: string[]): string[] {
   return name === undefined ? ["--help"] : [name, "--help"];
 }
 
+/**
+ * The SDK refuses a flag before the command in prose of its own, under its own
+ * code — the one error of this CLI that did not arrive as TOON with a code
+ * saying which mistake it was. Answered here instead, so `lightspeed --bogus`
+ * parses like every other failure.
+ */
+function leadingFlagProblem(given: string[]): ReviewError | undefined {
+  const [flag] = given;
+  if (flag === undefined || !flag.startsWith("-")) return undefined;
+  if (given.length === 1 && ["--all", "--help", "--version", "-v", "-V"].includes(flag)) {
+    return undefined;
+  }
+  return invocationError(
+    "unknown_flag",
+    LEADING_FLAGS.includes(flag)
+      ? `${flag} is read only on its own, with no command after it`
+      : `unknown flag ${flag}`,
+    [
+      "Flags come after the command: `lightspeed <command> [args] [flags]`",
+      "Run `lightspeed --help` for the commands, or `lightspeed` for this repository's reviews",
+    ],
+    `before a command only ${LEADING_FLAGS.join(", ")} are read`,
+  );
+}
+
+const LEADING_FLAGS = ["--all", "--help", "--version"];
+
 exitQuietlyWhenReaderCloses();
-await runAxiCli({
-  argv: allRepos ? [] : argv,
-  description,
-  // TOON errors on stdout so an agent parses failures like results, not prose off stderr.
-  formatError: (error) => ({
-    output: `${renderToon(errorOutput(error))}\n`,
-    exitCode: exitCodeFor(error),
-  }),
-  version,
-  topLevelHelp,
-  getCommandHelp: commandHelp,
-  renderUnknownCommand: unknownCommandOutput,
-  commands,
-  home: () => homeOutput(homeInput(allRepos)),
-});
+const leadingProblem = leadingFlagProblem(argv);
+if (leadingProblem !== undefined) {
+  process.stdout.write(`${renderToon(errorOutput(leadingProblem))}\n`);
+  process.exitCode = 2;
+} else {
+  await runAxiCli({
+    argv: allRepos ? [] : argv,
+    description,
+    // TOON errors on stdout so an agent parses failures like results, not prose off stderr.
+    formatError: (error) => ({
+      output: `${renderToon(errorOutput(error))}\n`,
+      exitCode: exitCodeFor(error),
+    }),
+    version,
+    topLevelHelp,
+    getCommandHelp: commandHelp,
+    renderUnknownCommand: unknownCommandOutput,
+    commands,
+    home: () => homeOutput(homeInput(allRepos)),
+  });
+}

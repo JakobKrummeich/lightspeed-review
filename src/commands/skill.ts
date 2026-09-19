@@ -1,4 +1,4 @@
-import { ReviewError, validationError } from "../errors.ts";
+import { ReviewError, invocationError } from "../errors.ts";
 import { isSkillAgent, renderSkillFor, SKILL_AGENTS } from "../skill.ts";
 import { scanArgs } from "./args.ts";
 
@@ -41,14 +41,16 @@ function unknownAgent(agent: string): ReviewError {
 }
 
 function unknownSkillFlag(flag: string): Error {
-  return validationError(`unknown flag ${flag}`, [
+  return invocationError("unknown_flag", `unknown flag ${flag}`, [
     "Known here: --agent",
     "Run `lightspeed skill --help` for what it does",
   ]);
 }
 
 function missingAgentValue(flag: string): Error {
-  return validationError(`${flag} needs a value`, [`Say which agent: ${SKILL_AGENTS.join(", ")}`]);
+  return invocationError("argument_missing", `${flag} needs a value`, [
+    `Say which agent: ${SKILL_AGENTS.join(", ")}`,
+  ]);
 }
 
 function positionalAgent(token: string): ReviewError {

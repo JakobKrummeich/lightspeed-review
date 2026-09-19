@@ -1,4 +1,4 @@
-import { ReviewError, validationError } from "../errors.ts";
+import { ReviewError, invocationError } from "../errors.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { approvalPaths, type ApprovalPaths } from "../review-files.ts";
@@ -53,7 +53,7 @@ export function parseApprovalsArgs(args: string[]): ApprovalsArgs {
 }
 
 function unknownApprovalsFlag(flag: string): Error {
-  return validationError(`unknown flag ${flag}`, [
+  return invocationError("unknown_flag", `unknown flag ${flag}`, [
     `Known here: ${APPROVALS_FLAGS.join(", ")}`,
     "Run `lightspeed approvals --help` for what each flag does",
   ]);

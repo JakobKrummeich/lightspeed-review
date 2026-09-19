@@ -1,5 +1,5 @@
 import type { CommentDeclaration } from "../declarations.ts";
-import { validationError } from "../errors.ts";
+import { invocationError } from "../errors.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
@@ -35,7 +35,7 @@ export function parseSayArgs(args: string[]): SayArgs {
   // Files without an id name changes belonging to no comment: the between-round
   // diff already says what moved, so the list would answer a question nobody asked.
   if (files.length > 0 && pinned === undefined) {
-    throw validationError("--files needs the --for it describes", [
+    throw invocationError("argument_missing", "--files needs the --for it describes", [
       'Run `lightspeed say "<answer>" --for <id> --files <a,b>` with the id `wait` printed',
     ]);
   }
@@ -49,7 +49,7 @@ function splitFiles(value: string | undefined): string[] {
     .map((path) => path.trim())
     .filter((path) => path !== "");
   if (files.length === 0) {
-    throw validationError("--files needs a comma-separated list of paths", [
+    throw invocationError("argument_missing", "--files needs a comma-separated list of paths", [
       'Run `lightspeed say "<answer>" --for <id> --files src/api/users.ts,src/db.ts`',
     ]);
   }

@@ -1,6 +1,6 @@
 import type { LightspeedConfig } from "../config.ts";
 import { extractDiff as extractDiffFromGit, type ExtractedDiff } from "../diff-extract.ts";
-import { validationError } from "../errors.ts";
+import { invocationError } from "../errors.ts";
 import { groupDiff as groupDiffWithModel, type GroupDiffInput } from "../llm/grouping.ts";
 import type { GroupingResult } from "../llm/grouping.ts";
 import type { PreviousGroup } from "../llm/prompts.ts";
@@ -116,7 +116,7 @@ export function parseStartArgs(args: string[]): StartArgs {
 }
 
 function unknownStartFlag(flag: string): Error {
-  return validationError(`unknown flag ${flag}`, [
+  return invocationError("unknown_flag", `unknown flag ${flag}`, [
     `Known here: ${START_FLAGS.join(", ")}`,
     "Run `lightspeed start --help` for what each flag does",
   ]);

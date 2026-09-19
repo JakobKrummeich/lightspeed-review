@@ -7,7 +7,7 @@ import {
   renderToon,
   truncateContent,
 } from "../src/output.ts";
-import { ReviewError, validationError } from "../src/errors.ts";
+import { ReviewError, invocationError } from "../src/errors.ts";
 
 test("renderToon encodes a record as TOON", () => {
   assert.equal(renderToon({ status: "open", pending: 0 }), "status: open\npending: 0");
@@ -61,11 +61,14 @@ test("errorOutput renders unexpected non-Review errors as internal_error", () =>
   });
 });
 
-test("errorOutput keeps an SDK validation code so an unknown flag still exits 2", () => {
-  assert.deepEqual(errorOutput(validationError("unknown flag `--bogus`", ["Run `--help`"])), {
-    error: { code: "VALIDATION_ERROR", message: "unknown flag `--bogus`" },
-    help: ["Run `--help`"],
-  });
+test("a bad command line renders under the code for the mistake it is", () => {
+  assert.deepEqual(
+    errorOutput(invocationError("unknown_flag", "unknown flag `--bogus`", ["Run `--help`"])),
+    {
+      error: { code: "unknown_flag", message: "unknown flag `--bogus`" },
+      help: ["Run `--help`"],
+    },
+  );
 });
 
 test("a ReviewError always renders with a help block", () => {

@@ -8,7 +8,7 @@
  * command — a verb whose subject hides behind `--something` reads as optional.
  * Branch and base resolve exactly as they do everywhere else when omitted.
  */
-import { validationError } from "../errors.ts";
+import { invocationError } from "../errors.ts";
 import { scanArgs, type ScannedArgs } from "./args.ts";
 
 export interface VerbSpec {
@@ -56,7 +56,7 @@ export function parseVerb(args: string[], spec: VerbSpec, wanted: string): VerbA
 
 function unknownFlag(spec: VerbSpec, flag: string): Error {
   const known = [...(spec.value ?? []), ...(spec.boolean ?? [])];
-  return validationError(`unknown flag ${flag}`, [
+  return invocationError("unknown_flag", `unknown flag ${flag}`, [
     known.length === 0
       ? `\`lightspeed ${spec.verb}\` takes no flags`
       : `Known here: ${known.join(", ")}`,
@@ -70,7 +70,7 @@ function unknownFlag(spec: VerbSpec, flag: string): Error {
  */
 function requireMessage(spec: VerbSpec, message: string | undefined, wanted: string): string {
   if (message !== undefined && message.trim() !== "") return message;
-  throw validationError(`${spec.verb} needs ${wanted}`, [
+  throw invocationError("argument_missing", `${spec.verb} needs ${wanted}`, [
     `Run \`lightspeed ${spec.verb} "<${spec.placeholder ?? "text"}>" [branch] [base]\``,
     `Run \`lightspeed ${spec.verb} --help\` for two examples`,
   ]);

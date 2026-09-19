@@ -611,7 +611,7 @@ test("an unknown flag is refused, with the flags that do exist", () => {
     (error: Error) => {
       assert.match(error.message, /unknown flag --no-opne/);
       assert.match((error as AxiError).suggestions.join(" "), /--intent/);
-      assert.equal((error as AxiError).code, "VALIDATION_ERROR");
+      assert.equal((error as AxiError).code, "unknown_flag");
       return true;
     },
   );

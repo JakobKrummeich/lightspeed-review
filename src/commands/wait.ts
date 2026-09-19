@@ -1,4 +1,4 @@
-import { validationError } from "../errors.ts";
+import { invocationError } from "../errors.ts";
 import { END_VERDICTS, type EndApproval, type PollPayload } from "../feedback.ts";
 import { truncateContent, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
@@ -40,7 +40,7 @@ export function parseWaitArgs(args: string[]): WaitArgs {
     // Fail loud: a mistyped flag read as a branch name would wait on the wrong
     // session, or on none.
     onUnknown: (flag) =>
-      validationError(`unknown flag ${flag}`, [
+      invocationError("unknown_flag", `unknown flag ${flag}`, [
         `Known here: ${WAIT_FLAGS.join(", ")}`,
         "Run `lightspeed wait --help` for what it takes",
       ]),
