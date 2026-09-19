@@ -1,6 +1,6 @@
-import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { runAxiCli } from "axi-sdk-js";
+import { CLI_DESCRIPTION, CLI_VERSION } from "./version.ts";
 import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE, homeOutput } from "./commands/home.ts";
 import { homeInput } from "./commands/home-input.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
@@ -33,12 +33,8 @@ import { findRepoRoot, repoRootOrNone } from "./repo.ts";
 import { missingSession, resolveSession, type ResolvedSession } from "./session-resolve.ts";
 import { SessionStore } from "./session-store.ts";
 
-// Single-sourced from package.json; resolves the same from `src/cli.ts` and `dist/cli.mjs`.
-const require = createRequire(import.meta.url);
-const { version, description } = require("../package.json") as {
-  version: string;
-  description: string;
-};
+const version = CLI_VERSION;
+const description = CLI_DESCRIPTION;
 
 /** Command name to handler; the one list the CLI answers, and the one both
  * top-level help and the unknown-command error are built from. */

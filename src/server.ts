@@ -29,6 +29,7 @@ import { hostIsAllowed, originIsAllowed } from "./server/security.ts";
 import { SessionTransport } from "./server/streams.ts";
 import type { SessionStore } from "./session-store.ts";
 import { DEFAULT_STATIC_DIR, loadAssets } from "./static-assets.ts";
+import { CLI_VERSION } from "./version.ts";
 
 export type { CreateSessionRequest };
 export type { LedgerReport };
@@ -133,7 +134,10 @@ function buildRoutes(context: ServerContext): Route[] {
     {
       method: "GET",
       pattern: "/health",
-      handler: (_request, response) => sendJson(response, 200, { status: "ok" }),
+      // The version is the handshake: a client that reads a protocol this server
+      // does not speak must find that out before it blocks on an answer.
+      handler: (_request, response) =>
+        sendJson(response, 200, { status: "ok", version: CLI_VERSION }),
     },
     { method: "POST", pattern: "/api/sessions", handler: bind(handleCreateSession) },
     { method: "GET", pattern: "/session/:key", handler: bind(handleReviewPage) },

@@ -9,6 +9,7 @@ import { parseWaitArgs, runWait } from "../../src/commands/wait.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { PROMPT_LIMIT, SELECTION_LIMIT } from "../../src/output.ts";
 import { sessionKey } from "../../src/paths.ts";
+import { CLI_VERSION } from "../../src/version.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore, type SessionRecord } from "../../src/session-store.ts";
 import type { DiffGroup } from "../../src/diff-extract.ts";
@@ -64,6 +65,15 @@ function session(overrides: Partial<SessionRecord> = {}): SessionRecord {
     rounds: [],
     ...overrides,
   };
+}
+
+/** A review server of another version: ours by `/health`, and speaking a
+ * protocol this CLI no longer reads. */
+function createStaleServer(version: string): Server {
+  return createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ status: "ok", version }));
+  });
 }
 
 async function withServer(
@@ -260,6 +270,32 @@ test("--full hands back the selection exactly as the reviewer made it", async ()
   });
 });
 
+/**
+ * N6: a `serve` process left over from an older install answered this CLI with
+ * a payload that had no `turn` and no `round`, and the client defaulted its way
+ * past it — so the agent read "agent reading" off a server that had never heard
+ * of turns. A wait that cannot trust the answer must not block for one.
+ */
+test("a wait against a server of another version is refused, with the way to clear it", async () => {
+  const stale = createStaleServer("0.0.1");
+  await new Promise<void>((resolve) => stale.listen(0, "127.0.0.1", resolve));
+  const { port } = stale.address() as { port: number };
+
+  await assert.rejects(
+    () => runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port }),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "server_stale");
+      assert.match(error.message, /0\.0\.1/);
+      assert.match(error.suggestions.join(" "), /lightspeed stop/);
+      assert.match(error.suggestions.join(" "), /lightspeed wait feature-auth main/);
+      return true;
+    },
+  );
+
+  await new Promise<void>((resolve) => stale.close(() => resolve()));
+});
+
 test("an ended review reports it and stops suggesting another wait", async () => {
   await withServer(session({ status: "ended" }), async ({ port }) => {
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
@@ -395,13 +431,18 @@ test("a session ended before the closer was recorded names neither party", async
   });
 });
 
-/** A server answering one fixed payload, for the shapes older servers sent. */
+/**
+ * A server answering one fixed payload, for the shapes a payload can arrive in.
+ * It states this CLI's own version: version skew is refused by the handshake, so
+ * what is left to read defensively is a payload of the right version that does
+ * not hold together.
+ */
 async function fixedPayloadServer(payload: unknown): Promise<{
   port: number;
   close: () => Promise<void>;
 }> {
   const server: Server = createServer((request, response) => {
-    const body = request.url === "/health" ? {} : payload;
+    const body = request.url === "/health" ? { status: "ok", version: CLI_VERSION } : payload;
     response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(body));
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

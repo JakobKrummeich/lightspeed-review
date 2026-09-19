@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
 import { legalMoves, nextMoves } from "../src/commands/home.ts";
+import { CLI_VERSION } from "../src/version.ts";
 import { SessionStore } from "../src/session-store.ts";
 import { LedgerStore } from "../src/ledger/store.ts";
 import type { AnnotationRecord } from "../src/ledger/records.ts";
@@ -185,12 +186,18 @@ test("a round posted with reopen opens the review again and keeps its history", 
   });
 });
 
-test("health reports ok", async () => {
+/**
+ * N6: a `serve` from two weeks earlier was still answering the current CLI with
+ * a pre-turn protocol — `wait` came back with no `turn` and no `round`, and the
+ * client papered over it with a default. The server says which version it is,
+ * which is the whole of what a handshake needs.
+ */
+test("health reports ok and the version of the CLI that started it", async () => {
   await withServer(async ({ url }) => {
     const response = await fetch(`${url}/health`);
 
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { status: "ok" });
+    assert.deepEqual(await response.json(), { status: "ok", version: CLI_VERSION });
   });
 });
 

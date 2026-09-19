@@ -1,4 +1,4 @@
-import { invocationError } from "../errors.ts";
+import { ReviewError, invocationError } from "../errors.ts";
 import { END_VERDICTS, type EndApproval, type PollPayload } from "../feedback.ts";
 import {
   PROMPT_LIMIT,
@@ -8,10 +8,11 @@ import {
 } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import type { AnnotationPrompt, FeedbackPrompt, ReviewCloser } from "../session-store.ts";
-import { turnBlock } from "../turn.ts";
+import { turnBlock, type TurnLabel } from "../turn.ts";
 import { hasFlag, scanArgs } from "./args.ts";
 import { longPoll } from "./long-poll.ts";
 import { serverOrigin } from "./server-address.ts";
+import { assertServerCurrent } from "./server-lifecycle.ts";
 import { legalMoves, turnHelp } from "./home.ts";
 
 export interface WaitArgs {
@@ -65,6 +66,9 @@ export function parseWaitArgs(args: string[]): WaitArgs {
  */
 export async function runWait(input: WaitInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
+  // Before the block, not after it: a wait against a server this CLI cannot read
+  // would otherwise hold the agent for hours and then answer with defaults.
+  await assertServerCurrent(input.port, `${input.branch} ${input.base}`.trimEnd());
   const result = (await longPoll({
     origin: serverOrigin(input.port),
     key,
@@ -123,9 +127,28 @@ function moves(result: PollPayload, target: string): string[] {
     ? // An ended review is read once and acted on once: the account of what it
       // left is never boilerplate, so it is never shortened.
       [endedHelp(result), ...helpApprovals(result, target), ...legalMoves("ended", target)]
-    : // Delivery is what ended this wait, so the turn is the agent's — stated by
-      // the answer, and assumed only of a server too old to state it.
-      turnHelp(result.turn ?? "agent reading", target, result.helpForm);
+    : // Delivery is what ended this wait, so the turn is the agent's — and the
+      // answer states it: the handshake refused every server that would not.
+      turnHelp(turnOf(result), target, result.helpForm);
+}
+
+/**
+ * The turn this answer landed on. It used to default to `agent reading`, which
+ * is how a server from before the turn existed had its silence read as a fact:
+ * the agent was told it held a turn nobody had handed over. A server of this
+ * version always states it — `runWait` refuses the ones that would not — so
+ * absence here is our own payload gone wrong, and is reported, never guessed.
+ */
+function turnOf(result: PollPayload): TurnLabel {
+  if (result.turn !== undefined) return result.turn;
+  throw new ReviewError({
+    code: "server_stale",
+    message: "the review server answered without saying whose turn it is",
+    detail: "a payload with no `turn` comes from a server older than this CLI",
+    suggestions: [
+      "Run `lightspeed stop`, then re-run the command; the next `start` brings this version up",
+    ],
+  });
 }
 
 /**
