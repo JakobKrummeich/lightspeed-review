@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { git, newRepo } from "./helpers/git-repo.ts";
 import { sessionKey } from "../src/paths.ts";
 import { SessionStore } from "../src/session-store.ts";
@@ -25,6 +27,20 @@ async function runCli(
     const failure = error as { stdout?: string; code?: number };
     return { stdout: failure.stdout ?? "", code: failure.code ?? 1 };
   }
+}
+
+/**
+ * A server that holds the port and answers 404 to everything: the review server
+ * as an agent meets it when the session it names was never opened there.
+ */
+async function servePlain404(): Promise<number> {
+  const server = createServer((_request, response) => {
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: { code: "session_not_found", message: "no session" } }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  test.after(() => void server.close());
+  return (server.address() as AddressInfo).port;
 }
 
 /**
@@ -120,6 +136,54 @@ test("--all lists other repositories' sessions, which the repo-scoped view names
   assert.equal(all.code, 0, all.stdout);
   assert.match(all.stdout, /^sessions\[1\]\{repo,branch,base,turn,round,pending\}:$/m);
   assert.match(all.stdout, /^ {2}\/somewhere\/else,feat\/tokens,main,reviewer,1,0$/m);
+});
+
+/**
+ * S7 through the store: `approvals` reads the session file itself, so a review
+ * nobody opened must be named by what the agent typed, beside what is there.
+ */
+test("a command about a review nothing holds names the reviews that are held", async () => {
+  const repoRoot = emptyRepo();
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+
+  const { stdout, code } = await runCli(["approvals", "other/branch", "main"], repoRoot);
+
+  assert.equal(code, 1);
+  assert.match(stdout, /^ {2}code: session_not_found$/m);
+  assert.match(
+    stdout,
+    new RegExp(`message: no review session for other/branch against main in ${repoRoot}`),
+  );
+  assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
+  assert.match(stdout, /lightspeed start other\/branch main --intent/);
+  assert.match(stdout, /lightspeed approvals feature\/greeting main/);
+});
+
+/**
+ * The same failure off the wire: the server answers 404 for a key it does not
+ * hold, and the agent must read the same two facts as in the store case.
+ */
+test("a session the server does not know is named the same way as one on disk", async () => {
+  const repoRoot = emptyRepo();
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+  const port = await servePlain404();
+  writeFileSync(
+    join(repoRoot, ".lightspeed.conf.json"),
+    JSON.stringify({
+      model: "anthropic/claude-haiku-4-5",
+      thinking: "off",
+      stateDir: join(repoRoot, "state"),
+      port,
+    }),
+  );
+
+  const { stdout, code } = await runCli(["wait", "other/branch", "main"], repoRoot);
+
+  assert.equal(code, 1);
+  assert.match(stdout, /^ {2}code: session_not_found$/m);
+  assert.match(stdout, /message: no review session for other\/branch against main/);
+  assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
+  assert.match(stdout, /lightspeed wait feature\/greeting main/);
 });
 
 test("a failing command reports code, message and help as TOON on stdout, exit 1", async () => {

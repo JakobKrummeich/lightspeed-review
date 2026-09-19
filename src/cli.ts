@@ -30,7 +30,7 @@ import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
 import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
-import { resolveSession, type ResolvedSession } from "./session-resolve.ts";
+import { missingSession, resolveSession, type ResolvedSession } from "./session-resolve.ts";
 import { SessionStore, type SessionRecord } from "./session-store.ts";
 
 // Single-sourced from package.json; resolves the same from `src/cli.ts` and `dist/cli.mjs`.
@@ -89,14 +89,34 @@ function repoContext(): { repoRoot: string; config: LightspeedConfig } {
   return { repoRoot, config: loadConfig(repoRoot) };
 }
 
-/** Which review the positional `<branch> [base]` arguments name. */
-function resolveTarget(
-  repoRoot: string,
-  config: LightspeedConfig,
+interface SessionContext extends ResolvedSession {
+  repoRoot: string;
+  config: LightspeedConfig;
+}
+
+/**
+ * Every command that speaks about one review: which review the positional
+ * `<branch> [base]` name, and — when nothing holds it — one error that says so
+ * in the agent's own words. The catch lives here because this is the only layer
+ * that has both halves: the store knows what is open in this repository, and the
+ * dispatch knows which command asked. Below it, a 404 off the wire and a missing
+ * file on disk would each have to invent the same sentence.
+ */
+async function onSession<T>(
+  verb: string,
   branch: string | undefined,
   base: string | undefined,
-): ResolvedSession {
-  return resolveSession(new SessionStore(config.stateDir).list(), repoRoot, branch, base);
+  run: (context: SessionContext) => T | Promise<T>,
+): Promise<T> {
+  const { repoRoot, config } = repoContext();
+  const sessions = new SessionStore(config.stateDir).list();
+  const target = resolveSession(sessions, repoRoot, branch, base);
+  try {
+    return await run({ repoRoot, config, ...target });
+  } catch (error) {
+    if (!(error instanceof ReviewError) || error.code !== "session_not_found") throw error;
+    throw missingSession({ repoRoot, ...target, verb, sessions });
+  }
 }
 
 /** Extracts the diff, groups it and opens the review page. Safe to re-run. */
@@ -139,55 +159,54 @@ async function startCommand(args: string[]): Promise<StructuredOutput> {
 /** The one blocking call: the turn comes to the agent when this returns. */
 async function waitCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, full } = parseWaitArgs(args);
-  const { repoRoot, config } = repoContext();
-  const target = resolveTarget(repoRoot, config, branch, base);
-  return await runWait({ repoRoot, ...target, port: config.port, full });
+  return await onSession("wait", branch, base, ({ config, ...target }) =>
+    runWait({ ...target, port: config.port, full }),
+  );
 }
 
 /** Puts a question to the reviewer and blocks on their answer. */
 async function askCommand(args: string[]): Promise<StructuredOutput> {
   const { message, branch, base } = parseAskArgs(args);
-  const { repoRoot, config } = repoContext();
-  const target = resolveTarget(repoRoot, config, branch, base);
-  return await runAsk({ repoRoot, ...target, port: config.port, question: message });
+  return await onSession("ask", branch, base, ({ config, ...target }) =>
+    runAsk({ ...target, port: config.port, question: message }),
+  );
 }
 
 /** Says something without blocking and without giving the turn up. */
 async function sayCommand(args: string[]): Promise<StructuredOutput> {
   const parsed = parseSayArgs(args);
-  const { repoRoot, config } = repoContext();
-  const target = resolveTarget(repoRoot, config, parsed.branch, parsed.base);
-  return await runSay({
-    repoRoot,
-    ...target,
-    port: config.port,
-    text: parsed.message,
-    ...(parsed.for === undefined ? {} : { for: parsed.for }),
-    files: parsed.files,
-  });
+  return await onSession("say", parsed.branch, parsed.base, ({ config, ...target }) =>
+    runSay({
+      ...target,
+      port: config.port,
+      text: parsed.message,
+      ...(parsed.for === undefined ? {} : { for: parsed.for }),
+      files: parsed.files,
+    }),
+  );
 }
 
 /** Declares the plan the agent is about to go quiet over. */
 async function workCommand(args: string[]): Promise<StructuredOutput> {
   const { message, branch, base } = parseWorkArgs(args);
-  const { repoRoot, config } = repoContext();
-  const target = resolveTarget(repoRoot, config, branch, base);
-  return await runWork({ repoRoot, ...target, port: config.port, plan: message });
+  return await onSession("work", branch, base, ({ config, ...target }) =>
+    runWork({ ...target, port: config.port, plan: message }),
+  );
 }
 
 /** Names the files behind the counts `wait` reports; nothing else prints them. */
-function approvalsCommand(args: string[]): StructuredOutput {
+async function approvalsCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, full } = parseApprovalsArgs(args);
-  const { repoRoot, config } = repoContext();
-  const target = resolveTarget(repoRoot, config, branch, base);
-  return runApprovals({ repoRoot, ...target, stateDir: config.stateDir, full });
+  return await onSession("approvals", branch, base, ({ config, ...target }) =>
+    runApprovals({ ...target, stateDir: config.stateDir, full }),
+  );
 }
 
 /** Agent-initiated close of a review session. */
 async function endCommand(args: string[]): Promise<StructuredOutput> {
-  const { repoRoot, config } = repoContext();
-  const target = resolveTarget(repoRoot, config, args[0], args[1]);
-  return await runEnd({ repoRoot, ...target, port: config.port });
+  return await onSession("end", args[0], args[1], ({ config, ...target }) =>
+    runEnd({ ...target, port: config.port }),
+  );
 }
 
 /** Runs the review server in the foreground; `start` spawns this detached. */
