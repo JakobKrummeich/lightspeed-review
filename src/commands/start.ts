@@ -4,7 +4,7 @@ import { validationError } from "../errors.ts";
 import { groupDiff as groupDiffWithModel, type GroupDiffInput } from "../llm/grouping.ts";
 import type { GroupingResult } from "../llm/grouping.ts";
 import type { PreviousGroup } from "../llm/prompts.ts";
-import type { StructuredOutput } from "../output.ts";
+import { renderToon, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { currentGroupingMode } from "../rounds/session-round.ts";
 import type { LedgerReport } from "../server.ts";
@@ -39,6 +39,8 @@ export interface StartDeps {
   groupDiff?: (input: GroupDiffInput) => Promise<GroupingResult>;
   ensureServerRunning?: (options: EnsureServerOptions) => Promise<void>;
   openBrowser?: (url: string) => void;
+  /** Where the publish block goes when `--wait` is about to block on top of it. */
+  write?: (text: string) => void;
 }
 
 /** The seams filled in once, so the run below reads as the steps it takes
@@ -49,6 +51,7 @@ function resolveDeps(deps: StartDeps = {}): Required<StartDeps> {
     groupDiff: deps.groupDiff ?? groupDiffWithModel,
     ensureServerRunning: deps.ensureServerRunning ?? ensureServerRunning,
     openBrowser: deps.openBrowser ?? openBrowser,
+    write: deps.write ?? ((text) => void process.stdout.write(text)),
   };
 }
 
@@ -141,12 +144,19 @@ export async function runStart(input: StartInput): Promise<StructuredOutput> {
   await run.ensureServerRunning({ port: config.port });
   const created = await publishRound(input, extracted, grouping);
   if (input.open !== false) run.openBrowser(created.url);
+  const outcome = { created, extracted, grouping, branch, base, intents: input.intents };
   // `--wait` is the round and the block in one line, for the agent that has
-  // nothing else to do until the reviewer answers. It blocks like `wait` does.
+  // nothing else to do until the reviewer answers. It blocks like `wait` does —
+  // which is why the round it just published is written out first rather than
+  // returned: the reviewer's url is no use to anybody after they have sent, and
+  // a command that prints nothing for the length of a review is one nobody can
+  // hand the person whose turn it is. The wait's own answer follows on the same
+  // stdout, which is where the agent was already reading.
   if (input.wait === true) {
+    run.write(`${renderToon(blockingOutput(outcome))}\n`);
     return await runWait({ repoRoot, branch, base, port: config.port });
   }
-  return startOutput({ created, extracted, grouping, branch, base, intents: input.intents });
+  return startOutput(outcome);
 }
 
 /** The round itself, posted to the server: this diff, this grouping, and why the
@@ -204,7 +214,9 @@ interface StartOutcome {
   intents: string[];
 }
 
-function startOutput({
+/** The round as it now stands, which is what both endings lead with: what was
+ * published, where the reviewer reads it, and whose move it is. */
+function publishedRound({
   created,
   extracted,
   grouping,
@@ -212,8 +224,6 @@ function startOutput({
   base,
   intents,
 }: StartOutcome): StructuredOutput {
-  const target = `${branch} ${base}`;
-  const ledger = created.ledger ?? { status: "off" as const };
   return {
     // A round opens on the reviewer's move: nothing has been sent to the agent
     // yet, so it holds no turn and nothing but `wait` will give it one.
@@ -229,13 +239,25 @@ function startOutput({
       intents,
       url: created.url,
     },
-    ledger,
+    ledger: ledgerReport(created),
     diff: extracted.stats,
     groups: grouping.groups.map((group) => ({ name: group.name, files: group.files.length })),
     grouping: {
       mode: grouping.mode,
       ...(grouping.reason === undefined ? {} : { reason: grouping.reason }),
     },
+  };
+}
+
+function ledgerReport(created: CreatedSession): LedgerReport {
+  return created.ledger ?? { status: "off" };
+}
+
+function startOutput(outcome: StartOutcome): StructuredOutput {
+  const target = `${outcome.branch} ${outcome.base}`;
+  const ledger = ledgerReport(outcome.created);
+  return {
+    ...publishedRound(outcome),
     // An ended review never gets here (server refuses the round), so this help
     // assumes an active one.
     help: [
@@ -244,6 +266,21 @@ function startOutput({
       helpEnd(target),
       ...(ledger.status === "degraded" ? [helpLedgerDegraded(ledger)] : []),
     ],
+  };
+}
+
+/**
+ * The same round, for an agent that is about to block on it. No `help[]`: every
+ * move it would name is one this command is already making, and the one thing
+ * left to do with this block is give the url to the reviewer. A broken ledger
+ * still says so — that warning appears nowhere else.
+ */
+function blockingOutput(outcome: StartOutcome): StructuredOutput {
+  const ledger = ledgerReport(outcome.created);
+  return {
+    ...publishedRound(outcome),
+    message: "published; now blocking on the reviewer — give them the url above",
+    ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
   };
 }
 

@@ -452,6 +452,75 @@ test("--wait is off unless the command line says so", () => {
   assert.equal(parseStartArgs(["feature-auth", "--wait"]).wait, true);
 });
 
+/** Waits for something a blocked command does on another tick. */
+async function until(ready: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (ready()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error("the blocked command never got there");
+}
+
+function postFeedback(port: number, key: string, body: unknown): Promise<Response> {
+  return fetch(`http://127.0.0.1:${port}/api/session/${key}/feedback`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * B5: `--wait` printed nothing at all until the reviewer sent — no key, no url,
+ * nothing to hand the person whose turn it is. The publish block goes out the
+ * moment the round exists, and the answer follows it on the same stdout.
+ */
+test("--wait prints the round it published before it blocks on the reviewer", async () => {
+  await withHarness(async ({ config, deps, store }) => {
+    const written: string[] = [];
+    const key = sessionKey(REPO, BRANCH, BASE);
+
+    const running = runStart({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      intents: INTENTS,
+      config,
+      deps: { ...deps, write: (text) => written.push(text) },
+      wait: true,
+    });
+    await until(() => written.length > 0);
+
+    // Nothing has been sent yet: this is the block an agent can act on while
+    // the reviewer still has the turn.
+    assert.equal(store.get(key)?.pending.length, 0);
+    assert.equal(store.get(key)?.turn.holder, "reviewer");
+    const published = written.join("");
+    assert.match(published, /^turn: reviewer$/m);
+    assert.match(published, /^round: 1$/m);
+    assert.match(published, new RegExp(`^ {2}key: ${key}$`, "m"));
+    assert.match(
+      published,
+      new RegExp(`^ {2}url: "?http://127.0.0.1:${config.port}/session/`, "m"),
+    );
+    assert.match(published, /^ {2}files_changed: 2$/m);
+    assert.match(
+      published,
+      /^message: "?published; now blocking on the reviewer — give them the url above"?$/m,
+    );
+    // Never the move it is making: the command is the wait.
+    assert.doesNotMatch(published, /lightspeed wait/);
+
+    await postFeedback(config.port, key, {
+      prompts: [{ type: "message", comment: "looks good" }],
+      ended: false,
+    });
+    const answer = await running;
+
+    assert.equal(answer.turn, "agent reading");
+    assert.deepEqual(answer.prompts, [{ type: "message", comment: "looks good" }]);
+  });
+});
+
 test("--intent is repeatable and keeps the order it was given in", () => {
   assert.deepEqual(
     parseStartArgs(["feature-auth", "--intent", "sign the tokens", "--intent", "drop /login"])
