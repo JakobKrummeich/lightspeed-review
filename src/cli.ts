@@ -1,14 +1,8 @@
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { runAxiCli } from "axi-sdk-js";
-import {
-  HELP_END,
-  HELP_START,
-  HELP_WAIT,
-  TURN_RULE,
-  homeOutput,
-  type HomeInput,
-} from "./commands/home.ts";
+import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE, homeOutput } from "./commands/home.ts";
+import { homeInput } from "./commands/home-input.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
 import { parseAskArgs, runAsk } from "./commands/ask.ts";
 import { commandHelp, commandSummary } from "./commands/command-help.ts";
@@ -25,7 +19,6 @@ import { parseSkillArgs, runSkill } from "./commands/skill.ts";
 import { parseStartArgs, runStart } from "./commands/start.ts";
 import { runStop } from "./commands/stop.ts";
 import {
-  defaultStateDir,
   loadConfig,
   loadLedgerConfig,
   loadServiceConfig,
@@ -38,7 +31,7 @@ import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.t
 import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
 import { missingSession, resolveSession, type ResolvedSession } from "./session-resolve.ts";
-import { SessionStore, type SessionRecord } from "./session-store.ts";
+import { SessionStore } from "./session-store.ts";
 
 // Single-sourced from package.json; resolves the same from `src/cli.ts` and `dist/cli.mjs`.
 const require = createRequire(import.meta.url);
@@ -296,44 +289,6 @@ function skillCommand(args: string[]): string {
  */
 function initCommand(args: string[]): StructuredOutput {
   return runInit({ ...parseInitArgs(args), home: homedir(), cwd: process.cwd() });
-}
-
-/**
- * Home view must always render, so nothing here throws — but what stopped a
- * review from running is the answer, not something to swallow. A bare catch
- * turned a missing config into `sessions: 0`, which is the one reading that is
- * both false and costs a turn: the sessions were on disk and the command it
- * then offered fails the same way.
- */
-function homeInput(all: boolean): HomeInput {
-  const repoRoot = repoRootOrNone(process.cwd());
-  if (repoRoot === undefined) return { sessions: storedSessions(defaultStateDir()), all };
-  try {
-    const { stateDir } = loadConfig(repoRoot);
-    return { repoRoot, sessions: storedSessions(stateDir), all };
-  } catch (error) {
-    // The store is a machine-wide directory a config only redirects, so an
-    // unreadable one still knows where to look: the default.
-    return {
-      repoRoot,
-      config: codeOf(error) === "config_missing" ? "missing" : "invalid",
-      sessions: storedSessions(defaultStateDir()),
-      all,
-    };
-  }
-}
-
-function codeOf(error: unknown): string | undefined {
-  return error instanceof ReviewError ? error.code : undefined;
-}
-
-/** A corrupt session file must not take the whole view down with it. */
-function storedSessions(stateDir: string): SessionRecord[] {
-  try {
-    return new SessionStore(stateDir).list();
-  } catch {
-    return [];
-  }
 }
 
 /**
