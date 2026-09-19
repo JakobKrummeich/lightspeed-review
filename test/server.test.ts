@@ -6,7 +6,7 @@ import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
-import { helpAsk, helpPublishAndWait, helpSay } from "../src/commands/home.ts";
+import { legalMoves, nextMoves } from "../src/commands/home.ts";
 import { SessionStore } from "../src/session-store.ts";
 import { LedgerStore } from "../src/ledger/store.ts";
 import type { AnnotationRecord } from "../src/ledger/records.ts";
@@ -1149,6 +1149,7 @@ test("a reply may declare what each comment led to, stored under the comment's i
     assert.deepEqual(await response.json(), {
       turn: "reviewer",
       round: 1,
+      helpForm: "full",
       delivered: true,
       declared: 1,
     });
@@ -1349,7 +1350,14 @@ test("work names the plan on the turn the agent is already holding", async () =>
     const response = await postWork(url, key, { plan: "splitting the helper out" });
 
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { turn: "agent working", round: 1, changed: true });
+    // `takeTheTurn` already carried the round's full help, so this answer is the
+    // one-line reminder rather than the same four lines again.
+    assert.deepEqual(await response.json(), {
+      turn: "agent working",
+      round: 1,
+      helpForm: "short",
+      changed: true,
+    });
     assert.partialDeepStrictEqual(store.get(key)?.turn, {
       holder: "agent",
       mode: "working",
@@ -1434,18 +1442,37 @@ test("a wait from an agent that declared work is refused, and the turn stays put
     assert.equal(response.status, 422);
     const body = (await response.json()) as { error: { code: string }; help: string[] };
     assert.equal(body.error.code, "turn_still_yours");
-    // The same list the commands print, whole: a refusal that offered the move it
-    // is refusing would send the agent straight back here.
-    assert.deepEqual(body.help, [
-      helpPublishAndWait("feature-auth main"),
-      helpAsk("feature-auth main"),
-      helpSay("feature-auth main"),
-    ]);
+    // The same list the commands print: a refusal that offered the move it is
+    // refusing would send the agent straight back here. In the short form, because
+    // this round already spelt those three moves out to this agent once.
+    assert.deepEqual(body.help, [nextMoves("agent working", "feature-auth main")]);
     assert.partialDeepStrictEqual(store.get(key)?.turn, {
       holder: "agent",
       mode: "working",
       note: "splitting the helper out",
     });
+  });
+});
+
+/** A refusal reads the round's budget but never spends it: an agent that has
+ * not been told the moves is told them, and being refused is not the answer
+ * those tokens were for. */
+test("a refusal on a round nobody has been told about spells the moves out", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    const record = store.get(key)!;
+    // Mid-edit, with nothing yet printed this round: the state an agent recovered
+    // in a fresh process is in.
+    store.save({ ...record, turn: { holder: "agent", mode: "working", at: record.updatedAt } });
+
+    const response = await fetch(`${url}/api/poll?key=${key}`, {
+      signal: AbortSignal.timeout(2_000),
+    });
+
+    const body = (await response.json()) as { help: string[] };
+    assert.deepEqual(body.help, legalMoves("agent working", "feature-auth main"));
+    // Read, not spent: the next answer still owes this agent the full block.
+    assert.equal(store.get(key)?.helpShownRound, undefined);
   });
 });
 

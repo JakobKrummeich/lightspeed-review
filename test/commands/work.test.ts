@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { helpAsk, helpPublishAndWait, helpSay } from "../../src/commands/home.ts";
+import { helpAsk, helpPublishAndWait, helpSay, nextMoves } from "../../src/commands/home.ts";
 import { parseWorkArgs, runWork } from "../../src/commands/work.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
@@ -183,5 +183,45 @@ test("declaring work on an unknown session fails with session_not_found", async 
         return true;
       },
     );
+  });
+});
+
+/**
+ * S4: the four-line block is how an agent learns the protocol from one answer,
+ * and every repeat of it inside the same round is bytes it already has — 74% of
+ * a `work` answer. The first answer of a round spells the moves out; the rest
+ * name them.
+ */
+test("the first answer of a round spells the moves out, the next one names them", async () => {
+  await withServer(session(), async ({ port, store }) => {
+    const input = { repoRoot: REPO, branch: BRANCH, base: BASE, port };
+
+    const first = await runWork({ ...input, plan: "splitting the helper out" });
+    const second = await runWork({ ...input, plan: "and re-running the suite" });
+
+    assert.equal((first.help as string[]).length, 3);
+    assert.deepEqual(second.help, [nextMoves("agent working", "feature-auth main")]);
+    // On the record, because the next command is a fresh process with no memory
+    // of this one: the round it was told about is the only place that can say.
+    assert.equal(store.get(KEY)?.helpShownRound, 1);
+  });
+});
+
+/** A round is where the moves change, so it is where the full block earns its
+ * tokens again — and `start` resets nothing to make that happen. */
+test("a new round spells the moves out again", async () => {
+  await withServer(session(), async ({ port, store }) => {
+    const input = { repoRoot: REPO, branch: BRANCH, base: BASE, port };
+    await runWork({ ...input, plan: "splitting the helper out" });
+    const record = store.get(KEY)!;
+    store.save({
+      ...record,
+      rounds: [...record.rounds, { index: 1, at: AT, files: [], approvedAtEnd: [] }],
+    });
+
+    const output = await runWork({ ...input, plan: "second round work" });
+
+    assert.equal(output.round, 2);
+    assert.equal((output.help as string[]).length, 3);
   });
 });

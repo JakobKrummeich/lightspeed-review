@@ -6,8 +6,17 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { drainPending, type PollPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import type { Delivery, FeedbackPrompt, SessionRecord } from "../session-store.ts";
-import { legalMoves } from "../commands/home.ts";
-import { agentReading, reviewerTurn, turnFacts, turnLabel } from "../turn.ts";
+import { turnHelp } from "../commands/home.ts";
+import {
+  agentReading,
+  budgetHelp,
+  helpFormFor,
+  helpFormField,
+  reviewerTurn,
+  turnFacts,
+  turnLabel,
+  type HelpForm,
+} from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
 import type { Waker } from "./streams.ts";
@@ -128,17 +137,35 @@ function deliverFeedback(context: ServerContext, key: string, response: ServerRe
   const drained = session && drainPending(session);
   if (!drained) return false;
   const now = new Date().toISOString();
-  const handedOver = handsOverTurn(drained.payload);
-  const saved: SessionRecord = handedOver
-    ? { ...drained.session, turn: agentReading(now) }
-    : drained.session;
+  const handed = handOver(drained.session, drained.payload, now);
   const held = heldForConfirmation(context, drained.payload.prompts, now);
-  context.store.save({ ...saved, ...held.record });
+  context.store.save({ ...handed.session, ...held.record });
   // The turn as it stands after the handover, not before it: the answer is the
   // agent's proof that the review is now its move.
-  sendJson(response, 200, { ...drained.payload, ...turnFacts(saved), ...held.payload });
-  if (handedOver) context.transport.publishPresence(key);
+  sendJson(response, 200, {
+    ...drained.payload,
+    ...turnFacts(handed.session),
+    ...helpFormField(handed.form),
+    ...held.payload,
+  });
+  if (handsOverTurn(drained.payload)) context.transport.publishPresence(key);
   return true;
+}
+
+/**
+ * The record as the handover leaves it, and the form its answer carries. A
+ * payload that hands nothing over is an ended review's account of what it left
+ * — read once, acted on once, never shortened — so it takes no turn and spends
+ * none of the round's help budget.
+ */
+function handOver(
+  session: SessionRecord,
+  payload: PollPayload,
+  now: string,
+): { form?: HelpForm; session: SessionRecord } {
+  if (!handsOverTurn(payload)) return { session };
+  const spoken = budgetHelp(session);
+  return { form: spoken.form, session: { ...spoken.session, turn: agentReading(now) } };
 }
 
 /**
@@ -235,6 +262,6 @@ function stillYours(session: SessionRecord): DomainErrorBody {
         "you declared this work with `lightspeed work`, so the reviewer is waiting on you;" +
         " waiting here would hand them the turn while you are still editing",
     },
-    help: legalMoves("agent working", `${session.branch} ${session.base}`),
+    help: turnHelp("agent working", `${session.branch} ${session.base}`, helpFormFor(session)),
   };
 }

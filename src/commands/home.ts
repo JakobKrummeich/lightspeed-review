@@ -1,6 +1,6 @@
 import type { StructuredOutput } from "../output.ts";
 import type { SessionRecord } from "../session-store.ts";
-import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
+import { roundNumber, turnLabel, type HelpForm, type TurnLabel } from "../turn.ts";
 
 /** One row of the home view session table. */
 export interface SessionSummary {
@@ -109,6 +109,10 @@ export function helpReopen(target: string): string {
   );
 }
 
+/** The moves the protocol has, named so one list can order them and two
+ * renderings can spell them. */
+type Move = "wait" | "publish" | "ask" | "say" | "work" | "next round" | "reopen";
+
 /**
  * The moves that are legal from a turn, in the order they are usually wanted.
  * Every `help[]` about the turn is built from this one list — the commands', and
@@ -118,19 +122,73 @@ export function helpReopen(target: string): string {
  *
  * `wait` is therefore offered on the reviewer's turn and nowhere else. An agent
  * that holds it is handed the moves that give it up deliberately instead —
- * publish the round, or ask — and `work` is offered only before the silence is
- * declared, because redeclaring it is a no-op an agent should not be sent to.
- *
+ * publish the round, or ask — and `work` leads on a turn just delivered,
+ * because declaring the silence is what an agent does before it starts editing,
+ * and is dropped once it has, since redeclaring is a no-op.
+ */
+function movesFor(turn: TurnLabel): [Move, ...Move[]] {
+  if (turn === "ended") return ["reopen"];
+  if (turn === "reviewer") return ["wait"];
+  if (turn === "agent working") return ["publish", "ask", "say"];
+  return ["work", "say", "ask", "next round"];
+}
+
+const SPELT: Record<Move, (target: string) => string> = {
+  wait: helpWait,
+  publish: helpPublishAndWait,
+  ask: helpAsk,
+  say: helpSay,
+  work: helpWork,
+  "next round": helpNextRound,
+  reopen: helpReopen,
+};
+
+/**
+ * The same moves for a reader that has already been given them in full this
+ * round. The command an agent is most likely to want next is written out whole;
+ * the rest are the verb and what it takes, because by here the agent has the
+ * long form above in its own transcript.
+ */
+const RECALLED: Record<Move, (target: string) => string> = {
+  wait: (target) => `\`lightspeed wait ${target}\``,
+  publish: (target) => `\`lightspeed start ${target} --wait --intent "<why>"\``,
+  ask: () => '`ask "<q>"`',
+  say: () => '`say "<text>"`',
+  work: (target) => `\`lightspeed work "<plan>" ${target}\``,
+  "next round": (target) => `commit then \`start ${target} --intent "<why>"\``,
+  reopen: (target) => `the reviewer asks, then \`start ${target} --reopen --intent "<why>"\``,
+};
+
+/**
  * It lives here, with the lines it is made of, rather than in `turn.ts`: those
  * lines read `turn.ts` for the label, and a module cannot import its readers.
  */
 export function legalMoves(turn: TurnLabel, target: string): [string, ...string[]] {
-  if (turn === "ended") return [helpReopen(target)];
-  if (turn === "reviewer") return [helpWait(target)];
-  if (turn === "agent working") {
-    return [helpPublishAndWait(target), helpAsk(target), helpSay(target)];
-  }
-  return [helpAsk(target), helpSay(target), helpWork(target), helpNextRound(target)];
+  const [first, ...rest] = movesFor(turn);
+  return [SPELT[first](target), ...rest.map((move) => SPELT[move](target))];
+}
+
+/** The one-line form of that same list, in that same order. */
+export function nextMoves(turn: TurnLabel, target: string): string {
+  return `Next: ${movesFor(turn)
+    .map((move) => RECALLED[move](target))
+    .join(" | ")}`;
+}
+
+/**
+ * The help an answer closes with. The full block is worth its tokens once per
+ * round — it is how an agent learns the protocol from one answer — and after
+ * that it is the same bytes again: measured at 146 of an `ask` answer's 187
+ * tokens, with one clause of it repeated nineteen times in a single transcript.
+ * A server too old to have an opinion gets the full block, which is what it
+ * always sent.
+ */
+export function turnHelp(
+  turn: TurnLabel,
+  target: string,
+  form: HelpForm | undefined,
+): [string, ...string[]] {
+  return form === "short" ? [nextMoves(turn, target)] : legalMoves(turn, target);
 }
 
 /** Stored sessions as home-view rows. Ended ones are history, not work. */

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseAskArgs, runAsk } from "../../src/commands/ask.ts";
 import { runWait } from "../../src/commands/wait.ts";
+import { nextMoves } from "../../src/commands/home.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer } from "../../src/server.ts";
@@ -222,4 +223,42 @@ test("the missing-question error names a question, the same as `ask --help`", ()
       return true;
     },
   );
+});
+
+/**
+ * S4: 146 of this answer's 187 tokens were the same four help lines the `wait`
+ * that opened the round already printed. The answer to a question asked
+ * mid-round closes with the one-line reminder instead.
+ */
+test("an answer to a question asked mid-round reminds rather than re-teaches", async () => {
+  const record = session({ pending: [answer], helpShownRound: 1 });
+  await withServer(record, async ({ port }) => {
+    const output = await runAsk({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      port,
+      question: "should the HMAC key live in env or in the existing config file?",
+    });
+
+    assert.equal(output.turn, "agent reading");
+    assert.equal(output.asked, "should the HMAC key live in env or in the existing config file?");
+    assert.deepEqual(output.help, [nextMoves("agent reading", "feature-auth main")]);
+  });
+});
+
+/** The first delivery of a round is where an agent learns the protocol. */
+test("the answer that opens a round carries the moves in full", async () => {
+  await withServer(session({ pending: [answer] }), async ({ port, store }) => {
+    const output = await runAsk({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      port,
+      question: "anything else?",
+    });
+
+    assert.equal((output.help as string[]).length, 4);
+    assert.equal(store.get(KEY)?.helpShownRound, 1);
+  });
 });

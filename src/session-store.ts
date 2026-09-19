@@ -245,6 +245,14 @@ export interface SessionRecord {
    */
   rounds: SessionRound[];
   /**
+   * The round, as `round:` prints it, whose full `help[]` an answer has already
+   * carried. Persisted because every CLI invocation is a fresh process: there is
+   * nowhere else "this agent has already been told the moves" could live across
+   * one. Absent reads as "not yet told", which is the safe direction — the cost
+   * of being wrong is a repeated help block, not a lost move.
+   */
+  helpShownRound?: number;
+  /**
    * What the agent said each comment led to, keyed by `AnnotationPrompt.id`;
    * newest declaration wins, which makes redeclaring idempotent. On the session,
    * not just the ledger: replay reads from here and the ledger may be off.

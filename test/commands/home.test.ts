@@ -5,7 +5,10 @@ import {
   helpPublishAndWait,
   helpReopen,
   homeOutput,
+  legalMoves,
+  nextMoves,
   sessionSummaries,
+  turnHelp,
   type SessionSummary,
 } from "../../src/commands/home.ts";
 import type { SessionRecord } from "../../src/session-store.ts";
@@ -329,6 +332,45 @@ test("wait help warns it must block in the foreground", () => {
   const waitHelp = (output.help as string[])[2]!;
   assert.match(waitHelp, /foreground/);
   assert.match(waitHelp, /never background it or wrap it in a timeout/);
+});
+
+/**
+ * S4: the same four-line block was printed by `wait`, `ask`, `say`, `work` and
+ * every turn refusal in that state — 146 of an `ask` answer's 187 tokens, and
+ * one 17-token clause 19 times in a single transcript. After the first answer
+ * of a round has spelt the moves out, the reminder is one line.
+ */
+test("the short form names the same moves, in the same order, on one line", () => {
+  assert.equal(
+    nextMoves("agent working", "feat/tokens main"),
+    'Next: `lightspeed start feat/tokens main --wait --intent "<why>"`' +
+      ' | `ask "<q>"` | `say "<text>"`',
+  );
+  assert.equal(
+    nextMoves("agent reading", "feat/tokens main"),
+    'Next: `lightspeed work "<plan>" feat/tokens main` | `say "<text>"` | `ask "<q>"`' +
+      ' | commit then `start feat/tokens main --intent "<why>"`',
+  );
+  assert.equal(
+    nextMoves("reviewer", "feat/tokens main"),
+    "Next: `lightspeed wait feat/tokens main`",
+  );
+});
+
+/** One list, two renderings: a move may never appear in one and not the other. */
+test("no turn offers a move in one form that the other form leaves out", () => {
+  for (const turn of ["reviewer", "agent reading", "agent working", "ended"] as const) {
+    const short = nextMoves(turn, "b m");
+    const full = legalMoves(turn, "b m");
+    assert.equal(short.split(" | ").length, full.length, turn);
+  }
+});
+
+test("the full block is what a turn's first answer carries, the short line the rest", () => {
+  assert.deepEqual(turnHelp("agent working", "b m", "full"), legalMoves("agent working", "b m"));
+  assert.deepEqual(turnHelp("agent working", "b m", "short"), [nextMoves("agent working", "b m")]);
+  // A server too old to say which is one that never heard of the short form.
+  assert.deepEqual(turnHelp("agent working", "b m", undefined), legalMoves("agent working", "b m"));
 });
 
 /** B3: every `wait`/`ask` answer closed with a `start` line that had no

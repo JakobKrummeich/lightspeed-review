@@ -171,9 +171,9 @@ test("a delivered wait closes with the moves that are legal from there", async (
     // The whole array, not a substring of it joined up: a `wait` offered here is
     // refused with exit 2, and only an exact list can prove it is not offered.
     assert.deepEqual(output.help, [
-      helpAsk("feature-auth main"),
-      helpSay("feature-auth main"),
       helpWork("feature-auth main"),
+      helpSay("feature-auth main"),
+      helpAsk("feature-auth main"),
       helpNextRound("feature-auth main"),
     ]);
   });

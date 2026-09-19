@@ -5,8 +5,8 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionRecord } from "../session-store.ts";
-import { legalMoves } from "../commands/home.ts";
-import { agentWorking, turnFacts, turnLabel } from "../turn.ts";
+import { turnHelp } from "../commands/home.ts";
+import { agentWorking, budgetHelp, helpFormFor, turnFacts, turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
 import { readWork } from "./validate.ts";
@@ -46,10 +46,15 @@ export async function handleWork(
   // Redeclaring is a no-op that still rewrites the note: an agent that says the
   // same thing twice has changed nothing, and one that refines its plan has.
   const changed = session.turn.mode !== "working" || session.turn.note !== plan;
-  const updated: SessionRecord = { ...session, turn: agentWorking(now, plan), updatedAt: now };
+  const spoken = budgetHelp(session);
+  const updated: SessionRecord = {
+    ...spoken.session,
+    turn: agentWorking(now, plan),
+    updatedAt: now,
+  };
   context.store.save(updated);
   context.transport.publishPresence(session.key);
-  sendJson(response, 200, { ...turnFacts(updated), changed });
+  sendJson(response, 200, { ...turnFacts(updated), helpForm: spoken.form, changed });
 }
 
 /**
@@ -68,6 +73,8 @@ function turnRejection(session: SessionRecord): DomainErrorBody {
     },
     // The same list the commands print: a refusal must not name a move another
     // answer calls illegal. An ended review never reaches here — it is a 409.
-    help: legalMoves("reviewer", `${session.branch} ${session.base}`),
+    // Read short where the round has already spelt the moves out, but never
+    // spent: a refusal is not the answer those tokens were for.
+    help: turnHelp("reviewer", `${session.branch} ${session.base}`, helpFormFor(session)),
   };
 }

@@ -5,7 +5,7 @@ import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { lastValue } from "./args.ts";
-import { legalMoves } from "./home.ts";
+import { turnHelp } from "./home.ts";
 import { parseVerb, type VerbArgs } from "./verb-args.ts";
 import { serverOrigin } from "./server-address.ts";
 
@@ -83,7 +83,7 @@ export async function runSay(input: SayInput): Promise<StructuredOutput> {
     // Speaking moves nothing, so the moves that were legal before it still are.
     // A server too old to state a turn predates the turn itself: `wait` was the
     // only way to get one there, which is what the reviewer's turn offers.
-    help: legalMoves(answered.turn ?? "reviewer", target),
+    help: turnHelp(answered.turn ?? "reviewer", target, answered.helpForm),
   };
 }
 

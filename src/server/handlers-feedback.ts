@@ -10,7 +10,7 @@ import { listDiffNames } from "../git-file.ts";
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
 import type { SessionRecord } from "../session-store.ts";
-import { turnFacts } from "../turn.ts";
+import { budgetHelp, helpFormField, turnFacts, type HelpForm } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { announceRoundEnd } from "./handlers-session.ts";
 import { badRequest, sendJson } from "./http.ts";
@@ -119,7 +119,8 @@ export async function handleAgentReply(
     return;
   }
   const now = new Date().toISOString();
-  const updated = withDeclarations(spoken(session, reply, now), reply.declarations, now);
+  const told = toldThisRound(session, reply);
+  const updated = withDeclarations(spoken(told.session, reply, now), reply.declarations, now);
   context.store.save(updated);
   if (reply.comment !== undefined) logAgentReply(context.log, session, reply.comment, now);
   logDeclarations(context.log, session, reply.declarations, now);
@@ -130,9 +131,23 @@ export async function handleAgentReply(
   context.transport.publish(session.key, "session", { reason: "agent_reply" });
   sendJson(response, 200, {
     ...turnFacts(updated),
+    ...helpFormField(told.form),
     delivered: true,
     declared: reply.declarations.length,
   });
+}
+
+/**
+ * Only an answer somebody reads spends the round's help budget. `ask` posts its
+ * question here and then blocks: this response is discarded by the client, and
+ * the poll that follows is what the agent actually reads — so charging the
+ * question for it would leave that poll with nothing left to spell out.
+ */
+function toldThisRound(
+  session: SessionRecord,
+  reply: AgentReply,
+): { form?: HelpForm; session: SessionRecord } {
+  return reply.kind === "question" ? { session } : budgetHelp(session);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { parsePrompt } from "./feedback-prompt.ts";
 import { approvalPaths, type ApprovalPaths } from "./review-files.ts";
 import type { FeedbackPrompt, ReviewCloser, SessionRecord } from "./session-store.ts";
-import { reviewerTurn, type TurnLabel } from "./turn.ts";
+import { reviewerTurn, type HelpForm, type TurnLabel } from "./turn.ts";
 
 export interface FeedbackRequest {
   prompts: FeedbackPrompt[];
@@ -58,6 +58,12 @@ export interface PollPayload {
    */
   turn?: TurnLabel;
   round?: number;
+  /**
+   * Whether this answer's `help[]` spells the legal moves out or reminds the
+   * agent of them in one line. Absent from an older server's payload, which
+   * reads as `full` — the only form it ever sent.
+   */
+  helpForm?: HelpForm;
   /**
    * Transport, not review: the id of this handover, which the client echoes to
    * `POST /api/session/:key/delivered` to say the prompts arrived. Absent when

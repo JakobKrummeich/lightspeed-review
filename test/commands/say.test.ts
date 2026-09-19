@@ -10,6 +10,7 @@ import {
   helpPublishAndWait,
   helpSay,
   helpWork,
+  nextMoves,
 } from "../../src/commands/home.ts";
 import { parseSayArgs, runSay } from "../../src/commands/say.ts";
 import { ReviewError } from "../../src/errors.ts";
@@ -165,9 +166,9 @@ test("speaking leaves the turn where it was, and offers the moves that fit it", 
     // The whole array: a joined string hid a `wait` here that the server refuses
     // with exit 2 for as long as the turn is the agent's.
     assert.deepEqual(output.help, [
-      helpAsk("feature-auth main"),
-      helpSay("feature-auth main"),
       helpWork("feature-auth main"),
+      helpSay("feature-auth main"),
+      helpAsk("feature-auth main"),
       helpNextRound("feature-auth main"),
     ]);
   });
@@ -324,5 +325,40 @@ test("speaking into an unknown session fails with session_not_found", async () =
         return true;
       },
     );
+  });
+});
+
+/**
+ * S4: an agent that answers a comment mid-edit has already read this round's
+ * moves off the `wait` that delivered the comment — 73% of this answer was that
+ * same block again.
+ */
+test("an answer later in the round closes with one line, not the block again", async () => {
+  const record = session({
+    turn: { holder: "agent", mode: "working", at: AT, note: "switching mint() to a keyed hash" },
+    helpShownRound: 1,
+    conversation: [
+      {
+        role: "reviewer",
+        at: AT,
+        roundIndex: 0,
+        prompts: [{ ...annotation, id: "evt_0mu83xjhi_0005" }],
+      },
+    ],
+  });
+  await withServer(record, async ({ port }) => {
+    const output = await runSay({
+      repoRoot: REPO,
+      branch: BRANCH,
+      base: BASE,
+      port,
+      text: "renamed to userId and switched to an HMAC keyed off TOKEN_SECRET",
+      for: "evt_0mu83xjhi_0005",
+    });
+
+    assert.equal(output.turn, "agent working");
+    assert.equal(output.said, "renamed to userId and switched to an HMAC keyed off TOKEN_SECRET");
+    assert.equal(output.for, "evt_0mu83xjhi_0005");
+    assert.deepEqual(output.help, [nextMoves("agent working", "feature-auth main")]);
   });
 });

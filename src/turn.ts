@@ -35,16 +35,54 @@ export function agentWorking(now: string, note: string): Turn {
 export type TurnLabel = "reviewer" | "agent reading" | "agent working" | "ended";
 
 /**
+ * Whether an answer spells the legal moves out or reminds the agent of them in
+ * one line. The full block is how an agent learns the protocol from a single
+ * answer; every repeat of it inside one round is bytes the agent already has.
+ */
+export type HelpForm = "full" | "short";
+
+/**
  * What every command's output carries, and the whole protocol an agent needs to
  * read off one answer: whose move it is now, and which round it is about.
  */
 export interface TurnFacts {
   turn: TurnLabel;
   round: number;
+  /** Which form this answer's `help[]` should take; absent from an old server. */
+  helpForm?: HelpForm;
 }
 
 export function turnFacts(session: Pick<SessionRecord, "status" | "turn" | "rounds">): TurnFacts {
   return { turn: turnLabel(session), round: roundNumber(session) };
+}
+
+/**
+ * Which form this answer's help takes, and the record that remembers it was
+ * given. Full on the first answer of a round, short on every answer after it.
+ *
+ * Kept on the session rather than worked out from `turn.at` or held in memory,
+ * because every CLI invocation is a fresh process and a `serve` restart must
+ * not re-start the reader's education mid-round. Keyed on the round because a
+ * new round is exactly when the moves change and the full block earns its
+ * tokens again — and because that makes `start` reset it without writing
+ * anything: the round number it compares against has simply moved on.
+ */
+export function budgetHelp(session: SessionRecord): { form: HelpForm; session: SessionRecord } {
+  const round = roundNumber(session);
+  if (session.helpShownRound === round) return { form: "short", session };
+  return { form: "full", session: { ...session, helpShownRound: round } };
+}
+
+/** The same reading without spending it: a refusal tells an agent what it may
+ * do instead, and telling it that is not the answer a round's help was for. */
+export function helpFormFor(session: SessionRecord): HelpForm {
+  return session.helpShownRound === roundNumber(session) ? "short" : "full";
+}
+
+/** The wire field, present only where there is a form to state — an answer
+ * nobody prints states none, and a reader that finds none prints in full. */
+export function helpFormField(form: HelpForm | undefined): { helpForm?: HelpForm } {
+  return form === undefined ? {} : { helpForm: form };
 }
 
 /**

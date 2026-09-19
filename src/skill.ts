@@ -47,7 +47,10 @@ question.
 
 Every answer this CLI prints carries \`turn\` and \`round\`. Read \`turn\`
 before choosing the next command; the \`help[]\` under it lists the moves that
-are legal from where you are.
+are legal from where you are. The first answer of each round spells them out;
+every answer after it in the same round gives the same list as a one-line
+\`Next:\` reminder, because by then you have the long form above in your own
+transcript.
 
 | command | turn after | blocks |
 | --- | --- | --- |

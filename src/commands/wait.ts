@@ -7,7 +7,7 @@ import { turnBlock } from "../turn.ts";
 import { hasFlag, scanArgs } from "./args.ts";
 import { longPoll } from "./long-poll.ts";
 import { serverOrigin } from "./server-address.ts";
-import { legalMoves } from "./home.ts";
+import { legalMoves, turnHelp } from "./home.ts";
 
 export interface WaitArgs {
   /** Unset when the agent left it to `resolveSession` to work out. */
@@ -92,10 +92,12 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
     ...promptBlock(result, input.full ?? false),
     ...endedFacts(result),
     help: result.ended
-      ? [endedHelp(result), ...helpApprovals(result, target), ...legalMoves("ended", target)]
+      ? // An ended review is read once and acted on once: the account of what it
+        // left is never boilerplate, so it is never shortened.
+        [endedHelp(result), ...helpApprovals(result, target), ...legalMoves("ended", target)]
       : // Delivery is what ended this wait, so the turn is the agent's — stated by
         // the answer, and assumed only of a server too old to state it.
-        legalMoves(result.turn ?? "agent reading", target),
+        turnHelp(result.turn ?? "agent reading", target, result.helpForm),
   };
 }
 
