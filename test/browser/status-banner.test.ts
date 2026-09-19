@@ -126,7 +126,10 @@ test("a plan cannot inject markup into the header", () => {
     }),
   );
 
-  assert.doesNotMatch(html, /<script>/);
+  // Case-insensitive and open-ended: `<SCRIPT>` and `<script src=x>` are the
+  // same escape, and a regexp that only knows the exact lower-case tag would
+  // pass while the banner served one of the others.
+  assert.doesNotMatch(html, /<script/i);
   assert.match(html, /&lt;script&gt;/);
 });
 

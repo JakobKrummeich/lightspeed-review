@@ -469,6 +469,9 @@ test("a question escapes like everything else the agent writes", () => {
     }),
   );
 
-  assert.doesNotMatch(html, /<script>/);
+  // Case-insensitive and open-ended: `<SCRIPT>` and `<script src=x>` are the
+  // same escape, and a regexp that only knows the exact lower-case tag would
+  // pass while the panel served one of the others.
+  assert.doesNotMatch(html, /<script/i);
   assert.match(html, /&lt;script&gt;/);
 });
