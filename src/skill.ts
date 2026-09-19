@@ -1,6 +1,7 @@
 import { DEFAULT_PATH_LIMIT } from "./commands/approvals.ts";
 import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./commands/home.ts";
 import { REACHABLE_MODELS } from "./config.ts";
+import { PROMPT_LIMIT, SELECTION_LIMIT } from "./output.ts";
 
 /** Where the generated skill lives, relative to the repository root. */
 export const SKILL_PATH = "skills/lightspeed/SKILL.md";
@@ -146,7 +147,11 @@ comment. An annotation carries:
 - \`selected_text\` quotes exactly those characters. Whole lines keep their
   \`+\`/\`-\` marker; a clipped line is quoted as the file has it.
 - The anchor can be missing entirely when the diff printed no line numbers for
-  the selection; \`selected_text\` is then all you have.`;
+  the selection; \`selected_text\` is then all you have.
+- A long \`selected_text\` is cut at ${SELECTION_LIMIT} characters and says
+  where the rest is — the anchor above points into your own checkout. The
+  \`comment\` is never cut. A round that queues more than ${PROMPT_LIMIT}
+  prompts reports \`omitted\`; read the rest with \`--full\` before you act.`;
 
 const RULES = `## Rules
 
@@ -178,9 +183,10 @@ const RULES = `## Rules
 - \`lightspeed approvals [branch] [base]\` names those files — which were
   approved, which were swept, which nobody signed off on. Run it only when
   something turns on which file; the verdict and counts answer most reviews on
-  their own. It prints the first ${DEFAULT_PATH_LIMIT} paths of each list; the
-  \`count\` block beside them is read off the whole review either way, and
-  \`--full\` prints every path when a list was cut. \`endedBy\` is
+  their own. It prints the first ${DEFAULT_PATH_LIMIT} paths of each list, and
+  only the lists that name something; the \`counts\` block beside them is read
+  off the whole review either way, and \`--full\` prints every path when a list
+  was cut. \`endedBy\` is
   \`reviewer\` or \`agent\` — whether a person closed it or an agent's own
   \`lightspeed end\` did — and is absent when the session does not say.
   The \`help[]\` line echoes the verdict and otherwise adds only what those

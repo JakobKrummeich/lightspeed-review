@@ -1,8 +1,13 @@
 import { invocationError } from "../errors.ts";
 import { END_VERDICTS, type EndApproval, type PollPayload } from "../feedback.ts";
-import { truncateContent, type StructuredOutput } from "../output.ts";
+import {
+  PROMPT_LIMIT,
+  SELECTION_LIMIT,
+  truncateContent,
+  type StructuredOutput,
+} from "../output.ts";
 import { sessionKey } from "../paths.ts";
-import type { FeedbackPrompt, ReviewCloser } from "../session-store.ts";
+import type { AnnotationPrompt, FeedbackPrompt, ReviewCloser } from "../session-store.ts";
 import { turnBlock } from "../turn.ts";
 import { hasFlag, scanArgs } from "./args.ts";
 import { longPoll } from "./long-poll.ts";
@@ -72,7 +77,20 @@ export async function runWait(input: WaitInput): Promise<StructuredOutput> {
 /** Selections can be page-long; `--full` is the way to see one in full. */
 function shorten(prompt: FeedbackPrompt): FeedbackPrompt {
   if (prompt.type !== "annotation") return prompt;
-  return { ...prompt, selected_text: truncateContent(prompt.selected_text) };
+  return {
+    ...prompt,
+    selected_text: truncateContent(prompt.selected_text, SELECTION_LIMIT, whereTheRestIs(prompt)),
+  };
+}
+
+/**
+ * Where the agent reads the part that was cut, in its own checkout. A selection
+ * is a pointer into a file it already has, so the cut costs nothing as long as
+ * the pointer survives it.
+ */
+function whereTheRestIs(prompt: AnnotationPrompt): string {
+  if (prompt.line_start === undefined) return `${prompt.file} has the rest`;
+  return `lines ${prompt.line_start}-${prompt.line_end} of ${prompt.file} have the rest`;
 }
 
 /**
@@ -82,6 +100,7 @@ function shorten(prompt: FeedbackPrompt): FeedbackPrompt {
  */
 export function waitOutput(result: PollPayload, input: WaitInput): StructuredOutput {
   const target = `${input.branch} ${input.base}`.trimEnd();
+  const listed = promptBlock(result, input.full ?? false);
   return {
     ...turnBlock(result),
     ...(input.asked === undefined ? {} : { asked: input.asked }),
@@ -90,16 +109,23 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
     // `feedback` long after the feedback was read. Two fields for one fact is a
     // reconciliation an agent should never be asked to make.
     ended: result.ended,
-    ...promptBlock(result, input.full ?? false),
+    ...listed.block,
     ...endedFacts(result),
-    help: result.ended
-      ? // An ended review is read once and acted on once: the account of what it
-        // left is never boilerplate, so it is never shortened.
-        [endedHelp(result), ...helpApprovals(result, target), ...legalMoves("ended", target)]
-      : // Delivery is what ended this wait, so the turn is the agent's — stated by
-        // the answer, and assumed only of a server too old to state it.
-        turnHelp(result.turn ?? "agent reading", target, result.helpForm),
+    // A queue the cap cut is said in `help[]` as well as in the payload: help is
+    // what an agent reads before it acts, and acting on part of a round while
+    // believing it has all of it is the one failure a cut can cause.
+    help: [...listed.help, ...moves(result, target)],
   };
+}
+
+function moves(result: PollPayload, target: string): string[] {
+  return result.ended
+    ? // An ended review is read once and acted on once: the account of what it
+      // left is never boilerplate, so it is never shortened.
+      [endedHelp(result), ...helpApprovals(result, target), ...legalMoves("ended", target)]
+    : // Delivery is what ended this wait, so the turn is the agent's — stated by
+      // the answer, and assumed only of a server too old to state it.
+      turnHelp(result.turn ?? "agent reading", target, result.helpForm);
 }
 
 /**
@@ -109,11 +135,29 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
  * would leave an agent unable to tell that from a field that came back empty by
  * accident.
  */
-function promptBlock(result: PollPayload, full: boolean): StructuredOutput {
+function promptBlock(
+  result: PollPayload,
+  full: boolean,
+): { block: StructuredOutput; help: string[] } {
   if (result.prompts.length === 0) {
-    return { prompts: 0, message: "no feedback was queued when this review ended" };
+    return {
+      block: { prompts: 0, message: "no feedback was queued when this review ended" },
+      help: [],
+    };
   }
-  return { prompts: full ? result.prompts : result.prompts.map(shorten) };
+  if (full || result.prompts.length <= PROMPT_LIMIT) {
+    return { block: { prompts: full ? result.prompts : result.prompts.map(shorten) }, help: [] };
+  }
+  const held = result.prompts.length - PROMPT_LIMIT;
+  const rest = `${held} more prompt${held === 1 ? "" : "s"} in this round`;
+  return {
+    block: {
+      prompts: result.prompts.slice(0, PROMPT_LIMIT).map(shorten),
+      omitted: held,
+      message: `${rest}: re-run this wait's command with --full to read them`,
+    },
+    help: [`Read the whole round before you act: ${rest}, printed by --full`],
+  };
 }
 
 /** Counts, not paths: no agent should parse the help sentence for a fact the

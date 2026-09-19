@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { helpAsk, helpNextRound, helpReopen, helpSay, helpWork } from "../../src/commands/home.ts";
 import { parseWaitArgs, runWait } from "../../src/commands/wait.ts";
 import { ReviewError } from "../../src/errors.ts";
-import { CONTENT_LIMIT } from "../../src/output.ts";
+import { PROMPT_LIMIT, SELECTION_LIMIT } from "../../src/output.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore, type SessionRecord } from "../../src/session-store.ts";
@@ -179,8 +179,21 @@ test("a delivered wait closes with the moves that are legal from there", async (
   });
 });
 
-test("a huge selection is truncated with a hint at how to see all of it", async () => {
-  const huge = { ...annotation, selected_text: "+".repeat(5000) };
+/**
+ * S5: the guard sat at 2000 characters, so a 1226-character selection came back
+ * whole — 372 tokens for one prompt, of text the agent can read in the file it
+ * is standing in. The cut says where the rest is, which is what makes it a cut
+ * and not a loss.
+ */
+test("a huge selection is cut where the reviewer's point is still visible", async () => {
+  const huge = {
+    ...annotation,
+    file: "a.txt",
+    side: "new" as const,
+    line_start: 1,
+    line_end: 1,
+    selected_text: `const veryLongSelection = ${"x".repeat(1200)}`,
+  };
   await withServer(session({ pending: [huge], status: "feedback" }), async ({ port }) => {
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
 
@@ -189,8 +202,52 @@ test("a huge selection is truncated with a hint at how to see all of it", async 
     // and the point of the cut is that a page-long selection stays readable.
     assert.equal(
       prompt.selected_text,
-      `${"+".repeat(CONTENT_LIMIT)}\n(truncated, 5000 chars — use --full)`,
+      `${huge.selected_text.slice(0, SELECTION_LIMIT)}\n(truncated, 1226 chars — use --full;` +
+        " lines 1-1 of a.txt have the rest)",
     );
+  });
+});
+
+/** The comment is the reviewer's own words, and the only part of a prompt the
+ * agent cannot read anywhere else. It is never cut. */
+test("the reviewer's comment comes back whole however long it is", async () => {
+  const wordy = { ...annotation, comment: "because ".repeat(400) };
+  await withServer(session({ pending: [wordy], status: "feedback" }), async ({ port }) => {
+    const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
+
+    const [prompt] = output.prompts as [{ comment: string }];
+    assert.equal(prompt.comment, wordy.comment);
+  });
+});
+
+/** A round the reviewer spent an hour on can queue dozens of prompts; the whole
+ * pile in one answer is a context an agent cannot act on either. */
+test("a queue past the cap is cut with a count and the flag that prints it all", async () => {
+  const many = Array.from({ length: PROMPT_LIMIT + 3 }, (_, index) => ({
+    ...annotation,
+    comment: `point ${index}`,
+  }));
+  await withServer(session({ pending: many, status: "feedback" }), async ({ port }) => {
+    const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
+
+    assert.equal((output.prompts as unknown[]).length, PROMPT_LIMIT);
+    assert.equal(output.omitted, 3);
+    assert.match(output.message as string, /--full/);
+    // The one line an agent reads before it acts, so the cut is named there too.
+    assert.match((output.help as string[])[0]!, /--full/);
+  });
+});
+
+test("--full hands back every prompt the cap held back", async () => {
+  const many = Array.from({ length: PROMPT_LIMIT + 3 }, (_, index) => ({
+    ...annotation,
+    comment: `point ${index}`,
+  }));
+  await withServer(session({ pending: many, status: "feedback" }), async ({ port }) => {
+    const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port, full: true });
+
+    assert.equal((output.prompts as unknown[]).length, PROMPT_LIMIT + 3);
+    assert.ok(!("omitted" in output));
   });
 });
 

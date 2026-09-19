@@ -127,6 +127,10 @@ comment. An annotation carries:
   `+`/`-` marker; a clipped line is quoted as the file has it.
 - The anchor can be missing entirely when the diff printed no line numbers for
   the selection; `selected_text` is then all you have.
+- A long `selected_text` is cut at 200 characters and says
+  where the rest is — the anchor above points into your own checkout. The
+  `comment` is never cut. A round that queues more than 20
+  prompts reports `omitted`; read the rest with `--full` before you act.
 
 ## Rules
 
@@ -158,9 +162,10 @@ comment. An annotation carries:
 - `lightspeed approvals [branch] [base]` names those files — which were
   approved, which were swept, which nobody signed off on. Run it only when
   something turns on which file; the verdict and counts answer most reviews on
-  their own. It prints the first 50 paths of each list; the
-  `count` block beside them is read off the whole review either way, and
-  `--full` prints every path when a list was cut. `endedBy` is
+  their own. It prints the first 50 paths of each list, and
+  only the lists that name something; the `counts` block beside them is read
+  off the whole review either way, and `--full` prints every path when a list
+  was cut. `endedBy` is
   `reviewer` or `agent` — whether a person closed it or an agent's own
   `lightspeed end` did — and is absent when the session does not say.
   The `help[]` line echoes the verdict and otherwise adds only what those

@@ -14,13 +14,18 @@ test("renderToon encodes a record as TOON", () => {
 });
 
 test("content shorter than the limit is passed through untouched", () => {
-  assert.equal(truncateContent("+const user = 1;", 100), "+const user = 1;");
+  assert.equal(truncateContent("+const user = 1;", 100, "a.txt has the rest"), "+const user = 1;");
 });
 
-test("long content is cut and says how much there was and how to see it all", () => {
-  const truncated = truncateContent("x".repeat(50), 10);
+/** A cut that does not say where the rest is is a loss; this one names the
+ * place the agent can read it in full without another round trip. */
+test("long content is cut and says how much there was and where the rest is", () => {
+  const truncated = truncateContent("x".repeat(50), 10, "lines 1-1 of a.txt have the rest");
 
-  assert.match(truncated, /^x{10}\n\(truncated, 50 chars — use --full\)$/);
+  assert.equal(
+    truncated,
+    `${"x".repeat(10)}\n(truncated, 50 chars — use --full; lines 1-1 of a.txt have the rest)`,
+  );
 });
 
 test("errorOutput nests code, message and detail under error", () => {
