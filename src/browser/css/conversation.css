@@ -120,10 +120,52 @@
 }
 
 /*
+ * Who said it. Two voices share this history and used to wear the same card,
+ * so which side a message came from was one small label to be read on every
+ * card. Each voice now wears the hue it has everywhere else on the page: the
+ * accent where the agent speaks — the question card, the declared answer under
+ * a comment — and the violet of the reviewer's own words in the replay and on
+ * the "commented last round" badge. Swapping them would put the agent's cobalt
+ * answer inside a cobalt reviewer card and say nothing.
+ *
+ * The hue is picked once per voice and painted three ways: a bar down the
+ * card's edge, the role label, and — while the round is live — the card
+ * itself. The bar and the tint are the glance; the label is also the word,
+ * for whoever cannot tell cobalt from violet. Both hues and the card base go
+ * through `light-dark()`, so the mix follows the scheme on its own.
+ */
+.lsr-entry[data-role="agent"] {
+  --lsr-speaker: var(--lsr-accent);
+}
+
+.lsr-entry[data-role="reviewer"] {
+  --lsr-speaker: var(--lsr-violet);
+}
+
+.lsr-entry[data-role] {
+  border-left: 3px solid var(--lsr-speaker);
+}
+
+.lsr-entry[data-role] .lsr-entry-role {
+  color: var(--lsr-speaker);
+}
+
+/*
+ * Mixed into the card's own base rather than laid over it, so the card stays
+ * opaque and lifted and only gains a hue. Live rounds only, by selector rather
+ * than by cascade order: the tint is the lift in colour, and the rule below
+ * takes the lift off an earlier round.
+ */
+.lsr-entry[data-role][data-round-state="current"] {
+  background: color-mix(in oklab, var(--lsr-speaker) 12%, var(--lsr-raised));
+}
+
+/*
  * Said in a round that is over. Flat instead of raised, rather than dimmed:
  * opacity stacks with everything under it and takes the reviewer's own words
  * down with it, while a card that has lost its lift reads as history in both
- * schemes — the live round is the one still standing off the panel.
+ * schemes — the live round is the one still standing off the panel. The bar
+ * and the label keep their hue, which is how an old card still says who spoke.
  */
 .lsr-entry[data-round-state="earlier"] {
   background: none;
