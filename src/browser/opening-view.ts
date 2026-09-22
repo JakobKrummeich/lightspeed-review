@@ -26,8 +26,6 @@ export function opensFor(review: OpeningReview): boolean {
 
 /** One sheet of the stack, before it is laid into the room. */
 interface Sheet {
-  /** Which of the two a sheet is, because the cover speaks louder than a reason. */
-  kind: "cover" | "reason";
   /** The quiet line above the cover's headline: where this came from. */
   lead?: string;
   /** The cover's one loud line; the reasons speak in the body alone. */
@@ -67,7 +65,6 @@ ${dots(sheets.length)}
  */
 function cover(): Sheet {
   return {
-    kind: "cover",
     lead: "from your agent",
     headline: "Something was built for you",
     act: "Unwrap",
@@ -80,7 +77,6 @@ function cover(): Sheet {
  */
 function reasonSheet(total: number): (intent: string, index: number) => Sheet {
   return (intent, index) => ({
-    kind: "reason",
     label: `reason ${index + 1} of ${total}`,
     body: escapeHtml(intent),
     // The last sheet is the way in: there is nothing behind it but the review.
@@ -90,8 +86,7 @@ function reasonSheet(total: number): (intent: string, index: number) => Sheet {
 
 /**
  * A sheet in the room. Every sheet names its z-layer (cover must paint on
- * top); `data-at` is what the peel moves and the stylesheet animates;
- * `data-sheet` lets one body rule speak at two sizes.
+ * top); `data-at` is what the peel moves and the stylesheet animates.
  */
 function laid(sheet: Sheet, index: number, total: number): string {
   const parts = [
@@ -101,7 +96,7 @@ function laid(sheet: Sheet, index: number, total: number): string {
     `<button type="button" class="lsr-opening-press">${sheet.act}</button>`,
   ].filter((part) => part !== "");
   const label = sheet.label === undefined ? "" : ` aria-label="${sheet.label}"`;
-  return `<section class="lsr-opening-sheet" data-index="${index}" data-sheet="${sheet.kind}" data-at="${index === 0 ? "top" : "under"}"${label} style="z-index:${total - index}">
+  return `<section class="lsr-opening-sheet" data-index="${index}" data-at="${index === 0 ? "top" : "under"}"${label} style="z-index:${total - index}">
 ${parts.join("\n")}
 </section>`;
 }

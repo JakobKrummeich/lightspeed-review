@@ -70,14 +70,6 @@ test("a reason sheet carries the reason and the way on, and nothing else", () =>
   assert.deepEqual(texts(reason, "lsr-opening-body"), ["one"]);
 });
 
-test("each sheet says which kind it is, so the cover can speak at a size the reasons do not", () => {
-  const kinds = sheets(renderOpening(["one", "two"])).map((sheet) =>
-    attribute(sheet, "data-sheet"),
-  );
-
-  assert.deepEqual(kinds, ["cover", "reason", "reason"]);
-});
-
 test("each reason says which of how many it is, to whoever cannot see the dots", () => {
   // The counter costs no pixels now: it is the reason section's own label, so
   // a screen reader still hears how far through the stack it is.

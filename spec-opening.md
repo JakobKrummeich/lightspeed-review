@@ -120,9 +120,7 @@ round has none of.
   the whole room, no DOM: the motes, every sheet, the dots and the layer the
   flood is painted on. Every sheet is in the markup from the start; peeling
   moves a `data-at` attribute (`gone` / `top` / `under`), so a press is one
-  attribute write and the animation is the stylesheet's business. `data-sheet`
-  says whether a sheet is the cover or a reason, which is how one body rule
-  speaks at two sizes.
+  attribute write and the animation is the stylesheet's business.
 - `mountOpening` in `src/browser/dom/opening-overlay.ts` — the mount, modelled
   on `mountReplayOverlay`: `Escape` closes, focus moves to the top sheet's
   button on every peel and is restored to the page on close. It also writes the
