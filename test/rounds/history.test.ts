@@ -33,9 +33,13 @@ function file(path: string, blob: string | null, previousPath?: string): RoundFi
   };
 }
 
-/** A file git's `-C` paired with one that is still there: `previousPath` names the source. */
-function copy(path: string, blob: string | null, previousPath: string): RoundFile {
-  return { path, status: "copied", blob, previousPath };
+/**
+ * A file recorded as `modified` with an earlier name: how a round recorded a
+ * copy while `src/diff-extract.ts` still asked git for copies. The earlier
+ * name is another file, still in the review under its own name.
+ */
+function earlierName(path: string, blob: string | null, previousPath: string): RoundFile {
+  return { path, status: "modified", blob, previousPath };
 }
 
 test("fileHistory lists a file's rounds oldest first", () => {
@@ -70,24 +74,24 @@ test("fileHistory follows a rename back to the name the file had then", () => {
   ]);
 });
 
-test("fileHistory starts a copy at the copy: its source's rounds stay the source's", () => {
-  // A copy carries `previousPath` like a rename, but the source did not go
-  // anywhere — walking into its rounds would hand a new file another's past.
+test("fileHistory does not follow an earlier name on a file git did not call renamed", () => {
+  // The earlier name is a file that did not go anywhere — walking into its
+  // rounds would hand a new file another's past.
   const rounds = [
     round(0, [file("src/a.ts", "aaa1111")], ["src/a.ts"]),
-    round(1, [file("src/a.ts", "aaa1111"), copy("src/b.ts", "bbb1111", "src/a.ts")]),
+    round(1, [file("src/a.ts", "aaa1111"), earlierName("src/b.ts", "bbb1111", "src/a.ts")]),
   ];
 
   assert.deepEqual(fileHistory(rounds, "src/b.ts"), [
-    { round: 1, path: "src/b.ts", blob: "bbb1111", status: "copied", approved: false },
+    { round: 1, path: "src/b.ts", blob: "bbb1111", status: "modified", approved: false },
   ]);
 });
 
-test("currentName follows a rename forward, and leaves the source of a copy where it is", () => {
+test("currentName follows a rename forward, not an earlier name git did not call a rename", () => {
   const current = round(1, [
     file("src/new.ts", "5ee1111", "src/old.ts"),
     file("src/a.ts", "aaa1111"),
-    copy("src/b.ts", "bbb1111", "src/a.ts"),
+    earlierName("src/b.ts", "bbb1111", "src/a.ts"),
   ]);
 
   assert.equal(currentName(current, "src/old.ts"), "src/new.ts");
@@ -95,10 +99,11 @@ test("currentName follows a rename forward, and leaves the source of a copy wher
   assert.equal(currentName(current, "src/a.ts"), "src/a.ts");
 });
 
-test("a copy of an approved file arrives unapproved: nobody ticked the copy", () => {
+test("a file carrying an approved file's name as its earlier name arrives unapproved", () => {
+  // Nobody ticked the new file; the tick on `src/a.ts` is `src/a.ts`'s.
   const rounds = [
     round(0, [file("src/a.ts", "aaa1111")], ["src/a.ts"]),
-    round(1, [file("src/a.ts", "aaa1111"), copy("src/b.ts", "aaa1111", "src/a.ts")]),
+    round(1, [file("src/a.ts", "aaa1111"), earlierName("src/b.ts", "aaa1111", "src/a.ts")]),
   ];
 
   assert.equal(fileApproval(rounds, "src/b.ts"), "unapproved");
@@ -121,11 +126,14 @@ test("changedBetween resolves the earlier round's name across a rename", () => {
   assert.equal(changedBetween(first, renamedOnly, "src/new.ts"), false);
 });
 
-test("changedBetween reports a copy as new, whatever its source's blob was", () => {
+test("changedBetween reports a file with an unfollowed earlier name as new, whatever that file's blob was", () => {
   const first = round(0, [file("src/a.ts", "aaa1111")]);
-  const copied = round(1, [file("src/a.ts", "aaa1111"), copy("src/b.ts", "aaa1111", "src/a.ts")]);
+  const second = round(1, [
+    file("src/a.ts", "aaa1111"),
+    earlierName("src/b.ts", "aaa1111", "src/a.ts"),
+  ]);
 
-  assert.equal(changedBetween(first, copied, "src/b.ts"), true);
+  assert.equal(changedBetween(first, second, "src/b.ts"), true);
 });
 
 test("changedBetween sees through an abbreviation git widened between rounds", () => {

@@ -52,22 +52,6 @@ test("a rename git scored 100% identical is mechanical: nothing in it is a decis
   assert.deepEqual(classifyFile(renamed), { mechanical: true, guardrail: false });
 });
 
-test("a copy git scored 100% identical is mechanical too: the same text, in a second place", () => {
-  const copied = file("app/models/orders/order.rb", {
-    status: "copied",
-    previousPath: "app/models/order.rb",
-    similarity: 100,
-    diff: [
-      "diff --git a/app/models/order.rb b/app/models/orders/order.rb",
-      "similarity index 100%",
-      "copy from app/models/order.rb",
-      "copy to app/models/orders/order.rb",
-    ].join("\n"),
-  });
-
-  assert.deepEqual(classifyFile(copied), { mechanical: true, guardrail: false });
-});
-
 test("a rename that also changed lines is not mechanical — the change is the point", () => {
   const renamed = file("app/models/orders/order.rb", {
     status: "renamed",

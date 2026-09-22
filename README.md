@@ -143,7 +143,7 @@ nothing else about a review.
 
 `classify` names the files this repository knows something about that no general
 rule could. Lightspeed classifies every changed file twice over: `mechanical` is
-bulk with nothing to decide — a rename or copy git scored 100% identical, a
+bulk with nothing to decide — a rename git scored 100% identical, a
 whitespace-only reformat, a file whose own banner says a generator wrote it,
 documentation, styling and translation catalogues — and `guardrail` is a file
 whose change is never bulk: shell and PowerShell scripts, anything under
@@ -666,11 +666,12 @@ A ledger failure never fails a review: it is reported as
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
-- A file that moved, was renamed or was copied shows both of its paths
-  (`old → new`), the word for which it was, and how much of the file survived.
-  One git found identical says so in place of an empty diff, and pairs are
-  found down to 40% similar: a file whose imports moved with it is one move,
-  not a deletion and an addition.
+- A file that moved or was renamed shows both of its paths (`old → new`), the
+  word for which it was, and how much of the file survived. One git found
+  identical says so in place of an empty diff, and pairs are found down to 40%
+  similar: a file whose imports moved with it is one move, not a deletion and
+  an addition. A new file is shown whole, however much of it resembles another:
+  git's copy detection is not asked for.
 - The heaviest added branching in the review is marked **densest logic**, on the
   file row and on the group in the index. Branching a change only re-adds counts
   for nothing — a reindented or renamed block scores zero, however many `if`s it

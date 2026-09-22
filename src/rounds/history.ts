@@ -37,7 +37,8 @@ export interface SettledFile {
 /**
  * Every round a file took part in, oldest first, under whatever name it had at
  * the time — a rename is followed backwards, so callers pass today's path only.
- * A copy is not followed: its history begins with the copy (`renamedFrom`).
+ * An earlier name on any other status is not followed: the file's history
+ * begins where it appeared (`renamedFrom`).
  */
 export function fileHistory(rounds: SessionRound[], path: string): FileAppearance[] {
   const appearances: FileAppearance[] = [];
@@ -61,9 +62,10 @@ export function fileHistory(rounds: SessionRound[], path: string): FileAppearanc
 
 /**
  * The name `path` goes by in a later round: a rename since makes the file show
- * up there as the new name's `previousPath`; a copy since leaves `path` where
- * it is. Shared by the ledger's outcomes and the between-rounds replay, so the
- * two cannot disagree on which file a verdict is about.
+ * up there as the new name's `previousPath`; a file that merely carries `path`
+ * as an earlier name leaves it where it is (`renamedFrom`). Shared by the
+ * ledger's outcomes and the between-rounds replay, so the two cannot disagree
+ * on which file a verdict is about.
  */
 export function currentName(current: SessionRound, path: string): string {
   return current.files.find((file) => renamedFrom(file) === path)?.path ?? path;

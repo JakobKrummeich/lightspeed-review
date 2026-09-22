@@ -30,8 +30,8 @@ export function readSessionFile(
 /**
  * The name git knows a file by, or undefined when this session's grouping does
  * not list it at all — which is what keeps `?path=` from being a read-any-file
- * hole. A rename's old version is stored under the name it had then, and a
- * copy's under its source's: the old side of either diff is that file.
+ * hole. A rename's old version is stored under the name it had then: the old
+ * side of its diff is that file.
  */
 export function gitPathOf(
   session: SessionRecord,

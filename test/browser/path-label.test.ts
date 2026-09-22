@@ -17,10 +17,13 @@ function file(path: string, overrides: Partial<DiffFile> = {}): DiffFile {
 
 test("a relocated file is named by both of its paths, old to new", () => {
   const moved = file("src/new/thing.ts", { status: "renamed", previousPath: "src/old/thing.ts" });
-  const copied = file("src/auth/admin.ts", { status: "copied", previousPath: "src/auth/user.ts" });
+  const renamed = file("src/auth/admin.ts", {
+    status: "renamed",
+    previousPath: "src/auth/user.ts",
+  });
 
   assert.equal(pathLabel(moved), "src/old/thing.ts → src/new/thing.ts");
-  assert.equal(pathLabel(copied), "src/auth/user.ts → src/auth/admin.ts");
+  assert.equal(pathLabel(renamed), "src/auth/user.ts → src/auth/admin.ts");
 });
 
 test("any other file is named by its path alone", () => {
@@ -29,8 +32,9 @@ test("any other file is named by its path alone", () => {
 });
 
 test("an earlier name git did not pair the file with is not shown", () => {
-  // A session written before copies were told apart stored one as `modified`
-  // with a `previousPath`; the label follows `relocationOf`, not the field.
+  // A session written while `src/diff-extract.ts` still asked git for copies
+  // stored one as `modified` with a `previousPath`; the label follows
+  // `relocationOf`, not the field.
   const stale = file("src/auth/admin.ts", { status: "modified", previousPath: "src/auth/user.ts" });
 
   assert.equal(pathLabel(stale), "src/auth/admin.ts");

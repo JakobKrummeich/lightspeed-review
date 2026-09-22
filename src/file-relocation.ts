@@ -7,24 +7,22 @@ import type { DiffFile } from "./diff-extract.ts";
  * reads it, and so do the ledger and the rounds, which never draw anything.
  */
 
-/** The reviewer's word for where a file's text came from. */
-export type Relocation = "moved" | "renamed" | "copied";
+/** The reviewer's word for where a file came from. */
+export type Relocation = "moved" | "renamed";
 
 /**
- * `copied` when git said so; `moved` when a renamed file left its directory
- * and `renamed` when only its name changed. Git calls both of the last two a
- * rename, and a reviewer reading `useGroupPages.ts` under `renamed from
- * screens/usePresenterGroupWorkScreen.ts` had to compare two long paths to
- * learn that it moved. Decided by status, not by the presence of an earlier
- * name: a session written before copies were told apart stored one as
- * `modified` with a `previousPath`, and read back it is not moved anywhere.
- * Undefined for a file that was where it is.
+ * `moved` when a renamed file left its directory, `renamed` when only its name
+ * changed. Git calls both a rename, and a reviewer reading `useGroupPages.ts`
+ * under `renamed from screens/usePresenterGroupWorkScreen.ts` had to compare
+ * two long paths to learn that it moved. Decided by status, not by the presence
+ * of an earlier name: a session written before `src/diff-extract.ts` stopped
+ * asking git for copies stored one as `modified` with a `previousPath`, and
+ * read back it is not moved anywhere. Undefined for a file that was where it is.
  */
 export function relocationOf(
   file: Pick<DiffFile, "status" | "path" | "previousPath">,
 ): Relocation | undefined {
   if (file.previousPath === undefined) return undefined;
-  if (file.status === "copied") return "copied";
   if (file.status !== "renamed") return undefined;
   return directoryOf(file.previousPath) === directoryOf(file.path) ? "renamed" : "moved";
 }
@@ -57,10 +55,12 @@ function isUnchanged(file: DiffFile): boolean {
 
 /**
  * The name a renamed file had before, or undefined for every other file —
- * copies included. A copy carries `previousPath` like a rename, but its source
- * is still in the review under its own name: following the copy's
- * `previousPath` through the rounds handed a brand-new file its source's
- * approval (`settled`) and its source's comments (`currentName`).
+ * including one that carries a `previousPath` under another status. Session
+ * records written while `src/diff-extract.ts` still asked git for copies hold
+ * git's ≥50%-similar copies as `modified` with a `previousPath`, and the
+ * source of such a file is still in the review under its own name: following
+ * that name through the rounds handed a brand-new file its source's approval
+ * (`settled`) and its source's comments (`currentName`).
  */
 export function renamedFrom(file: Pick<DiffFile, "status" | "previousPath">): string | undefined {
   return file.status === "renamed" ? file.previousPath : undefined;

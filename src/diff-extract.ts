@@ -3,13 +3,7 @@ import { ReviewError } from "./errors.ts";
 import { startCall } from "./commands/home.ts";
 import type { GroupTier } from "./group-tier.ts";
 
-/**
- * `copied`: git's `-C` found the file's text mostly in another file that is
- * still there (`copy from`/`copy to`). Like `renamed` it carries `previousPath`
- * and `similarity`; unlike a rename its source keeps its own history, so
- * `src/rounds/history.ts` follows `previousPath` only for renames.
- */
-export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "copied" | "binary";
+export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "binary";
 
 /**
  * One `@@ … @@` region kept as the exact bytes git wrote (`header` = the `@@`
@@ -38,9 +32,9 @@ export interface DiffFile {
   deletions: number;
   /** True when the diff is big enough that the browser should lazy-render it. */
   oversized: boolean;
-  /** Rename or copy source; the old version of the file lives under this name. */
+  /** Rename source; the old version of the file lives under this name. */
   previousPath?: string;
-  /** git's rename/copy similarity (0-100): `98% identical` is skim vs re-read. */
+  /** git's rename similarity (0-100): `98% identical` is skim vs re-read. */
   similarity?: number;
 }
 
@@ -137,30 +131,25 @@ export function diffStats(files: DiffFile[]): DiffStats {
 
 /**
  * `--histogram`: anchors hunks on rare lines so an inserted block reads as one.
- * `-M40% -C40%`: renames and copies reported whatever the user's `diff.renames`
- * says, paired down to 40% similar rather than git's default 50%. A file moved
- * to another directory has its imports re-pointed on the way, and with a test
- * id renamed or a hook generalised on top it scored 43–49% — under the default,
- * so the review showed it twice, as a deleted file and an added one. 40% is the
- * lowest threshold at which every extra rename pair in the user's real history
- * was a true move; from 30% down, CSS modules and boilerplate start pairing
- * with strangers. Copies share the number — git keeps one score for both, and a
- * bare `-C` after `-M40%` resets it to 50% (measured, git 2.43) — so keeping
- * `-C` means `-C40%`, measured too: over 30+ ranges of that history, 40%
- * instead of 50% paired 8 more copies. 6 were templates
- * (`FacilitatorIntentHandler.cs → ParticipantIntentHandler.cs` 40%,
- * `SubmitValueSelectionCommand.cs → Reassign/Reopen/SubmitGroupWorkCommand.cs`
- * 49%, `useAdvancePhaseButton.ts → useIntentSender.ts` 49%) and 2 strangers,
- * both CSS modules sharing boilerplate (`SelectionResultsView.module.css →
- * Eyebrow.module.css` 45%, `LanguageSwitcher.module.css → ValueTabs.module.css`
- * 48%). A stranger costs the reviewer one switch to the whole-file view, which
- * every `copied` file offers (pinned in `test/browser/diff-view.test.ts`), and
- * that is cheaper than losing the six.
+ * `-M40%`: renames reported whatever the user's `diff.renames` says, paired
+ * down to 40% similar rather than git's default 50%. A file moved to another
+ * directory has its imports re-pointed on the way, and with a test id renamed
+ * or a hook generalised on top it scored 43–49% — under the default, so the
+ * review showed it twice, as a deleted file and an added one. 40% is the lowest
+ * threshold at which every extra pair in the user's real history was a true
+ * move; from 30% down, CSS modules and boilerplate start pairing with
+ * strangers.
+ * No `-C`: copy detection paired a genuinely new file with any modified file it
+ * resembled and showed only the delta. Measured at 40% over the same history:
+ * 8 extra pairs, 2 of them strangers (CSS modules sharing boilerplate). A new
+ * file — copied from a template or not — is new code the reviewer reads whole,
+ * so it is shown whole. `-M` alone also overrides a `diff.renames=copies`
+ * config (measured, git 2.43), so no `copy from` header reaches `parseDiff`.
  * `--full-index`: rounds compare `index` shas to tell edited from untouched;
  * abbreviated width is git's choice (repo size, `core.abbrev`), so two rounds
  * could name one object differently — the full sha never varies.
  */
-const DIFF_ARGS = ["diff", "--histogram", "-M40%", "-C40%", "--full-index"];
+const DIFF_ARGS = ["diff", "--histogram", "-M40%", "--full-index"];
 
 /** `base...branch`: everything the branch added since the two last agreed. */
 function ref(base: string, branch: string): string {
@@ -302,11 +291,14 @@ function readStatus(lines: string[], isBinary: boolean): DiffFileStatus {
   if (lines.some((line) => line.startsWith("new file mode"))) return "added";
   if (lines.some((line) => line.startsWith("deleted file mode"))) return "deleted";
   if (lines.some((line) => line.startsWith("rename to "))) return "renamed";
-  if (lines.some((line) => line.startsWith("copy to "))) return "copied";
   return "modified";
 }
 
-/** The pre-image name of a renamed or copied file; undefined for every other file. */
+/**
+ * The pre-image name of a renamed file; undefined for every other file. A copy
+ * header's `copy from` is read too, though `DIFF_ARGS` never asks git for one:
+ * a patch from elsewhere parses as modified with its source, not as nothing.
+ */
 function readPreviousPath(lines: string[]): string | undefined {
   const from = lines.find(
     (line) => line.startsWith("rename from ") || line.startsWith("copy from "),
@@ -314,7 +306,7 @@ function readPreviousPath(lines: string[]): string | undefined {
   return from === undefined ? undefined : unquote(from.slice(from.indexOf("from ") + 5));
 }
 
-/** git's own `similarity index 96%`, for a rename or a copy; never a guess of ours. */
+/** git's own `similarity index 96%` on a rename; never a guess of ours. */
 function readSimilarity(lines: string[]): number | undefined {
   const line = lines.find((candidate) => candidate.startsWith("similarity index "));
   const percent = line === undefined ? Number.NaN : Number.parseInt(line.slice(17), 10);

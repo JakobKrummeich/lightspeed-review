@@ -674,21 +674,6 @@ test("a renamed file says where it came from and how much survived", () => {
   assert.match(text, /- src\/auth\/token\.ts \(renamed from src\/token\.ts, 96% identical, /);
 });
 
-test("a copied file says where it was copied from, in git's word for it", () => {
-  const copied = diffFile("src/auth/admin-session.ts", {
-    status: "copied",
-    previousPath: "src/auth/session.ts",
-    similarity: 80,
-  });
-
-  const text = buildGroupingPrompt({ files: [copied], intents: [] });
-
-  assert.match(
-    text,
-    /^- src\/auth\/admin-session\.ts \(copied from src\/auth\/session\.ts, 80% identical, \+1\/-1\)$/m,
-  );
-});
-
 /**
  * The marks are the classifier's answer restated where the model reads the diff. Asserted as
  * whole lines: the mark belongs at the end of the line git's own numbers close, not anywhere.

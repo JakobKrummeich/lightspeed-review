@@ -37,25 +37,15 @@ test("a file that stayed in its directory under another name is renamed", () => 
   assert.equal(relocationOf(atRoot), "renamed");
 });
 
-test("a copy is copied, into its own directory or another", () => {
-  const beside = file("src/auth/admin.ts", { status: "copied", previousPath: "src/auth/user.ts" });
-  const elsewhere = file("src/admin/user.ts", {
-    status: "copied",
-    previousPath: "src/auth/user.ts",
-  });
-
-  assert.equal(relocationOf(beside), "copied");
-  assert.equal(relocationOf(elsewhere), "copied");
-});
-
 test("a file with no earlier name is not relocated", () => {
   assert.equal(relocationOf(file("src/a.ts")), undefined);
   assert.equal(relocationOf(file("src/a.ts", { status: "added" })), undefined);
 });
 
-test("an earlier name on a file git did not call renamed or copied is not a relocation", () => {
-  // Sessions written before copies were told apart stored a copy as `modified`
-  // with a `previousPath`; read back, such a file is not moved anywhere.
+test("an earlier name on a file git did not call renamed is not a relocation", () => {
+  // Sessions written while `src/diff-extract.ts` still asked git for copies
+  // stored one as `modified` with a `previousPath`; read back, such a file is
+  // not moved anywhere.
   const stale = file("src/auth/admin.ts", { status: "modified", previousPath: "src/auth/user.ts" });
 
   assert.equal(relocationOf(stale), undefined);
@@ -69,10 +59,7 @@ test("a relocation git scored 100% with nothing changed on top is unchanged, in 
   });
 
   assert.equal(unchangedRelocationOf(moved), "moved");
-  assert.equal(
-    unchangedRelocationOf({ ...moved, path: "src/old/b.ts", status: "copied" }),
-    "copied",
-  );
+  assert.equal(unchangedRelocationOf({ ...moved, path: "src/old/b.ts" }), "renamed");
   assert.equal(unchangedRelocationOf({ ...moved, similarity: 96, insertions: 2 }), undefined);
   assert.equal(unchangedRelocationOf({ ...moved, insertions: 1 }), undefined);
   assert.equal(unchangedRelocationOf(file("src/a.ts", { similarity: 100 })), undefined);
@@ -98,13 +85,15 @@ test("a mode flip on a 100% relocation is a change, hunks or no hunks", () => {
   assert.equal(unchangedRelocationOf(madeExecutable), undefined);
 });
 
-test("renamedFrom is the old name of a rename and nothing for a copy", () => {
+test("renamedFrom is the old name of a rename, and nothing for an earlier name under any other status", () => {
   assert.equal(
     renamedFrom(file("src/b.ts", { status: "renamed", previousPath: "src/a.ts" })),
     "src/a.ts",
   );
+  // How a round recorded a copy while `src/diff-extract.ts` still asked git
+  // for copies: `src/a.ts` is still there, so it is not `src/b.ts`'s past.
   assert.equal(
-    renamedFrom(file("src/b.ts", { status: "copied", previousPath: "src/a.ts" })),
+    renamedFrom(file("src/b.ts", { status: "modified", previousPath: "src/a.ts" })),
     undefined,
   );
   assert.equal(renamedFrom(file("src/b.ts")), undefined);

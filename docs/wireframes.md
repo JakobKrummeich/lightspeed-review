@@ -206,7 +206,7 @@ held is the diff's:
   (keyboard and screen reader included) with no hand from the mount. Each
   `.lsr-gate-file` is a `.lsr-gate-path` and its `.lsr-gate-lines`. A
   relocated file's path reads `old → new`, and its lines say the word first —
-  `moved · +4 −0`, `renamed · …`, `copied · …` — or the word alone when the
+  `moved · +4 −0`, `renamed · …` — or the word alone when the
   move is the whole change: `src/new/thing.ts +0 −0` read as a file nobody
   touched.
 - Shut, the section is drawn as the card it is: `max-width: 84ch`, centred,
@@ -240,12 +240,11 @@ held is the diff's:
   sides, word-level highlights; binary files say
   "Binary file — no diff to show." A relocation git found identical has no
   lines to draw, so in place of diff2html's "File without changes" the body
-  is one line of ours: `Moved unchanged from <code>old</code>.` (`Renamed`,
-  `Copied`).
+  is one line of ours: `Moved unchanged from <code>old</code>.` (or `Renamed`).
 - File-header path (`.lsr-file-path`) reads `old → new` for a relocated file,
   the same words as on its card. Badges (inline spans): `moved, 96% identical`
-  / `renamed, …` / `copied, …` (`moved, identical` when nothing changed on
-  top), logic badge, `commented last round`, `changed after approval`.
+  / `renamed, …` (`moved, identical` when nothing changed on top), logic
+  badge, `commented last round`, `changed after approval`.
 - Per-file form switch appears only when the file has a second diff to show:
   `[Branch diff│Since approval]` (approved file changed afterwards) or
   `[Branch diff│Since last round]` (file edited between the last two rounds).

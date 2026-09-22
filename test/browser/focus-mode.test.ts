@@ -144,29 +144,19 @@ test("a file moved and edited says both: the word, then the size of the edit", (
   assert.match(html, /<span class="lsr-gate-lines">moved · \+11 −11<\/span>/);
 });
 
-test("a rename within its directory is renamed, and a copy is copied", () => {
+test("a rename within its directory is renamed", () => {
   const renamed = {
     ...file("src/auth/session.ts", 0, 0),
     status: "renamed" as const,
     previousPath: "src/auth/token.ts",
     similarity: 100,
   };
-  const copied = {
-    ...file("src/auth/admin-session.ts", 1, 1),
-    status: "copied" as const,
-    previousPath: "src/auth/session.ts",
-    similarity: 80,
-  };
 
-  const html = gate({ name: "Moves", rationale: "why Moves", files: [renamed, copied] });
+  const html = gate({ name: "Moves", rationale: "why Moves", files: [renamed] });
 
   assert.match(
     html,
     /src\/auth\/token\.ts → src\/auth\/session\.ts<\/span><span class="lsr-gate-lines">renamed<\/span>/,
-  );
-  assert.match(
-    html,
-    /src\/auth\/session\.ts → src\/auth\/admin-session\.ts<\/span><span class="lsr-gate-lines">copied · \+1 −1<\/span>/,
   );
 });
 

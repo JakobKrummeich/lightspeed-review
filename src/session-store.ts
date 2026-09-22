@@ -153,8 +153,10 @@ export interface RoundMark {
 export interface RoundFile {
   path: string;
   /**
-   * Where a rename or copy came from, under the name that round's diff used.
-   * Only a rename's is followed through the rounds (`renamedFrom`).
+   * Where a rename came from, under the name that round's diff used. Rounds
+   * recorded while git was still asked for copies hold a copy's source here
+   * under `modified`; only a rename's is followed through the rounds
+   * (`renamedFrom`).
    */
   previousPath?: string;
   status: DiffFileStatus;

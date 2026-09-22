@@ -31,7 +31,8 @@ export function commentedLastRound(
  * called the file — so some renames lose the badge. Left partial on purpose:
  * following renames through rounds is `fileHistory` in `rounds/history.ts`,
  * which needs the whole `SessionRound[]` — not worth sending to the browser.
- * A copy's source is not tried: it is still on the page, wearing the badge itself.
+ * An earlier name on any other status is not tried (`renamedFrom`): that file
+ * is still on the page, wearing the badge itself.
  */
 export function commentedOn(file: DiffFile, commented: ReadonlySet<string>): boolean {
   if (commented.has(file.path)) return true;

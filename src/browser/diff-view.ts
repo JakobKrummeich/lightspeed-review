@@ -378,5 +378,4 @@ export function renderFileBody(file: DiffFile, renderer: DiffRenderer): string {
 const UNCHANGED_RELOCATION: Record<Relocation, string> = {
   moved: "Moved",
   renamed: "Renamed",
-  copied: "Copied",
 };

@@ -41,9 +41,10 @@ function headOf(round: SessionRound): string | null {
  * undefined for a sha missing or too short to trust: the switch opens on a
  * diff, so it may only be offered on "provably different". Matched by today's
  * name first, the rename's old name second (`previousPath` names the base side
- * and outlives the rename by rounds); a copy's source is not its earlier self.
- * Exported for `src/browser/round-changes.ts` so page and server decide by the
- * same comparison.
+ * and outlives the rename by rounds); an earlier name on any other status is
+ * not the file's earlier self (`renamedFrom`). Exported for
+ * `src/browser/round-changes.ts` so page and server decide by the same
+ * comparison.
  */
 export function changedFrom(
   previous: readonly RoundFile[],

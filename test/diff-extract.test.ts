@@ -61,9 +61,11 @@ test("parseDiff remembers the name a renamed file used to have", () => {
   assert.equal(fileByPath(files, "src/api/users.ts").previousPath, undefined);
 });
 
-test("parseDiff tells a copy from a rename, and remembers what it was copied from", () => {
-  // `-C` reports a copy with `copy from`/`copy to` where a rename says `rename`;
-  // the source still exists, so a copy is not the old file under a new name.
+test("a copy header, which extractDiff never asks git for, parses as modified with its source", () => {
+  // `-C` reports a copy as `copy from`/`copy to`; `DIFF_ARGS` has no `-C`, so
+  // none reaches the parser from `extractDiff`. Handed one from elsewhere, the
+  // parser keeps its old shape — the shape session records held while `-C` was
+  // asked for — rather than a status nothing downstream reads.
   const diff = [
     "diff --git a/src/auth/session.ts b/src/auth/admin-session.ts",
     "similarity index 80%",
@@ -79,12 +81,12 @@ test("parseDiff tells a copy from a rename, and remembers what it was copied fro
     "",
   ].join("\n");
 
-  const [copied] = parseDiff(diff);
+  const [parsed] = parseDiff(diff);
 
-  assert.equal(copied?.path, "src/auth/admin-session.ts");
-  assert.equal(copied?.status, "copied");
-  assert.equal(copied?.previousPath, "src/auth/session.ts");
-  assert.equal(copied?.similarity, 80);
+  assert.equal(parsed?.path, "src/auth/admin-session.ts");
+  assert.equal(parsed?.status, "modified");
+  assert.equal(parsed?.previousPath, "src/auth/session.ts");
+  assert.equal(parsed?.similarity, 80);
 });
 
 test("parseDiff marks binary files and keeps no content for them", () => {
@@ -297,6 +299,45 @@ test("a file moved and half rewritten is one rename, not a deletion and an addit
   );
   assert.equal(moved.insertions, 11);
   assert.equal(moved.deletions, 11);
+});
+
+/**
+ * The decision this pins: a genuinely new file is shown whole. Git's copy
+ * detection (`-C`) paired a new file with any modified file it resembled and
+ * showed only the delta — here 2 lines of a 10-line file — and a new file,
+ * copied from a template or not, is new code the reviewer reads whole.
+ */
+test("a new file that resembles a modified one is added, whole: not a copy of it", () => {
+  const repoRoot = newRepo("lsr-copy-");
+  const line = (name: string, index: number) => `export const ${name}${index} = ${index};`;
+  const shared = Array.from({ length: 8 }, (_, index) => line("keep", index));
+  const write = (name: string, lines: string[]) =>
+    writeFileSync(join(repoRoot, name), lines.join("\n") + "\n");
+  write("a.ts", [...shared, line("keep", 8), line("keep", 9)]);
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "base");
+  fixtureGit(repoRoot, "checkout", "-b", "feature");
+  write("a.ts", [...shared, line("keep", 8), line("edited", 9)]);
+  write("b.ts", [...shared, line("own", 8), line("own", 9)]);
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "edit a, add b");
+  // The fixture is only a fixture while git's copy detection would pair the two:
+  // a modified file is a copy source, and 8 of 10 lines shared is over any threshold.
+  assert.match(
+    fixtureGit(repoRoot, "diff", "-C40%", "--name-status", "main...feature"),
+    /^C\d+\ta\.ts\tb\.ts$/m,
+  );
+
+  const { files } = extractDiff(repoRoot, "feature", "main");
+
+  assert.equal(files.length, 2);
+  assert.equal(fileByPath(files, "a.ts").status, "modified");
+  const added = fileByPath(files, "b.ts");
+  assert.equal(added.status, "added");
+  assert.equal(added.previousPath, undefined);
+  assert.equal(added.similarity, undefined);
+  assert.equal(added.insertions, 10, "every line of the new file, not the 2 it does not share");
+  assert.equal(added.deletions, 0);
 });
 
 test("a repeated closing line anchors on the inserted block, not on a blend of two", () => {

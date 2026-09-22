@@ -441,10 +441,7 @@ test("an ordinary file still offers the whole-file view, and only that", () => {
   assert.ok(!html.includes("Since last round"));
 });
 
-test("added, renamed and copied files offer the whole-file view too", () => {
-  // `-C40%` (diff-extract.ts) is kept on the strength of this: a copy paired
-  // with a stranger costs the reviewer one switch to the whole file, so the
-  // switch has to be there for every copy.
+test("added and renamed files offer the whole-file view too", () => {
   const html = chapter({
     groups: [
       {
@@ -453,13 +450,12 @@ test("added, renamed and copied files offer the whole-file view too", () => {
         files: [
           file("a.ts", { status: "added" }),
           file("b.ts", { status: "renamed", previousPath: "old-b.ts" }),
-          file("c.ts", { status: "copied", previousPath: "a.ts" }),
         ],
       },
     ],
   });
 
-  assert.equal(html.match(/>Whole file</g)?.length, 3);
+  assert.equal(html.match(/>Whole file</g)?.length, 2);
 });
 
 test("a deleted or binary file offers no whole-file view: there is no new side to show", () => {
@@ -573,26 +569,17 @@ test("a moved file's header shows both paths, and says moved with git's own simi
   assert.match(html, /aria-label="Mark src\/auth\/token\.ts approved"/);
 });
 
-test("a rename within its directory says renamed, and a copy says copied", () => {
+test("a rename within its directory says renamed", () => {
   const renamed = {
     ...file("src/auth/session.ts"),
     status: "renamed" as const,
     previousPath: "src/auth/token.ts",
     similarity: 96,
   };
-  const copied = {
-    ...file("src/auth/admin-session.ts"),
-    status: "copied" as const,
-    previousPath: "src/auth/session.ts",
-    similarity: 80,
-  };
 
-  const html = chapter({
-    groups: [{ name: "Moves", rationale: "mechanical", files: [renamed, copied] }],
-  });
+  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [renamed] }] });
 
   assert.match(html, /<span class="lsr-file-rename">renamed, 96% identical<\/span>/);
-  assert.match(html, /<span class="lsr-file-rename">copied, 80% identical<\/span>/);
 });
 
 test("a move git found identical says so once, in place of a diff with nothing in it", () => {
@@ -614,22 +601,6 @@ test("a move git found identical says so once, in place of a diff with nothing i
     /<p class="lsr-unchanged">Moved unchanged from <code>src\/token\.ts<\/code>\.<\/p>/,
   );
   assert.doesNotMatch(html, /<pre class="stub">/, "nothing is handed to the diff renderer");
-});
-
-test("a copy git found identical is said in its own word", () => {
-  const copied = {
-    ...file("src/auth/admin.ts", { insertions: 0, deletions: 0 }),
-    status: "copied" as const,
-    previousPath: "src/auth/user.ts",
-    similarity: 100,
-  };
-
-  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [copied] }] });
-
-  assert.match(
-    html,
-    /<p class="lsr-unchanged">Copied unchanged from <code>src\/auth\/user\.ts<\/code>\.<\/p>/,
-  );
 });
 
 test("a binary file keeps its own line: it is not a relocation", () => {

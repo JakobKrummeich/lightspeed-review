@@ -190,7 +190,7 @@ export const MECHANICAL_PATH_RULES: readonly PathRule[] = [
  */
 export const MECHANICAL_DIFF_RULES: readonly DiffRule[] = [
   {
-    name: "a rename or copy git scored 100% identical, with no line changed on top of it",
+    name: "a rename git scored 100% identical, with no line changed on top of it",
     applies: (file) => unchangedRelocationOf(file) !== undefined,
   },
   { name: "a change no line survived except as whitespace", applies: isWhitespaceOnly },
