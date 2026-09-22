@@ -237,17 +237,6 @@
   letter-spacing: -0.012em;
 }
 
-/* On the cover the body is not the news — the headline above it is — so it
- * speaks at the reading size and gets out of the way. */
-.lsr-opening-sheet[data-sheet="cover"] .lsr-opening-body {
-  max-width: 40ch;
-  color: var(--lsr-muted);
-  font-size: var(--lsr-size-ui);
-  line-height: var(--lsr-leading);
-  font-weight: 400;
-  letter-spacing: 0;
-}
-
 /* The words land rather than appear: they arrive from just below, a beat
  * behind the sheet carrying them, which is what makes a press feel answered. */
 .lsr-opening-sheet[data-at="top"] .lsr-opening-body {

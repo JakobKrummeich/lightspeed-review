@@ -312,7 +312,6 @@ review's first round, only if intents were stated. One sheet at a time.
 │                                                            │
 │                    FROM YOUR AGENT             .lsr-opening-lead
 │            Something was built for you         .lsr-opening-headline
-│           Two reasons, one at a time.          .lsr-opening-body
 │                                                            │
 │                     ( Unwrap )                 .lsr-opening-press
 │                                                            │

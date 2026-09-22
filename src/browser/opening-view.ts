@@ -34,7 +34,8 @@ interface Sheet {
   headline?: string;
   /** Which reason of how many, for whoever cannot see the dots. */
   label?: string;
-  body: string;
+  /** The reason itself; the cover has none — its headline is all it says. */
+  body?: string;
   /** What the button on this sheet says, which is what pressing it does. */
   act: string;
 }
@@ -48,7 +49,7 @@ interface Sheet {
  */
 export function renderOpening(intents: readonly string[]): string {
   if (intents.length === 0) return "";
-  const sheets: Sheet[] = [cover(intents.length), ...intents.map(reasonSheet(intents.length))];
+  const sheets: Sheet[] = [cover(), ...intents.map(reasonSheet(intents.length))];
   return `<div class="lsr-opening-overlay" role="dialog" aria-modal="true" aria-label="What this round is for" data-flare="false" data-bloom="false">
 ${motes()}
 <div class="lsr-opening-stack">
@@ -59,13 +60,16 @@ ${dots(sheets.length)}
 </div>`;
 }
 
-/** The cover: who it is from and how much there is. */
-function cover(count: number): Sheet {
+/**
+ * The cover: who it is from and that there is something. It does not count
+ * the reasons — "Four reasons, one at a time." was a line to read before the
+ * reasons could be, and the dots already say how many.
+ */
+function cover(): Sheet {
   return {
     kind: "cover",
     lead: "from your agent",
     headline: "Something was built for you",
-    body: `${spelled(count)} reason${count === 1 ? "" : "s"}, one at a time.`,
     act: "Unwrap",
   };
 }
@@ -93,7 +97,7 @@ function laid(sheet: Sheet, index: number, total: number): string {
   const parts = [
     sheet.lead === undefined ? "" : `<p class="lsr-opening-lead">${sheet.lead}</p>`,
     sheet.headline === undefined ? "" : `<p class="lsr-opening-headline">${sheet.headline}</p>`,
-    `<p class="lsr-opening-body">${sheet.body}</p>`,
+    sheet.body === undefined ? "" : `<p class="lsr-opening-body">${sheet.body}</p>`,
     `<button type="button" class="lsr-opening-press">${sheet.act}</button>`,
   ].filter((part) => part !== "");
   const label = sheet.label === undefined ? "" : ` aria-label="${sheet.label}"`;
@@ -131,14 +135,4 @@ function dots(total: number): string {
     (_unused, index) => `<i class="lsr-opening-dot" data-on="${index === 0}"></i>`,
   ).join("");
   return `<span class="lsr-opening-dots" aria-hidden="true">${row}</span>`;
-}
-
-/**
- * Count in words (the cover is a sentence); digits past eight — "Nine" would
- * not soften nine reasons.
- */
-function spelled(count: number): string {
-  return (
-    ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"][count] ?? `${count}`
-  );
 }
