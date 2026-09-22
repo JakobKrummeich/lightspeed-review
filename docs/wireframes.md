@@ -147,8 +147,9 @@ diff rendered but shut behind one press.
 │   ┌─ section.lsr-group (shut: 84ch, centred, lifted) ────┐        │
 │   │ Chapter name                                         │        │ .lsr-gate-name (title)
 │   │ What happened, one sentence.                         │        │ .lsr-gate-rationale (lead)
-│   │ src/path/file.ts   +12 −3                            │        │ .lsr-gate-files / -file
-│   │ src/other.ts       +4 −0                             │        │ .lsr-gate-path / -lines
+│   │ ▸ 2 files · +16 −3                                   │        │ details.lsr-gate-files / -summary (shut)
+│   │   src/path/file.ts              +12 −3               │        │ .lsr-gate-files-list / -file, once opened
+│   │   src/old.ts → src/other.ts     moved · +4 −0        │        │ .lsr-gate-path / -lines
 │   │ 1/3 approved                                         │        │ .lsr-gate-counter
 │   │ ( Read the diff )                                    │        │ .lsr-gate-press
 │   │                              approve chapter [ ]     │        │ .lsr-group-foot
@@ -197,6 +198,17 @@ held is the diff's:
   diff, they never do. A sweep chapter's card says why its tick is the press
   to make, under a `.lsr-gate-tier` label in the survey lane's words: there is
   nothing in it to decide.
+- The file list is folded behind one line — `<details class="lsr-gate-files">`,
+  its `.lsr-gate-files-summary` reading `2 files · +16 −3` in the survey's own
+  words — because the count and the size are what a card is read for at a
+  glance; the paths in `.lsr-gate-files-list` are for the reviewer checking
+  the rationale against them, one press away, and the browser works the fold
+  (keyboard and screen reader included) with no hand from the mount. Each
+  `.lsr-gate-file` is a `.lsr-gate-path` and its `.lsr-gate-lines`. A
+  relocated file's path reads `old → new`, and its lines say the word first —
+  `moved · +4 −0`, `renamed · …`, `copied · …` — or the word alone when the
+  move is the whole change: `src/new/thing.ts +0 −0` read as a file nobody
+  touched.
 - Shut, the section is drawn as the card it is: `max-width: 84ch`, centred,
   its words a `--lsr-space-6` from its edges, lifted off the page with
   `--lsr-shadow-lift` — the finish card's shadow. Full width it was a band the
@@ -226,9 +238,14 @@ held is the diff's:
   deliberate, you approve what you have read past.
 - Diff body: unified or side-by-side (header switch), line numbers both
   sides, word-level highlights; binary files say
-  "Binary file — no diff to show."
-- File-header badges (inline spans): `renamed from …`, logic badge,
-  `commented last round`, `changed after approval`.
+  "Binary file — no diff to show." A relocation git found identical has no
+  lines to draw, so in place of diff2html's "File without changes" the body
+  is one line of ours: `Moved unchanged from <code>old</code>.` (`Renamed`,
+  `Copied`).
+- File-header path (`.lsr-file-path`) reads `old → new` for a relocated file,
+  the same words as on its card. Badges (inline spans): `moved, 96% identical`
+  / `renamed, …` / `copied, …` (`moved, identical` when nothing changed on
+  top), logic badge, `commented last round`, `changed after approval`.
 - Per-file form switch appears only when the file has a second diff to show:
   `[Branch diff│Since approval]` (approved file changed afterwards) or
   `[Branch diff│Since last round]` (file edited between the last two rounds).

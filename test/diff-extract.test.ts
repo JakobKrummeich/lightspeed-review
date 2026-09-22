@@ -289,7 +289,12 @@ test("a file moved and half rewritten is one rename, not a deletion and an addit
   const moved = fileByPath(files, "src/new/thing.ts");
   assert.equal(moved.status, "renamed");
   assert.equal(moved.previousPath, "src/old/thing.ts");
-  assert.equal(moved.similarity, 44);
+  // The band, not git's exact score: the fixture exists to land between the
+  // two thresholds, and which forties git names is its arithmetic, not ours.
+  assert.ok(
+    moved.similarity !== undefined && moved.similarity >= 40 && moved.similarity < 50,
+    `a move scored in the forties is what pairs under -M40% and not under git's 50%; got ${moved.similarity}`,
+  );
   assert.equal(moved.insertions, 11);
   assert.equal(moved.deletions, 11);
 });
