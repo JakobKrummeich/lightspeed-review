@@ -1,11 +1,6 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
-import {
-  isUnchangedRelocation,
-  pathLabel,
-  relocationOf,
-  type Relocation,
-} from "../file-relocation.ts";
+import { relocationOf, unchangedRelocationOf, type Relocation } from "../file-relocation.ts";
 import { reviewPaths } from "../review-files.ts";
 import type { Approval } from "../rounds/history.ts";
 import {
@@ -20,6 +15,7 @@ import type { DiffRenderer } from "./diff-renderer.ts";
 import { clampFocus, renderChapterGate, renderFocusBar } from "./focus-mode.ts";
 import { approvedLabel, renderGroupIndex } from "./group-index.ts";
 import { LOGIC_BADGE_LABEL, heaviestFiles } from "./hunk-complexity.ts";
+import { pathLabel } from "./path-label.ts";
 
 /** Where each path of this round stands; a path the server did not name is unapproved. */
 export type ApprovalMap = Record<string, Approval>;
@@ -274,11 +270,12 @@ function renderFile(row: FileRow): string {
 function relocationBadge(file: DiffFile): string {
   const relocation = relocationOf(file);
   if (relocation === undefined) return "";
-  const identical = isUnchangedRelocation(file)
-    ? ", identical"
-    : file.similarity === undefined
-      ? ""
-      : `, ${file.similarity}% identical`;
+  const identical =
+    unchangedRelocationOf(file) !== undefined
+      ? ", identical"
+      : file.similarity === undefined
+        ? ""
+        : `, ${file.similarity}% identical`;
   return `<span class="lsr-file-rename">${relocation}${identical}</span>`;
 }
 
@@ -368,11 +365,12 @@ export function renderFileBody(file: DiffFile, renderer: DiffRenderer): string {
   if (file.status === "binary") {
     return `<p class="lsr-binary">Binary file — no diff to show.</p>`;
   }
-  const relocation = relocationOf(file);
-  if (relocation !== undefined && isUnchangedRelocation(file)) {
-    return `<p class="lsr-unchanged">${UNCHANGED_RELOCATION[relocation]} unchanged from <code>${escapeHtml(file.previousPath ?? "")}</code>.</p>`;
-  }
-  return renderer.renderFile(file.diff);
+  const unchanged = unchangedRelocationOf(file);
+  const from = file.previousPath;
+  // Every relocation has a `from` (`relocationOf`), which the type cannot say;
+  // a record without one gets the renderer's own words rather than an empty name.
+  if (unchanged === undefined || from === undefined) return renderer.renderFile(file.diff);
+  return `<p class="lsr-unchanged">${UNCHANGED_RELOCATION[unchanged]} unchanged from <code>${escapeHtml(from)}</code>.</p>`;
 }
 
 /** The relocation's word as the sentence above opens: literal keys, one per word. */

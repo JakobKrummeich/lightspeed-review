@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { DiffFile } from "../src/diff-extract.ts";
-import { isUnchangedRelocation, relocationOf, renamedFrom } from "../src/file-relocation.ts";
+import { relocationOf, renamedFrom, unchangedRelocationOf } from "../src/file-relocation.ts";
 
 function file(path: string, overrides: Partial<DiffFile> = {}): DiffFile {
   return {
@@ -53,17 +53,49 @@ test("a file with no earlier name is not relocated", () => {
   assert.equal(relocationOf(file("src/a.ts", { status: "added" })), undefined);
 });
 
-test("a relocation git scored 100% with nothing changed on top is unchanged", () => {
+test("an earlier name on a file git did not call renamed or copied is not a relocation", () => {
+  // Sessions written before copies were told apart stored a copy as `modified`
+  // with a `previousPath`; read back, such a file is not moved anywhere.
+  const stale = file("src/auth/admin.ts", { status: "modified", previousPath: "src/auth/user.ts" });
+
+  assert.equal(relocationOf(stale), undefined);
+});
+
+test("a relocation git scored 100% with nothing changed on top is unchanged, in its own word", () => {
   const moved = file("src/new/a.ts", {
     status: "renamed",
     previousPath: "src/old/a.ts",
     similarity: 100,
   });
 
-  assert.equal(isUnchangedRelocation(moved), true);
-  assert.equal(isUnchangedRelocation({ ...moved, similarity: 96, insertions: 2 }), false);
-  assert.equal(isUnchangedRelocation({ ...moved, insertions: 1 }), false);
-  assert.equal(isUnchangedRelocation(file("src/a.ts", { similarity: 100 })), false);
+  assert.equal(unchangedRelocationOf(moved), "moved");
+  assert.equal(
+    unchangedRelocationOf({ ...moved, path: "src/old/b.ts", status: "copied" }),
+    "copied",
+  );
+  assert.equal(unchangedRelocationOf({ ...moved, similarity: 96, insertions: 2 }), undefined);
+  assert.equal(unchangedRelocationOf({ ...moved, insertions: 1 }), undefined);
+  assert.equal(unchangedRelocationOf(file("src/a.ts", { similarity: 100 })), undefined);
+});
+
+test("a mode flip on a 100% relocation is a change, hunks or no hunks", () => {
+  // `git mv` + `chmod +x`: git says `similarity index 100%` and counts no lines,
+  // and the one thing that changed is in the header.
+  const madeExecutable = file("bin/run.sh", {
+    status: "renamed",
+    previousPath: "scripts/run.sh",
+    similarity: 100,
+    diff: [
+      "diff --git a/scripts/run.sh b/bin/run.sh",
+      "old mode 100644",
+      "new mode 100755",
+      "similarity index 100%",
+      "rename from scripts/run.sh",
+      "rename to bin/run.sh",
+    ].join("\n"),
+  });
+
+  assert.equal(unchangedRelocationOf(madeExecutable), undefined);
 });
 
 test("renamedFrom is the old name of a rename and nothing for a copy", () => {

@@ -1,8 +1,9 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
-import { isUnchangedRelocation, pathLabel, relocationOf } from "../file-relocation.ts";
+import { relocationOf, unchangedRelocationOf } from "../file-relocation.ts";
 import { isSweep } from "../group-tier.ts";
 import { filesLabel, groupIndexEntries } from "./group-index.ts";
+import { pathLabel } from "./path-label.ts";
 
 /**
  * Focus mode: one chapter of the review filling the viewport, the others not
@@ -149,5 +150,5 @@ function sizeLabel(file: DiffFile): string {
   const lines = `+${file.insertions} −${file.deletions}`;
   const relocation = relocationOf(file);
   if (relocation === undefined) return lines;
-  return isUnchangedRelocation(file) ? relocation : `${relocation} · ${lines}`;
+  return unchangedRelocationOf(file) === undefined ? `${relocation} · ${lines}` : relocation;
 }

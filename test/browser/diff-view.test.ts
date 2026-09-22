@@ -441,18 +441,25 @@ test("an ordinary file still offers the whole-file view, and only that", () => {
   assert.ok(!html.includes("Since last round"));
 });
 
-test("added and renamed files offer the whole-file view too", () => {
+test("added, renamed and copied files offer the whole-file view too", () => {
+  // `-C40%` (diff-extract.ts) is kept on the strength of this: a copy paired
+  // with a stranger costs the reviewer one switch to the whole file, so the
+  // switch has to be there for every copy.
   const html = chapter({
     groups: [
       {
         name: "API",
         rationale: "why API",
-        files: [file("a.ts", { status: "added" }), file("b.ts", { status: "renamed" })],
+        files: [
+          file("a.ts", { status: "added" }),
+          file("b.ts", { status: "renamed", previousPath: "old-b.ts" }),
+          file("c.ts", { status: "copied", previousPath: "a.ts" }),
+        ],
       },
     ],
   });
 
-  assert.equal(html.match(/>Whole file</g)?.length, 2);
+  assert.equal(html.match(/>Whole file</g)?.length, 3);
 });
 
 test("a deleted or binary file offers no whole-file view: there is no new side to show", () => {

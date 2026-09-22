@@ -1,5 +1,5 @@
 import type { DiffFile } from "./diff-extract.ts";
-import { isUnchangedRelocation } from "./file-relocation.ts";
+import { unchangedRelocationOf } from "./file-relocation.ts";
 
 /**
  * Which files of a diff are bulk with nothing to decide, and which ones no
@@ -191,7 +191,7 @@ export const MECHANICAL_PATH_RULES: readonly PathRule[] = [
 export const MECHANICAL_DIFF_RULES: readonly DiffRule[] = [
   {
     name: "a rename or copy git scored 100% identical, with no line changed on top of it",
-    applies: isUnchangedRelocation,
+    applies: (file) => unchangedRelocationOf(file) !== undefined,
   },
   { name: "a change no line survived except as whitespace", applies: isWhitespaceOnly },
   { name: "a file whose own banner says a generator wrote it", applies: isGenerated },

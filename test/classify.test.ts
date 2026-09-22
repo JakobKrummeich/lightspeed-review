@@ -92,6 +92,27 @@ test("a rename that also changed lines is not mechanical — the change is the p
   assert.equal(classifyFile(renamed).mechanical, false);
 });
 
+test("a rename that flipped the file's mode is not mechanical: the header is the change", () => {
+  // `git mv` + `chmod +x` scores 100% with no hunks; a file made executable
+  // is a decision, and the line counts never see it. A `.rb`, not a `.sh`:
+  // shell scripts are guardrail paths and would fail this for another reason.
+  const madeExecutable = file("bin/console.rb", {
+    status: "renamed",
+    previousPath: "scripts/console.rb",
+    similarity: 100,
+    diff: [
+      "diff --git a/scripts/console.rb b/bin/console.rb",
+      "old mode 100644",
+      "new mode 100755",
+      "similarity index 100%",
+      "rename from scripts/console.rb",
+      "rename to bin/console.rb",
+    ].join("\n"),
+  });
+
+  assert.deepEqual(classifyFile(madeExecutable), { mechanical: false, guardrail: false });
+});
+
 test("a generated Go file is mechanical: its own banner says so", () => {
   const generated = file("internal/api/types.pb.go", {
     insertions: 1,

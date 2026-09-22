@@ -142,10 +142,20 @@ export function diffStats(files: DiffFile[]): DiffStats {
  * to another directory has its imports re-pointed on the way, and with a test
  * id renamed or a hook generalised on top it scored 43–49% — under the default,
  * so the review showed it twice, as a deleted file and an added one. 40% is the
- * lowest threshold at which every extra pair in the user's real history was a
- * true move; from 30% down, CSS modules and boilerplate start pairing with
- * strangers. Both flags carry the number: git keeps one score for both, and a
- * bare `-C` after `-M40%` resets it to 50% (measured, git 2.43).
+ * lowest threshold at which every extra rename pair in the user's real history
+ * was a true move; from 30% down, CSS modules and boilerplate start pairing
+ * with strangers. Copies share the number — git keeps one score for both, and a
+ * bare `-C` after `-M40%` resets it to 50% (measured, git 2.43) — so keeping
+ * `-C` means `-C40%`, measured too: over 30+ ranges of that history, 40%
+ * instead of 50% paired 8 more copies. 6 were templates
+ * (`FacilitatorIntentHandler.cs → ParticipantIntentHandler.cs` 40%,
+ * `SubmitValueSelectionCommand.cs → Reassign/Reopen/SubmitGroupWorkCommand.cs`
+ * 49%, `useAdvancePhaseButton.ts → useIntentSender.ts` 49%) and 2 strangers,
+ * both CSS modules sharing boilerplate (`SelectionResultsView.module.css →
+ * Eyebrow.module.css` 45%, `LanguageSwitcher.module.css → ValueTabs.module.css`
+ * 48%). A stranger costs the reviewer one switch to the whole-file view, which
+ * every `copied` file offers (pinned in `test/browser/diff-view.test.ts`), and
+ * that is cheaper than losing the six.
  * `--full-index`: rounds compare `index` shas to tell edited from untouched;
  * abbreviated width is git's choice (repo size, `core.abbrev`), so two rounds
  * could name one object differently — the full sha never varies.
