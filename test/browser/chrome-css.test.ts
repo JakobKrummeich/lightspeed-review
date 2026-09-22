@@ -281,6 +281,28 @@ test("the sweep card's label is set as the survey's lane heading is", () => {
   assert.match(lane, /color: var\(--lsr-muted\);/);
 });
 
+test("the card's folded file list is a quiet line with the page's arrow on it", () => {
+  // One line saying how much the chapter is, set as the tier label is: a label
+  // on the chapter, not one of the sentences the card exists to have read.
+  const line = rulesFor(".lsr-gate-files-summary").join("");
+  assert.match(line, /font-size: var\(--lsr-size-meta\);/);
+  assert.match(line, /color: var\(--lsr-muted\);/);
+  assert.match(line, /cursor: pointer;/);
+  // The browser's own marker goes; the page's arrow takes its place, turned by
+  // the fold the same way it is on a file row.
+  assert.match(line, /list-style: none;/);
+  assert.match(
+    rulesFor(".lsr-gate-files-summary::before").join(""),
+    /transform: rotate\(-45deg\);/,
+  );
+  assert.match(
+    rulesFor(".lsr-gate-files[open] > .lsr-gate-files-summary::before").join(""),
+    /transform: rotate\(45deg\);/,
+  );
+  // Reachable by keyboard, and visibly so.
+  assert.match(rulesFor(".lsr-gate-files-summary:focus-visible").join(""), /outline: 2px solid/);
+});
+
 test("the chapter's card stands in the middle of the screen, its lines flush left", () => {
   // The block is centred, not the words on it: a column of sentences reads
   // from one left edge, and a card hugging the screen's edge read as one more

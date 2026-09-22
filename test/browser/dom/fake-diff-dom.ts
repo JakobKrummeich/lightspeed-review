@@ -163,6 +163,16 @@ export class FakeElement {
     else this.attributes.delete("hidden");
   }
 
+  /** A `<details>` fold, which the browser keeps in the attribute; a test flips it as a press on the summary would. */
+  get open(): boolean {
+    return this.attributes.has("open");
+  }
+
+  set open(open: boolean) {
+    if (open) this.attributes.set("open", "");
+    else this.attributes.delete("open");
+  }
+
   /** Puts an element inside this one: what the parser does for markup, done by hand. */
   append(child: FakeElement): void {
     child.parent = this;

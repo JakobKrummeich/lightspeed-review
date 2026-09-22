@@ -1,7 +1,7 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
 import { isSweep } from "../group-tier.ts";
-import { groupIndexEntries } from "./group-index.ts";
+import { filesLabel, groupIndexEntries } from "./group-index.ts";
 
 /**
  * Focus mode: one chapter of the review filling the viewport, the others not
@@ -95,9 +95,12 @@ export function renderChapterGate({ group, contentId, counter }: ChapterGate): s
   return `<div class="lsr-gate">
     <h2 class="lsr-gate-name">${escapeHtml(group.name)}</h2>${tierLine(group)}
     <p class="lsr-gate-rationale">${escapeHtml(group.rationale)}</p>
-    <ul class="lsr-gate-files">
-      ${group.files.map(gateFile).join("\n      ")}
-    </ul>
+    <details class="lsr-gate-files">
+      <summary class="lsr-gate-files-summary">${filesSummary(group.files)}</summary>
+      <ul class="lsr-gate-files-list">
+        ${group.files.map(gateFile).join("\n        ")}
+      </ul>
+    </details>
     <p class="lsr-gate-counter">${counter}</p>
     <button type="button" class="lsr-gate-press" aria-expanded="false" aria-controls="${contentId}">Read the diff</button>
   </div>`;
@@ -112,6 +115,20 @@ export function renderChapterGate({ group, contentId, counter }: ChapterGate): s
 function tierLine(group: DiffGroup): string {
   if (!isSweep(group)) return "";
   return `\n    <p class="lsr-gate-tier">Mechanical — nothing to decide</p>`;
+}
+
+/**
+ * The one line the file list is folded behind: how many files and how many
+ * lines, in the survey's words for the same chapter. Folded by default and
+ * by the browser — a `<details>`, so the keyboard and the screen reader get
+ * the fold for free and no press of the mount's is needed to work it — because
+ * the count and the size are what a card is read for at a glance; the paths
+ * are for the reviewer checking the rationale against them, one press away.
+ */
+function filesSummary(files: DiffFile[]): string {
+  const insertions = files.reduce((total, file) => total + file.insertions, 0);
+  const deletions = files.reduce((total, file) => total + file.deletions, 0);
+  return `${filesLabel(files.length)} · +${insertions} −${deletions}`;
 }
 
 /**

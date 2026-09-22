@@ -112,6 +112,38 @@ test("the gate lists every file of the chapter with the size of its change", () 
   assert.match(html, /\+4 −0/);
 });
 
+test("the file list is folded by default, behind one line that says how much there is", () => {
+  // The count and the size say enough at a glance; the paths are for the
+  // reviewer who wants to check the rationale against them, one press away.
+  const html = gate({
+    name: "Auth",
+    rationale: "why Auth",
+    files: [file("src/auth.ts", 12, 3), file("src/token.ts", 4, 0)],
+  });
+
+  assert.match(html, /<details class="lsr-gate-files">/);
+  assert.doesNotMatch(html, /<details[^>]*\sopen/, "folded until asked");
+  assert.match(html, /<summary class="lsr-gate-files-summary">2 files · \+16 −3<\/summary>/);
+});
+
+test("one file is a file, not files", () => {
+  const html = gate({ name: "Auth", rationale: "why Auth", files: [file("src/auth.ts", 12, 3)] });
+
+  assert.match(html, /<summary class="lsr-gate-files-summary">1 file · \+12 −3<\/summary>/);
+});
+
+test("the rows are inside the fold, under the line that stands for them", () => {
+  const html = gate({
+    name: "Auth",
+    rationale: "why Auth",
+    files: [file("src/auth.ts", 12, 3), file("src/token.ts", 4, 0)],
+  });
+
+  const fold = /<details class="lsr-gate-files">([\s\S]*?)<\/details>/.exec(html)?.[1] ?? "";
+  assert.equal(fold.match(/<li class="lsr-gate-file">/g)?.length, 2, "every row is in the fold");
+  assert.ok(fold.indexOf("lsr-gate-files-summary") < fold.indexOf('<li class="lsr-gate-file">'));
+});
+
 test("the gate carries the chapter's counter, worded as every other counter is", () => {
   assert.match(
     gate(group("API"), "1/3 approved"),

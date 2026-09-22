@@ -45,6 +45,36 @@ function isOpen(block: HTMLElement, selector: string): boolean {
 }
 
 /**
+ * Which chapters' cards have their file list unfolded, by chapter number. Not
+ * part of `OpenFolds`: that list is what the mount folds itself, read after
+ * each of its own presses and stored for a reload, and every read is fresh
+ * because the mount made the last fold. The file list is a `<details>` the
+ * browser folds on its own — no press of the mount's says when it moved, so
+ * a held copy would be stale by the next draw. Read off the markup a draw is
+ * about to replace, and put back once it has: keyed by chapter number, which
+ * a same-round redraw (an agent's reply, a layout switch) keeps and every
+ * other draw changes — a focus move draws another chapter, and a re-group
+ * falls to the overview, where there is no card.
+ */
+export function readOpenFileLists(root: HTMLElement): number[] {
+  return [...root.querySelectorAll<HTMLElement>(".lsr-group")]
+    .filter((section) => fileList(section)?.open === true)
+    .map((section) => Number(section.dataset.groupIndex))
+    .filter((index) => Number.isInteger(index));
+}
+
+export function applyOpenFileLists(root: HTMLElement, open: number[]): void {
+  for (const index of open) {
+    const list = fileList(groupSection(root, index));
+    if (list) list.open = true;
+  }
+}
+
+function fileList(section: HTMLElement | null): HTMLDetailsElement | null {
+  return section?.querySelector<HTMLDetailsElement>(".lsr-gate-files") ?? null;
+}
+
+/**
  * Applies a tick's folds as one anchored gesture. Headers take their new state
  * at once — a shut group must read as shut to anything asking, whatever its
  * animation is still doing — and the blocks fold together under one correction.

@@ -56,7 +56,8 @@ export function indexFilesLabel(entry: GroupIndexEntry): string {
   return filesLabel(entry.files);
 }
 
-function filesLabel(files: number): string {
+/** How many files, wherever a chapter's size is said: the survey's row and lane, the card's folded list. */
+export function filesLabel(files: number): string {
   return `${files} file${files === 1 ? "" : "s"}`;
 }
 

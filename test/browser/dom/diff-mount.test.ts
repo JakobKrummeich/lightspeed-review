@@ -126,6 +126,8 @@ interface Mounted {
   read: string[];
   /** The press on a chapter's gate: the control that stands for the whole chapter's fold. */
   gatePress(index: number): FakeElement;
+  /** The card's file list: a `<details>` the browser folds, which the mount only keeps. */
+  fileList(index: number): FakeElement;
   groupContent(index: number): FakeElement;
   groupTick(index: number): FakeInput;
   fileHeader(path: string): FakeElement;
@@ -244,6 +246,7 @@ function mount(
       }
     },
     gatePress: (index) => tickTarget(section(index), ".lsr-gate-press"),
+    fileList: (index) => tickTarget(section(index), ".lsr-gate-files"),
     groupContent: (index) => tickTarget(section(index), ".lsr-group-content"),
     groupTick: (index) => tickIn(section(index), ".lsr-tick-all"),
     fileHeader: (path) => tickTarget(find(`.lsr-file[data-file="${path}"]`), ".lsr-file-header"),
@@ -487,6 +490,21 @@ test("pressing anywhere on the card passes the gate, not only the button", (t) =
 
   assert.equal(isOpen(page.gatePress(0)), true);
   assert.equal(page.groupContent(0).hidden, false);
+});
+
+test("unfolding the card's file list is not a press through the gate", (t) => {
+  // `<details>` folds itself on a press of its summary; the card around it
+  // takes a press anywhere else on it, and must not take this one.
+  const page = mount(t, [group("API", ["a.png"])], [], { focus: 0 });
+
+  press(page, ".lsr-gate-files-summary");
+
+  assert.equal(isOpen(page.gatePress(0)), false, "the card stays");
+  assert.equal(page.groupContent(0).hidden, true);
+  // And the summary is left to the browser: a fold state of the mount's on
+  // it would contradict the one `<details>` already announces.
+  const summary = page.root.querySelector(".lsr-gate-files-summary");
+  assert.equal(summary?.getAttribute("aria-expanded"), null);
 });
 
 test("the chapter's own tick on a finished card is a tick, not a press through the gate", (t) => {
@@ -1330,6 +1348,36 @@ test("news inside the round leaves the review folded as the reviewer folded it",
   assert.equal(isOpen(page.gatePress(0)), true, "the gate they passed is not put back up");
   assert.equal(isOpen(page.fileHeader("b.png")), false, "and the file they shut is still shut");
   assert.deepEqual(page.opened.at(-1), { groups: [0], files: ["a.png"] });
+});
+
+test("news inside the round leaves the card's file list unfolded as the reviewer unfolded it", (t) => {
+  // The browser keeps this fold and tells the mount nothing; a redraw of the
+  // same card must read it off the markup it replaces.
+  const page = mount(t, [group("API", ["a.png", "b.png"])], [], { focus: 0 });
+  page.fileList(0).open = true;
+
+  page.view.update(session([group("API", ["a.png", "b.png"])], []), "same-round");
+
+  assert.equal(page.fileList(0).open, true);
+});
+
+test("switching layout keeps the card's file list unfolded", (t) => {
+  const page = mount(t, [group("API", ["a.png", "b.png"])], [], { focus: 0 });
+  page.fileList(0).open = true;
+
+  page.view.setFormat("side-by-side");
+
+  assert.equal(page.fileList(0).open, true);
+});
+
+test("another chapter's card opens with its file list folded, whatever the last one's was", (t) => {
+  // Each view opens as rendered: the fold is the chapter's, not the reviewer's.
+  const page = mount(t, [group("API", ["a.png"]), group("Docs", ["b.png"])], [], { focus: 0 });
+  page.fileList(0).open = true;
+
+  press(page, ".lsr-focus-next");
+
+  assert.equal(page.fileList(1).open, false);
 });
 
 test("a file a new round no longer has is not reported as open", (t) => {

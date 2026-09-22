@@ -16,11 +16,13 @@ import { renderProgressBar } from "../progress-bar.ts";
 import { createApprovedFormStore, type ApprovedFormStore } from "./approved-form-store.ts";
 import {
   applyCollapsePlan,
+  applyOpenFileLists,
   applyOpenFolds,
   fileBlock,
   foldSection,
   groupSection,
   isExpanded,
+  readOpenFileLists,
   readOpenFolds,
   switchSection,
 } from "./diff-folds.ts";
@@ -220,6 +222,9 @@ function openChapter(view: DiffView, index: number): void {
 function draw(view: DiffView): void {
   const { root, progress, key } = view.options;
   const { groups, approved, renderer, approval, commented, sinceLastRound, focus } = view.state;
+  // Off the markup about to go, not off held state: the browser keeps this
+  // fold and tells the mount nothing (`readOpenFileLists`).
+  const fileLists = readOpenFileLists(root);
   root.innerHTML = renderGroups({
     groups,
     approved,
@@ -232,6 +237,7 @@ function draw(view: DiffView): void {
   // Before anything is measured or painted: the reviewer is about to be
   // scrolled back into a group opened here.
   if (view.state.open) applyOpenFolds(root, view.state.open);
+  applyOpenFileLists(root, fileLists);
   reportOpen(view);
   // Approved forms on show come back in the fresh layout: see the store.
   view.forms.restore();
@@ -251,13 +257,11 @@ function handleClick(view: DiffView, event: Event): void {
   const target =
     event.target instanceof Element
       ? event.target.closest(
-          ".lsr-tick, .lsr-gate-press, .lsr-file-header, .lsr-index-entry, .lsr-form-option, .lsr-focus-exit, .lsr-focus-prev, .lsr-focus-next, .lsr-sweep-approve, .lsr-group",
+          ".lsr-tick, .lsr-gate-files-summary, .lsr-gate-press, .lsr-file-header, .lsr-index-entry, .lsr-form-option, .lsr-focus-exit, .lsr-focus-prev, .lsr-focus-next, .lsr-sweep-approve, .lsr-group",
         )
       : null;
   if (!(target instanceof HTMLElement)) return;
-  // A tick is the browser's: it fires `change`, and the card it may sit on
-  // must not read the same press as a request to open.
-  if (target.classList.contains("lsr-tick")) return;
+  if (isBrowserPress(target)) return;
   if (answeredItself(view, target)) return;
   if (isFocusControl(target)) {
     const press = focusPress(target, view.state.focus, view.state.groups.length);
@@ -421,6 +425,17 @@ function setFocus(view: DiffView, next: number | undefined): void {
   // Scroll to the top of what was entered. Instant: everything on screen is
   // a fresh draw anyway.
   view.options.root.scrollIntoView({ block: "start" });
+}
+
+/**
+ * The presses the browser answers by itself, which the card they sit on must
+ * not read as a request to open: a tick fires `change`, and the file list's
+ * summary folds its own `<details>`.
+ */
+const BROWSER_PRESSES = ["lsr-tick", "lsr-gate-files-summary"];
+
+function isBrowserPress(target: HTMLElement): boolean {
+  return BROWSER_PRESSES.some((name) => target.classList.contains(name));
 }
 
 /** The controls that move the focus: the index's entries and the bar's buttons. */
