@@ -142,3 +142,11 @@ test("a file renamed since the comment was left is still the file it was left on
 
   assert.equal(commentedOn(file("src/http/api.ts", "src/api.ts"), paths), true);
 });
+
+test("a copy of a commented file is not the file the comment was left on", () => {
+  // The source is still in the review under its own name, wearing the badge itself.
+  const paths = new Set(["src/api.ts"]);
+  const copied = { ...file("src/admin-api.ts", "src/api.ts"), status: "copied" as const };
+
+  assert.equal(commentedOn(copied, paths), false);
+});

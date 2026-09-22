@@ -1,3 +1,4 @@
+import { renamedFrom } from "../file-relocation.ts";
 import type { RoundFile, SessionRound } from "../session-store.ts";
 import type { ApprovedForm } from "./approved-form.ts";
 import { fileApproval, sameBlob } from "./history.ts";
@@ -40,8 +41,9 @@ function headOf(round: SessionRound): string | null {
  * undefined for a sha missing or too short to trust: the switch opens on a
  * diff, so it may only be offered on "provably different". Matched by today's
  * name first, the rename's old name second (`previousPath` names the base side
- * and outlives the rename by rounds). Exported for
- * `src/browser/round-changes.ts` so page and server decide by the same comparison.
+ * and outlives the rename by rounds); a copy's source is not its earlier self.
+ * Exported for `src/browser/round-changes.ts` so page and server decide by the
+ * same comparison.
  */
 export function changedFrom(
   previous: readonly RoundFile[],
@@ -49,7 +51,7 @@ export function changedFrom(
 ): RoundFile | undefined {
   const before =
     previous.find((entry) => entry.path === file.path) ??
-    previous.find((entry) => entry.path === file.previousPath);
+    previous.find((entry) => entry.path === renamedFrom(file));
   if (before === undefined || before.blob === null || file.blob === null) return undefined;
   return sameBlob(before.blob, file.blob) ? undefined : before;
 }

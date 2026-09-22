@@ -3,7 +3,13 @@ import { ReviewError } from "./errors.ts";
 import { startCall } from "./commands/home.ts";
 import type { GroupTier } from "./group-tier.ts";
 
-export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "binary";
+/**
+ * `copied`: git's `-C` found the file's text mostly in another file that is
+ * still there (`copy from`/`copy to`). Like `renamed` it carries `previousPath`
+ * and `similarity`; unlike a rename its source keeps its own history, so
+ * `src/rounds/history.ts` follows `previousPath` only for renames.
+ */
+export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "copied" | "binary";
 
 /**
  * One `@@ … @@` region kept as the exact bytes git wrote (`header` = the `@@`
@@ -32,7 +38,7 @@ export interface DiffFile {
   deletions: number;
   /** True when the diff is big enough that the browser should lazy-render it. */
   oversized: boolean;
-  /** Rename source; the old version of the file lives under this name. */
+  /** Rename or copy source; the old version of the file lives under this name. */
   previousPath?: string;
   /** git's rename/copy similarity (0-100): `98% identical` is skim vs re-read. */
   similarity?: number;
@@ -131,12 +137,20 @@ export function diffStats(files: DiffFile[]): DiffStats {
 
 /**
  * `--histogram`: anchors hunks on rare lines so an inserted block reads as one.
- * `-M -C`: renames reported as renames whatever the user's `diff.renames` says.
+ * `-M40% -C40%`: renames and copies reported whatever the user's `diff.renames`
+ * says, paired down to 40% similar rather than git's default 50%. A file moved
+ * to another directory has its imports re-pointed on the way, and with a test
+ * id renamed or a hook generalised on top it scored 43–49% — under the default,
+ * so the review showed it twice, as a deleted file and an added one. 40% is the
+ * lowest threshold at which every extra pair in the user's real history was a
+ * true move; from 30% down, CSS modules and boilerplate start pairing with
+ * strangers. Both flags carry the number: git keeps one score for both, and a
+ * bare `-C` after `-M40%` resets it to 50% (measured, git 2.43).
  * `--full-index`: rounds compare `index` shas to tell edited from untouched;
  * abbreviated width is git's choice (repo size, `core.abbrev`), so two rounds
  * could name one object differently — the full sha never varies.
  */
-const DIFF_ARGS = ["diff", "--histogram", "-M", "-C", "--full-index"];
+const DIFF_ARGS = ["diff", "--histogram", "-M40%", "-C40%", "--full-index"];
 
 /** `base...branch`: everything the branch added since the two last agreed. */
 function ref(base: string, branch: string): string {
@@ -278,6 +292,7 @@ function readStatus(lines: string[], isBinary: boolean): DiffFileStatus {
   if (lines.some((line) => line.startsWith("new file mode"))) return "added";
   if (lines.some((line) => line.startsWith("deleted file mode"))) return "deleted";
   if (lines.some((line) => line.startsWith("rename to "))) return "renamed";
+  if (lines.some((line) => line.startsWith("copy to "))) return "copied";
   return "modified";
 }
 

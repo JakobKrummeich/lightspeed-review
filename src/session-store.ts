@@ -152,7 +152,10 @@ export interface RoundMark {
 /** One file of the review as it stood in one round. */
 export interface RoundFile {
   path: string;
-  /** Where a rename came from, under the name that round's diff used. */
+  /**
+   * Where a rename or copy came from, under the name that round's diff used.
+   * Only a rename's is followed through the rounds (`renamedFrom`).
+   */
   previousPath?: string;
   status: DiffFileStatus;
   /**

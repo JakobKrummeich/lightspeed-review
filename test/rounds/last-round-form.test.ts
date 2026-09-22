@@ -108,6 +108,19 @@ test("a file whose approval was withdrawn still gets the last-round switch", () 
   assert.equal(form.toCommit, "head2");
 });
 
+test("a file copied from another this round is new, whatever its source did last round", () => {
+  // The source is still there under its own name: the copy is not its edit.
+  const rounds = [
+    round(0, [file("src/a.ts", "aaa1111")]),
+    round(1, [
+      file("src/a.ts", "aaa1111"),
+      { path: "src/b.ts", status: "copied", blob: "bbb2222", previousPath: "src/a.ts" },
+    ]),
+  ];
+
+  assert.equal(lastRoundForm(rounds, "src/b.ts"), undefined);
+});
+
 test("a rename between the two rounds is asked for under both names", () => {
   const rounds = [
     round(0, [file("src/old.ts", "01d1111")]),

@@ -338,8 +338,10 @@ function classificationMark(file: DiffFile, classify?: ClassifyConfig): string {
 }
 
 /**
- * A rename git measured is mechanical by arithmetic, not by judgement: with the
- * similarity on the line, the quarantine group is a fact the model can read.
+ * A rename or copy git measured is mechanical by arithmetic, not by judgement:
+ * with the similarity on the line, the quarantine group is a fact the model can
+ * read. The status before it is git's own word, so the line says `renamed from`
+ * or `copied from`.
  */
 function renameMark(file: DiffFile): string {
   if (file.previousPath === undefined) return "";

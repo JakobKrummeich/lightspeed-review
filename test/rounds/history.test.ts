@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   carriedApproval,
   changedBetween,
+  currentName,
   fileApproval,
   fileHistory,
   firstSeenRound,
@@ -30,6 +31,11 @@ function file(path: string, blob: string | null, previousPath?: string): RoundFi
     blob,
     ...(previousPath === undefined ? {} : { previousPath }),
   };
+}
+
+/** A file git's `-C` paired with one that is still there: `previousPath` names the source. */
+function copy(path: string, blob: string | null, previousPath: string): RoundFile {
+  return { path, status: "copied", blob, previousPath };
 }
 
 test("fileHistory lists a file's rounds oldest first", () => {
@@ -64,6 +70,41 @@ test("fileHistory follows a rename back to the name the file had then", () => {
   ]);
 });
 
+test("fileHistory starts a copy at the copy: its source's rounds stay the source's", () => {
+  // A copy carries `previousPath` like a rename, but the source did not go
+  // anywhere — walking into its rounds would hand a new file another's past.
+  const rounds = [
+    round(0, [file("src/a.ts", "aaa1111")], ["src/a.ts"]),
+    round(1, [file("src/a.ts", "aaa1111"), copy("src/b.ts", "bbb1111", "src/a.ts")]),
+  ];
+
+  assert.deepEqual(fileHistory(rounds, "src/b.ts"), [
+    { round: 1, path: "src/b.ts", blob: "bbb1111", status: "copied", approved: false },
+  ]);
+});
+
+test("currentName follows a rename forward, and leaves the source of a copy where it is", () => {
+  const current = round(1, [
+    file("src/new.ts", "5ee1111", "src/old.ts"),
+    file("src/a.ts", "aaa1111"),
+    copy("src/b.ts", "bbb1111", "src/a.ts"),
+  ]);
+
+  assert.equal(currentName(current, "src/old.ts"), "src/new.ts");
+  // A comment left on `src/a.ts` is about `src/a.ts`, which is still here.
+  assert.equal(currentName(current, "src/a.ts"), "src/a.ts");
+});
+
+test("a copy of an approved file arrives unapproved: nobody ticked the copy", () => {
+  const rounds = [
+    round(0, [file("src/a.ts", "aaa1111")], ["src/a.ts"]),
+    round(1, [file("src/a.ts", "aaa1111"), copy("src/b.ts", "aaa1111", "src/a.ts")]),
+  ];
+
+  assert.equal(fileApproval(rounds, "src/b.ts"), "unapproved");
+  assert.equal(fileApproval(rounds, "src/a.ts"), "approved");
+});
+
 test("changedBetween compares the blobs of the two rounds", () => {
   const first = round(0, [file("src/a.ts", "aaa1111")]);
   const same = round(1, [file("src/a.ts", "aaa1111")]);
@@ -78,6 +119,13 @@ test("changedBetween resolves the earlier round's name across a rename", () => {
   const renamedOnly = round(1, [file("src/new.ts", "aaa1111", "src/old.ts")]);
 
   assert.equal(changedBetween(first, renamedOnly, "src/new.ts"), false);
+});
+
+test("changedBetween reports a copy as new, whatever its source's blob was", () => {
+  const first = round(0, [file("src/a.ts", "aaa1111")]);
+  const copied = round(1, [file("src/a.ts", "aaa1111"), copy("src/b.ts", "aaa1111", "src/a.ts")]);
+
+  assert.equal(changedBetween(first, copied, "src/b.ts"), true);
 });
 
 test("changedBetween sees through an abbreviation git widened between rounds", () => {

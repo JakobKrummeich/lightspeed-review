@@ -1,4 +1,5 @@
 import type { DiffFile } from "../diff-extract.ts";
+import { renamedFrom } from "../file-relocation.ts";
 import type { ConversationEntry, RoundMark } from "../session-store.ts";
 import { roundOf } from "./conversation-rounds.ts";
 
@@ -25,13 +26,15 @@ export function commentedLastRound(
 }
 
 /**
- * Whether this row is one of them. `previousPath` is tried too, but that is
- * git's rename since the merge base (`diff-extract.ts`), not what last round
+ * Whether this row is one of them. A rename's old name is tried too, but that
+ * is git's rename since the merge base (`diff-extract.ts`), not what last round
  * called the file — so some renames lose the badge. Left partial on purpose:
  * following renames through rounds is `fileHistory` in `rounds/history.ts`,
  * which needs the whole `SessionRound[]` — not worth sending to the browser.
+ * A copy's source is not tried: it is still on the page, wearing the badge itself.
  */
 export function commentedOn(file: DiffFile, commented: ReadonlySet<string>): boolean {
   if (commented.has(file.path)) return true;
-  return file.previousPath !== undefined && commented.has(file.previousPath);
+  const earlierName = renamedFrom(file);
+  return earlierName !== undefined && commented.has(earlierName);
 }

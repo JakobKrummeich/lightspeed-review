@@ -1,4 +1,5 @@
 import type { DiffFileStatus } from "../diff-extract.ts";
+import { renamedFrom } from "../file-relocation.ts";
 import type { RoundFile, SessionRound } from "../session-store.ts";
 
 /**
@@ -36,6 +37,7 @@ export interface SettledFile {
 /**
  * Every round a file took part in, oldest first, under whatever name it had at
  * the time — a rename is followed backwards, so callers pass today's path only.
+ * A copy is not followed: its history begins with the copy (`renamedFrom`).
  */
 export function fileHistory(rounds: SessionRound[], path: string): FileAppearance[] {
   const appearances: FileAppearance[] = [];
@@ -52,19 +54,19 @@ export function fileHistory(rounds: SessionRound[], path: string): FileAppearanc
       status: file.status,
       approved: round.approvedAtEnd.includes(name),
     });
-    if (file.previousPath !== undefined) name = file.previousPath;
+    name = renamedFrom(file) ?? name;
   }
   return appearances.reverse();
 }
 
 /**
  * The name `path` goes by in a later round: a rename since makes the file show
- * up there as the new name's `previousPath`. Shared by the ledger's outcomes
- * and the between-rounds replay, so the two cannot disagree on which file a
- * verdict is about.
+ * up there as the new name's `previousPath`; a copy since leaves `path` where
+ * it is. Shared by the ledger's outcomes and the between-rounds replay, so the
+ * two cannot disagree on which file a verdict is about.
  */
 export function currentName(current: SessionRound, path: string): string {
-  return current.files.find((file) => file.previousPath === path)?.path ?? path;
+  return current.files.find((file) => renamedFrom(file) === path)?.path ?? path;
 }
 
 /**
@@ -75,7 +77,7 @@ export function currentName(current: SessionRound, path: string): string {
  */
 export function changedBetween(a: SessionRound, b: SessionRound, path: string): boolean {
   const later = fileIn(b, path);
-  const earlier = fileIn(a, later?.previousPath ?? path);
+  const earlier = fileIn(a, (later && renamedFrom(later)) ?? path);
   return !sameBlob(later?.blob ?? null, earlier?.blob ?? null);
 }
 
