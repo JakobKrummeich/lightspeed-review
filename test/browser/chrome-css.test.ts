@@ -64,9 +64,12 @@ test("every gap between things is a step of one scale", () => {
   // 23 unrelated spacing values used to live here; every gap must come off one scale.
   const spacing =
     /^\s*(padding|margin|gap|row-gap|column-gap)(-top|-right|-bottom|-left)?: ([^;]+);/;
+  // A step with a border's width taken back off it is still that step: the words land where
+  // they do on a card without the border.
+  const stepLessBorder = /^calc\(var\(--lsr-space-\d+\) - \d+px\)$/;
   const offScale = lines.filter((line) => {
     const value = spacing.exec(line)?.[3];
-    if (value === undefined) return false;
+    if (value === undefined || stepLessBorder.test(value)) return false;
     // The code line's left padding is the gutter it clears, not a gap.
     return value
       .split(/\s+/)
@@ -393,6 +396,57 @@ test("an earlier round's messages read as history without being faded out", () =
   assert.equal(earlier.length, 1);
   assert.match(earlier[0] ?? "", /background: none;/);
   assert.doesNotMatch(earlier[0] ?? "", /opacity/);
+});
+
+test("each voice of the sidechat is one hue, worn as a bar down the card and on its label", () => {
+  // The agent keeps the accent it has everywhere else on the page; the reviewer the violet of
+  // the replay. The bar is the glance, the label the word for whoever cannot tell the hues apart.
+  assert.match(
+    rulesFor('.lsr-entry[data-role="agent"]').join(""),
+    /--lsr-speaker: var\(--lsr-accent\);/,
+  );
+  assert.match(
+    rulesFor('.lsr-entry[data-role="reviewer"]').join(""),
+    /--lsr-speaker: var\(--lsr-violet\);/,
+  );
+
+  const card = rulesFor(".lsr-entry[data-role]").join("");
+  assert.match(card, /border-left: 3px solid var\(--lsr-speaker\);/);
+  // The bar is inside the box: without giving its width back, a card's words sat 3px right of
+  // the pills sharing the base padding.
+  assert.match(card, /padding-left: calc\(var\(--lsr-space-3\) - 3px\);/);
+
+  assert.match(
+    rulesFor(".lsr-entry[data-role] .lsr-entry-role").join(""),
+    /color: color-mix\(in oklab, var\(--lsr-speaker\) 80%, var\(--lsr-text\)\);/,
+  );
+});
+
+test("a live round's card is tinted with its voice at 6%, and an earlier round's is not", () => {
+  // 6% is measured, not eyeballed: at 12% the accent label on the tinted light card was 4.21:1
+  // and the muted caption 4.29:1, both under AA; at 6% they are 4.57:1 and 4.65:1 with the
+  // raw hue, and the label's step toward the text takes it to 5.52:1. The caption's own step
+  // is for the night scheme, where any lift of the card takes muted grey under the 4.31:1 it
+  // had on the plain card: at 6% it is 3.96:1 as it was and 4.72:1 with the step.
+  const live = rulesFor('.lsr-entry[data-role][data-round-state="current"]').join("");
+  assert.match(
+    live,
+    /background: color-mix\(in oklab, var\(--lsr-speaker\) 6%, var\(--lsr-raised\)\);/,
+  );
+
+  const caption = rulesFor(
+    '.lsr-entry[data-role][data-round-state="current"] .lsr-prompt-file:not(:hover)',
+  ).join("");
+  assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 80%, var\(--lsr-text\)\);/);
+
+  assert.match(rulesFor('.lsr-entry[data-round-state="earlier"]').join(""), /background: none;/);
+});
+
+test("a question inside the agent's card keeps its inset but not its own bar", () => {
+  // The card's 3px accent bar and the question's 2px one stood a few px apart: two bars, one voice.
+  const question = rulesFor('.lsr-entry[data-role="agent"] .lsr-prompt[data-kind="question"]');
+  assert.equal(question.length, 1);
+  assert.match(question[0] ?? "", /border-left: 0;/);
 });
 
 // Regression: regions naming only one axis let auto-flow deal them the wrong cells.

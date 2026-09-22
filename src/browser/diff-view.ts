@@ -270,13 +270,14 @@ function renderFile(row: FileRow): string {
 function relocationBadge(file: DiffFile): string {
   const relocation = relocationOf(file);
   if (relocation === undefined) return "";
-  const identical =
-    unchangedRelocationOf(file) !== undefined
-      ? ", identical"
-      : file.similarity === undefined
-        ? ""
-        : `, ${file.similarity}% identical`;
-  return `<span class="lsr-file-rename">${relocation}${identical}</span>`;
+  return `<span class="lsr-file-rename">${relocation}${similarityNote(file)}</span>`;
+}
+
+/** `, identical` with nothing on top of the move, git's score otherwise, nothing when git gave none. */
+function similarityNote(file: DiffFile): string {
+  if (unchangedRelocationOf(file) !== undefined) return ", identical";
+  if (file.similarity === undefined) return "";
+  return `, ${file.similarity}% identical`;
 }
 
 /** Where the thinking is inside this group; see `hunk-complexity.ts` for what it counts. */

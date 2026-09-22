@@ -133,6 +133,10 @@
  * itself. The bar and the tint are the glance; the label is also the word,
  * for whoever cannot tell cobalt from violet. Both hues and the card base go
  * through `light-dark()`, so the mix follows the scheme on its own.
+ *
+ * The bar is inside the box, so its width comes back off the padding: with it
+ * left in, a card's words sat 3px right of the pills that share the base
+ * padding above.
  */
 .lsr-entry[data-role="agent"] {
   --lsr-speaker: var(--lsr-accent);
@@ -144,10 +148,19 @@
 
 .lsr-entry[data-role] {
   border-left: 3px solid var(--lsr-speaker);
+  padding-left: calc(var(--lsr-space-3) - 3px);
 }
 
+/*
+ * A fifth of the way from the hue to the text, not the hue raw: the tint
+ * below takes contrast off everything on the card, and the label is the one
+ * thing on it set in the hue. On the light 6% card the raw accent reads at
+ * 4.57:1 and this at 5.52:1 (violet 6.19 → 6.97; night 5.15 → 5.74 and
+ * 6.17 → 6.60), so the label also carries the colour the tint was turned
+ * down from.
+ */
 .lsr-entry[data-role] .lsr-entry-role {
-  color: var(--lsr-speaker);
+  color: color-mix(in oklab, var(--lsr-speaker) 80%, var(--lsr-text));
 }
 
 /*
@@ -155,9 +168,25 @@
  * opaque and lifted and only gains a hue. Live rounds only, by selector rather
  * than by cascade order: the tint is the lift in colour, and the rule below
  * takes the lift off an earlier round.
+ *
+ * 6%, down from 12%, is where the light scheme keeps AA: at 12% the accent
+ * label on the agent's card was 4.21:1 and the muted caption 4.29:1; at 6%
+ * they are 4.57:1 and 4.65:1 (measured in oklab, sRGB, WCAG 2). The cards
+ * read as coloured through the bar and the label above instead.
  */
 .lsr-entry[data-role][data-round-state="current"] {
-  background: color-mix(in oklab, var(--lsr-speaker) 12%, var(--lsr-raised));
+  background: color-mix(in oklab, var(--lsr-speaker) 6%, var(--lsr-raised));
+}
+
+/*
+ * The caption on a live card takes the same fifth of a step toward the text.
+ * In the night scheme the hues are bright, so any tint of the dark card is a
+ * lift, and the muted caption — 4.31:1 on the plain card already — lands at
+ * 3.96:1 on the 6% one; the step puts it at 4.72:1 (violet 4.63:1), and on
+ * paper at 5.57:1. Not on hover, which keeps the accent it answers with.
+ */
+.lsr-entry[data-role][data-round-state="current"] .lsr-prompt-file:not(:hover) {
+  color: color-mix(in oklab, var(--lsr-muted) 80%, var(--lsr-text));
 }
 
 /*
@@ -233,6 +262,15 @@
 .lsr-prompt[data-kind="question"] {
   border-left: 2px solid var(--lsr-accent);
   padding-left: var(--lsr-space-3);
+}
+
+/*
+ * Inside the agent's own card the voice's bar already runs down the edge, and
+ * the question's stood a few px in from it: two bars, one voice. The inset
+ * stays, so the question is still set apart from the lines around it.
+ */
+.lsr-entry[data-role="agent"] .lsr-prompt[data-kind="question"] {
+  border-left: 0;
 }
 
 /*

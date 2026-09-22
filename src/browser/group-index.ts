@@ -31,13 +31,22 @@ export function groupIndexEntries(groups: DiffGroup[], approved: string[]): Grou
   const densest = heaviestGroups(groups);
   return groups.map((group, index) => ({
     name: group.name,
-    files: group.files.length,
-    insertions: sum(group, (file) => file.insertions),
-    deletions: sum(group, (file) => file.deletions),
+    ...groupSize(group),
     approved: group.files.filter((file) => approved.includes(file.path)).length,
     densestLogic: densest.includes(index),
     sweep: isSweep(group),
   }));
+}
+
+/** How big a chapter is, in the three numbers every surface says it in: the survey's row, the card's folded list. */
+export function groupSize(
+  group: DiffGroup,
+): Pick<GroupIndexEntry, "files" | "insertions" | "deletions"> {
+  return {
+    files: group.files.length,
+    insertions: sum(group, (file) => file.insertions),
+    deletions: sum(group, (file) => file.deletions),
+  };
 }
 
 export function indexCounterLabel(entry: GroupIndexEntry): string {
@@ -59,6 +68,11 @@ export function indexFilesLabel(entry: GroupIndexEntry): string {
 /** How many files, wherever a chapter's size is said: the survey's row and lane, the card's folded list. */
 export function filesLabel(files: number): string {
   return `${files} file${files === 1 ? "" : "s"}`;
+}
+
+/** How many lines, beside the file count wherever it is said. */
+export function linesLabel(insertions: number, deletions: number): string {
+  return `+${insertions} −${deletions}`;
 }
 
 /**
@@ -144,7 +158,7 @@ function renderEntry(entry: GroupIndexEntry, index: number): string {
       <button type="button" class="lsr-index-entry" data-group-index="${index}">
         <span class="lsr-index-name">${escapeHtml(entry.name)}</span>
         <span class="lsr-index-files">${indexFilesLabel(entry)}</span>
-        <span class="lsr-index-lines">+${entry.insertions} −${entry.deletions}</span>
+        <span class="lsr-index-lines">${linesLabel(entry.insertions, entry.deletions)}</span>
         <span class="lsr-index-counter">${indexCounterLabel(entry)}</span>
         <span class="lsr-index-logic"${entry.densestLogic ? "" : " hidden"}>${LOGIC_BADGE_LABEL}</span>
       </button>

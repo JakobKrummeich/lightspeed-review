@@ -2,7 +2,7 @@ import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
 import { relocationOf, unchangedRelocationOf } from "../file-relocation.ts";
 import { isSweep } from "../group-tier.ts";
-import { filesLabel, groupIndexEntries } from "./group-index.ts";
+import { filesLabel, groupIndexEntries, groupSize, linesLabel } from "./group-index.ts";
 import { pathLabel } from "./path-label.ts";
 
 /**
@@ -98,7 +98,7 @@ export function renderChapterGate({ group, contentId, counter }: ChapterGate): s
     <h2 class="lsr-gate-name">${escapeHtml(group.name)}</h2>${tierLine(group)}
     <p class="lsr-gate-rationale">${escapeHtml(group.rationale)}</p>
     <details class="lsr-gate-files">
-      <summary class="lsr-gate-files-summary">${filesSummary(group.files)}</summary>
+      <summary class="lsr-gate-files-summary">${filesSummary(group)}</summary>
       <ul class="lsr-gate-files-list">
         ${group.files.map(gateFile).join("\n        ")}
       </ul>
@@ -127,10 +127,9 @@ function tierLine(group: DiffGroup): string {
  * the count and the size are what a card is read for at a glance; the paths
  * are for the reviewer checking the rationale against them, one press away.
  */
-function filesSummary(files: DiffFile[]): string {
-  const insertions = files.reduce((total, file) => total + file.insertions, 0);
-  const deletions = files.reduce((total, file) => total + file.deletions, 0);
-  return `${filesLabel(files.length)} · +${insertions} −${deletions}`;
+function filesSummary(group: DiffGroup): string {
+  const { files, insertions, deletions } = groupSize(group);
+  return `${filesLabel(files)} · ${linesLabel(insertions, deletions)}`;
 }
 
 /**
@@ -147,7 +146,7 @@ function gateFile(file: DiffFile): string {
 
 /** `+n −m`, with the relocation's word in front of it — or alone, when the word is the whole change. */
 function sizeLabel(file: DiffFile): string {
-  const lines = `+${file.insertions} −${file.deletions}`;
+  const lines = linesLabel(file.insertions, file.deletions);
   const relocation = relocationOf(file);
   if (relocation === undefined) return lines;
   return unchangedRelocationOf(file) === undefined ? `${relocation} · ${lines}` : relocation;
