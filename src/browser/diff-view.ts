@@ -1,5 +1,11 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
+import {
+  isUnchangedRelocation,
+  pathLabel,
+  relocationOf,
+  type Relocation,
+} from "../file-relocation.ts";
 import { reviewPaths } from "../review-files.ts";
 import type { Approval } from "../rounds/history.ts";
 import {
@@ -238,13 +244,15 @@ function renderFile(row: FileRow): string {
   const contentId = `lsr-file-content-${id}`;
   // `data-group`: which concern an annotation was made under (task 8).
   // `data-status`: which versions exist, so the page only asks git for those.
+  // Every identity (`data-file`, the tick, the label) is the new path alone; a
+  // relocated file's old path is words on the row, never a key.
   // Tick follows the diff (reading ends at the last line; a top tick means
   // scrolling back), and is a sibling of it so collapsing keeps it on screen.
   return `<div class="lsr-file" data-file="${path}" data-approval="${approval}"${formAttribute(file, approval, row.sinceLastRound)} data-status="${file.status}" data-group="${escapeHtml(groupName)}">
       <div class="lsr-row">
         <button type="button" class="lsr-file-header" aria-expanded="${!isApproved}" aria-controls="${contentId}">
-          <span class="lsr-file-path">${path}</span>
-          <span class="lsr-file-stats">+${file.insertions} −${file.deletions}</span>${renameBadge(file)}${logicBadge(row.densestLogic)}${commentedBadge(row.commented)}${approvalBadge(approval)}
+          <span class="lsr-file-path">${pathLabel(file)}</span>
+          <span class="lsr-file-stats">+${file.insertions} −${file.deletions}</span>${relocationBadge(file)}${logicBadge(row.densestLogic)}${commentedBadge(row.commented)}${approvalBadge(approval)}
         </button>${formSwitch(file, approval, row.sinceLastRound)}
       </div>
       <div class="lsr-file-diff" id="${contentId}"${isApproved ? " hidden" : ""}>${renderFileBody(file, renderer)}</div>
@@ -258,13 +266,20 @@ function renderFile(row: FileRow): string {
 }
 
 /**
- * Rename plus similarity, which the diff alone never says: `98% identical` is
- * the difference between skimming and re-reading 400 lines.
+ * The relocation's word plus git's similarity, which the diff alone never
+ * says: `98% identical` is the difference between skimming and re-reading 400
+ * lines. The old path is not repeated here: the row's path already reads
+ * `old → new`.
  */
-function renameBadge(file: DiffFile): string {
-  if (file.previousPath === undefined) return "";
-  const identical = file.similarity === undefined ? "" : `, ${file.similarity}% identical`;
-  return `<span class="lsr-file-rename">renamed from ${escapeHtml(file.previousPath)}${identical}</span>`;
+function relocationBadge(file: DiffFile): string {
+  const relocation = relocationOf(file);
+  if (relocation === undefined) return "";
+  const identical = isUnchangedRelocation(file)
+    ? ", identical"
+    : file.similarity === undefined
+      ? ""
+      : `, ${file.similarity}% identical`;
+  return `<span class="lsr-file-rename">${relocation}${identical}</span>`;
 }
 
 /** Where the thinking is inside this group; see `hunk-complexity.ts` for what it counts. */
@@ -345,11 +360,24 @@ function formSwitch(file: DiffFile, approval: Approval, sinceLastRound: boolean)
 
 /**
  * One file's branch diff. Exported: the mount re-renders it when a file
- * switches back from the approved form.
+ * switches back from the approved form. A relocation git found identical is a
+ * header-only patch, which diff2html draws as "File without changes" — true,
+ * and silent on the one thing there is to know, where it came from.
  */
 export function renderFileBody(file: DiffFile, renderer: DiffRenderer): string {
   if (file.status === "binary") {
     return `<p class="lsr-binary">Binary file — no diff to show.</p>`;
   }
+  const relocation = relocationOf(file);
+  if (relocation !== undefined && isUnchangedRelocation(file)) {
+    return `<p class="lsr-unchanged">${UNCHANGED_RELOCATION[relocation]} unchanged from <code>${escapeHtml(file.previousPath ?? "")}</code>.</p>`;
+  }
   return renderer.renderFile(file.diff);
 }
+
+/** The relocation's word as the sentence above opens: literal keys, one per word. */
+const UNCHANGED_RELOCATION: Record<Relocation, string> = {
+  moved: "Moved",
+  renamed: "Renamed",
+  copied: "Copied",
+};

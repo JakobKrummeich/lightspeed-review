@@ -1,5 +1,6 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
+import { isUnchangedRelocation, pathLabel, relocationOf } from "../file-relocation.ts";
 import { isSweep } from "../group-tier.ts";
 import { filesLabel, groupIndexEntries } from "./group-index.ts";
 
@@ -135,8 +136,18 @@ function filesSummary(files: DiffFile[]): string {
  * One file of the chapter with the size of its change. The list is what makes
  * the rationale checkable: these paths and these many lines are the whole of
  * what the press opens, so a rationale that describes something else is caught
- * before the diff is read rather than after.
+ * before the diff is read rather than after. A relocated file shows both of
+ * its paths and the word for it: `src/new/thing.ts +0 −0` read as a file nobody
+ * touched, when the move was the change.
  */
 function gateFile(file: DiffFile): string {
-  return `<li class="lsr-gate-file"><span class="lsr-gate-path">${escapeHtml(file.path)}</span><span class="lsr-gate-lines">+${file.insertions} −${file.deletions}</span></li>`;
+  return `<li class="lsr-gate-file"><span class="lsr-gate-path">${pathLabel(file)}</span><span class="lsr-gate-lines">${sizeLabel(file)}</span></li>`;
+}
+
+/** `+n −m`, with the relocation's word in front of it — or alone, when the word is the whole change. */
+function sizeLabel(file: DiffFile): string {
+  const lines = `+${file.insertions} −${file.deletions}`;
+  const relocation = relocationOf(file);
+  if (relocation === undefined) return lines;
+  return isUnchangedRelocation(file) ? relocation : `${relocation} · ${lines}`;
 }

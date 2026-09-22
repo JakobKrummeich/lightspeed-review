@@ -548,17 +548,89 @@ test("the heaviest file in a group wears the logic badge on its row", () => {
   assert.deepEqual(badged, ["src/pay.ts"]);
 });
 
-test("a renamed file's row says so, with git's own similarity", () => {
-  const renamed = {
+test("a moved file's header shows both paths, and says moved with git's own similarity", () => {
+  const moved = {
     ...file("src/auth/token.ts"),
     status: "renamed" as const,
     previousPath: "src/token.ts",
     similarity: 96,
   };
 
-  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [renamed] }] });
+  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [moved] }] });
 
-  assert.match(html, /renamed from src\/token\.ts, 96% identical/);
+  assert.match(html, /<span class="lsr-file-path">src\/token\.ts → src\/auth\/token\.ts<\/span>/);
+  assert.match(html, /<span class="lsr-file-rename">moved, 96% identical<\/span>/);
+  // Every identity stays on the new path: the tick, the block and the label.
+  assert.match(html, /class="lsr-file" data-file="src\/auth\/token\.ts"/);
+  assert.match(html, /class="lsr-approved" data-file="src\/auth\/token\.ts"/);
+  assert.match(html, /aria-label="Mark src\/auth\/token\.ts approved"/);
+});
+
+test("a rename within its directory says renamed, and a copy says copied", () => {
+  const renamed = {
+    ...file("src/auth/session.ts"),
+    status: "renamed" as const,
+    previousPath: "src/auth/token.ts",
+    similarity: 96,
+  };
+  const copied = {
+    ...file("src/auth/admin-session.ts"),
+    status: "copied" as const,
+    previousPath: "src/auth/session.ts",
+    similarity: 80,
+  };
+
+  const html = chapter({
+    groups: [{ name: "Moves", rationale: "mechanical", files: [renamed, copied] }],
+  });
+
+  assert.match(html, /<span class="lsr-file-rename">renamed, 96% identical<\/span>/);
+  assert.match(html, /<span class="lsr-file-rename">copied, 80% identical<\/span>/);
+});
+
+test("a move git found identical says so once, in place of a diff with nothing in it", () => {
+  // diff2html draws "File without changes" for a header-only patch: true, and
+  // the one thing the reviewer needs to know — where it came from — unsaid.
+  const moved = {
+    ...file("src/auth/token.ts", { insertions: 0, deletions: 0 }),
+    status: "renamed" as const,
+    previousPath: "src/token.ts",
+    similarity: 100,
+    diff: "diff --git a/src/token.ts b/src/auth/token.ts\nsimilarity index 100%\nrename from src/token.ts\nrename to src/auth/token.ts",
+  };
+
+  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [moved] }] });
+
+  assert.match(html, /<span class="lsr-file-rename">moved, identical<\/span>/);
+  assert.match(
+    html,
+    /<p class="lsr-unchanged">Moved unchanged from <code>src\/token\.ts<\/code>\.<\/p>/,
+  );
+  assert.doesNotMatch(html, /<pre class="stub">/, "nothing is handed to the diff renderer");
+});
+
+test("a copy git found identical is said in its own word", () => {
+  const copied = {
+    ...file("src/auth/admin.ts", { insertions: 0, deletions: 0 }),
+    status: "copied" as const,
+    previousPath: "src/auth/user.ts",
+    similarity: 100,
+  };
+
+  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [copied] }] });
+
+  assert.match(
+    html,
+    /<p class="lsr-unchanged">Copied unchanged from <code>src\/auth\/user\.ts<\/code>\.<\/p>/,
+  );
+});
+
+test("a binary file keeps its own line: it is not a relocation", () => {
+  const html = chapter({
+    groups: [{ name: "Assets", rationale: "why", files: [file("logo.png", { status: "binary" })] }],
+  });
+
+  assert.match(html, /<p class="lsr-binary">Binary file — no diff to show\.<\/p>/);
 });
 
 test("a file the reviewer commented on last round is marked, and its neighbours are not", () => {

@@ -112,6 +112,78 @@ test("the gate lists every file of the chapter with the size of its change", () 
   assert.match(html, /\+4 −0/);
 });
 
+test("a moved file's row shows both of its paths, and the word in place of a change of nothing", () => {
+  // `src/new/thing.ts +0 −0` read as a file nobody touched; the move is the change.
+  const moved = {
+    ...file("src/new/thing.ts", 0, 0),
+    status: "renamed" as const,
+    previousPath: "src/old/thing.ts",
+    similarity: 100,
+  };
+
+  const html = gate({ name: "Moves", rationale: "why Moves", files: [moved] });
+
+  assert.match(
+    html,
+    /<span class="lsr-gate-path">src\/old\/thing\.ts → src\/new\/thing\.ts<\/span><span class="lsr-gate-lines">moved<\/span>/,
+  );
+  // The chapter's own summary line still counts lines; the row is what says the word.
+  assert.doesNotMatch(html, /lsr-gate-lines">\+0 −0/);
+});
+
+test("a file moved and edited says both: the word, then the size of the edit", () => {
+  const moved = {
+    ...file("src/new/thing.ts", 11, 11),
+    status: "renamed" as const,
+    previousPath: "src/old/thing.ts",
+    similarity: 44,
+  };
+
+  const html = gate({ name: "Moves", rationale: "why Moves", files: [moved] });
+
+  assert.match(html, /<span class="lsr-gate-lines">moved · \+11 −11<\/span>/);
+});
+
+test("a rename within its directory is renamed, and a copy is copied", () => {
+  const renamed = {
+    ...file("src/auth/session.ts", 0, 0),
+    status: "renamed" as const,
+    previousPath: "src/auth/token.ts",
+    similarity: 100,
+  };
+  const copied = {
+    ...file("src/auth/admin-session.ts", 1, 1),
+    status: "copied" as const,
+    previousPath: "src/auth/session.ts",
+    similarity: 80,
+  };
+
+  const html = gate({ name: "Moves", rationale: "why Moves", files: [renamed, copied] });
+
+  assert.match(
+    html,
+    /src\/auth\/token\.ts → src\/auth\/session\.ts<\/span><span class="lsr-gate-lines">renamed<\/span>/,
+  );
+  assert.match(
+    html,
+    /src\/auth\/session\.ts → src\/auth\/admin-session\.ts<\/span><span class="lsr-gate-lines">copied · \+1 −1<\/span>/,
+  );
+});
+
+test("both paths of a moved file are escaped, never injected", () => {
+  const moved = {
+    ...file("src/<b>new</b>.ts", 0, 0),
+    status: "renamed" as const,
+    previousPath: "src/old/<i>x</i>.ts",
+    similarity: 100,
+  };
+
+  const html = gate({ name: "Moves", rationale: "why Moves", files: [moved] });
+
+  assert.doesNotMatch(html, /<b>|<i>/);
+  assert.match(html, /src\/old\/&lt;i&gt;x&lt;\/i&gt;\.ts → src\/&lt;b&gt;new&lt;\/b&gt;\.ts/);
+});
+
 test("the file list is folded by default, behind one line that says how much there is", () => {
   // The count and the size say enough at a glance; the paths are for the
   // reviewer who wants to check the rationale against them, one press away.

@@ -100,9 +100,9 @@
 }
 
 /*
- * Mechanical, not logical: the quietest thing on the row it explains. It may be
- * cut short — it names a path, and the head of a path is enough to
- * recognise it by.
+ * Mechanical, not logical: the quietest thing on the row it explains. The
+ * word and git's percentage (`moved, 96% identical`); the paths are in the
+ * row's path, which wraps, so this may stay on one line and be cut short.
  */
 .lsr-file-rename {
   color: var(--lsr-muted);
@@ -375,6 +375,12 @@
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   font-size: var(--lsr-size-ui);
   line-height: var(--lsr-leading-tight);
+}
+
+/* A relocated file's path is two paths and an arrow: wrapped, like the gate's, never run off the row. */
+.lsr-file-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .lsr-file-stats {
