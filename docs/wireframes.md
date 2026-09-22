@@ -149,7 +149,7 @@ diff rendered but shut behind one press.
 │   │ What happened, one sentence.                         │        │ .lsr-gate-rationale (lead)
 │   │ ▸ 2 files · +16 −3                                   │        │ details.lsr-gate-files / -summary (shut)
 │   │   src/path/file.ts              +12 −3               │        │ .lsr-gate-files-list / -file, once opened
-│   │   src/old.ts → src/other.ts     moved · +4 −0        │        │ .lsr-gate-path / -lines
+│   │   src/old/a.ts → src/new/a.ts   moved · +4 −0        │        │ .lsr-gate-path / -lines
 │   │ 1/3 approved                                         │        │ .lsr-gate-counter
 │   │ ( Read the diff )                                    │        │ .lsr-gate-press
 │   │                              approve chapter [ ]     │        │ .lsr-group-foot
@@ -297,6 +297,12 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 States: sending — primary reads "Sending…", all compose controls disabled;
 ended — "This review has ended.", textarea disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.
+
+Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's
+hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — as a
+3px left bar and the `.lsr-entry-role` label colour on every card, plus a 6%
+tint of the card itself only while `data-round-state="current"`; earlier
+rounds keep the bar and the label but lose the tint along with the lift.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 
