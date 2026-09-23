@@ -23,8 +23,7 @@ test("splits tokens into positionals, value flags and boolean flags", () => {
   ]);
 });
 
-/** A mistyped flag must never pass for a branch name: `start` opened reviews on
- * `--basee` before it was made to throw. */
+/** Regression: `start` opened reviews on a branch called `--basee`. */
 test("a near-miss of a known flag is an error, not a positional", () => {
   assert.throws(
     () => scanArgs(["--basee", "develop"], { value: ["--base"], onUnknown: reject }),
@@ -40,7 +39,6 @@ test("the caller's error is thrown at the unknown flag", () => {
 });
 
 test("the leftmost mistake is reported, not an arbitrary one", () => {
-  // One pass, left to right: with two unknown flags the first one is the error.
   assert.throws(() => scanArgs(["--first", "--second"], { onUnknown: reject }), /--first/);
 });
 

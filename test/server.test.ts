@@ -187,10 +187,8 @@ test("a round posted with reopen opens the review again and keeps its history", 
 });
 
 /**
- * N6: a `serve` from two weeks earlier was still answering the current CLI with
- * a pre-turn protocol — `wait` came back with no `turn` and no `round`, and the
- * client papered over it with a default. The server says which version it is,
- * which is the whole of what a handshake needs.
+ * A `serve` from weeks earlier was still answering the current CLI with a
+ * pre-turn protocol; the version is the whole of what a handshake needs.
  */
 test("health reports ok and the version of the CLI that started it", async () => {
   await withServer(async ({ url }) => {
@@ -289,7 +287,6 @@ test("every round but the one being reviewed has been closed on what was ticked"
 
     const rounds = store.get(key)!.rounds;
     assert.equal(rounds.length, 3);
-    // Closed rounds record what was ticked when they stopped being current; the open one says nothing yet.
     assert.deepEqual(
       rounds.map((round) => round.approvedAtEnd),
       [["src/api/users.ts"], ["src/api/users.ts"], []],
@@ -423,7 +420,6 @@ test("send-and-end closes the round, and the next start opens another", async ()
 
 test("a retired `journeys` field from an older CLI is dropped, not a 400", async () => {
   await withServer(async ({ url, store }) => {
-    // Journeys shipped and were withdrawn: an older CLI still posts them, and the server ignores them.
     const response = await postSessionRaw(url, {
       ...sessionPayload,
       journeys: [{ protagonist: "a token", stations: [] }],
@@ -697,7 +693,6 @@ function usersRound(repoRoot: string, baseCommit: string, commit: string, round:
   };
 }
 
-/** A repository with a base commit, the approved commit, and whatever came after. */
 function reapprovalRepo(prefix: string, commits: Record<string, string | Buffer>): string {
   const repoRoot = newRepo(prefix);
   mkdirSync(join(repoRoot, "src", "api"), { recursive: true });
@@ -720,7 +715,6 @@ interface Reapproval extends RunningServer {
   head: string;
 }
 
-/** The two rounds the approved-form toggle is about, over a repository git can answer for. */
 async function withReapprovalSession(
   body: (running: Reapproval) => Promise<void>,
   after: string | Buffer = "const fresher = 3;\n",
@@ -826,7 +820,6 @@ test("a file edited and put back reads as identical to the form the reviewer app
 });
 
 test("a file that has become binary is named as that, not served as an empty diff", async () => {
-  // Approved as text, now binary: git has no lines to show.
   await withReapprovalSession(
     async ({ url, key }) => {
       const data = (await (await approvedForm(url, key, USERS)).json()) as {
@@ -938,7 +931,6 @@ test("a needs-reapproval file keeps the approved form and never carries this one
 });
 
 test("a file that stood still between the rounds has no last-round form", async () => {
-  // Two rounds over the same head: blobs match, no second diff to offer.
   const repoRoot = reapprovalRepo("lsr-unmoved-", {
     "Take the users handler off the old constant": "const fresh = 2;\n",
   });
@@ -1183,7 +1175,6 @@ test("a declaration for an id no comment carries rejects the whole reply", async
     const body = (await response.json()) as { error: { code: string; detail: string } };
     assert.equal(body.error.code, "declaration_invalid");
     assert.match(body.error.detail, /evt_ghost/);
-    // Rejected whole: the summary was not delivered and nothing was declared.
     const session = store.get(key)!;
     assert.equal(session.conversation.length, before);
     assert.equal(session.declarations, undefined);
@@ -1191,10 +1182,9 @@ test("a declaration for an id no comment carries rejects the whole reply", async
 });
 
 /**
- * B4: the round the comment was made on is the round the agent is still on, so
- * nothing it edited is in any published diff yet. The old escape hatch named
- * `--note`, which is not a flag, so the agent's next line was refused too. Both
- * ways out here are commands the CLI accepts.
+ * The round the comment was made on is the round the agent is still on, so
+ * nothing it edited is in any published diff yet. Regression: the escape hatch
+ * named `--note`, which is not a flag.
  */
 test("a file claim made before the next round is carried out by its own help", async () => {
   await withServer(async ({ url, store }) => {
@@ -1223,9 +1213,8 @@ test("a file claim made before the next round is carried out by its own help", a
 });
 
 /**
- * N5: `help[0]` used to repeat the detail almost word for word — the detail
- * already says where ids come from — so the two lines an agent read cost the
- * tokens of two and carried the information of one. Help says what to run.
+ * Regression: `help[0]` repeated the detail almost word for word — two lines
+ * with the information of one. Help says what to run.
  */
 test("a rejection that is not about files offers commands, not its own detail again", async () => {
   await withServer(async ({ url }) => {
@@ -1322,10 +1311,9 @@ async function postWork(url: string, key: string, body: unknown): Promise<Respon
 
 /**
  * A poll the way a healthy `wait` makes one: takes the answer, then confirms the
- * handover. Without the confirmation the server must assume the prompts were
- * lost — it cannot see whether anything read them — and hands them out again on
- * the next poll, which is right for a dead agent and wrong for a test pretending
- * to be a live one.
+ * handover. Unconfirmed, the server must assume the prompts were lost and hands
+ * them out again on the next poll — right for a dead agent, wrong for a test
+ * pretending to be a live one.
  */
 async function pollAndAck(url: string, key: string): Promise<Record<string, unknown>> {
   const payload = await pollOnce(url, key);
@@ -1340,7 +1328,6 @@ async function pollOnce(url: string, key: string): Promise<Record<string, unknow
   return (await answer.json()) as Record<string, unknown>;
 }
 
-/** The confirmation a live `wait` sends the moment the answer is in its hands. */
 async function ackDelivery(
   url: string,
   key: string,
@@ -1414,10 +1401,9 @@ test("work without the turn is refused, with the command that earns it", async (
 });
 
 /**
- * An ended review is ended before it is anybody's turn: the record still names
- * whoever held the turn last, so a `work` from the agent that held it was
- * written onto the closed session — and answered `turn_not_yours`, which is not
- * what was wrong. Every command answers an ended review with the same 409.
+ * Regression: the record still names whoever held the turn last, so a `work`
+ * from that agent was written onto the closed session and answered
+ * `turn_not_yours`. Every command answers an ended review with the same 409.
  */
 test("work on an ended review is refused as ended, and declares nothing", async () => {
   await withServer(async ({ url, store }) => {
@@ -1433,7 +1419,6 @@ test("work on an ended review is refused as ended, and declares nothing", async 
     assert.equal(response.status, 409);
     const body = (await response.json()) as { error: { code: string } };
     assert.equal(body.error.code, "session_ended");
-    // The closed record is untouched: no plan written onto a review nobody reads.
     assert.deepEqual(store.get(key)?.turn, closed);
     assert.equal(store.get(key)?.status, "ended");
   });
@@ -1486,7 +1471,6 @@ test("a refusal on a round nobody has been told about spells the moves out", asy
 
     const body = (await response.json()) as { help: string[] };
     assert.deepEqual(body.help, legalMoves("agent working", "feature-auth main"));
-    // Read, not spent: the next answer still owes this agent the full block.
     assert.equal(store.get(key)?.helpShownRound, undefined);
   });
 });
@@ -1521,8 +1505,6 @@ test("work without a plan is a 400, and on an unknown session a 404", async () =
   });
 });
 
-/** The banner is the whole point of `work`: the reviewer's page has to hear the
- * plan without a reload. */
 test("work puts the plan on the wire for the reviewer's page", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);
@@ -1538,7 +1520,6 @@ test("work puts the plan on the wire for the reviewer's page", async () => {
   });
 });
 
-/** The page's event stream, read one SSE frame at a time. */
 interface OpenStream {
   /**
    * Next matching frame; earlier frames dropped, later ones kept. Frame-by-frame because the
@@ -1557,11 +1538,9 @@ async function openStream(url: string, key: string, budget = 5_000): Promise<Ope
   let partial = "";
 
   /**
-   * A frame that never comes aborts the read and fails the waiting test, never parking a run
-   * forever. The budget is spent per read and refunded the moment one lands, because a test holds
-   * one stream across several waits and does slow work between them — parking a poll, killing a
-   * subprocess — and a budget spanning the whole stream fails that test on a loaded machine for
-   * being slow rather than for being wrong.
+   * The budget is spent per read, not per stream: a test holds one stream across several waits
+   * and does slow work between them — parking a poll, killing a subprocess — and a budget
+   * spanning the whole stream fails that test on a loaded machine for being slow, not wrong.
    */
   async function readFrames(wanted: RegExp): Promise<void> {
     const deadline = setTimeout(() => abort.abort(), budget);
@@ -1594,24 +1573,20 @@ async function openStream(url: string, key: string, budget = 5_000): Promise<Ope
 }
 
 /**
- * The bound on a poll this file parks and releases later. Everything the test does in between
- * happens inside it, so it catches a hang rather than measuring latency: wide enough that a
- * machine slow enough to be swapping never trips it, and finite so that a poll nothing releases
- * fails the test instead of running for as long as the suite is allowed to.
+ * Catches a hang rather than measuring latency: wide enough that a machine slow enough to be
+ * swapping never trips it, and finite so that a poll nothing releases fails the test instead of
+ * running for as long as the suite is allowed to.
  */
 const PARKED_POLL_LIMIT_MS = 30_000;
 
 /**
- * A watch on this session's presence, on which `until(/"waiting":true/)` is a poll parking.
- * Awaiting that is how a test knows a poll is really waiting: the request is sent from here and
- * registered over there, so a test that paused a fixed moment instead was — on a machine busy
- * enough — sending the reviewer's word to a poll the server had never heard of, and passing down
- * the path where the answer was already there, with none of the waiting it is named for.
+ * `until(/"waiting":true/)` on this is a poll parking. A test that paused a fixed moment instead
+ * was — on a machine busy enough — sending the reviewer's word to a poll the server had never
+ * heard of, and passing down the path where the answer was already there.
  *
  * Opened before the polls it is asked about, and primed by dropping the frame every new watcher
- * is handed: that one states what was true beforehand, and presence carries a flag rather than a
- * count, so the frames are all that tells one park from the next. Each wait is bounded by the
- * stream's read budget, so a park that never comes fails the test instead of hanging the run.
+ * is handed: presence carries a flag rather than a count, so the frames are all that tells one
+ * park from the next.
  */
 async function parkWatch(url: string, key: string): Promise<OpenStream> {
   const stream = await openStream(url, key);
@@ -1623,7 +1598,6 @@ test("ending a session closes it and releases a waiting poll", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
     const parks = await parkWatch(url, key);
-    // Bounded too: an `end` that leaves the poll parked must fail this test, not hang the run.
     const polling = fetch(`${url}/api/poll?key=${key}`, {
       signal: AbortSignal.timeout(PARKED_POLL_LIMIT_MS),
     });
@@ -1788,7 +1762,6 @@ test("a poll waits for feedback that arrives later", async () => {
     const { key } = await postSession(url);
 
     const parks = await parkWatch(url, key);
-    // Bounded: feedback that never reaches the parked poll fails the test instead of hanging it.
     const polling = fetch(`${url}/api/poll?key=${key}`, {
       signal: AbortSignal.timeout(PARKED_POLL_LIMIT_MS),
     });
@@ -1805,9 +1778,8 @@ test("a poll waits for feedback that arrives later", async () => {
 
 /**
  * A poll parked on a connection the test can kill without telling the server, as a dying agent
- * connection does. `parked` is how the caller knows the server has it and there is no default:
- * a test that killed after a fixed pause was killing a poll the server had never heard of
- * whenever the machine was busy enough. See `parkWatch` for what such a caller waits on.
+ * connection does. `parked` has no default: a test that killed after a fixed pause was killing a
+ * poll the server had never heard of whenever the machine was busy enough. See `parkWatch`.
  */
 async function parkedPoll(
   url: string,
@@ -1834,10 +1806,9 @@ test("feedback drained for a poll whose connection died is still there for the n
 
     // Both orders of the race: connection dies before the reviewer sends, and while the answer is written.
     for (const killFirst of [true, false]) {
-      // A watch of its own each pass, and never one shared across both: `until` keeps the frames
-      // it walked past, so a `"waiting":true` left over from the pass before would confirm this
-      // pass's park without it having happened. Closed as soon as it has answered, so the race
-      // below runs against the same two connections it always did.
+      // A watch of its own each pass: `until` keeps the frames it walked past, so a
+      // `"waiting":true` left over from the pass before would confirm this pass's park without
+      // it having happened. Closed as soon as it has answered, to keep it out of the race below.
       const watch = await parkWatch(url, key);
       const poll = await parkedPoll(url, key, () => watch.until(/"waiting":true/));
       watch.close();
@@ -1846,11 +1817,9 @@ test("feedback drained for a poll whose connection died is still there for the n
       if (!killFirst) poll.kill();
       await posting;
 
-      // Bounded so feedback lost into the dead connection fails the test instead of parking forever.
       const polled = await pollAndAck(url, key);
       assert.partialDeepStrictEqual(polled.prompts, [annotation], `killFirst: ${killFirst}`);
-      // Confirmed, so nothing is in flight and nothing is queued: the feedback
-      // is where it belongs and the next pass starts from a clean review.
+      // Confirmed, so nothing is in flight or queued: the next pass starts from a clean review.
       assert.deepEqual(store.get(key)?.pending, []);
       assert.equal(store.get(key)?.delivering, undefined);
     }
@@ -1891,12 +1860,11 @@ function postDelivered(url: string, key: string, body: unknown): Promise<Respons
 }
 
 /**
- * The woken path, which is the common one: an agent is normally already parked
- * when the reviewer sends, and a silently dropped connection never fires
- * `close`, so a zombie poller that was answered and confirmed nothing is
- * routine. The batch in flight to it must survive the drain that answers the
- * next poller — overwritten, it would be in neither `pending` nor `delivering`,
- * and no wait could ever find it again.
+ * An agent is normally already parked when the reviewer sends, and a silently
+ * dropped connection never fires `close`, so a zombie poller that was answered
+ * and confirmed nothing is routine. Overwritten by the drain that answers the
+ * next poller, its batch would be in neither `pending` nor `delivering`, and no
+ * wait could ever find it again.
  */
 test("a batch in flight is not overwritten by the delivery that answers the next poller", async () => {
   const later = { type: "message" as const, comment: "and one more thing" };
@@ -1915,8 +1883,6 @@ test("a batch in flight is not overwritten by the delivery that answers the next
     await postFeedback(url, key, { prompts: [annotation], ended: false });
     await postFeedback(url, key, { prompts: [later], ended: false });
 
-    // The second poller is handed the unconfirmed batch at the head, in written
-    // order, ahead of everything sent since.
     const answered = (await (await second).json()) as { prompts: unknown[] };
     assert.partialDeepStrictEqual(answered.prompts, [annotation, later]);
     assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation, later]);
@@ -1932,7 +1898,6 @@ test("feedback drained onto a connection nobody read is handed out again", async
 
     await deliverIntoTheVoid(url, key);
 
-    // Drained off the queue, but not gone: unconfirmed, so the review still owes it.
     assert.deepEqual(store.get(key)?.pending, []);
     assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation]);
 
@@ -1944,9 +1909,9 @@ test("feedback drained onto a connection nobody read is handed out again", async
 });
 
 /**
- * The other half of the same rule: a handover the agent confirmed is spent. Left
- * unconfirmed forever it would be re-delivered on every poll, and the agent
- * would read the same comment once per round for the rest of the review.
+ * A handover the agent confirmed is spent. Left unconfirmed forever it would be
+ * re-delivered on every poll, and the agent would read the same comment once per
+ * round for the rest of the review.
  */
 test("a delivery the agent confirmed is not handed out a second time", async () => {
   await withServer(async ({ url, store }) => {
@@ -1956,8 +1921,6 @@ test("a delivery the agent confirmed is not handed out a second time", async () 
     assert.match(String(polled.delivery), /^evt_/);
     assert.equal(store.get(key)?.delivering, undefined);
 
-    // The next wait finds an empty review and parks, rather than being answered
-    // with the words the agent is already acting on.
     const parks = await parkWatch(url, key);
     const parked = new AbortController();
     void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
@@ -1984,23 +1947,19 @@ test("an acknowledgement that names no handover in flight confirms nothing", asy
 });
 
 /**
- * The id is the whole guard: an acknowledgement confirms the handover it names
- * and no other. A `wait` that died mid-round and is retried from a shell, or a
- * process two rounds out of date, would otherwise clear the batch a live agent
- * is waiting on — and that batch is in neither `pending` nor `delivering` once
- * it is cleared, which is feedback lost for good.
+ * An acknowledgement confirms the handover it names and no other: a `wait`
+ * retried from a shell, or a process two rounds out of date, would otherwise
+ * clear the batch a live agent is waiting on — feedback lost for good.
  */
 test("an acknowledgement of a spent id leaves the handover in flight alone", async () => {
   const later = { type: "message" as const, comment: "and one more thing" };
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
     await postFeedback(url, key, { prompts: [annotation], ended: false });
-    // Read but never confirmed, which is what a `wait` killed mid-round leaves.
     const first = await pollOnce(url, key);
     await postFeedback(url, key, { prompts: [later], ended: false });
 
-    // The next poll recovers the unconfirmed batch and hands both over under a
-    // new id, so the first id now names a handover that is no longer in flight.
+    // The next poll hands both over under a new id, so the first id is spent.
     const second = await pollOnce(url, key);
     assert.notEqual(second.delivery, first.delivery);
     const stale = await postDelivered(url, key, { delivery: first.delivery });
@@ -2009,7 +1968,6 @@ test("an acknowledgement of a spent id leaves the handover in flight alone", asy
     assert.equal(store.get(key)?.delivering?.id, second.delivery);
     assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation, later]);
 
-    // And the id that is in flight still confirms, so nothing is stuck either.
     const live = await postDelivered(url, key, { delivery: second.delivery });
     assert.deepEqual(await live.json(), { confirmed: true });
     assert.equal(store.get(key)?.delivering, undefined);
@@ -2048,13 +2006,10 @@ test("a second poller keeps waiting instead of getting an empty answer", async (
 
     const drained = (await (await first).json()) as Record<string, unknown>;
     assert.partialDeepStrictEqual(drained.prompts, [annotation]);
-    // Confirmed, because this test is about a healthy agent taking the feedback.
-    // An unacknowledged batch is one the server has to assume nobody read, so it
-    // rides out again on the next drain — a real answer to a different question,
-    // and the second poller would get the first poller's words.
+    // Confirmed: an unacknowledged batch rides out again on the next drain, and
+    // the second poller would get the first poller's words.
     await ackDelivery(url, key, drained);
 
-    // The queue is empty now, so the second poller must still be waiting.
     await postFeedback(url, key, {
       prompts: [{ type: "message", comment: "and one more thing" }],
       ended: false,
@@ -2177,9 +2132,8 @@ test("presence flips while an agent polls and back when it gives up", async () =
 test("a stream survives a test that is slow between the frames it waits for", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);
-    // A budget smaller than the pause below: with one deadline for the whole stream this stream is
-    // already aborted by the time the second frame is asked for, which is the CI failure in the
-    // small. Spent per read, the pause costs nothing, because no read is outstanding during it.
+    // A budget smaller than the pause below: one deadline for the whole stream would have aborted
+    // it before the second frame is asked for. Spent per read, the pause costs nothing.
     const stream = await openStream(url, key, 200);
     await stream.until(/event: presence/);
 
@@ -2236,8 +2190,6 @@ test("an agent asking for more feedback is an agent that is no longer working", 
     await pollAndAck(url, key);
     await stream.until(/"turn":\{"holder":"agent"/);
 
-    // An agent that skips the reply and polls again has finished with what it took;
-    // parking for the next feedback is it saying so.
     const parked = new AbortController();
     void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
 
@@ -2332,18 +2284,16 @@ test("a poll that died holding the feedback leaves the agent reading as working"
     const stream = await parkWatch(url, key);
     const poll = await parkedPoll(url, key, () => stream.until(/"waiting":true/));
 
-    // The handover first and awaited, so the work is the agent's before its connection dies. Which
-    // of the two happened first decides what the server can say afterwards, and a test that posted
-    // and killed in the same breath was letting the machine's mood pick the scenario.
+    // The handover first and awaited, so the work is the agent's before its connection dies: a
+    // test that posted and killed in the same breath let the machine's mood pick the scenario.
     await postFeedback(url, key, { prompts: [annotation], ended: false });
     await stream.until(/"turn":\{"holder":"agent"/);
 
     poll.kill();
 
-    // The frame the death itself publishes: the waiter is gone, the work is not. A dead agent
-    // reads exactly like one thinking hard and there is no heartbeat to tell them apart, so the
-    // flag stands until the next poll, reply, round or end clears it — clearing it here would
-    // announce that nobody is acting on feedback that has already left the building.
+    // A dead agent reads exactly like one thinking hard and there is no heartbeat to tell them
+    // apart, so the flag stands until the next poll, reply, round or end clears it — clearing it
+    // here would announce that nobody is acting on feedback that has already left the building.
     assert.match(
       await stream.until(/event: presence/),
       /"waiting":false,"turn":\{"holder":"agent"/,
@@ -2388,8 +2338,6 @@ test("feedback nobody is waiting for queues and leaves the turn with the reviewe
   });
 });
 
-/** Feedback sent at a connection that is already gone reaches nobody, so it
- * takes nothing: the turn waits with the prompts for a `wait` that is really there. */
 test("a delivery into a dead connection leaves the turn for the wait that follows", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
@@ -2400,7 +2348,6 @@ test("a delivery into a dead connection leaves the turn for the wait that follow
     poll.kill();
     await postFeedback(url, key, { prompts: [annotation], ended: false });
 
-    // Bounded so prompts lost into the dead connection fail the test rather than parking it.
     const polled = await pollAndAck(url, key);
     assert.partialDeepStrictEqual(polled.prompts, [annotation]);
     assert.equal(store.get(key)?.turn.holder, "agent");
@@ -2444,10 +2391,8 @@ test("a poll carrying the reviewer's last word marks nobody working", async () =
 
 /**
  * The gate is global — one check in front of the router, not a decoration each
- * route remembers to wear — so a route added since is covered by the same test
- * that covers the oldest one. `/delivered` is here because it mutates: a page
- * that could confirm a handover could make the review forget feedback nobody
- * read.
+ * route remembers to wear. `/delivered` is here because it mutates: a page that
+ * could confirm a handover could make the review forget feedback nobody read.
  */
 test("a page on another origin cannot drive the review API", async () => {
   await withServer(async ({ url, store }) => {
@@ -2462,7 +2407,6 @@ test("a page on another origin cannot drive the review API", async () => {
     assert.equal(response.status, 403);
     assert.deepEqual(store.get(key)?.pending, []);
 
-    // The same gate, in front of the endpoint that spends a handover.
     await postFeedback(url, key, { prompts: [annotation], ended: false });
     const inFlight = await pollOnce(url, key);
     const forged = await fetch(`${url}/api/session/${key}/delivered`, {
@@ -2587,7 +2531,6 @@ test("posting approved files for an unknown session is a 404", async () => {
   });
 });
 
-/** A bundle directory holding the two files a review page cannot mount without. */
 function bundleDir(script = "console.log('hi');", style = ".lsr-file{}"): string {
   const staticDir = mkdtempSync(join(tmpdir(), "lsr-static-"));
   writeFileSync(join(staticDir, "app.js"), script);
@@ -2612,10 +2555,7 @@ test("static assets are served from the build output directory", async () => {
   );
 });
 
-/**
- * Drift this closes: a rebuild under a running server used to pair an old shell with new CSS.
- * The server serves the build it started with until a new round opens.
- */
+/** Regression: a rebuild under a running server paired an old shell with new CSS. */
 test("a rebuild under a running server does not change what it serves", async () => {
   const staticDir = bundleDir("console.log('first');", ".lsr-review{overflow:auto}");
 
@@ -2674,7 +2614,6 @@ test("a bundle broken at round start keeps the old snapshot; the round still ope
   );
 });
 
-/** An asset added after start is not served either: the snapshot is the build. */
 test("an asset the bundle did not have at start is a 404", async () => {
   const staticDir = bundleDir();
 

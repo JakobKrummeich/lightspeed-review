@@ -21,7 +21,6 @@ interface Seen {
   login?: { provider: string; type: string; interaction: AuthInteraction };
 }
 
-/** A login flow in a jar: records the store and the call, answers instantly. */
 function fakeDeps(result: Credential | Error = oauthCredential): { deps: LoginDeps; seen: Seen } {
   const seen: Seen = {};
   const deps: LoginDeps = {

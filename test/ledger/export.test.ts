@@ -32,7 +32,6 @@ interface AnnotationOptions {
   comment?: string;
   selected?: string;
   context?: string;
-  /** Set when the reviewer marked part of a line rather than whole lines. */
   columns?: { col_start?: number; col_end?: number };
 }
 

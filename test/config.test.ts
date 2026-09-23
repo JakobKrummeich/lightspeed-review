@@ -73,10 +73,8 @@ test("a retired groupingThreshold still loads, and decides nothing", () => {
 });
 
 /**
- * B2: the error named no command that writes the file, and told the agent to
- * put `<provider/model>` in it — a placeholder nothing in the CLI, the help or
- * the skill resolves into a real id. Two turns, then a guessed model that
- * degrades grouping silently.
+ * Regression: the error named no command that writes the file, and told the
+ * agent to put `<provider/model>` in it — a placeholder nothing resolves.
  */
 test("missing config file names the directory, the command and a model that exists", () => {
   const repoRoot = repoWithConfig(undefined);
@@ -102,9 +100,9 @@ test("unparseable JSON reports config_invalid", () => {
 });
 
 /**
- * `wait`, `end` and `approvals` touch no model, so demanding one of them made a
- * missing config gate the two commands an agent needs precisely when it cannot
- * write one — mid-review, on someone else's machine.
+ * `wait`, `end` and `approvals` touch no model; demanding one gated the commands
+ * an agent needs precisely when it cannot write a config — mid-review, on
+ * someone else's machine.
  */
 test("a command that never reaches a model reads a config that does not exist", () => {
   const config = loadServiceConfig(repoWithConfig(undefined));
@@ -123,8 +121,6 @@ test("a config with no model still hands over the port and the store it names", 
   assert.equal(config.stateDir, "/tmp/lsr-service");
 });
 
-/** Lenient about `model`, not about the file: a config that cannot be read is
- * still a config the agent must fix, whichever command found it. */
 test("a broken config file is still broken for the commands that need no model", () => {
   assert.throws(
     () => loadServiceConfig(repoWithConfig("{ not json")),
@@ -441,10 +437,7 @@ test("an empty apiKey is rejected, written out or expanded to one", () => {
   });
 });
 
-/**
- * Undici rejects a newline in a header by quoting the value back — onto stdout and into CI logs.
- * The secret must fail at load, and the failure must not repeat it.
- */
+/** Undici rejects a newline in a header by quoting the value back: onto stdout and into CI logs. */
 test("a header value carrying a newline fails at load and is never quoted back", () => {
   withEnv({ CORP_LLM_TOKEN: "super-secret\n" }, () => {
     const error = loadError(

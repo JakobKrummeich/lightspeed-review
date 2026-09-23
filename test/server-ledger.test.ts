@@ -100,7 +100,6 @@ async function startRound(url: string, payload: unknown = sessionPayload): Promi
   return (await response.json()) as Created;
 }
 
-/** The round after a `Send & End`, which only the reviewer's `--reopen` allows. */
 async function reopenRound(
   url: string,
   payload: Record<string, unknown> = sessionPayload,

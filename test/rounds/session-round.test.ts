@@ -47,10 +47,7 @@ function stamp(round: number) {
   return { key: "key", round: `rnd_${round}`, now: `2026-03-0${round}T00:00:00.000Z` };
 }
 
-/**
- * Round zero as "Send to Agent" leaves it: `approvedPaths` ticked, the round
- * still open — the state the next `start` has to make sense of.
- */
+/** Round zero as "Send to Agent" leaves it: `approvedPaths` ticked, the round still open. */
 function firstRound(files: DiffFile[], approvedPaths: string[]): SessionRecord {
   const opened = nextSessionRecord(undefined, payload(files), stamp(0));
   return { ...opened, approved: approvedPaths };

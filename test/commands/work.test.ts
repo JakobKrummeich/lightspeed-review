@@ -82,7 +82,6 @@ test("a blank plan is refused: the banner would name nothing", () => {
   );
 });
 
-/** `work` does not take the turn — it says what is being done with one already held. */
 test("declaring the plan names it on the turn the agent already holds", async () => {
   await withServer(session(), async ({ port }) => {
     const output = await runWork({
@@ -100,9 +99,8 @@ test("declaring the plan names it on the turn the agent already holds", async ()
   });
 });
 
-/** The happy path used to close with `lightspeed wait`, which the poll refuses
- * with `turn_still_yours` and exit 2 the moment this command succeeds. The whole
- * array is asserted because a joined string is what hid it. */
+/** The whole array: a joined string hid a `wait` here, which the poll refuses
+ * with `turn_still_yours` the moment this command succeeds. */
 test("the moves after work are the ones that give the turn up, never a wait", async () => {
   await withServer(session(), async ({ port }) => {
     const output = await runWork({
@@ -154,9 +152,8 @@ test("work without the turn is refused, with the command that earns it", async (
   });
 });
 
-/** The turn on an ended record is whoever held it last, not a move anyone can
- * make: `work` from that agent used to be written onto the closed session. It is
- * refused as ended, the way `say` and `ask` are refused. */
+/** Regression: the turn on an ended record is whoever held it last, and `work`
+ * from that agent was written onto the closed session. */
 test("work on an ended review is refused as ended, and declares nothing", async () => {
   const record = session({ status: "ended", turn: { holder: "agent", mode: "reading", at: AT } });
   await withServer(record, async ({ port, store }) => {
@@ -187,10 +184,9 @@ test("declaring work on an unknown session fails with session_not_found", async 
 });
 
 /**
- * S4: the four-line block is how an agent learns the protocol from one answer,
- * and every repeat of it inside the same round is bytes it already has — 74% of
- * a `work` answer. The first answer of a round spells the moves out; the rest
- * name them.
+ * The four-line block is how an agent learns the protocol from one answer, and
+ * every repeat of it inside the same round is bytes it already has — 74% of a
+ * `work` answer.
  */
 test("the first answer of a round spells the moves out, the next one names them", async () => {
   await withServer(session(), async ({ port, store }) => {

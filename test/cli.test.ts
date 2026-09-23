@@ -77,8 +77,6 @@ test("bare invocation prints the content-first home view", async () => {
   assert.match(stdout, /^help\[1\]:/m);
 });
 
-/** A session belonging to some other repository, in the state directory the
- * repo under test reads. */
 function storeSession(stateDir: string, repoRoot: string, branch: string): void {
   const at = "2025-01-01T00:00:00.000Z";
   new SessionStore(stateDir).save({
@@ -99,14 +97,12 @@ function storeSession(stateDir: string, repoRoot: string, branch: string): void 
 }
 
 /**
- * B1: the home view caught `config_missing` and reported `sessions: 0` with
- * `start` as the next step — false twice over, and one wasted turn for every
- * cold agent in every unconfigured repository.
+ * Regression: the home view caught `config_missing` and reported `sessions: 0`
+ * with `start` as the next step — false twice over.
  */
 test("bare invocation in a repo with no config reports the config, not an empty review list", async () => {
   const repoRoot = newRepo("lsr-cli-noconf-");
-  // No config names a state directory, so the view reads the default one —
-  // which is where the sessions it used to report as absent actually were.
+  // No config names a state directory, so the view reads the default one.
   const home = mkdtempSync(join(tmpdir(), "lsr-cli-home-dir-"));
   storeSession(join(home, ".lightspeed"), "/somewhere/else", "feat/tokens");
 
@@ -122,9 +118,9 @@ test("bare invocation in a repo with no config reports the config, not an empty 
   assert.match(stdout, /lightspeed init --config/);
 });
 
-/** S1: `--all` is the only flag that comes before a command, and the SDK
- * refuses a leading flag before it ever dispatches — so the CLI reads it
- * itself. Proving it here proves the plumbing, not just the renderer. */
+/** `--all` is the only flag that comes before a command, and the SDK refuses a
+ * leading flag before it ever dispatches — so the CLI reads it itself. Proving
+ * it here proves the plumbing, not just the renderer. */
 test("--all lists other repositories' sessions, which the repo-scoped view names but omits", async () => {
   const repoRoot = emptyRepo();
   const stateDir = join(repoRoot, "state");
@@ -141,10 +137,7 @@ test("--all lists other repositories' sessions, which the repo-scoped view names
   assert.match(all.stdout, /^ {2}\/somewhere\/else,feat\/tokens,main,reviewer,1,0$/m);
 });
 
-/**
- * S7 through the store: `approvals` reads the session file itself, so a review
- * nobody opened must be named by what the agent typed, beside what is there.
- */
+/** Through the store: `approvals` reads the session file itself. */
 test("a command about a review nothing holds names the reviews that are held", async () => {
   const repoRoot = emptyRepo();
   storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
@@ -162,10 +155,7 @@ test("a command about a review nothing holds names the reviews that are held", a
   assert.match(stdout, /lightspeed approvals feature\/greeting main/);
 });
 
-/**
- * The same failure off the wire: the server answers 404 for a key it does not
- * hold, and the agent must read the same two facts as in the store case.
- */
+/** The same failure off the wire: the server answers 404 for a key it does not hold. */
 test("a session the server does not know is named the same way as one on disk", async () => {
   const repoRoot = emptyRepo();
   storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
@@ -189,11 +179,7 @@ test("a session the server does not know is named the same way as one on disk", 
   assert.match(stdout, /lightspeed wait feature\/greeting main/);
 });
 
-/**
- * B2: `approvals` reads a session file and nothing else, but the strict config
- * load gated it on a `model` it never uses — so a repo without a config could
- * not be asked what the reviewer had ticked.
- */
+/** Regression: the strict config load gated `approvals` on a `model` it never uses. */
 test("a command that needs no model answers in a repository with no config", async () => {
   const repoRoot = newRepo("lsr-cli-nomodel-");
   const home = mkdtempSync(join(tmpdir(), "lsr-cli-nomodel-home-"));
@@ -210,9 +196,8 @@ test("a command that needs no model answers in a repository with no config", asy
 });
 
 /**
- * S6 end to end: an agent captures `2>&1`, so anything git says on its own
- * behalf lands in front of our TOON and breaks the parse. The failure is
- * reported once, on stdout, in the shape every other failure has.
+ * An agent captures `2>&1`, so anything git says on its own behalf lands in
+ * front of our TOON and breaks the parse.
  */
 test("a git failure says nothing on stderr that stdout has not already said", async () => {
   const repoRoot = emptyRepo();
@@ -250,7 +235,6 @@ test("start without a branch says which argument is missing", async () => {
   assert.match(stdout, /^ {2}code: invalid_arguments$/m);
 });
 
-/** Nothing is worth doing before the review can say what the change is for. */
 test("start without --intent fails before it looks for a repository at all", async () => {
   const outsideAnyRepo = mkdtempSync(join(tmpdir(), "lsr-cli-nointent-"));
 
@@ -263,10 +247,9 @@ test("start without --intent fails before it looks for a repository at all", asy
 });
 
 /**
- * Three mistakes, three recoveries, so three codes: an agent that branches on
- * `error.code` had to re-read the message to tell a misspelt command from a
- * misspelt flag from an argument it forgot, because all three answered
- * `VALIDATION_ERROR`.
+ * Three codes, not one `VALIDATION_ERROR`: an agent that branches on `error.code`
+ * should not have to re-read the message to tell a misspelt command from a
+ * misspelt flag from an argument it forgot.
  */
 test("unknown flag before a command exits 2, under a code that names the mistake", async () => {
   const { stdout, code } = await runCli(["--bogus"]);
@@ -285,10 +268,6 @@ test("a forgotten argument is its own code, not the code an unknown flag has", a
   assert.match(stdout, /ask needs the question/);
 });
 
-/**
- * First contact for an agent that guessed a name: the failure it meets must parse
- * like every other one, `error.code` included, and name the commands that exist.
- */
 test("an unknown command fails in the same error shape as everything else", async () => {
   const { stdout, code } = await runCli(["nonsense"]);
 
@@ -327,11 +306,7 @@ test("--help lists every command the CLI answers", async () => {
   assert.match(stdout, /Queue always\. End always\. Send only on your turn\./);
 });
 
-/**
- * `help` is what an agent types before it has read anything, and the answer to
- * it used to be `Unknown command: help` — a turn spent learning the flag form
- * of a word the CLI already understood.
- */
+/** `help` is what an agent types before it has read anything. */
 test("`help` is a word the CLI answers, not a command it does not have", async () => {
   const { stdout, code } = await runCli(["help"]);
 
@@ -348,7 +323,6 @@ test("`help <command>` describes that command, the same as `<command> --help`", 
   assert.doesNotMatch(stdout, /error:/);
 });
 
-/** A word that is not a command is not made one by `help` in front of it. */
 test("`help nonsense` fails as the unknown command it names", async () => {
   const { stdout, code } = await runCli(["help", "nonsense"]);
 
@@ -389,7 +363,6 @@ test("feedback reads a ledger outside any repository, with no model configured",
   assert.match(stdout, new RegExp(`path: ${nowhere}/state/feedback$`, "m"));
 });
 
-/** No config file at all is the mining agent's normal case: the defaults describe it. */
 test("feedback with no config file reads the default ledger", async () => {
   const { stdout, code } = await runCli(["feedback"], mkdtempSync(join(tmpdir(), "lsr-cli-bare-")));
 
@@ -407,7 +380,7 @@ test("feedback --repo . outside a repository explains that there is none", async
   assert.match(stdout, /code: git_repo_not_found/);
 });
 
-/** A mistyped flag used to be read as a branch name and reported as a bad git ref. */
+/** Regression: a mistyped flag was read as a branch name and reported as a bad git ref. */
 test("start rejects an unknown flag instead of running with it", async () => {
   const { stdout, code } = await runCli(["start", "feature", "main", "--no-opne", "--intent", "x"]);
 
@@ -455,7 +428,6 @@ test("every command answers --help", async () => {
   }
 });
 
-/** Nothing is worth writing before the command says whose file it is writing. */
 test("init without --agent names the agents instead of guessing one", async () => {
   const { stdout, code } = await runCli(["init"]);
 
@@ -464,10 +436,7 @@ test("init without --agent names the agents instead of guessing one", async () =
   assert.match(stdout, /pi, claude-code, codex, opencode, vscode/);
 });
 
-/**
- * The one end-to-end check of the destination, run against a home directory of
- * its own: a real one would rewrite the skill of whoever runs the suite.
- */
+/** A home directory of its own: a real one would rewrite the skill of whoever runs the suite. */
 test("init --dry-run names the file pi scans and leaves the disk alone", async () => {
   const home = mkdtempSync(join(tmpdir(), "lsr-cli-init-"));
 

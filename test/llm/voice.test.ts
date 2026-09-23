@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { voiceProblem } from "../../src/llm/voice.ts";
 
-/** A group with the one sentence under test and nothing else worth reading. */
 function group(rationale: string) {
   return [{ name: "Auth probe", rationale, tier: "study" as const, files: ["src/auth.ts"] }];
 }
@@ -16,8 +15,7 @@ test("a statement about the code passes", () => {
 });
 
 test("a question is rejected, whichever group asks it", () => {
-  // The whole complaint that started this: the reviewer's eye slides off a
-  // question it cannot answer before reading the diff it stands in front of.
+  // The reviewer's eye slides off a question it cannot answer before reading the diff.
   assert.match(
     voiceProblem(group("Does this split the auth failures correctly?")) ?? "",
     /question/,

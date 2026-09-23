@@ -99,7 +99,6 @@ test("readDiffBetween reports an unreachable commit as unreachable", () => {
   });
 });
 
-/** The patch of a read that produced one; anything else fails the assertion. */
 function patchOf(read: DiffBetween): string {
   assert.equal(read.state, "patch");
   return read.state === "patch" ? read.patch : "";

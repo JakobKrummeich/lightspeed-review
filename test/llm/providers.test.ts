@@ -21,7 +21,6 @@ interface SeenRequest {
   headers?: Record<string, string>;
 }
 
-/** A faux provider that records the model and the auth each request went out with. */
 function fauxModels(): { models: MutableModels; seen: SeenRequest } {
   const seen: SeenRequest = {};
   const faux = fauxProvider({ models: [{ id: "faux-1" }, { id: "faux-2" }] });
@@ -58,7 +57,6 @@ function applyError(providers: Record<string, ProviderConfig>): ReviewError {
   throw new Error("expected applyConfiguredProviders to throw");
 }
 
-/** A store holding one api-key credential, standing in for pi's auth.json. */
 function storedKey(key: string): CredentialStore {
   const credential: ApiKeyCredential = { type: "api_key", key };
   return {
@@ -83,7 +81,6 @@ function headerProvider(headers: Record<string, string>): Provider {
   };
 }
 
-/** A builtin stand-in whose credentials come from the store, the way pi's do. */
 function storedKeyProvider(id = "faux"): Provider {
   return {
     id,
@@ -400,7 +397,6 @@ test("a provider pi-ai never heard of needs a URL to talk to", () => {
   assert.match(error.message, /baseUrl/);
 });
 
-/** The no-regression case: an absent `providers` must leave the builtins as they are. */
 test("no configured providers leaves the collection exactly as it was", () => {
   const { models } = fauxModels();
   const before = models.getProviders();

@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { lastRoundForm } from "../../src/rounds/last-round-form.ts";
 import type { RoundFile, SessionRound } from "../../src/session-store.ts";
 
-/** A round as `start` writes it. */
 function round(index: number, files: RoundFile[], approvedAtEnd: string[] = []): SessionRound {
   return {
     index,
@@ -109,9 +108,9 @@ test("a file whose approval was withdrawn still gets the last-round switch", () 
 });
 
 test("an earlier name on a file git did not call renamed is not followed to last round", () => {
-  // How a round recorded a copy while `src/diff-extract.ts` still asked git
-  // for copies: `modified` with the source as `previousPath`. The source is
-  // still there under its own name, so the new file is not its edit.
+  // A copy, as rounds recorded one while `src/diff-extract.ts` still asked git for copies:
+  // `modified` with the source as `previousPath`. The source is still there under its own name,
+  // so the new file is not its edit.
   const rounds = [
     round(0, [file("src/a.ts", "aaa1111")]),
     round(1, [

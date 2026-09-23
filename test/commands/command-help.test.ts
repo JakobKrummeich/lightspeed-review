@@ -95,7 +95,6 @@ test("init help names the real destinations and the restart nobody documented", 
   assert.match(help, /^examples\[\d+\]:.*lightspeed init --config/m);
 });
 
-/** The path that made the whole hand-redirect story fail silently. */
 test("skill help no longer names a pi directory pi never reads", () => {
   const help = commandHelp("skill") ?? "";
 
@@ -122,9 +121,8 @@ test("start help lists its flags", () => {
 });
 
 /**
- * B4: `--files` only ever names files a published round changed, and `say --help`
- * showed it beside a comment id with nothing to say the round has to come first —
- * which is the dead end the CLI then refuses with `declaration_invalid`.
+ * `say --help` showed `--files` beside a comment id with nothing to say the round
+ * has to come first — the dead end the CLI then refuses with `declaration_invalid`.
  */
 test("say help says --files needs a published round, in the flag and in the example", () => {
   const help = commandHelp("say") ?? "";

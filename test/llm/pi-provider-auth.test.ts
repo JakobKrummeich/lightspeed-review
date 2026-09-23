@@ -16,7 +16,6 @@ import type { PiProviderConfig } from "../../src/llm/pi-models.ts";
 import { applyPiProviders } from "../../src/llm/providers.ts";
 import { ReviewError } from "../../src/errors.ts";
 
-/** A stand-in for a provider pi-ai ships: its key comes from pi's credential store. */
 function builtinProvider(headers?: Record<string, string>): Provider {
   return {
     id: "faux",
@@ -44,7 +43,6 @@ function builtinProvider(headers?: Record<string, string>): Provider {
   };
 }
 
-/** A store holding one credential, standing in for pi's auth.json. */
 function stored(credential: Credential): CredentialStore {
   return {
     read: async () => credential,
@@ -191,8 +189,7 @@ test("a models.json value nothing resolves is a config error naming what failed"
 });
 
 /**
- * The reason the case above needs an unconfigured builtin: a models.json apiKey
- * is read only when nothing else supplies one, so a stale `$VAR` beside a
+ * A models.json apiKey is read only when nothing else supplies one, so a stale `$VAR` beside a
  * working `pi login` must not take the review down with it.
  */
 test("a stored credential leaves an unresolvable models.json apiKey unread", async () => {

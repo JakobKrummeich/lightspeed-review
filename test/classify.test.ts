@@ -264,8 +264,8 @@ test("a lockfile is guardrail and never mechanical, however it was generated", (
 });
 
 /**
- * The rule the whole module turns on. Both files would be mechanical on their
- * diff alone — one is a rename git scored 100%, the other pure re-indentation.
+ * Both files would be mechanical on their diff alone — one is a rename git
+ * scored 100%, the other pure re-indentation.
  */
 test("guardrail wins over every mechanical rule", () => {
   const movedWorkflow = file(".github/workflows/release.yml", {
@@ -374,7 +374,6 @@ test("a glob's regex characters are literal, so a `.` is a dot and nothing else"
   assert.equal(classifyFile(file("CHANGELOGxmd"), configured).mechanical, false);
 });
 
-/** Mirrors `TEST_PATH_CONVENTIONS`: a rule that stopped claiming its own examples fails here. */
 function claims(rules: readonly PathRule[], path: string): PathRule[] {
   return rules.filter((rule) => rule.pattern.test(path));
 }
@@ -408,7 +407,6 @@ for (const [table, rules] of [
   });
 }
 
-/** The contract in the module comment, checked rather than promised. */
 test("no default rule names a path out of this repository", () => {
   for (const rule of [...GUARDRAIL_PATH_RULES, ...MECHANICAL_PATH_RULES]) {
     assert.doesNotMatch(rule.pattern.source, /src\\\/(browser|llm|ledger|rounds|commands|server)/);

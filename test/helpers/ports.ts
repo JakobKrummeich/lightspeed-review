@@ -1,8 +1,8 @@
 import { createServer, type Socket } from "node:net";
 
 /**
- * A port nothing is listening on right now. "Is a server running?" tests need
- * a real port, not the port-0 trick: the question predates the server.
+ * "Is a server running?" tests need a real port, not the port-0 trick: the
+ * question predates the server.
  */
 export async function freePort(): Promise<number> {
   const probe = createServer();

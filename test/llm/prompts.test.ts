@@ -62,7 +62,6 @@ function randoms(seed: number): () => number {
   };
 }
 
-/** The `--- path ---` block for one file, without the label or the blank line after it. */
 function sectionOf(text: string, path: string): string {
   const label = `--- ${path} ---\n`;
   const start = text.indexOf(label);
@@ -75,7 +74,6 @@ function sectionOf(text: string, path: string): string {
 /** Prompt with wrapping flattened: asserting against wrapped text fails on a reflow that changed nothing. */
 const RULES = GROUPING_SYSTEM_PROMPT.replace(/\s+/g, " ");
 
-/** Bullets under `A good grouping:`, unwrapped — the closed set of what the model orders on. */
 function goodGroupingRules(): string[] {
   const lines = GROUPING_SYSTEM_PROMPT.split("\n");
   const start = lines.indexOf("A good grouping:") + 1;
@@ -109,8 +107,8 @@ test("the system prompt refuses to cap the number of groups", () => {
 });
 
 test("`rationale` is asked for as what the change does, not as a check-question", () => {
-  // The complaint: the rationale was the heading again with a question mark. Loose on the
-  // sentence, exact on the invariant: phrasing is the prompt author's business, the demand is not.
+  // Loose on the sentence, exact on the invariant: phrasing is the prompt author's business,
+  // the demand is not.
   assert.match(RULES, /`rationale`.{0,120}what the.{0,40}does/i);
   assert.match(RULES, /never a.{0,20}question/i);
   assert.match(RULES, /never the name again in longer words/i);
@@ -129,7 +127,6 @@ test("`rationale` bans the buried imperative, not only the one that opens the se
   assert.match(RULES, /`verify`, `ensure`, `confirm` or any other verb aimed at the reader/);
 });
 
-/** B2: the prompt states the applicable test — each group readable from the groups above — not just "causal". */
 test("the order is causal: every group readable from the groups above it alone", () => {
   assert.match(RULES, /seen only the groups above/i);
   assert.match(RULES, /mechanism before its uses/i);
@@ -163,7 +160,6 @@ test("the two chapters that are never swept are named as exceptions, not as pref
   assert.match(RULES, /check on the code just read/i);
 });
 
-/** Rules the schema and `validateGroupingReply` already enforce are deleted on purpose. */
 test("the system prompt does not restate what the validator already enforces", () => {
   assert.doesNotMatch(GROUPING_SYSTEM_PROMPT, /^.*there is no order field.*$/im);
   assert.doesNotMatch(GROUPING_SYSTEM_PROMPT, /never invent/i);
@@ -206,7 +202,6 @@ test("the user prompt lists every changed file with its status", () => {
   assert.match(text, /binary/);
 });
 
-/** The common case, and the one a budget rule must not touch. */
 test("a patch that fits is sent whole, with nothing added to it", () => {
   const diff = patch("src/a.ts", 1, 3);
 
@@ -271,7 +266,6 @@ test("the share a small file leaves unused goes to the file that needs it", () =
   );
 });
 
-/** The old fallback dropped every diff in the prompt when any one file was too big. */
 test("one oversized file no longer blinds the model to the rest of the diff", () => {
   const huge = diffFile("src/huge.ts", { diff: patch("src/huge.ts", 20_000, 40) });
   const small = diffFile("src/small.ts", { diff: patch("src/small.ts", 2, 3) });
@@ -430,8 +424,8 @@ test("a diff of only binary files lists them without claiming the prompt was too
 });
 
 /**
- * Used to end with `, already approved`, which the rules sank to the review's end; asserted as
- * the whole line so a mark put back on it fails here.
+ * Regression: the line ended with `, already approved`, which the rules sank to the review's
+ * end. Asserted as the whole line so a mark put back on it fails here.
  */
 test("an inventory line ends at what git measured, saying nothing of approval", () => {
   const text = prompt([diffFile("src/a.ts"), diffFile("src/b.ts")]);
@@ -458,14 +452,10 @@ test("the rules the model orders on are these and no others", () => {
       "Holds the previous round's reading order wherever it is still true",
     ],
   );
-  // Nothing anywhere else in the prompt speaks of approval either.
   assert.doesNotMatch(RULES, /approv/i);
 });
 
-/**
- * Complaint: every round re-grouped from scratch and the reviewer re-learned the map.
- * In the system prompt on purpose: it is the cacheable prefix.
- */
+/** In the system prompt on purpose: it is the cacheable prefix. */
 test("the system prompt asks for last round's reading order to be held steady", () => {
   assert.match(RULES, /Holds the previous round's reading order wherever it is still true/i);
   assert.match(RULES, /already learned/i);
@@ -530,7 +520,6 @@ test("an oversized previous grouping is cut at a group boundary, and says so", (
   // Whole groups only: the last kept carries all five files, the first dropped carries none.
   assert.match(section, new RegExp(`^${kept}\\. Concern number ${kept - 1} — .*file-4\\.ts$`, "m"));
   assert.doesNotMatch(section, new RegExp(`Concern number ${kept}\\b`));
-  // And the diff still won: the budget the header left over still bought patches.
   assert.ok(text.length <= MAX_PROMPT_CHARS, `prompt was ${text.length} chars`);
   assert.match(text, /^--- src\/file-0\.ts ---$/m);
   assert.match(text, /^@@ /m);
@@ -538,7 +527,6 @@ test("an oversized previous grouping is cut at a group boundary, and says so", (
 
 const PREVIOUS_HEADING = "Grouping you returned last round, in the order the reviewer read it:";
 
-/** The listing under the heading, without the heading or the blank line after it. */
 function previousListing(text: string): string {
   const start = text.indexOf(`${PREVIOUS_HEADING}\n`);
   assert.notEqual(start, -1, "no previous-grouping section");
@@ -699,7 +687,6 @@ test("the repository's own classify globs reach the inventory", () => {
   assert.match(text, /^- docs\/api\/orders\.json \(modified, \+1\/-1, mechanical\)$/m);
 });
 
-/** Guardrail wins in the classifier, and the line the model reads must not say otherwise. */
 test("a guardrail file is never reported as mechanical, whatever else it is", () => {
   const text = prompt([diffFile("docs/deploy.md")], {
     classify: { mechanical: [], guardrail: ["docs/deploy.md"] },

@@ -45,10 +45,9 @@ test("the skill quotes the CLI's own start guidance rather than a second copy", 
 });
 
 /**
- * B2: the Setup section told the agent to write `"model": "<provider/model>"`
- * — a placeholder nothing here resolves. There is no `models` command, so the
- * skill is the only place a real id can come from, and a guessed one degrades
- * every review to a single group without failing.
+ * There is no `models` command, so the skill is the only place a real id can
+ * come from, and a guessed one degrades every review to a single group without
+ * failing.
  */
 test("the skill's setup names models that exist instead of a placeholder", () => {
   assert.doesNotMatch(skill, /<provider\/model>/);

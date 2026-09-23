@@ -13,7 +13,6 @@ import type { RoundFile, SessionRecord, SessionRound } from "../../src/session-s
 const REPO: RepoRef = { root: "/repo", name: "repo", remote: null };
 const NOW = "2026-02-14T10:00:00.000Z";
 
-/** A round as `start` writes it: its ledger id, its head commit, its files. */
 function round(index: number, files: RoundFile[], approvedAtEnd: string[] = []): SessionRound {
   return {
     index,
@@ -74,7 +73,6 @@ function annotation(id: string, roundId: string, path: string): AnnotationRecord
   });
 }
 
-/** Git that always answers, remembering what it was asked for. */
 function fakeDiff(patch = "@@ -1 +1 @@\n-old\n+new"): ReadFileDiff & { calls: string[][] } {
   const calls: string[][] = [];
   const read = (from: string, to: string, paths: string[]) => {
@@ -84,7 +82,6 @@ function fakeDiff(patch = "@@ -1 +1 @@\n-old\n+new"): ReadFileDiff & { calls: st
   return Object.assign(read, { calls });
 }
 
-/** Git that cannot reach a commit — a rebase or force-push happened. */
 const unreachable: ReadFileDiff = () => undefined;
 
 function judge(
@@ -291,7 +288,6 @@ test("an oversized response patch is capped and marked", () => {
   assert.equal((outcomes[0]?.response_patch ?? "").split("\n").length, 2000);
 });
 
-/** Every combination of the facts, so no pair of verdict tests can overlap. */
 test("verdictFor labels every combination of facts exactly once", () => {
   const expected: [boolean, boolean, boolean, boolean, Verdict][] = [
     [false, false, false, false, "unknown"],

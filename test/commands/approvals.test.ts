@@ -92,7 +92,7 @@ test("names every file behind the counts, and which of them a lane swept", () =>
 });
 
 /**
- * S8: 166 tokens for a three-file review, ~90 of them unactionable — every
+ * 166 tokens for a three-file review, ~90 of them unactionable — every
  * list printed empty beside its own count, `omitted: 0`, `has_more: false`,
  * and a two-line explanation of `swept` on a review that swept nothing.
  */
@@ -119,8 +119,8 @@ test("a review with nothing ticked prints the counts and no empty lists", () => 
   ]);
 });
 
-/** N4 here too: `turn` names whose move it is, and a second word for the same
- * state goes stale between rounds. */
+/** `turn` names whose move it is, and a second word for the same state goes
+ * stale between rounds. */
 test("the session block names the review and says nothing twice", () => {
   const stateDir = stateWith(
     session({ status: "ended", groups: [group("Auth", "study", "src/auth.ts")] }),

@@ -29,10 +29,7 @@ const nextId = createIdSource();
 /** Stands for git having no version to read: binary, oversized or deleted. */
 const noFile: ReadSideFile = () => undefined;
 
-/**
- * The two versions of `src/server.ts` a reader would hand back, distinguishable
- * so a test can tell which side the slicer was pointed at.
- */
+/** Distinguishable, so a test can tell which side the slicer was pointed at. */
 const versions: Record<AnnotationSide, string> = {
   old: ["before one", "before two", "old marker", "before four"].join("\n"),
   new: ["after one", "after two", "new marker", "after four"].join("\n"),

@@ -39,8 +39,8 @@ test("a guardrail file raises a chapter its own diff says is bulk", () => {
 });
 
 test("study is never lowered, however mechanical every file in it looks", () => {
-  // The asymmetry, stated as a test: automation may add reading, never remove
-  // it. A chapter wrongly swept is the change nobody looked at.
+  // Automation may add reading, never remove it: a chapter wrongly swept is the change nobody
+  // looked at.
   const groups = [group("study", [file("README.md"), file("locale/de.po")])];
 
   assert.deepEqual(tiersOf(groups), ["study"]);

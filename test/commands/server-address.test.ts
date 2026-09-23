@@ -72,7 +72,6 @@ test("diagnosePort returns at the first open probe instead of sitting out the ba
 
 test("reviewServerIsUp recognises our server and only our server", async () => {
   const port = await freePort();
-  // Nothing listening: no server, ours or otherwise.
   assert.equal(await reviewServerIsUp(port), false);
 
   const server = reviewServerOn(port);

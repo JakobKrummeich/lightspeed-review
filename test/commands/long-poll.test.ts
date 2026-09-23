@@ -17,7 +17,6 @@ interface Harness {
   port: number;
   /** Poll requests the server saw, dropped ones included. */
   polls: PollRequest[];
-  /** Answers everyone still waiting. */
   answer: (status: number, body: string) => void;
   close: () => Promise<void>;
 }
@@ -31,10 +30,6 @@ interface HarnessOptions {
   keepAliveTimeoutMs?: number;
 }
 
-/**
- * A server speaking the two poll routes: kills its first `dropped` polls while
- * they wait (a broken long-poll from here), parks later ones until the test answers.
- */
 async function pollServer(options: HarnessOptions = {}): Promise<Harness> {
   const polls: PollRequest[] = [];
   const waiting = new Set<ServerResponse>();
@@ -95,7 +90,6 @@ function pollFor(harness: Harness): Promise<unknown> {
   });
 }
 
-/** Waits for the poll to arrive (or arrive again), and says so when it never does. */
 async function untilPolled(harness: Harness, count: number): Promise<void> {
   for (let waited = 0; waited < 2_000 && harness.polls.length < count; waited += 10) {
     await new Promise((resolve) => setTimeout(resolve, 10));

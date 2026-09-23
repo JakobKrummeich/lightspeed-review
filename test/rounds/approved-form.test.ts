@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { approvedForm } from "../../src/rounds/approved-form.ts";
 import type { RoundFile, SessionRound } from "../../src/session-store.ts";
 
-/** A round as `start` writes it. */
 function round(index: number, files: RoundFile[], approvedAtEnd: string[] = []): SessionRound {
   return {
     index,

@@ -12,7 +12,6 @@ import {
 } from "../../src/rounds/history.ts";
 import type { RoundFile, SessionRound } from "../../src/session-store.ts";
 
-/** A round as `start` writes it, closed with whatever was ticked approved. */
 function round(index: number, files: RoundFile[], approvedAtEnd: string[] = []): SessionRound {
   return {
     index,
@@ -34,9 +33,8 @@ function file(path: string, blob: string | null, previousPath?: string): RoundFi
 }
 
 /**
- * A file recorded as `modified` with an earlier name: how a round recorded a
- * copy while `src/diff-extract.ts` still asked git for copies. The earlier
- * name is another file, still in the review under its own name.
+ * A copy, as rounds recorded one while `src/diff-extract.ts` still asked git for copies:
+ * `modified` with an earlier name that is another file, still in the review under its own name.
  */
 function earlierName(path: string, blob: string | null, previousPath: string): RoundFile {
   return { path, status: "modified", blob, previousPath };
@@ -381,7 +379,6 @@ test("roundApproval follows the reviewer's ticks the moment they change", () => 
     "src/a.ts": "unapproved",
     "src/b.ts": "unapproved",
   });
-  // Ticked a file for the first time, in the round still open.
   assert.deepEqual(roundApproval(rounds, ["src/a.ts", "src/b.ts"]), {
     "src/a.ts": "approved",
     "src/b.ts": "approved",

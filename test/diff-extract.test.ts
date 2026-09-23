@@ -64,8 +64,8 @@ test("parseDiff remembers the name a renamed file used to have", () => {
 test("a copy header, which extractDiff never asks git for, parses as modified with its source", () => {
   // `-C` reports a copy as `copy from`/`copy to`; `DIFF_ARGS` has no `-C`, so
   // none reaches the parser from `extractDiff`. Handed one from elsewhere, the
-  // parser keeps its old shape — the shape session records held while `-C` was
-  // asked for — rather than a status nothing downstream reads.
+  // parser keeps the shape session records held while `-C` was asked for,
+  // rather than a status nothing downstream reads.
   const diff = [
     "diff --git a/src/auth/session.ts b/src/auth/admin-session.ts",
     "similarity index 80%",
@@ -201,10 +201,9 @@ test("diffStats counts binary files in binary_skipped", () => {
 });
 
 /**
- * S6: git's own stderr went straight past the output layer, so an agent reading
- * `2>&1` — the common case — got three lines of `fatal:` prose in front of the
- * TOON and failed to parse a failure that was already reported. The same three
- * lines were inside `detail` all along, where one of them is enough.
+ * Regression: git's own stderr went straight past the output layer, so an agent
+ * reading `2>&1` got three lines of `fatal:` prose in front of the TOON. One of
+ * them, inside `detail`, is enough.
  */
 test("extractDiff reports git_ref_not_found naming both refs and the way back", () => {
   const repoRoot = gitRepoWithBranch();
@@ -256,11 +255,11 @@ test("extractDiff asks git for histogram diffs and rename detection", () => {
 });
 
 /**
- * The complaint this guards against: a file moved to another directory and
- * edited on the way (imports re-pointed, a hook generalised) scores 40–49% on
- * git's similarity, under the default 50%, and came out as one deleted file
- * and one added file — the same code shown twice. Measured on the user's own
- * history: every pair git added between 50% and 40% was a real move.
+ * A file moved to another directory and edited on the way (imports re-pointed,
+ * a hook generalised) scores 40–49% on git's similarity, under the default 50%,
+ * and came out as one deleted file and one added file — the same code shown
+ * twice. Measured on the user's own history: every pair git added between 50%
+ * and 40% was a real move.
  */
 test("a file moved and half rewritten is one rename, not a deletion and an addition", () => {
   const repoRoot = newRepo("lsr-move-");
@@ -302,10 +301,9 @@ test("a file moved and half rewritten is one rename, not a deletion and an addit
 });
 
 /**
- * The decision this pins: a genuinely new file is shown whole. Git's copy
- * detection (`-C`) paired a new file with any modified file it resembled and
- * showed only the delta — here 2 lines of a 10-line file — and a new file,
- * copied from a template or not, is new code the reviewer reads whole.
+ * Git's copy detection (`-C`) paired a new file with any modified file it
+ * resembled and showed only the delta — here 2 lines of a 10-line file. A new
+ * file, copied from a template or not, is new code the reviewer reads whole.
  */
 test("a new file that resembles a modified one is added, whole: not a copy of it", () => {
   const repoRoot = newRepo("lsr-copy-");
@@ -368,14 +366,13 @@ test("a repeated closing line anchors on the inserted block, not on a blend of t
     .split("\n")
     .filter((line) => line.startsWith("+") && line[1] !== "+");
 
-  // The whole function arrives as added lines; nothing is rewritten around it.
   assert.deepEqual(added, ["+function two() {", "+  return two;", "+}"]);
   assert.equal(files[0]?.deletions, 0);
 });
 
 /**
- * The invariant the cut exists to keep: `header`, then every hunk's `header`/`body`
- * in order, is the patch that went in — `git apply` needs git's bytes, not a reconstruction.
+ * `header`, then every hunk's `header`/`body` in order, is the patch that went
+ * in — `git apply` needs git's bytes, not a reconstruction.
  */
 function assertHunksJoinBackIntoTheDiff(files: DiffFile[], source: string): void {
   assert.ok(files.length > 0, `${source}: no files, so the round trip proves nothing`);
@@ -538,7 +535,7 @@ test("a header that lost its closing @@ is not read as a hunk header", () => {
 
 /**
  * One file of every diff shape git emits (two-hunk modification, add, delete, pure rename,
- * binary, no-newline, decoy `@@` patch file). Git's own output, built once for three tests.
+ * binary, no-newline, decoy `@@` patch file). Git's own output, built once and shared.
  */
 function repoWithEveryDiffShape(): string {
   everyDiffShape ??= buildRepoWithEveryDiffShape();

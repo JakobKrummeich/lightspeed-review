@@ -73,7 +73,6 @@ test("no --agent and nothing else is agent_missing, named before anything is wri
   assert.deepEqual(readdirSync(place.home), []);
 });
 
-/** The error has to teach both ways out, not just the one it is named after. */
 test("agent_missing says --config on its own is a thing you can run", () => {
   assert.throws(
     () => run(roots(), { agent: undefined }),
@@ -101,7 +100,6 @@ test("--config alone writes the config and no skill at all", () => {
   assert.deepEqual(readdirSync(place.home), [], "nothing written for any agent");
 });
 
-/** Restarting buys nothing when no skill was written; the line would be a lie. */
 test("--config alone never tells you to restart your agent", () => {
   const help = run(roots(), { agent: undefined, config: true }).help as string[];
 

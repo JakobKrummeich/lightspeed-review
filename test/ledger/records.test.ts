@@ -417,7 +417,6 @@ test("each id source counts on its own", () => {
   assert.equal(one("evt", "2026-02-14T09:31:02.118Z"), other("evt", "2026-02-14T09:31:02.118Z"));
 });
 
-/** The documented limit of a 16-bit sequence, pinned so it cannot surprise. */
 test("the sequence wraps after 65536 ids in the same millisecond", () => {
   const nextId = createIdSource();
   const first = nextId("evt", "2026-02-14T09:31:02.118Z");

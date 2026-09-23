@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import type { AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
 import { loginInteraction, type InteractionIo } from "../../src/commands/login-interaction.ts";
 
-/** Terminal stand-in: canned answers in, every question and line recorded. */
 function scriptedIo(answers: string[]): {
   io: InteractionIo;
   asked: string[];
