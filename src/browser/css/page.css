@@ -196,7 +196,7 @@ body {
 }
 
 /*
- * The header is one row at every width: the presence sentence is the only part
+ * The header is one row at every width: the presence label is the only part
  * that can be cut and still read, so the branch, the count and the switches
  * keep their line. The bar is the distance and the count is the exact answer,
  * and neither is dropped: the mind does not turn `12/40` into how much is left.
@@ -220,7 +220,7 @@ body {
 /*
  * One segment per group, each as wide as the lines its group changed, by
  * `flex-grow` from the markup. The floor: below eight characters' worth it is
- * no longer a distance anybody can read, and the presence sentence beside it
+ * no longer a distance anybody can read, and the presence label beside it
  * is the part of the row built to be cut short instead. Narrower than the
  * floor fits, the bar is not drawn at all — the 746px query in `code.css`
  * measures where that is.

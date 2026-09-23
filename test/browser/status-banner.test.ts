@@ -41,18 +41,38 @@ test("shows the session status", () => {
   assert.match(html, />open</);
 });
 
-test("says the agent is waiting while it polls", () => {
+/** What the header shows, as opposed to what its tooltip carries. */
+function presenceText(html: string): string | undefined {
+  return /<p class="lsr-presence"[^>]*>([^<]*)<\/p>/.exec(html)?.[1];
+}
+
+function presenceTitle(html: string): string | undefined {
+  return /<p class="lsr-presence"[^>]*title="([^"]*)"/.exec(html)?.[1];
+}
+
+/** Not "Agent is waiting": beside "Agent is working" that read as the same
+ * news, when one is the reviewer's move and the other is not. */
+test("says the move is the reviewer's while an agent polls", () => {
   const html = renderStatusBanner(banner({ agentWaiting: true }));
 
   assert.match(html, /data-waiting="true"/);
-  assert.match(html, /agent is waiting/i);
+  assert.equal(presenceText(html), "Waiting for your feedback");
+  assert.equal(presenceTitle(html), "an agent is waiting for your feedback");
 });
 
 test("says nobody is waiting when no agent polls, rather than hiding the fact", () => {
   const html = renderStatusBanner(banner({ agentWaiting: false }));
 
   assert.match(html, /data-waiting="false"/);
-  assert.match(html, /no agent is waiting/i);
+  assert.equal(presenceText(html), "No agent is waiting");
+});
+
+/** The queued-anyway advice is said nowhere else on the page, so the short
+ * label keeps it one hover away rather than dropping it. */
+test("keeps the send-anyway advice in the tooltip when nobody is waiting", () => {
+  const html = renderStatusBanner(banner({ agentWaiting: false }));
+
+  assert.equal(presenceTitle(html), "no agent is waiting — send anyway, the feedback is queued");
 });
 
 test("covers the page with what the review came to once it is closed", () => {
@@ -74,21 +94,19 @@ test("shows no overlay while the review is still open", () => {
 test("does not claim an agent is waiting on an ended review", () => {
   const html = renderStatusBanner(banner({ status: "ended", agentWaiting: true }));
 
-  assert.doesNotMatch(html, /agent is waiting/i);
+  assert.doesNotMatch(html, /waiting for your feedback/i);
 });
 
-test("says the agent has the feedback once the turn is the agent's", () => {
+/** The header is a corner, not a sentence: the detail is written at the foot
+ * of the conversation, and a long plan in the header only got cut off there. */
+test("says only that the agent is working once the turn is the agent's", () => {
   const html = renderStatusBanner(banner({ turn: READING }));
 
   assert.match(html, /data-turn="agent"/);
-  assert.match(html, /the agent has your feedback/i);
-  assert.doesNotMatch(html, /no agent is waiting/i);
+  assert.equal(presenceText(html), "Agent is working");
 });
 
-/** `work "<plan>"` is the agent buying silence with a reason. The banner is
- * where that reason is spent: a reviewer watching a still page wants to know
- * what is being done, not merely that something is. */
-test("a declared plan is named in the banner instead of the general sentence", () => {
+test("a declared plan stays out of the header text, one hover away in the tooltip", () => {
   const html = renderStatusBanner(
     banner({
       turn: {
@@ -100,16 +118,17 @@ test("a declared plan is named in the banner instead of the general sentence", (
     }),
   );
 
-  assert.match(html, /implementing: splitting the helper out/);
-  assert.doesNotMatch(html, /has your feedback/);
+  assert.equal(presenceText(html), "Agent is working");
+  assert.equal(presenceTitle(html), "implementing: splitting the helper out");
 });
 
-test("work with no plan still says which of the two silences it is", () => {
+test("work with no plan says the same short thing", () => {
   const html = renderStatusBanner(
     banner({ turn: { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" } }),
   );
 
-  assert.match(html, /the agent is implementing your feedback/i);
+  assert.equal(presenceText(html), "Agent is working");
+  assert.equal(presenceTitle(html), "the agent is implementing your feedback");
 });
 
 test("a plan cannot inject markup into the header", () => {
@@ -119,7 +138,7 @@ test("a plan cannot inject markup into the header", () => {
         holder: "agent",
         mode: "working",
         at: "2025-01-01T00:07:00.000Z",
-        note: "<script>alert(1)</script>",
+        note: '"><script>alert(1)</script>',
       },
     }),
   );
@@ -127,7 +146,8 @@ test("a plan cannot inject markup into the header", () => {
   // Case-insensitive and open-ended: a regexp that only knows the exact lower-case
   // tag would pass while the banner served `<SCRIPT>` or `<script src=x>`.
   assert.doesNotMatch(html, /<script/i);
-  assert.match(html, /&lt;script&gt;/);
+  // The quote is what would break out of the tooltip attribute.
+  assert.match(html, /&quot;&gt;&lt;script&gt;/);
 });
 
 test("the turn beats waiting, since what became of the feedback is the news", () => {
@@ -135,8 +155,8 @@ test("the turn beats waiting, since what became of the feedback is the news", ()
   // nothing the reviewer can act on; what became of their feedback does.
   const html = renderStatusBanner(banner({ agentWaiting: true, turn: READING }));
 
-  assert.match(html, /the agent has your feedback/i);
-  assert.doesNotMatch(html, /agent is waiting/i);
+  assert.equal(presenceText(html), "Agent is working");
+  assert.doesNotMatch(html, /waiting for your feedback/i);
 });
 
 test("does not claim an agent is working on an ended review", () => {

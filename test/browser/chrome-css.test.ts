@@ -555,7 +555,7 @@ test("the header's bar gives its room back before the exact count does", () => {
   assert.match(bar, /min-width: 8rem;/);
   assert.match(bar, /flex: 1 1 auto;/);
   // The bar takes the row's slack and gives it back first; fixed at content size it would starve
-  // the presence sentence.
+  // the presence label.
   assert.match(rulesFor(".lsr-progress").join(""), /flex: 1 1 12rem;/);
   assert.match(bare, /@media \(max-width: 746px\)\s*\{\s*\.lsr-progress-bar\s*\{\s*display: none;/);
   assert.match(rulesFor(".lsr-progress-count").join(""), /flex: 0 0 auto;/);
@@ -884,4 +884,12 @@ test("the round's announcement holds still too: no fold flight, no orbiting spar
   assert.match(quiet, /#lsr-round-popup\[data-state="folding"\] \{\s*display: none;/);
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\] \{\s*animation: none;/);
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\]::after \{\s*display: none;/);
+});
+
+test("the header sets the reviewer's move apart from the agent's by weight, not by hue", () => {
+  // Both keep the accent the conversation's working line wears — an agent is live either way.
+  // Only one asks something of the reviewer, and the turn wins over waiting, so the rule names both.
+  const theirs = rulesFor('.lsr-presence[data-turn="reviewer"][data-waiting="true"]').join("");
+  assert.match(theirs, /font-weight: 600;/);
+  assert.doesNotMatch(rulesFor('.lsr-presence[data-turn="agent"]').join(""), /font-weight/);
 });

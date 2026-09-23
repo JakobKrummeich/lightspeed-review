@@ -32,18 +32,36 @@ function statusLine(status: SessionStatus): string {
  * All three states stated: "nobody is listening" is as much news as somebody
  * is. The turn wins over waiting when both are reported — a second parked agent
  * is nothing the reviewer can act on, and the agent holding their feedback is.
+ *
+ * The header says a short fixed label; the full sentence rides in `title`. The
+ * plan `work` declares ran long, got cut off in the header's corner, and is
+ * already written out at the foot of the conversation — but that panel can be
+ * collapsed, and the no-agent advice is said nowhere else, so the sentence
+ * stays one hover away instead of being dropped.
  */
 function presenceLine(state: StatusState): string {
-  // The holder, not "is the agent working": a reading agent is not working.
-  // Escaped because on the agent's turn the text carries the plan `work`
-  // declared, which is the agent's own words.
+  // Escaped because on the agent's turn the title carries the plan `work`
+  // declared, which is the agent's own words — inside an attribute, so the
+  // quote matters as much as the angle brackets.
   const turn = state.turn.holder;
-  return `<p class="lsr-presence" data-waiting="${state.agentWaiting}" data-turn="${turn}">${escapeHtml(presenceLabel(state))}</p>`;
+  const { label, detail } = presenceWords(state);
+  return `<p class="lsr-presence" data-waiting="${state.agentWaiting}" data-turn="${turn}" title="${escapeHtml(detail)}">${escapeHtml(label)}</p>`;
 }
 
-function presenceLabel(state: StatusState): string {
-  if (state.turn.holder === "agent") return agentTurnText(state.turn);
+/**
+ * "Working" covers reading too: whether the agent has only picked the feedback
+ * up or is already changing code is the conversation's to say, not the header's.
+ * The reviewer's move does not start with "Agent is": beside "Agent is working"
+ * it read as the same news, when one asks for the reviewer and the other does not.
+ */
+function presenceWords(state: StatusState): { label: string; detail: string } {
+  if (state.turn.holder === "agent") {
+    return { label: "Agent is working", detail: agentTurnText(state.turn) };
+  }
   return state.agentWaiting
-    ? "an agent is waiting for your feedback"
-    : "no agent is waiting — send anyway, the feedback is queued";
+    ? { label: "Waiting for your feedback", detail: "an agent is waiting for your feedback" }
+    : {
+        label: "No agent is waiting",
+        detail: "no agent is waiting — send anyway, the feedback is queued",
+      };
 }

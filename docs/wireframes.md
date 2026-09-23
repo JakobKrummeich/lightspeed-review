@@ -48,7 +48,7 @@ One baseline-aligned flex row:
 │ [Unified│Side-by-side] [scheme]  (Replay last round) (Round 2 is ready   │
 │  #lsr-view-switch  #lsr-scheme-switch  #lsr-replay-reopen   · 5 files)   │
 │                                              #lsr-round-offer            │
-│ status line · presence sentence                     #lsr-status-banner   │
+│ status line · presence label                        #lsr-status-banner   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,6 +62,12 @@ One baseline-aligned flex row:
   last ones on the bar because they are the last entries in the array
   (`trailSweeps`, `src/group-tier.ts`), which is what makes the bar, the survey
   and "Chapter n of m" name one order; the bar itself sorts nothing.
+- Presence label `.lsr-presence`: a short fixed label — "Agent is working"
+  (agent's turn, reading or working), "Waiting for your feedback" (an
+  agent is parked on `wait`; set in 600 weight, as the one state that asks
+  for the reviewer), "No agent is waiting". The full sentence (the declared plan, the send-anyway advice) is
+  its `title`, a hover-only convenience; the plan is written out at the foot of the conversation (§5,
+  `.lsr-working` line), so the header does not repeat it.
 - `#lsr-replay-reopen` and `#lsr-round-offer` are hidden until relevant.
 - Round-offer states: plain → **glow** (`lsr-offer-glow`, after the round
   popup folds into it) → **beckon** (orbiting spark via `::after` +
@@ -279,8 +285,10 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ └────────────────────────────────────┘ │ │
 │ │ agent                                  │ │
 │ │   reply text                           │ │
-│ │ ●●● the agent is working on your       │ │ .lsr-working (animated dots;
-│ │     feedback                           │ │  gone once review ends)
+│ │ ●●● the agent is implementing your     │ │ .lsr-working (animated dots;
+│ │     feedback                           │ │  gone once review ends; or
+│ │                                        │ │  "the agent has your feedback",
+│ │                                        │ │  "implementing: <plan>")
 │ │                                        │ │
 │ │ ┌ section.lsr-queue ─────────────────┐ │ │
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │
