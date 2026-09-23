@@ -1,46 +1,39 @@
 import type { FileApprovalFlip, GroupApprovalFlip } from "./diff-view.ts";
 
-/** One collapsible block of the review, named the way the page can find it again. */
 export type FoldTarget = { kind: "group"; index: number } | { kind: "file"; path: string };
 
 /**
- * Everything open in one draw. A whole state, not departures from the default:
- * "not listed" would mean different things per list, and the draw has already
- * resolved both.
+ * A whole state, not departures from the default: "not listed" would mean
+ * different things per list, and the draw has already resolved both.
  */
 export interface OpenFolds {
   groups: number[];
   files: string[];
 }
 
-/** One block to open or shut as part of a single gesture. */
 export interface FoldStep {
   target: FoldTarget;
   expanded: boolean;
-  /** Worth watching: false for a block folding inside another folding block. */
   animated: boolean;
 }
 
-/** What one tick does to what is open, and what must not move while it happens. */
 export interface CollapsePlan {
   steps: FoldStep[];
-  /** Block held still in viewport; undefined when the tick moved nothing. */
+  /** Held still in the viewport. */
   anchor: FoldTarget | undefined;
 }
 
 /**
- * What a tick folds, in apply order, and what the eye keeps. Anchor is the
- * outermost thing the gesture leaves standing (group over file). Only the
- * outermost fold animates: animating a file inside a group already folding
- * over it reads as two jolts for one press, so the inner one snaps shut where
- * nobody can see it.
+ * Anchor is the outermost thing the gesture leaves standing (group over file).
+ * Only the outermost fold animates: a file animating inside a group already
+ * folding over it reads as two jolts for one press, so the inner one snaps
+ * shut where nobody can see it.
  *
- * A group folds only on the tick that finishes it. The one that undoes it
- * moves the group nowhere: an untick is a withdrawal, not a request to read,
- * and it is made on the chapter's card as often as under its lines — a card
- * that opened on it would look as if it had taken the press meant for the
- * tick. The files inside do open again, behind whatever the chapter is; the
- * chapter itself opens on its own press and on nothing else.
+ * A group folds only on the tick that finishes it; the untick moves it nowhere.
+ * An untick is a withdrawal, not a request to read, and it is made on the
+ * chapter's card as often as under its lines — a card that opened on it would
+ * look as if it had taken the press meant for the tick. The files inside do
+ * open again, behind whatever the chapter is.
  */
 export function tickCollapsePlan(
   fileFlips: FileApprovalFlip[],

@@ -1,7 +1,6 @@
 /**
- * Which highlight.js grammar a reviewed file should be read with. Kept as data
- * because it is the one place that decides what "a .tsx file" means, and it is
- * also the list of grammars the bundle can lazy-load — see `syntax-grammars.ts`.
+ * The one place that decides what "a .tsx file" means, and the list of
+ * grammars the bundle can lazy-load — see `syntax-grammars.ts`.
  */
 export const LANGUAGE_BY_EXTENSION: Record<string, string> = {
   ts: "typescript",
@@ -53,16 +52,12 @@ export const LANGUAGE_BY_EXTENSION: Record<string, string> = {
   dockerfile: "dockerfile",
 };
 
-/** Files whose name, not extension, says what they are. */
 export const LANGUAGE_BY_FILENAME: Record<string, string> = {
   dockerfile: "dockerfile",
   makefile: "makefile",
 };
 
-/**
- * The grammar for one repository path, or undefined when nothing fits: an
- * unhighlighted file reads as it does today, a wrongly guessed one reads worse.
- */
+/** Undefined when nothing fits: an unhighlighted file reads as it does today, a wrongly guessed one reads worse. */
 export function languageForPath(path: string): string | undefined {
   const name = (path.split("/").pop() ?? "").toLowerCase();
   const byName = LANGUAGE_BY_FILENAME[name];

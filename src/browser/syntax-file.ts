@@ -1,26 +1,23 @@
 import type { HLJSApi } from "highlight.js";
 import { highlightSide } from "./syntax-lines.ts";
 
-/** One version of a file, highlighted as a whole and cut back into lines. */
 export interface FileHighlight {
-  /** Highlighted HTML, one entry per file line, in file order. */
+  /** One entry per file line. */
   html: string[];
-  /** The same lines as plain text, so a diff row can be checked against them. */
   text: string[];
 }
 
-/** A rendered diff row: which line of the file it shows, and what it shows. */
 export interface DiffRow {
-  /** 1-based line number in this version of the file; undefined on the other version's rows. */
+  /** 1-based; undefined on the other version's rows. */
   number: number | undefined;
   text: string;
 }
 
 /**
- * Highlights a whole file. This is the point of reading files instead of
- * hunks: highlight.js decides what a fragment means from the code around it,
- * so a JSX element, a block comment or a template literal that a hunk cuts in
- * half can only be coloured correctly from the complete text.
+ * The point of reading files instead of hunks: highlight.js decides what a
+ * fragment means from the code around it, so a JSX element, a block comment or
+ * a template literal that a hunk cuts in half can only be coloured correctly
+ * from the complete text.
  */
 export function highlightFile(
   hljs: HLJSApi,
@@ -33,11 +30,10 @@ export function highlightFile(
 }
 
 /**
- * The highlighted HTML for one diff row, or undefined when the file cannot
- * account for it: no line number, a number past the end, or text that differs
- * from the file's. Any of those means the file we fetched is not the one on
- * screen — a stale commit, a rename, an amended branch — and painting anyway
- * would put one line's colours on another.
+ * Undefined when the file cannot account for the row: any of no line number,
+ * a number past the end, or differing text means the file we fetched is not
+ * the one on screen — a stale commit, a rename, an amended branch — and
+ * painting anyway would put one line's colours on another.
  */
 export function htmlForRow(file: FileHighlight, row: DiffRow): string | undefined {
   if (row.number === undefined) return undefined;

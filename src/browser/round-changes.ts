@@ -2,14 +2,12 @@ import { changedFrom } from "../rounds/last-round-form.ts";
 import type { RoundFile } from "../session-store.ts";
 
 /**
- * Files provably edited since the round before — the `Since last round`
- * switch candidates. Uses the server's own comparison (`changedFrom`,
- * `src/rounds/last-round-form.ts`), so the page never offers a press the
- * server would refuse. Switch precedence is not decided here: that rule lives
- * only in `diff-view.ts`.
+ * Uses the server's own comparison (`changedFrom`, `src/rounds/last-round-form.ts`),
+ * so the page never offers a `Since last round` press the server would refuse.
+ * Switch precedence is not decided here: that rule lives only in `diff-view.ts`.
  */
 
-/** The slice of a wire round this question reads. `RoundMark`s carry no files. */
+/** `files` optional: `RoundMark`s carry none. */
 interface RoundBlobs {
   files?: readonly RoundFile[];
 }

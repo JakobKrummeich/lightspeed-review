@@ -1,12 +1,10 @@
 /**
- * The card that goes up the moment the last file is ticked: the one point in
- * a review where the reviewer has finished and the page has not said so. The
- * sidebar's note ("Every file is approved — Send & End when you are ready")
- * proved too quiet for the moment — it sits in a column the eye left an hour
- * ago — so the news is said once, over the review, with the press it calls
- * for on it. Two ways out and nothing else: end here, or keep looking, because
- * approved is not the same as done and the reviewer decides which this is.
- * Numbers only in the queued line, so nothing needs escaping.
+ * The sidebar's note ("Every file is approved — Send & End when you are
+ * ready") proved too quiet for the moment — it sits in a column the eye left
+ * an hour ago — so the news is said once, over the review, with the press it
+ * calls for on it. Two ways out and nothing else: approved is not the same as
+ * done and the reviewer decides which this is. Numbers only in the queued
+ * line, so nothing needs escaping.
  */
 export function renderReviewDone(queued: number, sendsQueue = true): string {
   return `<div class="lsr-done-overlay">
@@ -24,10 +22,9 @@ export function renderReviewDone(queued: number, sendsQueue = true): string {
 }
 
 /**
- * What ending carries with it: the notes queued and not yet sent, because
- * "End review" is the sidebar's Send & End and the reviewer should not learn
- * that from the conversation afterwards. Nothing queued says nothing — and on
- * the agent's turn the same press sends nothing, so it promises nothing.
+ * "End review" is the sidebar's Send & End, and the reviewer should not learn
+ * that from the conversation afterwards. On the agent's turn the same press
+ * sends nothing, so it promises nothing.
  */
 function queuedLine(queued: number): string {
   if (queued <= 0) return "";

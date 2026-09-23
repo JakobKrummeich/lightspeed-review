@@ -1,49 +1,35 @@
 import { escapeHtml } from "../escape-html.ts";
 
-/**
- * What decides whether this round is handed over or simply shown. Every field
- * is a reason to say no; asked in one place — `opensFor`.
- */
 export interface OpeningReview {
-  /** The round the diff on screen belongs to; a review's first is zero. */
+  /** Zero-based. */
   round: number;
-  /** Why the round exists, in the order the agent gave it. */
   intents: readonly string[];
   ended: boolean;
-  /** Whether this browser has already opened the wrapper for this review. */
   unwrapped: boolean;
 }
 
 /**
- * Worth wrapping? The ceremony costs presses, so: first round only, once.
- * Later rounds have the replay, and the two overlays must never stack. An
- * ended review is a record, not a handover; a reasonless round has nothing to
- * say one sheet at a time.
+ * The ceremony costs presses, so: first round only, once. Later rounds have
+ * the replay, and the two overlays must never stack. An ended review is a
+ * record, not a handover; a reasonless round has nothing to say one sheet at a time.
  */
 export function opensFor(review: OpeningReview): boolean {
   return review.round === 0 && review.intents.length > 0 && !review.ended && !review.unwrapped;
 }
 
-/** One sheet of the stack, before it is laid into the room. */
 interface Sheet {
-  /** The quiet line above the cover's headline: where this came from. */
   lead?: string;
-  /** The cover's one loud line; the reasons speak in the body alone. */
   headline?: string;
-  /** Which reason of how many, for whoever cannot see the dots. */
   label?: string;
-  /** The reason itself; the cover has none — its headline is all it says. */
   body?: string;
-  /** What the button on this sheet says, which is what pressing it does. */
   act: string;
 }
 
 /**
- * The whole room in one string: motes, cover, one sheet per reason, dots,
- * flood layer. Complete from the start because peeling is an attribute write,
- * not a redraw — the stylesheet animates the leaving sheet against the
- * arriving one. `data-flare`/`data-bloom` start off for the same reason. No
- * intents renders "": the mount reads that as nothing to open.
+ * Complete from the start because peeling is an attribute write, not a redraw
+ * — the stylesheet animates the leaving sheet against the arriving one.
+ * `data-flare`/`data-bloom` start off for the same reason. No intents renders
+ * "": the mount reads that as nothing to open.
  */
 export function renderOpening(intents: readonly string[]): string {
   if (intents.length === 0) return "";
@@ -59,9 +45,8 @@ ${dots(sheets.length)}
 }
 
 /**
- * The cover: who it is from and that there is something. It does not count
- * the reasons — "Four reasons, one at a time." was a line to read before the
- * reasons could be, and the dots already say how many.
+ * Does not count the reasons: "Four reasons, one at a time." was a line to
+ * read before the reasons could be, and the dots already say how many.
  */
 function cover(): Sheet {
   return {
@@ -71,23 +56,16 @@ function cover(): Sheet {
   };
 }
 
-/**
- * One reason and the way on. "Reason n of m" is the section's aria-label, not
- * a visible line: the dots say it to the eye.
- */
+/** "Reason n of m" is the section's aria-label, not a visible line: the dots say it to the eye. */
 function reasonSheet(total: number): (intent: string, index: number) => Sheet {
   return (intent, index) => ({
     label: `reason ${index + 1} of ${total}`,
     body: escapeHtml(intent),
-    // The last sheet is the way in: there is nothing behind it but the review.
     act: index === total - 1 ? "Open the review" : "Next reason",
   });
 }
 
-/**
- * A sheet in the room. Every sheet names its z-layer (cover must paint on
- * top); `data-at` is what the peel moves and the stylesheet animates.
- */
+/** Every sheet names its z-layer (cover must paint on top); `data-at` is what the peel moves and the stylesheet animates. */
 function laid(sheet: Sheet, index: number, total: number): string {
   const parts = [
     sheet.lead === undefined ? "" : `<p class="lsr-opening-lead">${sheet.lead}</p>`,
@@ -102,10 +80,10 @@ ${parts.join("\n")}
 }
 
 /**
- * Drifting dust motes. No `Math.random` in a pure render — two calls must
- * agree or no test can assert either. Irrational-fraction stepping scatters
- * indexes evenly without repeats; four steps give four non-aligned spreads.
- * Negative delays: the field is already drifting on the first frame.
+ * No `Math.random` in a pure render — two calls must agree or no test can
+ * assert either. Irrational-fraction stepping scatters indexes evenly without
+ * repeats; four steps give four non-aligned spreads. Negative delays: the
+ * field is already drifting on the first frame.
  */
 function motes(): string {
   const dust = Array.from({ length: 14 }, (_unused, index) => {
@@ -120,10 +98,7 @@ function motes(): string {
   return `<span class="lsr-opening-motes" aria-hidden="true">${dust}</span>`;
 }
 
-/**
- * Stack progress dots. Eye-only decoration: each section already carries the
- * same fact as an aria-label.
- */
+/** Eye-only decoration: each section already carries the same fact as an aria-label. */
 function dots(total: number): string {
   const row = Array.from(
     { length: total },

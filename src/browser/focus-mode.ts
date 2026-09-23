@@ -5,18 +5,10 @@ import { isSweep } from "../group-tier.ts";
 import { filesLabel, groupIndexEntries, groupSize, linesLabel } from "./group-index.ts";
 import { pathLabel } from "./path-label.ts";
 
-/**
- * Focus mode: one chapter of the review filling the viewport, the others not
- * rendered at all. Not hidden — absent: a big review is slow exactly because
- * every diff of every chapter is in the DOM, and hiding them would keep that
- * cost. This module is the pure half: which chapter may be focused, the bar
- * that says so, and the gate the chapter opens behind; the mount decides when
- * to draw them.
- */
+/** The pure half of focus mode; the mount decides when to draw these. */
 
 /**
- * A held or stored chapter index, judged against the groups on screen now. A
- * re-group renumbers the chapters and a stored record can be corrupt, so
+ * A re-group renumbers the chapters and a stored record can be corrupt, so
  * anything but an index this review actually has reads as no focus at all —
  * the overview, never an empty chapter.
  */
@@ -26,13 +18,10 @@ export function clampFocus(focus: number | undefined, count: number): number | u
 }
 
 /**
- * Where a reviewer goes once the chapter at `from` is finished: the next one in
- * reading order with something still unticked in it, wrapping round to the
- * start, so approving chapter after chapter never needs a press between them.
- * Sweep chapters are landed on like any other: the reviewer settles every
- * chapter in order, and every card offers its tick, so a sweep is a press on
- * its card and not a reading. Undefined when nothing is left: the finished
- * card stays, mark and all.
+ * Wraps round to the start, so approving chapter after chapter never needs a
+ * press between them. Sweep chapters are landed on like any other: every card
+ * offers its tick, so a sweep is a press on its card and not a reading.
+ * Undefined when nothing is left: the finished card stays, mark and all.
  */
 export function nextChapterToRead(
   groups: DiffGroup[],
@@ -49,15 +38,12 @@ export function nextChapterToRead(
 }
 
 /**
- * The bar above a focused chapter: the way back to the overview, the
- * chapter's name and place, and the way to its neighbours. The name is
- * rendered on every draw and shown by the stylesheet only while the diff is
- * up: on the card it is right below in the title size, and said on both it
- * was the one thing on the screen written twice; once the card is gone
- * behind the diff, the bar is the only place left to say which chapter this
- * is. Buttons, not links, because every one of them redraws in place. The
- * ends are disabled rather than dropped so the two controls keep their
- * positions under the pointer from chapter to chapter.
+ * The name is rendered on every draw and shown by the stylesheet only while
+ * the diff is up: on the card it is right below in the title size, and once
+ * the card is gone behind the diff the bar is the only place left to say
+ * which chapter this is. Buttons, not links, because every one of them
+ * redraws in place. The ends are disabled rather than dropped so the two
+ * controls keep their positions under the pointer from chapter to chapter.
  */
 export function renderFocusBar(groups: DiffGroup[], focus: number): string {
   const group = groups[focus];
@@ -72,26 +58,19 @@ export function renderFocusBar(groups: DiffGroup[], focus: number): string {
 </div>`;
 }
 
-/** A chapter's gate: what it says, and the region one press of it reveals. */
 export interface ChapterGate {
   group: DiffGroup;
-  /** The group's content element, named so the press can say what it opens. */
   contentId: string;
-  /**
-   * How far the chapter is approved, counted in `diff-view` so this line and
-   * every other counter in the review are one sentence with one source.
-   */
+  /** Counted in `diff-view`, so every counter in the review has one source. */
   counter: string;
 }
 
 /**
- * The card a chapter opens behind: its name, the one sentence the grouping
- * wrote about it, what is in it, and the one press that shows the diff. It
- * stands alone because the same sentence used to head the first file's diff,
- * where the eye went to the code and the intent was never read — a screen with
- * nothing else on it is the only place a reason gets read before the lines it
- * is about. Nothing here is muted for the same reason: on this screen quiet
- * type would only say "skip me".
+ * Stands alone because the same sentence once headed the first file's diff,
+ * where the eye went to the code and the intent was never read — a screen
+ * with nothing else on it is the only place a reason gets read before the
+ * lines it is about. Nothing here is muted for the same reason: on this
+ * screen quiet type would only say "skip me".
  */
 export function renderChapterGate({ group, contentId, counter }: ChapterGate): string {
   return `<div class="lsr-gate">
@@ -109,10 +88,9 @@ export function renderChapterGate({ group, contentId, counter }: ChapterGate): s
 }
 
 /**
- * Why a sweep chapter's tick is the press to make without reading first: the
- * survey's own words for its lane, said again on the one card that can be
- * reached without passing through the lane. Nothing on a study chapter's card,
- * because reading is the default and needs no label.
+ * The survey's own words for its lane, said again on the one card that can be
+ * reached without passing through the lane. Nothing on a study chapter's
+ * card: reading is the default and needs no label.
  */
 function tierLine(group: DiffGroup): string {
   if (!isSweep(group)) return "";
@@ -120,12 +98,10 @@ function tierLine(group: DiffGroup): string {
 }
 
 /**
- * The one line the file list is folded behind: how many files and how many
- * lines, in the survey's words for the same chapter. Folded by default and
- * by the browser — a `<details>`, so the keyboard and the screen reader get
- * the fold for free and no press of the mount's is needed to work it — because
- * the count and the size are what a card is read for at a glance; the paths
- * are for the reviewer checking the rationale against them, one press away.
+ * Folded behind a `<details>`, so the keyboard and the screen reader get the
+ * fold for free and no press of the mount's is needed to work it: the count
+ * and the size are what a card is read for at a glance; the paths are for the
+ * reviewer checking the rationale against them, one press away.
  */
 function filesSummary(group: DiffGroup): string {
   const { files, insertions, deletions } = groupSize(group);
@@ -133,18 +109,16 @@ function filesSummary(group: DiffGroup): string {
 }
 
 /**
- * One file of the chapter with the size of its change. The list is what makes
- * the rationale checkable: these paths and these many lines are the whole of
- * what the press opens, so a rationale that describes something else is caught
- * before the diff is read rather than after. A relocated file shows both of
- * its paths and the word for it: `src/new/thing.ts +0 −0` read as a file nobody
- * touched, when the move was the change.
+ * The list is what makes the rationale checkable: these paths and these many
+ * lines are the whole of what the press opens, so a rationale that describes
+ * something else is caught before the diff is read rather than after. A
+ * relocated file shows both of its paths and the word for it: `src/new/thing.ts
+ * +0 −0` read as a file nobody touched, when the move was the change.
  */
 function gateFile(file: DiffFile): string {
   return `<li class="lsr-gate-file"><span class="lsr-gate-path">${pathLabel(file)}</span><span class="lsr-gate-lines">${sizeLabel(file)}</span></li>`;
 }
 
-/** `+n −m`, with the relocation's word in front of it — or alone, when the word is the whole change. */
 function sizeLabel(file: DiffFile): string {
   const lines = linesLabel(file.insertions, file.deletions);
   const relocation = relocationOf(file);

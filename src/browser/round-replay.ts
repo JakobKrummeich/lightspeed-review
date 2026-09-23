@@ -11,19 +11,13 @@ import type {
 import type { ConversationEntry, RoundMark } from "../session-store.ts";
 
 /**
- * Between-rounds replay overlay: last round's comments, one card at a time,
- * with the agent's answer and the change. Pure; `dom/replay-overlay.ts` holds
- * the clicks. Only the current card renders — cards are static by spec (no
- * morph), so a move is a one-card redraw.
+ * Pure; `dom/replay-overlay.ts` holds the clicks. Only the current card
+ * renders — cards are static by spec (no morph), so a move is a one-card redraw.
  */
 export interface ReplayView {
   data: ReplayData;
-  /**
-   * The round reply blob, shown on unmapped cards as their only answer —
-   * labelled as the round reply, never passed off as per-comment.
-   */
   roundReply?: string;
-  /** Which card is on screen, 0-based; clamped rather than trusted. */
+  /** 0-based; clamped rather than trusted. */
   current: number;
 }
 
@@ -39,9 +33,9 @@ const STATUS_LABEL: Record<ReplayStatus, string> = {
 };
 
 /**
- * Why a card has no code, one sentence per non-ok state; neutral wording and
- * styling (spec bars failure styling). Literal-keyed like `NO_DIFF` in
- * `approved-form.ts`: a new server state stops compiling until answered here.
+ * Neutral wording and styling (spec bars failure styling). Literal-keyed like
+ * `NO_DIFF` in `approved-form.ts`: a new server state stops compiling until
+ * answered here.
  */
 const NO_ANSWERS: Record<Exclude<ReplayState, "ok">, string> = {
   unrecorded:
@@ -82,7 +76,6 @@ function knownStatus(status: ReplayStatus): ReplayStatus {
   return Object.hasOwn(STATUS_LABEL, status) ? status : "unknown";
 }
 
-/** One dot per card, the current one marked; each is a press that goes there. */
 function dots(total: number, current: number): string {
   return Array.from(
     { length: total },
@@ -91,10 +84,6 @@ function dots(total: number, current: number): string {
   ).join("");
 }
 
-/**
- * One card: file+chip, the reviewer's words, the agent's answer, the change.
- * Non-`ok` states keep the first three and say why the fourth is missing.
- */
 function renderCard(
   comment: ReplayComment,
   roundReply: string | undefined,
@@ -112,10 +101,6 @@ ${changes(comment, renderer)}
 </article>`;
 }
 
-/**
- * The reviewer's selection and words, in the violet the "commented last
- * round" badge wears: one colour for "this is where you spoke".
- */
 function quote(comment: ReplayComment): string {
   const selected =
     comment.selected_text === ""
@@ -128,9 +113,8 @@ function quote(comment: ReplayComment): string {
 }
 
 /**
- * The agent's words: declared note, or (unmapped cards) the round reply
- * labelled as exactly that — the label keeps the blob from passing as a
- * per-comment answer. Neither: no section, not an empty frame.
+ * The round reply is labelled as exactly that: the label keeps the blob from
+ * passing as a per-comment answer. Neither: no section, not an empty frame.
  */
 function answerNote(comment: ReplayComment, roundReply: string | undefined): string {
   const fallback = comment.declared ? undefined : roundReply;
@@ -144,10 +128,9 @@ function answerNote(comment: ReplayComment, roundReply: string | undefined): str
 }
 
 /**
- * What changed: one block per answer file. An empty answer set is a fact
- * (answered in words, or no edit), never failure-styled. The undeclared
- * marker sits here because it qualifies this section: hunks matched
- * mechanically, not vouched for.
+ * An empty answer set is a fact (answered in words, or no edit), never
+ * failure-styled. The undeclared marker sits here because it qualifies this
+ * section: hunks matched mechanically, not vouched for.
  */
 function changes(comment: ReplayComment, renderer: DiffRenderer): string {
   if (comment.state !== "ok") {
@@ -171,7 +154,6 @@ ${comment.answers.map((answer) => answerFile(answer, renderer)).join("\n")}
 </div>`;
 }
 
-/** One file of the answer set: its name, and its hunks or the reason for none. */
 function answerFile(answer: ReplayAnswer, renderer: DiffRenderer): string {
   return `<div class="lsr-replay-answer-file">
 <p class="lsr-replay-answer-path"><code>${escapeHtml(answer.file)}</code></p>
@@ -191,10 +173,7 @@ function answerBody(answer: ReplayAnswer, renderer: DiffRenderer): string {
   return `<div class="lsr-replay-diff">${renderer.renderFile(hunkPatch(answer))}</div>`;
 }
 
-/**
- * Hunks reassembled into the smallest unified diff the renderer takes. Both
- * header sides use today's name: the rename story is the diff below's to tell.
- */
+/** Both header sides use today's name: the rename story is the diff below's to tell. */
 function hunkPatch(answer: ReplayAnswer): string {
   const head = `--- a/${answer.file}\n+++ b/${answer.file}\n`;
   return head + answer.hunks.map((hunk) => withNewline(hunk.header) + hunk.body).join("\n");
@@ -205,11 +184,9 @@ function withNewline(text: string): string {
 }
 
 /**
- * The round reply for fallback cards: everything the agent said since the
- * reviewer's last words of the commented round. Read by position, not stamp
- * alone — replies land on both sides of the round boundary (a `say` carries
- * the old stamp, one after `start` the new); what they share
- * is coming after the comments they answer.
+ * Read by position, not stamp alone — replies land on both sides of the round
+ * boundary (a `say` carries the old stamp, one after `start` the new); what
+ * they share is coming after the comments they answer.
  */
 export function agentRoundReply(
   conversation: readonly ConversationEntry[],

@@ -2,29 +2,21 @@ import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { collapseWhitespace } from "../classify.ts";
 import { isSweep } from "../group-tier.ts";
 
-/** What the badge says wherever it appears: one phrase, two places. */
 export const LOGIC_BADGE_LABEL = "densest logic";
 
 /**
- * Branching words worth a point each. Deliberately a word list and not a
- * parser: the page must score a change in any language, in the browser, with no
- * grammar and no dependency — and the number only ever ranks the hunks of one
- * review against each other.
+ * Deliberately a word list and not a parser: the page must score a change in
+ * any language, in the browser, with no grammar and no dependency — and the
+ * number only ever ranks the hunks of one review against each other.
  */
 const BRANCH_WORDS =
   /\b(if|else|elif|for|while|switch|case|catch|try|finally|do|match|except|unless)\b/g;
 
-/** Symbolic branches the word list cannot see. */
 const BRANCH_SYMBOLS = /(\?\?|&&|\|\||\?\.)/g;
 
-/** The `+` and then one level of nesting per two spaces or per tab. */
 const ADDED_INDENT = /^\+([ \t]*)/;
 
 /**
- * How much branching a change *writes*: one point per branch in the lines it
- * newly wrote, less the branches in the lines it took away, plus the deepest
- * nesting those new lines reach.
- *
  * A line counts as newly written only when nothing on the removed side answers
  * it — the same content once whitespace is collapsed, which is the reading
  * `src/classify.ts` already uses to call a change a reformat, so the two cannot
@@ -33,15 +25,10 @@ const ADDED_INDENT = /^\+([ \t]*)/;
  * had, deeper than before, so a chapter that decided nothing could be named the
  * densest logic in the review. Subtracting the branches of the removed lines
  * nothing answers covers the other shape of it — a mechanical rename, where no
- * line comes back character-for-character and none of the branching is new
- * either.
+ * line comes back character-for-character and none of the branching is new either.
  *
- * Removal on its own still scores nothing: a deleted branch is relief, not risk,
- * and warning a reviewer about `if`s that no longer exist is warning them about
- * work already done.
- *
- * Not a quality score and no threshold: nothing is hidden and nothing is called
- * bad. It says where the thinking in this review is, from a collapsed group.
+ * Removal on its own still scores nothing: a deleted branch is relief, not risk.
+ * Not a quality score and no threshold: nothing is hidden and nothing is called bad.
  */
 export function addedComplexity(diff: string): number {
   const added = changedLines(diff, "+");
@@ -53,17 +40,16 @@ export function addedComplexity(diff: string): number {
   return branches + Math.max(0, ...written.map(nestingDepth));
 }
 
-/** One side of the patch; `+++ b/path` and `--- a/path` are its header, not lines of it. */
+/** `+++ b/path` and `--- a/path` are the header, not lines of it. */
 function changedLines(diff: string, marker: "+" | "-"): string[] {
   const header = marker.repeat(3);
   return diff.split("\n").filter((line) => line.startsWith(marker) && !line.startsWith(header));
 }
 
 /**
- * The lines of one side that no line of the other side answers, as multisets
- * rather than sets: a block that comes back holding two copies of a line it
- * removed once has written one of them, and set comparison would call that
- * nothing.
+ * Multisets rather than sets: a block that comes back holding two copies of a
+ * line it removed once has written one of them, and set comparison would call
+ * that nothing.
  */
 function unanswered(lines: string[], others: string[]): string[] {
   const spare = new Map<string, number>();
@@ -81,7 +67,6 @@ function unanswered(lines: string[], others: string[]): string[] {
   return left;
 }
 
-/** A line as its content alone: the marker gone, whitespace no longer a difference. */
 function lineContent(line: string): string {
   return collapseWhitespace(line.slice(1));
 }
@@ -102,11 +87,7 @@ export function groupComplexity(group: DiffGroup): number {
   return group.files.reduce((total, file) => total + fileComplexity(file), 0);
 }
 
-/**
- * The paths carrying the heaviest added logic in their group. Ties all mark,
- * because choosing between equals invents a difference; a group that added no
- * branching marks nothing.
- */
+/** Ties all mark: choosing between equals invents a difference. */
 export function heaviestFiles(group: DiffGroup): string[] {
   const scored = group.files.map((file) => ({ path: file.path, score: fileComplexity(file) }));
   const top = Math.max(0, ...scored.map((entry) => entry.score));
@@ -115,9 +96,6 @@ export function heaviestFiles(group: DiffGroup): string[] {
 }
 
 /**
- * The index entries that mark logic: the group holding the most added branching
- * in the whole review. One mark on the map, not one per line of it.
- *
  * Never a swept chapter, whatever it scores. The lane a swept chapter sits in
  * is the survey saying there is nothing to decide there and offering one press
  * for the lot; a badge inside it is the same screen giving two orders, and the

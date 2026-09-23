@@ -1,15 +1,11 @@
 /**
- * Who is on the other end, per the server's `presence` frame. Two separate
- * facts: `waiting` is a live connection — somebody would read the next send at
- * once; `turn` is the review's own truth about whose move it is, and the only
- * thing Send is gated on.
+ * Two separate facts: `waiting` is a live connection — somebody would read the
+ * next send at once; `turn` is whose move it is, and the only thing Send is gated on.
  */
 import type { Turn } from "../session-store.ts";
 
 export interface AgentPresence {
-  /** An agent is blocked in `wait` for this session. */
   waiting: boolean;
-  /** Whose move it is, as the server has it written down. */
   turn: Turn;
 }
 
@@ -27,7 +23,7 @@ export function readPresence(data: string): AgentPresence {
   }
 }
 
-/** The reviewer holding it, with no claim about when: nobody said. */
+/** `at` empty: nobody said when. */
 function reviewerHolds(): Turn {
   return { holder: "reviewer", at: "" };
 }
