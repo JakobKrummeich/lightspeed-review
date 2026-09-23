@@ -1,7 +1,6 @@
 /**
- * The review server's composition root: options, context, the route table,
- * and the listen/stop lifecycle. The handlers live in `src/server/`,
- * as top-level functions over the `ServerContext` built here.
+ * Composition root only: the handlers live in `src/server/`, as top-level
+ * functions over the `ServerContext` built here.
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -41,7 +40,6 @@ export interface ReviewServerOptions {
   ledger?: LedgerStore;
   /** Loopback only. Overridable for tests, never for production use. */
   host?: string;
-  /** Where the built browser bundle lives. Defaults to `dist/browser/`. */
   staticDir?: string;
 }
 
@@ -53,17 +51,13 @@ export interface StartedServer {
 export interface ReviewServer {
   start(): Promise<StartedServer>;
   stop(): Promise<void>;
-  /** Resolves when the server stops, whether by request or by signal. */
   whenStopped(): Promise<void>;
-  /** Pushes an SSE event to every browser watching one session. */
   publish(key: string, event: string, data: unknown): void;
 }
 
 export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   const host = options.host ?? "127.0.0.1";
   const staticDir = options.staticDir ?? DEFAULT_STATIC_DIR;
-  // Read whole so every request serves one build; a build under a running server
-  // dates the page, never splits it. Re-read only on round open — see `refreshAssets`.
   const assets = loadAssets(staticDir);
   // Reads the turn off the store rather than holding one: the presence frame is
   // then whatever the last write said, restart or no restart.
@@ -124,7 +118,6 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   };
 }
 
-/** Every path the server answers, each bound to its handler over the shared context. */
 function buildRoutes(context: ServerContext): Route[] {
   const bind =
     (handler: ContextHandler): RouteHandler =>
@@ -177,7 +170,6 @@ function handleShutdown(
   sendJson(response, 200, { status: "stopping" });
 }
 
-/** The security gate, the route dispatch, and the 500 that keeps failures JSON. */
 async function handleRequest(
   context: ServerContext,
   routes: Route[],

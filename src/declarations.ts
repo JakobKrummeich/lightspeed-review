@@ -2,35 +2,29 @@ import type { DiffNames } from "./git-file.ts";
 import type { DeclaredAnswer, SessionRecord } from "./session-store.ts";
 
 /**
- * The agent's answer to one reviewer comment (id from `wait` output): a note
- * and/or the files it led to. This file owns the whole server path — shape
- * check, session validation, session update. Only the agent knows these facts,
- * so nothing here fills one in: absence renders as "unknown", never a guess.
+ * Only the agent knows these facts, so nothing here fills one in: absence
+ * renders as "unknown", never a guess.
  */
 export interface CommentDeclaration {
-  /** The annotation's id, as `wait` printed it. */
   id: string;
-  /** The per-comment answer; absent when the files speak for themselves. */
   note?: string;
-  /** Paths the comment led to changes in; empty for a question or a decision. */
   files: string[];
 }
 
 /**
- * The names git says changed between two commits, injected so validation stays
- * pure. The server passes `listDiffNames` bound to the session's repository.
+ * Injected so validation stays pure; the server passes `listDiffNames` bound to
+ * the session's repository.
  */
 export type ReadRoundDiff = (from: string, to: string) => DiffNames;
 
 /**
- * Which half of the declaration was rejected, and so which way out the error may
- * offer. A `files` problem can be re-sent as words alone — drop `--files` and
- * the answer still reaches the reviewer — while an `entry` problem is the id or
- * the emptiness itself, which nothing can be stripped from.
+ * Which way out the error may offer: a `files` problem can be re-sent as words
+ * alone — drop `--files` and the answer still reaches the reviewer — while an
+ * `entry` problem is the id or the emptiness itself, which nothing can be
+ * stripped from.
  */
 export type DeclarationProblemKind = "files" | "entry";
 
-/** One rejected entry and why, spelt for the error the agent reads. */
 export interface DeclarationProblem {
   id: string;
   kind: DeclarationProblemKind;
@@ -38,8 +32,8 @@ export interface DeclarationProblem {
 }
 
 /**
- * Shape check of the untrusted `declarations` field: `undefined` = malformed,
- * whole request 400s. An absent field never reaches here — declaring nothing is valid.
+ * `undefined` = malformed, and the whole request 400s. An absent field never
+ * reaches here — declaring nothing is valid.
  */
 export function parseDeclarations(value: unknown): CommentDeclaration[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -68,7 +62,6 @@ function isNote(value: unknown): value is string | undefined {
   return value === undefined || typeof value === "string";
 }
 
-/** Absent files are an empty list; a list is only paths, each said once. */
 function parseFiles(value: unknown): string[] | undefined {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || entry === "")) {
@@ -128,8 +121,8 @@ function entryProblems(
 }
 
 /**
- * Declarable ids: annotation prompts with their round. Pre-id prompts are not
- * in the map, so declaring one is "unknown id" — never reachable by guesswork.
+ * Pre-id prompts are not in the map, so declaring one is "unknown id" — never
+ * reachable by guesswork.
  */
 function annotationRounds(session: SessionRecord): Map<string, number | undefined> {
   const rounds = new Map<string, number | undefined>();
@@ -159,9 +152,9 @@ function declaredFileProblems(
   const { from, to } = roundCommits(session, madeInRound);
   if (from === undefined || to === undefined || declaration.files.length === 0) return [];
   // Same commit both sides: the comment was made on the round the agent is still
-  // on, so nothing it has edited is in a published diff yet. Stated as the fact
-  // it is — the two ways out are the `help[]` this travels with, which is the one
-  // place that can name commands the CLI will actually accept.
+  // on, so nothing it has edited is in a published diff yet. The ways out are
+  // left to the `help[]` this travels with — the one place that can name
+  // commands the CLI will actually accept.
   if (from === to) {
     return declaration.files.map((file) => ({
       id: declaration.id,
@@ -185,7 +178,6 @@ function declaredFileProblems(
     }));
 }
 
-/** The comment's round's head and the current round's, where both are recorded. */
 function roundCommits(
   session: SessionRecord,
   madeInRound: number | undefined,

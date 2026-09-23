@@ -9,65 +9,47 @@ export interface FeedbackRequest {
 }
 
 /**
- * How much was approved at close. The payload must carry the evidence: a silent
- * end with nothing approved and one with everything approved are otherwise the
- * same bytes. Counts and not paths: the agent waiting is the one that wrote the
- * branch, it already knows the files, and a hundred paths it did not ask for are
- * a hundred paths of its context spent. `lightspeed approvals` names them when
- * something actually turns on which file — the help line says so.
+ * The payload must carry the evidence: a silent end with nothing approved and
+ * one with everything approved are otherwise the same bytes. Counts and not
+ * paths: the agent already knows the files, and a hundred paths it did not ask
+ * for are a hundred paths of its context spent — `lightspeed approvals` names
+ * them.
  */
 export interface EndApproval {
   /**
-   * What the counts add up to, so nothing has to add them up: `signed-off` is
-   * every file approved, `partial` some approved and some not, `none` nothing
-   * approved at all, `empty` a review that closed holding no files. Only
-   * `signed-off` is a sign-off, and it is one about acceptance, not reading: a
-   * review whose approvals came out of a sweep lane is signed off by someone
-   * nobody asked to read those files — `swept` says how much of it that was.
+   * `signed-off` is about acceptance, not reading: a review whose approvals came
+   * out of a sweep lane is signed off by someone nobody asked to read those
+   * files — `swept` says how much of it that was.
    */
   verdict: EndVerdict;
-  /** How many of the review's files were ticked approved when it closed. */
   approved: number;
-  /** How many nobody signed off on. */
   unapproved: number;
-  /**
-   * How many of those approvals a sweep lane took in one press: files the review
-   * filed as bulk, so the tick says accepted and never says read. Counted inside
-   * `approved`, not beside it.
-   */
+  /** Counted inside `approved`, not beside it. */
   swept: number;
-  /** How many distinct files the review's latest grouping holds, so nobody sums. */
   total: number;
 }
 
-/** The four readings of a closed review, as a closed set an agent can branch on. */
 export const END_VERDICTS = ["signed-off", "partial", "none", "empty"] as const;
 
 export type EndVerdict = (typeof END_VERDICTS)[number];
 
-/** What a `wait` hands back to the blocked agent. */
 export interface PollPayload {
   status: string;
   ended: boolean;
   prompts: FeedbackPrompt[];
   /**
-   * Whose move it is once this answer has landed, and which round it is about.
    * Added by the delivery handler, not by `drainPending`: the turn moves with
    * the bytes, so only the handler knows what it became. Absent from a payload
    * an older server wrote.
    */
   turn?: TurnLabel;
   round?: number;
-  /**
-   * Whether this answer's `help[]` spells the legal moves out or reminds the
-   * agent of them in one line. Absent from an older server's payload, which
-   * reads as `full` — the only form it ever sent.
-   */
+  /** Absent from an older server's payload, which reads as `full` — the only form it ever sent. */
   helpForm?: HelpForm;
   /**
-   * Transport, not review: the id of this handover, which the client echoes to
-   * `POST /api/session/:key/delivered` to say the prompts arrived. Absent when
-   * nothing was handed over, and never printed — no agent acts on it.
+   * Transport, not review: echoed by the client to
+   * `POST /api/session/:key/delivered` to say the prompts arrived, and never
+   * printed — no agent acts on it.
    */
   delivery?: string;
   /**
@@ -75,16 +57,14 @@ export interface PollPayload {
    * reader must treat its absence as "not stated", never as "nothing approved".
    */
   approval?: EndApproval;
-  /** Only on an ended payload, and only when the record says who closed it. */
   endedBy?: ReviewCloser;
 }
 
 /**
- * Queued in `pending` for the next `wait` to drain; kept in `conversation` as
- * the history that survives draining. A `Send & End` with nothing queued adds no
- * entry: an empty "reviewer" entry reads as words lost, not words never said.
- * The turn does not move here — the reviewer's Send never hands it over, only
- * delivery to a live `wait` does — except on the end, which owes nobody a move.
+ * A `Send & End` with nothing queued adds no entry: an empty "reviewer" entry
+ * reads as words lost, not words never said. The turn does not move here — the
+ * reviewer's Send never hands it over, only delivery to a live `wait` does —
+ * except on the end, which owes nobody a move.
  */
 export function withFeedback(
   session: SessionRecord,
@@ -109,9 +89,8 @@ export function withFeedback(
 }
 
 /**
- * `lightspeed say` / `lightspeed ask`: the agent speaks mid-review. A question
- * hands the turn back — it is the agent asking to be answered, and Send has to
- * be live for that. Plain speech does not: an agent that answers one comment
+ * A question hands the turn back — it is the agent asking to be answered, and
+ * Send has to be live for that. Plain speech does not: an agent that answers one comment
  * and keeps editing is still working, and unlocking Send between its sentences
  * would flap the reviewer's button for the length of a round.
  */
@@ -149,9 +128,8 @@ function currentRound(session: SessionRecord): { roundIndex?: number } {
 }
 
 /**
- * Hands the queued prompts to one waiter. An ended session always answers so a
- * waiting agent is never left blocking on a review that is over; an open one
- * with nothing queued answers with `undefined`, meaning "keep waiting".
+ * An ended session always answers so a waiting agent is never left blocking on
+ * a review that is over; `undefined` means "keep waiting".
  */
 export function drainPending(
   session: SessionRecord,
@@ -191,9 +169,8 @@ function endEvidence(session: SessionRecord): { approval: EndApproval; endedBy?:
 }
 
 /**
- * Read off the same account as the counts beside it, so the word and the numbers
- * cannot part ways. A review holding nothing is `empty` and not `signed-off`:
- * approving none of no files decides nothing.
+ * A review holding nothing is `empty` and not `signed-off`: approving none of no
+ * files decides nothing.
  */
 function endVerdict(paths: ApprovalPaths): EndVerdict {
   if (paths.total === 0) return "empty";
@@ -205,8 +182,7 @@ function endVerdict(paths: ApprovalPaths): EndVerdict {
  * First close wins: a second close (agent `end` after reviewer `Send & End`, or
  * a stale tab) must not rewrite who decided. Neither route refuses a second
  * close — `end` stays idempotent, a stale tab deserves no error — so the guard
- * is here, on the one field a second close could falsify. Already ended with no
- * recorded closer keeps saying nobody wrote it down.
+ * is here, on the one field a second close could falsify.
  */
 export function closedBy(session: SessionRecord, closer: ReviewCloser): { endedBy?: ReviewCloser } {
   return session.status === "ended" ? {} : { endedBy: closer };

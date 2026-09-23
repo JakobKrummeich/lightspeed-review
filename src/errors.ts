@@ -1,9 +1,6 @@
 import { AxiError, exitCodeForError } from "axi-sdk-js";
 
-/**
- * Every failure the CLI can report. Keeping the set closed means an error code
- * is greppable and `output.ts` never has to guess how to render one.
- */
+/** Closed so an error code is greppable and `output.ts` never has to guess how to render one. */
 export type ReviewErrorCode =
   | "config_missing"
   | "config_invalid"
@@ -43,9 +40,7 @@ export type ReviewErrorCode =
 export interface ReviewErrorInput {
   code: ReviewErrorCode;
   message: string;
-  /** Extra context shown under `error.detail`, e.g. the set of valid values. */
   detail?: string;
-  /** Next-step command templates rendered as `help[]`. At least one, always. */
   suggestions: [string, ...string[]];
 }
 
@@ -64,12 +59,9 @@ export class ReviewError extends AxiError {
 }
 
 /**
- * The three ways the command line itself can be wrong, and the recovery each
- * one asks for: look the command up, look the flag up, supply what was left
- * out. They used to share the SDK's `VALIDATION_ERROR`, which made an agent
- * that branches on `error.code` re-read the message text to find out which of
- * the three it had done — the one thing a code is for. `cli.ts` exits 2 on
- * them, the way the SDK exits 2 on its own.
+ * Three codes rather than the SDK's one `VALIDATION_ERROR`: an agent that
+ * branches on `error.code` should not have to re-read the message text to find
+ * out which of the three it had done.
  */
 export type InvocationErrorCode = "unknown_command" | "unknown_flag" | "argument_missing";
 

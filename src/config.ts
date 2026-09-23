@@ -11,7 +11,6 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
-/** Whether review feedback is appended to the durable ledger. */
 export const FEEDBACK_LOG_MODES = ["on", "off"] as const;
 
 export type FeedbackLogMode = (typeof FEEDBACK_LOG_MODES)[number];
@@ -27,10 +26,7 @@ export const PROVIDER_APIS = [
 
 export type ProviderApi = (typeof PROVIDER_APIS)[number];
 
-/**
- * One model, in pi's own `models.json` shape. Only `id` is required;
- * `thinkingLevelMap` and `compat` pass to pi-ai untouched.
- */
+/** Pi's own `models.json` shape; `thinkingLevelMap` and `compat` pass to pi-ai untouched. */
 export interface ProviderModelConfig {
   id: string;
   name?: string;
@@ -67,10 +63,8 @@ export interface LightspeedConfig {
   stateDir: string;
   feedbackLog: FeedbackLogMode;
   /**
-   * Globs this repository adds to the file classifier's own rules. Always
-   * present, empty lists included: the defaults are what a repository that
-   * configures nothing gets, so "no globs" is a pair of empty lists rather
-   * than an absence every reader has to handle.
+   * Always present, empty lists included: "no globs" is a pair of empty lists
+   * rather than an absence every reader has to handle.
    */
   classify: ClassifyConfig;
   /** Absent unless the config named providers: then pi-ai's builtins stand alone. */
@@ -117,10 +111,7 @@ const PROVIDER_MODEL_KEYS: (keyof ProviderModelConfig)[] = [
   "compat",
 ];
 
-/**
- * Old-config keys: read, ignored, never validated. `groupingThreshold` decides
- * nothing now, but an upgrade must not fail on a config that names it.
- */
+/** Read, ignored, never validated: an upgrade must not fail on a config that names one. */
 const RETIRED_KEYS = ["groupingThreshold"];
 
 const KNOWN_KEYS: readonly string[] = [...CONFIG_KEYS, ...RETIRED_KEYS];
@@ -134,11 +125,10 @@ const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$/;
 const ENVIRONMENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
- * The smallest config the loader accepts, and what `lightspeed init --config`
- * writes. `model` stays a placeholder on purpose: a plausible-looking default
- * would send a review at a model the user never chose and may not be able to
- * reach. One definition so the file written and the text telling you to write
- * it cannot say different things.
+ * `model` stays a placeholder on purpose: a plausible-looking default would send
+ * a review at a model the user never chose and may not be able to reach. One
+ * definition so the file `lightspeed init --config` writes and the text telling
+ * you to write it cannot say different things.
  */
 export const STARTER_CONFIG: Pick<LightspeedConfig, "model" | "thinking"> = {
   model: "<provider/model>",
@@ -148,11 +138,10 @@ export const STARTER_CONFIG: Pick<LightspeedConfig, "model" | "thinking"> = {
 const CREATE_HELP = `Create ${CONFIG_FILENAME} with {"model": "${STARTER_CONFIG.model}", "thinking": "${STARTER_CONFIG.thinking}"}`;
 
 /**
- * Models an agent can reach out of the box, named because `model` is the one key
- * nothing defaults and nothing in the CLI resolves: there is no `models`
- * command, so `<provider/model>` is a placeholder an agent can only guess at —
- * and a guess that looks right (`anthropic/claude-sonnet-4`) degrades every
- * review to one group without failing.
+ * Named because `model` is the one key nothing defaults and nothing in the CLI
+ * resolves: there is no `models` command, so `<provider/model>` is a placeholder
+ * an agent can only guess at — and a guess that looks right
+ * (`anthropic/claude-sonnet-4`) degrades every review to one group without failing.
  */
 export const REACHABLE_MODELS = [
   "anthropic/claude-sonnet-4-5",
@@ -160,7 +149,6 @@ export const REACHABLE_MODELS = [
   "openai/gpt-5",
 ];
 
-/** The two lines that turn "there is no config" into a configured repository. */
 export const HELP_WRITE_CONFIG = "Run `lightspeed init --config` to write it here";
 
 export const HELP_SET_MODEL =
@@ -183,8 +171,8 @@ function invalid(message: string, detail?: string): ReviewError {
 }
 
 /**
- * Loads `.lightspeed.conf.json` from the repo root. No env vars, no silent
- * defaults for `model`/`thinking`: a bad config fails before any git/LLM work.
+ * No env vars, no silent defaults for `model`/`thinking`: a bad config fails
+ * before any git/LLM work.
  */
 export function loadConfig(repoRoot: string): LightspeedConfig {
   const raw = readConfigFile(join(repoRoot, CONFIG_FILENAME));
@@ -202,10 +190,9 @@ export function loadConfig(repoRoot: string): LightspeedConfig {
 }
 
 /**
- * The repository's own additions to `src/classify.ts`, which are additions and
- * never replacements: the defaults key on facts every project shares, and this
- * block is where the paths only this project knows about go. An absent block
- * and an empty one say the same thing, so both read as two empty lists.
+ * Additions to the defaults in `src/classify.ts`, never replacements: the
+ * defaults key on facts every project shares. An absent block and an empty one
+ * say the same thing, so both read as two empty lists.
  */
 function readClassify(value: unknown): ClassifyConfig {
   if (value === undefined) return { mechanical: [], guardrail: [] };
@@ -233,24 +220,21 @@ function readGlobs(value: unknown, key: string): string[] {
   return (value as string[]).map((glob) => requireNonEmpty(glob, key));
 }
 
-/** Just the keys a ledger reader uses; `model` and `thinking` drive the LLM only. */
 export interface LedgerConfig {
   stateDir: string;
   feedbackLog: FeedbackLogMode;
 }
 
-/** What a command needs when it never reaches a model. */
 export interface ServiceConfig extends LedgerConfig {
   port: number;
 }
 
 /**
- * The config as the model-free half of the CLI reads it. `wait`, `ask`, `say`,
- * `work`, `approvals`, `end`, `serve` and `stop` talk to a port and a store and
- * to nothing else, so requiring `model` of them made a missing config refuse
- * the commands an agent needs exactly when it cannot write one — mid-review, on
- * a machine that is not its own. A file that exists is still validated whole:
- * lenient about the model, never about the file.
+ * `wait`, `ask`, `say`, `work`, `approvals`, `end`, `serve` and `stop` talk to a
+ * port and a store and to nothing else, so requiring `model` of them made a
+ * missing config refuse the commands an agent needs exactly when it cannot
+ * write one — mid-review, on a machine that is not its own. A file that exists
+ * is still validated whole: lenient about the model, never about the file.
  */
 export function loadServiceConfig(directory: string): ServiceConfig {
   const raw = readConfigFileIfAny(join(directory, CONFIG_FILENAME));
@@ -277,8 +261,8 @@ export function loadLedgerConfig(directory: string): LedgerConfig {
 }
 
 /**
- * State dir for callers with no config file. Same resolution as a loaded
- * config, adoption included, so every command lands in the same directory.
+ * Same resolution as a loaded config, adoption included, so every command lands
+ * in the same directory.
  */
 export function defaultStateDir(): string {
   return resolveStateDir(undefined);

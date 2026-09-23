@@ -36,8 +36,7 @@ import { SessionStore } from "./session-store.ts";
 const version = CLI_VERSION;
 const description = CLI_DESCRIPTION;
 
-/** Command name to handler; the one list the CLI answers, and the one both
- * top-level help and the unknown-command error are built from. */
+/** The one list: top-level help and the unknown-command error are both built from it. */
 const commands = {
   start: startCommand,
   wait: waitCommand,
@@ -57,8 +56,6 @@ const commands = {
 
 const COMMAND_NAMES = Object.keys(commands);
 
-/** The home view's one flag; documented here because it is the only place a
- * flag can appear before a command, and so the only place it can be missed. */
 const HELP_ALL =
   "list live sessions from every repository, not just this one; bare `lightspeed`" +
   " shows the repository you are in";
@@ -66,11 +63,9 @@ const HELP_ALL =
 /**
  * Every command is listed, `serve` and `login`/`logout` included: a help page
  * that hides a command the CLI still answers is how an agent burns a turn
- * guessing. Their own descriptions carry the caveat — `serve` says `start`
- * spawns it, `login` says an agent must never run it — so listing them warns
- * where hiding them would only puzzle. The workflow keeps its `help[]` lines
- * under the listing: three of eleven commands are the loop, and a flat list
- * cannot say which three.
+ * guessing, and their own descriptions carry the caveat. The `help[]` lines
+ * under the listing name the loop: three of eleven commands are it, and a flat
+ * list cannot say which three.
  */
 const topLevelHelp = `${renderToon({
   description,
@@ -80,17 +75,15 @@ const topLevelHelp = `${renderToon({
 })}\n`;
 
 /**
- * Everything a command needs before it can talk to a session or the server —
- * and nothing more. `model` and `thinking` are read only by the one command
- * that sends a diff to a model: gating `wait` or `end` on a model they never
- * call made a missing config refuse the review loop itself.
+ * `model` and `thinking` are read only by the one command that sends a diff to
+ * a model: gating `wait` or `end` on a model they never call made a missing
+ * config refuse the review loop itself.
  */
 function repoContext(): { repoRoot: string; config: ServiceConfig } {
   const repoRoot = findRepoRoot(process.cwd());
   return { repoRoot, config: loadServiceConfig(repoRoot) };
 }
 
-/** The strict read, for the one command whose work is the model's. */
 function groupingContext(): { repoRoot: string; config: LightspeedConfig } {
   const repoRoot = findRepoRoot(process.cwd());
   return { repoRoot, config: loadConfig(repoRoot) };
@@ -102,12 +95,10 @@ interface SessionContext extends ResolvedSession {
 }
 
 /**
- * Every command that speaks about one review: which review the positional
- * `<branch> [base]` name, and — when nothing holds it — one error that says so
- * in the agent's own words. The catch lives here because this is the only layer
- * that has both halves: the store knows what is open in this repository, and the
- * dispatch knows which command asked. Below it, a 404 off the wire and a missing
- * file on disk would each have to invent the same sentence.
+ * The `session_not_found` catch lives here because this is the only layer that
+ * has both halves: the store knows what is open in this repository, and the
+ * dispatch knows which command asked. Below it, a 404 off the wire and a
+ * missing file on disk would each have to invent the same sentence.
  */
 async function onSession<T>(
   verb: string,
@@ -126,7 +117,6 @@ async function onSession<T>(
   }
 }
 
-/** Extracts the diff, groups it and opens the review page. Safe to re-run. */
 async function startCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, open, model, reopen, wait, intents } = parseStartArgs(args);
   if (branch === undefined) {
@@ -163,7 +153,6 @@ async function startCommand(args: string[]): Promise<StructuredOutput> {
   });
 }
 
-/** The one blocking call: the turn comes to the agent when this returns. */
 async function waitCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, full } = parseWaitArgs(args);
   return await onSession("wait", branch, base, ({ config, ...target }) =>
@@ -171,7 +160,6 @@ async function waitCommand(args: string[]): Promise<StructuredOutput> {
   );
 }
 
-/** Puts a question to the reviewer and blocks on their answer. */
 async function askCommand(args: string[]): Promise<StructuredOutput> {
   const { message, branch, base } = parseAskArgs(args);
   return await onSession("ask", branch, base, ({ config, ...target }) =>
@@ -179,7 +167,6 @@ async function askCommand(args: string[]): Promise<StructuredOutput> {
   );
 }
 
-/** Says something without blocking and without giving the turn up. */
 async function sayCommand(args: string[]): Promise<StructuredOutput> {
   const parsed = parseSayArgs(args);
   return await onSession("say", parsed.branch, parsed.base, ({ config, ...target }) =>
@@ -193,7 +180,6 @@ async function sayCommand(args: string[]): Promise<StructuredOutput> {
   );
 }
 
-/** Declares the plan the agent is about to go quiet over. */
 async function workCommand(args: string[]): Promise<StructuredOutput> {
   const { message, branch, base } = parseWorkArgs(args);
   return await onSession("work", branch, base, ({ config, ...target }) =>
@@ -201,7 +187,6 @@ async function workCommand(args: string[]): Promise<StructuredOutput> {
   );
 }
 
-/** Names the files behind the counts `wait` reports; nothing else prints them. */
 async function approvalsCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, full } = parseApprovalsArgs(args);
   return await onSession("approvals", branch, base, ({ config, ...target }) =>
@@ -209,14 +194,12 @@ async function approvalsCommand(args: string[]): Promise<StructuredOutput> {
   );
 }
 
-/** Agent-initiated close of a review session. */
 async function endCommand(args: string[]): Promise<StructuredOutput> {
   return await onSession("end", args[0], args[1], ({ config, ...target }) =>
     runEnd({ ...target, port: config.port }),
   );
 }
 
-/** Runs the review server in the foreground; `start` spawns this detached. */
 async function serveCommand(): Promise<StructuredOutput> {
   const { config } = repoContext();
   return await runServe({
@@ -241,7 +224,6 @@ function feedbackCommand(args: string[]): StructuredOutput | string {
   });
 }
 
-/** Shuts the background review server down. */
 async function stopCommand(): Promise<StructuredOutput> {
   const { config } = repoContext();
   return await runStop({ port: config.port });
@@ -259,7 +241,6 @@ function requireProvider(args: string[], command: string): string {
   return provider;
 }
 
-/** Human-run OAuth sign-in — the one interactive surface, and never an agent's. */
 async function loginCommand(args: string[]): Promise<StructuredOutput> {
   const provider = requireProvider(args, "login");
   return await runLogin({ provider, stateDir: authStateDir(process.cwd()) });
@@ -278,21 +259,15 @@ function skillCommand(args: string[]): string {
   return runSkill(parseSkillArgs(args)).trimEnd();
 }
 
-/**
- * Writes that same document where the named agent will actually read it. Home
- * and cwd are passed in rather than read inside, so the destinations a test
- * drives are temporary directories and never the developer's own agents.
- */
 function initCommand(args: string[]): StructuredOutput {
   return runInit({ ...parseInitArgs(args), home: homedir(), cwd: process.cwd() });
 }
 
 /**
- * A guessed command name is an agent's most common first failure, and the SDK's
- * own version of it renders `error` as a string with no code. Routing it through
- * `errorOutput` keeps one error schema across the whole CLI, and the real
- * command list saves the round trip `--help` would cost. The SDK exits 2 here,
- * which is already this CLI's code for a command line it could not read.
+ * The SDK's own version renders `error` as a string with no code; routing it
+ * through `errorOutput` keeps one error schema across the whole CLI, and the
+ * real command list saves the round trip `--help` would cost. The SDK exits 2
+ * here, which is already this CLI's code for a command line it could not read.
  */
 function unknownCommandOutput(command: string): string {
   const error = invocationError("unknown_command", `Unknown command: ${command}`, [
@@ -311,12 +286,9 @@ const argv = withHelpAlias(process.argv.slice(2));
 const allRepos = argv.length === 1 && argv[0] === "--all";
 
 /**
- * `help` is the word an agent types before it has read anything, and the answer
- * used to be `Unknown command: help`: a turn spent discovering that this CLI
- * spells it `--help`. Translated into the flag rather than registered as a
- * command, so there is one help text and `help start` is `start --help`
- * exactly — including the unknown-command error a name that is not a command
- * still earns.
+ * Translated into the flag rather than registered as a command, so there is
+ * one help text and `help start` is `start --help` exactly — including the
+ * unknown-command error a name that is not a command still earns.
  */
 function withHelpAlias(given: string[]): string[] {
   if (given[0] !== "help") return given;
@@ -326,9 +298,8 @@ function withHelpAlias(given: string[]): string[] {
 
 /**
  * The SDK refuses a flag before the command in prose of its own, under its own
- * code — the one error of this CLI that did not arrive as TOON with a code
- * saying which mistake it was. Answered here instead, so `lightspeed --bogus`
- * parses like every other failure.
+ * code; answered here instead, so `lightspeed --bogus` parses like every other
+ * failure.
  */
 function leadingFlagProblem(given: string[]): ReviewError | undefined {
   const [flag] = given;

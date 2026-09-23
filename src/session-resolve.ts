@@ -14,16 +14,12 @@ export interface MissingSessionInput {
   base: string;
   /** The command the agent ran, so the way out is the command it already typed. */
   verb: string;
-  /** Every stored session; the live ones in this repo are what it could have meant. */
   sessions: SessionRecord[];
 }
 
 /**
- * A review nothing holds, named the way the agent named it. The old message was
- * the session key — a hash minted from the repo path and the branch pair, printed
- * nowhere an agent could have read it, so it identified the review to no one but
- * the store. What a command that missed needs is what it asked for, where it
- * looked, and what is actually open there.
+ * Named by branch, base and repo rather than by the session key: the key is a
+ * hash printed nowhere an agent could have read it.
  */
 export function missingSession(input: MissingSessionInput): ReviewError {
   const live = input.sessions.filter(
@@ -57,11 +53,7 @@ function instead(verb: string, live: SessionRecord[]): string[] {
   return [`Or name one of the sessions above: \`lightspeed ${verb} <branch> [base]\``];
 }
 
-/**
- * Which review a command applies to. Explicit arguments always win — that is
- * what makes concurrent sessions unambiguous — and omitting the branch is a
- * shortcut that only works when exactly one live session belongs to this repo.
- */
+/** Explicit arguments always win — that is what makes concurrent sessions unambiguous. */
 export function resolveSession(
   sessions: SessionRecord[],
   repoRoot: string,

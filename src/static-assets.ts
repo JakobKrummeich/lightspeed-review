@@ -14,7 +14,6 @@ export interface StaticAsset {
   contents: Buffer;
 }
 
-/** The built browser bundle as one server's worth of bytes, keyed by file name. */
 export type AssetSnapshot = ReadonlyMap<string, StaticAsset>;
 
 const CONTENT_TYPES: Record<string, string> = {

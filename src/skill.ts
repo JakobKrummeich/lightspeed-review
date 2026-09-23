@@ -3,16 +3,12 @@ import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./commands/home.ts";
 import { REACHABLE_MODELS } from "./config.ts";
 import { PROMPT_LIMIT, SELECTION_LIMIT } from "./output.ts";
 
-/** Where the generated skill lives, relative to the repository root. */
 export const SKILL_PATH = "skills/lightspeed/SKILL.md";
 
-/** Every agent `lightspeed skill --agent <id>` can address. */
 export const SKILL_AGENTS = ["pi", "claude-code", "codex", "opencode", "vscode"] as const;
 
 export type SkillAgent = (typeof SKILL_AGENTS)[number];
 
-/** Narrows a command line's `--agent` value; every caller of `renderSkillFor`
- * and of the destination table has to pass this gate first. */
 export function isSkillAgent(agent: string): agent is SkillAgent {
   return (SKILL_AGENTS as readonly string[]).includes(agent);
 }
@@ -247,9 +243,9 @@ ${SETUP}
 ${OUTPUT}`;
 
 /**
- * The installable skill, generated from the CLI's own `help[]` strings so the
- * guidance an agent installs and the guidance the CLI prints cannot drift.
- * Regenerate with `pnpm run build:skill`; `--check` fails when it is stale.
+ * Generated from the CLI's own `help[]` strings so the guidance an agent
+ * installs and the guidance the CLI prints cannot drift. Regenerate with
+ * `pnpm run build:skill`; `--check` fails when it is stale.
  */
 export function renderSkill(): string {
   return `---
@@ -266,10 +262,10 @@ ${SECTIONS}
 }
 
 /**
- * One body, two wrappers. pi and Claude Code read SKILL.md format, so they get
- * exactly `renderSkill()` (also the checked-in artifact). Codex, opencode and
- * VS Code read plain markdown: frontmatter goes, and the description's use-when
- * guidance moves into the intro prose so it is not lost with it.
+ * pi and Claude Code read SKILL.md format, so they get exactly `renderSkill()`
+ * (also the checked-in artifact). Codex, opencode and VS Code read plain
+ * markdown: frontmatter goes, and the description's use-when guidance moves
+ * into the intro prose so it is not lost with it.
  */
 export function renderSkillFor(agent: SkillAgent): string {
   if (agent === "pi" || agent === "claude-code") return renderSkill();

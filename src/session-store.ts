@@ -10,52 +10,42 @@ import { sessionFilePath, sessionsDirPath } from "./paths.ts";
 export type SessionStatus = "open" | "feedback" | "ended";
 
 /**
- * Who closed the review: reviewer `Send & End` or agent `lightspeed end`. An
- * agent whose `wait` returns on an ended review must be able to tell whether a
- * person looked at all.
+ * An agent whose `wait` returns on an ended review must be able to tell whether
+ * a person looked at all.
  */
 export type ReviewCloser = "reviewer" | "agent";
 
 /**
- * Whose move it is. Exactly one holder per session, and the whole rule is one
- * line: queue always, end always, send only on your turn. Persisted rather than
- * held in memory because a `serve` restart that silently handed Send back would
- * let the reviewer fire at an agent that is still editing.
- *
- * A union on `holder` so the fields that only mean something on one side cannot
- * be read on the other: there is no such thing as a reviewer's `mode`, and an
- * agent's turn always has one. Readers branch on `holder` and get the rest.
+ * Persisted rather than held in memory because a `serve` restart that silently
+ * handed Send back would let the reviewer fire at an agent that is still
+ * editing. A union on `holder` so the fields that only mean something on one
+ * side cannot be read on the other.
  */
 export type Turn = ReviewerTurn | AgentTurn;
 
-/** Send is live and nothing is owed to the reviewer. */
 export interface ReviewerTurn {
   holder: "reviewer";
   at: string;
 }
 
-/** The agent's move. Send is off until it hands the turn back. */
 export interface AgentTurn {
   holder: "agent";
   /**
-   * Presentational only: `reading` and `working` gate identically. `reading` is
-   * set on delivery, `working` by the agent's own `work "<plan>"`. Required, so
+   * Presentational only: `reading` and `working` gate identically. Required, so
    * no reader has to decide what an agent's turn with no mode would mean.
    */
   mode: "reading" | "working";
   at: string;
-  /** The plan `work` declared, which the reviewer's banner names. */
   note?: string;
 }
 
 /**
- * One batch of prompts handed to a poll and not yet confirmed by the agent that
- * asked for them. TCP cannot say whether an answer was read: the bytes reach the
- * OS whether the client is reading or already gone, so the only witness that a
- * delivery landed is the agent saying so (`POST /api/session/:key/delivered`).
- * Until it does, the batch is held here and the next poll puts it back — which
- * is why it is persisted and not kept in memory: a `serve` restart in that
- * window would otherwise be the one way feedback is lost for good.
+ * TCP cannot say whether an answer was read: the bytes reach the OS whether the
+ * client is reading or already gone, so the only witness that a delivery landed
+ * is the agent saying so (`POST /api/session/:key/delivered`). Until it does,
+ * the batch is held here and the next poll puts it back — persisted, not kept
+ * in memory, because a `serve` restart in that window would otherwise be the
+ * one way feedback is lost for good.
  */
 export interface Delivery {
   /** Minted per handover and echoed back, so a stale ack confirms nothing. */
@@ -65,10 +55,8 @@ export interface Delivery {
   at: string;
 }
 
-/** Which version of the file the annotated lines belong to. */
 export type AnnotationSide = "old" | "new";
 
-/** The line range a selection covers in one version of a file. */
 export interface LineAnchor {
   side: AnnotationSide;
   line_start: number;
@@ -85,8 +73,8 @@ export interface LineAnchor {
 }
 
 /**
- * An anchor flattened into its carrier, as the wire format spells it. The union
- * makes half an anchor — which locates nothing — unrepresentable.
+ * Flattened into the carrier, as the wire format spells it; the union makes half
+ * an anchor — which locates nothing — unrepresentable.
  */
 export type AnchorFields =
   | LineAnchor
@@ -98,14 +86,12 @@ export type AnchorFields =
       col_end?: undefined;
     };
 
-/** A reviewer annotation anchored to the diff text it was selected from. */
 export type AnnotationPrompt = {
   type: "annotation";
   /**
-   * Server-minted id this comment goes by everywhere (`wait` output, declarations,
-   * ledger). Minted on acceptance: a queued prompt has none — `parsePrompt`
-   * strips whatever a client claims — and pre-id prompts never get one, which
-   * reads as "unknown", not as any particular comment.
+   * Server-minted on acceptance: a queued prompt has none — `parsePrompt` strips
+   * whatever a client claims — and pre-id prompts never get one, which reads as
+   * "unknown", not as any particular comment.
    */
   id?: string;
   file: string;
@@ -114,14 +100,12 @@ export type AnnotationPrompt = {
   comment: string;
 } & AnchorFields;
 
-/** A free-form message: a reviewer's general comment or an agent reply. */
 export interface MessagePrompt {
   type: "message";
   comment: string;
   /**
-   * `lightspeed ask`: the agent put a question to the reviewer, so the panel
-   * draws an answer box under it. Absent is an ordinary message, never a
-   * question nobody answered.
+   * Set by `lightspeed ask`, so the panel draws an answer box under it. Absent
+   * is an ordinary message, never a question nobody answered.
    */
   kind?: "question";
 }
@@ -139,23 +123,17 @@ export interface ConversationEntry {
   prompts: FeedbackPrompt[];
 }
 
-/**
- * Which round, and when it opened — all a reader needs to place something in the
- * review's history. Named apart from the full round because the conversation
- * panel takes only this much.
- */
+/** Named apart from the full round because the conversation panel takes only this much. */
 export interface RoundMark {
   index: number;
   at: string;
 }
 
-/** One file of the review as it stood in one round. */
 export interface RoundFile {
   path: string;
   /**
-   * Where a rename came from, under the name that round's diff used. Rounds
-   * recorded while git was still asked for copies hold a copy's source here
-   * under `modified`; only a rename's is followed through the rounds
+   * Rounds recorded while git was still asked for copies hold a copy's source
+   * here under `modified`; only a rename's is followed through the rounds
    * (`renamedFrom`).
    */
   previousPath?: string;
@@ -169,33 +147,32 @@ export interface RoundFile {
 }
 
 /**
- * One `start` … `end` cycle. `start` appends and closes the round it displaces,
- * `end` closes the newest; closing records the approved ticks. A new grouping
- * resets ticks, so this is the only place that knowledge survives.
+ * `start` appends and closes the round it displaces, `end` closes the newest;
+ * closing records the approved ticks, and a new grouping resets them, so this is
+ * the only place that knowledge survives.
  */
 export interface SessionRound extends RoundMark {
-  /** Ledger id tying ledger records back to this round. Absent pre-outcomes. */
+  /** Ledger id; absent pre-outcomes. */
   round?: string;
   baseCommit?: string;
   headCommit?: string;
   /**
-   * Why the branch exists, as stated at round open. Per round so a later round
-   * can say something else without touching what was approved. Absent pre-intents.
+   * Per round so a later round can say something else without touching what was
+   * approved. Absent pre-intents.
    */
   intents?: string[];
-  /** Subjects of the commits the branch added when the round opened. */
   commits?: string[];
   /**
-   * How the grouping was arrived at; absent (pre-recording) reads as `llm`.
-   * Recorded because a degraded round (`fallback`/`skipped` = one `All Changes`
-   * group) is not a reading order `start` may hand back to the next round.
+   * Absent (pre-recording) reads as `llm`. Recorded because a degraded round
+   * (`fallback`/`skipped` = one `All Changes` group) is not a reading order
+   * `start` may hand back to the next round.
    */
   grouping?: GroupingMode;
   files: RoundFile[];
   /**
-   * Paths approved at close; empty while open, and empty forever on rounds whose
-   * approvals were lost before `start` closed displaced rounds. Older rounds
-   * lack the field entirely and read as closing on nothing; see `parseSession`.
+   * Empty while open, and empty forever on rounds whose approvals were lost
+   * before `start` closed displaced rounds. Older rounds lack the field entirely
+   * and read as closing on nothing; see `parseSession`.
    */
   approvedAtEnd: string[];
 }
@@ -205,16 +182,13 @@ export interface SessionRecord {
   repoRoot: string;
   branch: string;
   base: string;
-  /**
-   * The commits this round's diff was taken between, when the CLI could resolve
-   * them. Absent on sessions written before whole-file context existed.
-   */
+  /** Absent on sessions written before whole-file context existed. */
   baseCommit?: string;
   headCommit?: string;
   status: SessionStatus;
   /**
-   * Whose move it is. Never optional to a reader: a session file written before
-   * turns existed opens with the reviewer holding it — see `parseSession`.
+   * Never optional to a reader: a session file written before turns existed
+   * opens with the reviewer holding it — see `parseSession`.
    */
   turn: Turn;
   /**
@@ -225,61 +199,50 @@ export interface SessionRecord {
   createdAt: string;
   updatedAt: string;
   /**
-   * Latest grouping, in display order. Never optional: a file missing it, or a
-   * group without `files`, is rejected as corrupt — see `parseSession`.
+   * In display order. Never optional: a file missing it, or a group without
+   * `files`, is rejected as corrupt — see `parseSession`.
    */
   groups: DiffGroup[];
-  /** Everything already delivered, oldest first. */
   conversation: ConversationEntry[];
-  /** Queued by the browser, not yet handed to a `wait`. */
   pending: FeedbackPrompt[];
   /**
-   * Handed to a poll and not yet confirmed. Absent is the steady state: nothing
-   * is in flight, and every prompt the review owes the agent is in `pending`.
+   * Absent is the steady state: nothing is in flight, and every prompt the
+   * review owes the agent is in `pending`.
    */
   delivering?: Delivery;
-  /** Paths ticked `approved`; reset whenever `start` re-groups. */
+  /** Reset whenever `start` re-groups. */
   approved: string[];
-  /**
-   * Ledger id of the round on show; every ledger record of the round anchors to
-   * it. Absent on sessions from before the ledger existed.
-   */
+  /** Ledger id of the round on show; absent on sessions from before the ledger existed. */
   round?: string;
   /**
-   * Every round, oldest first. `src/rounds/history.ts` derives a file's whole
-   * past from it, so it is never optional: absent is rejected, not "no history".
+   * Oldest first. `src/rounds/history.ts` derives a file's whole past from it,
+   * so it is never optional: absent is rejected, not "no history".
    */
   rounds: SessionRound[];
   /**
    * The round, as `round:` prints it, whose full `help[]` an answer has already
-   * carried. Persisted because every CLI invocation is a fresh process: there is
-   * nowhere else "this agent has already been told the moves" could live across
-   * one. Absent reads as "not yet told", which is the safe direction — the cost
-   * of being wrong is a repeated help block, not a lost move.
+   * carried (see `budgetHelp`). Absent reads as "not yet told", the safe
+   * direction: the cost of being wrong is a repeated help block, not a lost move.
    */
   helpShownRound?: number;
   /**
-   * What the agent said each comment led to, keyed by `AnnotationPrompt.id`;
-   * newest declaration wins, which makes redeclaring idempotent. On the session,
-   * not just the ledger: replay reads from here and the ledger may be off.
-   * Absent reads as "nothing declared", never "nothing changed".
+   * Keyed by `AnnotationPrompt.id`. On the session, not just the ledger: replay
+   * reads from here and the ledger may be off. Absent reads as "nothing
+   * declared", never "nothing changed".
    */
   declarations?: Record<string, DeclaredAnswer>;
 }
 
-/** One comment's declared answer: the note, the files it led to, and when. */
 export interface DeclaredAnswer {
-  /** The agent's per-comment answer; absent when only files were declared. */
   note?: string;
-  /** Paths the comment led to changes in; empty for a question or a decision. */
   files: string[];
   at: string;
 }
 
 /**
- * One JSON file per session. Dumb persistence: timestamps and status transitions
- * belong to the caller, so tests stay deterministic. Only hole-causing fields are
- * checked; retired keys (e.g. `journeys`) are neither errors nor stripped.
+ * Timestamps and status transitions belong to the caller, so tests stay
+ * deterministic. Only hole-causing fields are checked; retired keys (e.g.
+ * `journeys`) are neither errors nor stripped.
  */
 function parseSession(contents: string, key: string): SessionRecord {
   let parsed: SessionRecord;
@@ -304,21 +267,15 @@ function parseSession(contents: string, key: string): SessionRecord {
   }
   // `approvedAtEnd` postdates `rounds`, and `tier` postdates `groups`; both are
   // filled in here so no reader has to ask whether the field is there. A group
-  // written before tiers existed opens as `study`: the review it belongs to was
-  // read chapter by chapter, and the safe direction for a missing answer is the
-  // one that asks for the reading rather than the one that waves it through.
-  //
-  // Ordered after that default is filled in, never before, since an untiered
-  // chapter is one to study and belongs above the bulk. A session stored before
-  // the tiers decided the order — or by anything that never ordered them — opens
-  // with its bulk last all the same, rather than waiting for the next round to
-  // rewrite the file: what a reader gets is the order the review is drawn in.
+  // written before tiers existed opens as `study`: the safe direction for a
+  // missing answer is the one that asks for the reading rather than the one
+  // that waves it through. Ordered after that default is filled in, never
+  // before, since an untiered chapter is one to study and belongs above the bulk.
   return {
     ...parsed,
     // A session from before turns existed opens with the reviewer holding it:
-    // the safe direction for a missing answer is the one that leaves Send live,
-    // since a lock nobody can lift is a review nobody can finish. Stamped at the
-    // last write, which is the only moment the file can vouch for.
+    // a lock nobody can lift is a review nobody can finish. Stamped at the last
+    // write, the only moment the file can vouch for.
     turn: parsed.turn ?? { holder: "reviewer", at: parsed.updatedAt },
     groups: trailSweeps(parsed.groups.map((group) => ({ ...group, tier: group.tier ?? "study" }))),
     rounds: parsed.rounds.map((round) => ({ ...round, approvedAtEnd: round.approvedAtEnd ?? [] })),
@@ -326,9 +283,9 @@ function parseSession(contents: string, key: string): SessionRecord {
 }
 
 /**
- * A group without `files` is a hole every reader falls into. Checked here, not
- * at the call site that noticed (`start`): a TypeError out of a session file is
- * a corrupt session however spelt, with the same delete-the-file answer.
+ * Checked here, not at the call site that noticed (`start`): a TypeError out of
+ * a session file is a corrupt session however spelt, with the same
+ * delete-the-file answer.
  */
 function readableGroup(group: unknown): boolean {
   return typeof group === "object" && group !== null && Array.isArray((group as DiffGroup).files);

@@ -24,29 +24,25 @@ export interface DiffFile {
   path: string;
   status: DiffFileStatus;
   /**
-   * Unified diff for this file alone, header included; empty for binary files.
-   * The one copy of the patch: per-hunk consumers ask `splitHunks`, not a second copy.
+   * Header included; empty for binary files. The one copy of the patch: per-hunk
+   * consumers ask `splitHunks`, not a second copy.
    */
   diff: string;
   insertions: number;
   deletions: number;
-  /** True when the diff is big enough that the browser should lazy-render it. */
   oversized: boolean;
-  /** Rename source; the old version of the file lives under this name. */
   previousPath?: string;
-  /** git's rename similarity (0-100): `98% identical` is skim vs re-read. */
+  /** git's rename similarity, 0-100. */
   similarity?: number;
 }
 
 /** Group order is the ARRAY position — the LLM returns an ordered array, no `order` field. */
 export interface DiffGroup {
   name: string;
-  /** One sentence of what happened in this group: the primer under its name. */
   rationale: string;
   /**
-   * How this chapter is meant to be read (`src/group-tier.ts`). Optional because
-   * sessions written before tiers existed have none, and every reader takes an
-   * absent tier as `study` — see `isSweep`.
+   * Optional because sessions written before tiers existed have none; every
+   * reader takes an absent tier as `study` — see `isSweep`.
    */
   tier?: GroupTier;
   files: DiffFile[];
@@ -78,7 +74,6 @@ export interface ExtractedDiff {
 
 export const OVERSIZED_LINE_COUNT = 10_000;
 
-/** Reads the merge-base diff (`git diff base...branch`) for a repository. */
 export function extractDiff(repoRoot: string, branch: string, base: string): ExtractedDiff {
   const files = parseDiff(runGitDiff(repoRoot, branch, base));
   return {
@@ -194,7 +189,6 @@ function firstLine(error: unknown): string {
   return said.split("\n")[0]?.trim() ?? said;
 }
 
-/** Splits a unified diff into one entry per file. */
 export function parseDiff(diff: string): DiffFile[] {
   return splitFileSections(diff).map(parseFileSection);
 }
@@ -261,8 +255,8 @@ export function splitHunks(diff: string): { header: string; hunks: DiffHunk[] } 
 }
 
 /**
- * Lines `from`..`to` with joining newlines. A region reaching the patch's end
- * ends bare: `parseFileSection` strips git's trailing newlines between sections.
+ * A region reaching the patch's end ends bare: `parseFileSection` strips git's
+ * trailing newlines between sections.
  */
 function region(lines: string[], from: number, to: number): string {
   const text = lines.slice(from, to).join("\n");
@@ -295,9 +289,8 @@ function readStatus(lines: string[], isBinary: boolean): DiffFileStatus {
 }
 
 /**
- * The pre-image name of a renamed file; undefined for every other file. A copy
- * header's `copy from` is read too, though `DIFF_ARGS` never asks git for one:
- * a patch from elsewhere parses as modified with its source, not as nothing.
+ * `copy from` is read too, though `DIFF_ARGS` never asks git for one: a patch
+ * from elsewhere parses as modified with its source, not as nothing.
  */
 function readPreviousPath(lines: string[]): string | undefined {
   const from = lines.find(
@@ -331,9 +324,8 @@ function readPath(lines: string[]): string {
 }
 
 /**
- * `diff --git a/x b/y` → `y`. Binary files have no `+++` line, so this header is
- * the only source for their path. Paths may contain spaces, so the split is on
- * the last ` b/` (or the second quoted token when git quoted the names).
+ * `diff --git a/x b/y` → `y`. Paths may contain spaces, so the split is on the
+ * last ` b/` (or the second quoted token when git quoted the names).
  */
 function headerPostImagePath(header: string): string {
   const rest = header.slice("diff --git ".length);
