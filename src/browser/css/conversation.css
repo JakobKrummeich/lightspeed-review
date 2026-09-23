@@ -105,9 +105,19 @@
  * where the agent speaks, the violet of the reviewer's own words in the replay
  * and on the "commented last round" badge. Swapping them would put the agent's
  * cobalt answer inside a cobalt reviewer card and say nothing. The hue is
- * painted three ways — a bar down the edge, the role label, and while the
- * round is live the card itself — so the label is also the word, for whoever
- * cannot tell cobalt from violet.
+ * painted as a bar down the edge and as the role label, so the label is also
+ * the word, for whoever cannot tell cobalt from violet.
+ *
+ * The bubbles are a chat's two, the reviewer's coloured and the agent's grey:
+ * cobalt against violet is the rejected pair, since at 14% each the two cards
+ * differ by 0.010 of oklab lightness on paper and 0.008 at night, one hue step
+ * apart, where the grey card sits 0.038 and 0.039 from the violet one and
+ * carries no hue to confuse with it. 14% is the night scheme's ceiling for AAA
+ * body text on the violet card (7.36:1; 7.01:1 at 16%), and 5% of ink is the
+ * grey that reads as a card on the light panel (1.07:1) without closing on the
+ * violet one. Every round keeps its bubbles: a flat earlier card would take
+ * the agent's grey off the page, and opacity would take the reviewer's own
+ * words down with it.
  *
  * The bar is inside the box, so its width comes back off the padding: with it
  * left in, a card's words sat 3px right of the pills that share the base
@@ -115,63 +125,50 @@
  */
 .lsr-entry[data-role="agent"] {
   --lsr-speaker: var(--lsr-accent);
+  --lsr-bubble: color-mix(in oklab, var(--lsr-text) 5%, var(--lsr-raised));
 }
 
 .lsr-entry[data-role="reviewer"] {
   --lsr-speaker: var(--lsr-violet);
+  --lsr-bubble: color-mix(in oklab, var(--lsr-violet) 14%, var(--lsr-raised));
 }
 
 .lsr-entry[data-role] {
+  background: var(--lsr-bubble);
   border-left: 3px solid var(--lsr-speaker);
   padding-left: calc(var(--lsr-space-3) - 3px);
 }
 
 /*
- * A fifth of the way from the hue to the text, not the hue raw: the tint
- * below takes contrast off everything on the card, and the label is the one
- * thing on it set in the hue. On the light 6% card the raw accent reads at
- * 4.57:1 and this at 5.52:1 (violet 6.19 → 6.97; night 5.15 → 5.74 and
- * 6.17 → 6.60), so the label also carries the colour the tint was turned
- * down from.
+ * A fifth of the way from the hue to the text, not the hue raw: the bubble
+ * takes contrast off everything on the card, and the label is the one thing
+ * on it set in the hue. The raw accent is 4.46:1 on the light agent's card;
+ * this is 5.40:1 (night 5.66:1), and the raw violet 5.49:1 on the light
+ * reviewer's, this 6.18:1 (night 5.71:1).
  */
 .lsr-entry[data-role] .lsr-entry-role {
   color: color-mix(in oklab, var(--lsr-speaker) 80%, var(--lsr-text));
 }
 
 /*
- * Mixed into the card's own base rather than laid over it, so the card stays
- * opaque and lifted and only gains a hue. Live rounds only, by selector rather
- * than by cascade order: the tint is the lift in colour, and the rule below
- * takes the lift off an earlier round.
- *
- * 6%, down from 12%, is where the light scheme keeps AA: at 12% the accent
- * label on the agent's card was 4.21:1 and the muted caption 4.29:1; at 6%
- * they are 4.57:1 and 4.65:1 (measured in oklab, sRGB, WCAG 2). The cards
- * read as coloured through the bar and the label above instead.
+ * Two fifths of the way from muted to the text: at a fifth the caption is
+ * under AA on the night reviewer's card from 8% violet (4.48:1), and at two
+ * fifths it is 4.70:1 on the 14% card (paper 5.84:1). Not on hover, which
+ * keeps the accent it answers with.
  */
-.lsr-entry[data-role][data-round-state="current"] {
-  background: color-mix(in oklab, var(--lsr-speaker) 6%, var(--lsr-raised));
+.lsr-entry[data-role] .lsr-prompt-file:not(:hover) {
+  color: color-mix(in oklab, var(--lsr-muted) 60%, var(--lsr-text));
 }
 
 /*
- * The caption on a live card takes the same fifth of a step toward the text.
- * In the night scheme the hues are bright, so any tint of the dark card is a
- * lift, and the muted caption — 4.31:1 on the plain card already — lands at
- * 3.96:1 on the 6% one; the step puts it at 4.72:1 (violet 4.63:1), and on
- * paper at 5.57:1. Not on hover, which keeps the accent it answers with.
+ * The accent labels inside a card take the role label's step: raw, the accent
+ * is 4.46:1 on the light agent's bubble under the question label and 3.98:1
+ * on the light reviewer's under the answer label; stepped, 5.40:1 and 4.81:1
+ * (night 5.66:1 and 4.88:1).
  */
-.lsr-entry[data-role][data-round-state="current"] .lsr-prompt-file:not(:hover) {
-  color: color-mix(in oklab, var(--lsr-muted) 80%, var(--lsr-text));
-}
-
-/*
- * A round that is over is flat rather than dimmed: opacity stacks with
- * everything under it and takes the reviewer's own words down with it. The
- * bar and the label keep their hue, which is how an old card still says who
- * spoke.
- */
-.lsr-entry[data-round-state="earlier"] {
-  background: none;
+.lsr-entry[data-role] .lsr-question-label,
+.lsr-entry[data-role] .lsr-prompt-answer-label {
+  color: color-mix(in oklab, var(--lsr-accent) 80%, var(--lsr-text));
 }
 
 .lsr-entry-role,
@@ -206,10 +203,17 @@
   text-decoration-color: var(--lsr-accent);
 }
 
-/* The seam between two comments of one turn: without it quote, comment and
- * the next file's caption run into one block at the same indent. */
+/*
+ * The seam between two comments of one turn: without it quote, comment and
+ * the next file's caption run into one block at the same indent. Drawn off
+ * the bubble rather than with the border token, which sits at the bubble's
+ * own lightness on the tinted cards — 1.00:1 on the night reviewer's, 1.10:1
+ * on the light one; 15% of ink into the bubble is 1.33:1 to 1.40:1 on every
+ * card in both schemes, the token's own 1.28:1 to 1.36:1 on the plain card.
+ */
 .lsr-prompt + .lsr-prompt {
-  border-top: 1px solid var(--lsr-border);
+  border-top: 1px solid
+    color-mix(in oklab, var(--lsr-text) 15%, var(--lsr-bubble, var(--lsr-raised)));
   margin-top: var(--lsr-space-3);
   padding-top: var(--lsr-space-3);
 }

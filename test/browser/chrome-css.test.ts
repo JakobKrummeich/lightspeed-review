@@ -376,13 +376,17 @@ test("regression guard: the round's line keeps the three properties that pin it"
   assert.match(mark, /background: var\(--lsr-surface\);/);
 });
 
-test("an earlier round's messages read as history without being faded out", () => {
+test("an earlier round keeps its bubbles: history is neither flattened nor faded", () => {
   // Old entries keep contrast (reviewer scrolled up to read them); opacity is barred because it
-  // multiplies down the tree.
-  const earlier = rulesFor('.lsr-entry[data-round-state="earlier"]');
-  assert.equal(earlier.length, 1);
-  assert.match(earlier[0] ?? "", /background: none;/);
-  assert.doesNotMatch(earlier[0] ?? "", /opacity/);
+  // multiplies down the tree, and a flat card would take the agent's grey bubble off the page.
+  const faded = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(
+      ([, list, body]) =>
+        /\.lsr-entry[^,{]*data-round-state="earlier"/.test(list ?? "") &&
+        /background|opacity/.test(body ?? ""),
+    )
+    .map(([, list]) => list?.trim());
+  assert.deepEqual(faded, [], "a rule takes an earlier round's bubble away");
 });
 
 test("each voice of the sidechat is one hue, worn as a bar down the card and on its label", () => {
@@ -409,24 +413,66 @@ test("each voice of the sidechat is one hue, worn as a bar down the card and on 
   );
 });
 
-test("a live round's card is tinted with its voice at 6%, and an earlier round's is not", () => {
-  // 6% is measured, not eyeballed: at 12% the accent label on the tinted light card was 4.21:1
-  // and the muted caption 4.29:1, both under AA; at 6% they are 4.57:1 and 4.65:1 with the
-  // raw hue, and the label's step toward the text takes it to 5.52:1. The caption's own step
-  // is for the night scheme, where any lift of the card takes muted grey under the 4.31:1 it
-  // had on the plain card: at 6% it is 3.96:1 as it was and 4.72:1 with the step.
-  const live = rulesFor('.lsr-entry[data-role][data-round-state="current"]').join("");
+test("the reviewer's bubble is violet and the agent's is grey, on every round", () => {
+  // Neutral against violet, not cobalt against violet: at 14% each, a cobalt card and a violet
+  // card differ by 0.010 of oklab lightness on paper and 0.008 at night, one hue step apart for
+  // whoever cannot tell the two blues apart; the grey card sits 0.038 and 0.039 away. 14% is
+  // the night scheme's ceiling for AAA body text on the violet card (7.36:1; 7.01:1 at 16%),
+  // and 5% of ink is the grey that reads as a card on the light panel (1.07:1) without closing
+  // on the violet one.
+  const reviewer = rulesFor('.lsr-entry[data-role="reviewer"]').join("");
   assert.match(
-    live,
-    /background: color-mix\(in oklab, var\(--lsr-speaker\) 6%, var\(--lsr-raised\)\);/,
+    reviewer,
+    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-violet\) 14%, var\(--lsr-raised\)\);/,
   );
 
-  const caption = rulesFor(
-    '.lsr-entry[data-role][data-round-state="current"] .lsr-prompt-file:not(:hover)',
-  ).join("");
-  assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 80%, var\(--lsr-text\)\);/);
+  const agent = rulesFor('.lsr-entry[data-role="agent"]').join("");
+  assert.match(
+    agent,
+    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-text\) 5%, var\(--lsr-raised\)\);/,
+  );
+  assert.doesNotMatch(
+    agent,
+    /--lsr-bubble:[^;]*var\(--lsr-(accent|violet|green|red|amber|pink|cyan)\)/,
+    "the agent's bubble carries no hue",
+  );
 
-  assert.match(rulesFor('.lsr-entry[data-round-state="earlier"]').join(""), /background: none;/);
+  // The bubble is the card's background whatever the round's state: a chat keeps its bubbles.
+  assert.match(rulesFor(".lsr-entry[data-role]").join(""), /background: var\(--lsr-bubble\);/);
+  assert.equal(
+    rulesFor('.lsr-entry[data-role][data-round-state="current"]').length,
+    0,
+    "the bubble is not a live-round effect",
+  );
+});
+
+test("the small print on a bubble steps toward the text: the caption, and the accent labels", () => {
+  // Muted grey at 80% is under AA on the night reviewer's card from 8% violet (4.48:1); at 60%
+  // it is 4.70:1 on the 14% card. The accent raw is 4.46:1 on the light agent's card and 3.98:1
+  // on the light reviewer's; the same fifth of a step the role label takes puts the question
+  // label at 5.40:1 and the answer label at 4.81:1. Not on hover, which keeps the accent it
+  // answers with.
+  const caption = rulesFor(".lsr-entry[data-role] .lsr-prompt-file:not(:hover)").join("");
+  assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 60%, var\(--lsr-text\)\);/);
+
+  for (const label of [".lsr-question-label", ".lsr-prompt-answer-label"]) {
+    assert.match(
+      rulesFor(`.lsr-entry[data-role] ${label}`).join(""),
+      /color: color-mix\(in oklab, var\(--lsr-accent\) 80%, var\(--lsr-text\)\);/,
+      `${label} is left raw on the bubble`,
+    );
+  }
+});
+
+test("the seam between two comments is drawn off the bubble, not off the border token", () => {
+  // The border token sits at the bubble's own lightness on the tinted cards: 1.00:1 on the
+  // night reviewer's card, 1.10:1 on the light one. 15% of ink into the bubble is 1.33:1 to
+  // 1.40:1 on every card in both schemes, where the token sat on the plain card (1.28 to 1.36).
+  const seam = rulesFor(".lsr-prompt + .lsr-prompt").join("");
+  assert.match(
+    seam,
+    /border-top: 1px solid\s+color-mix\(in oklab, var\(--lsr-text\) 15%, var\(--lsr-bubble, var\(--lsr-raised\)\)\);/,
+  );
 });
 
 test("a question inside the agent's card keeps its inset but not its own bar", () => {

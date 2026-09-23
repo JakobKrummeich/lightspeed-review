@@ -299,9 +299,9 @@ shut panel when the agent replies or when approval crosses done.
 
 Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's
 hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — as a
-3px left bar and the `.lsr-entry-role` label colour on every card, plus a 6%
-tint of the card itself only while `data-round-state="current"`; earlier
-rounds keep the bar and the label but lose the tint along with the lift.
+3px left bar and the `.lsr-entry-role` label colour; the card itself is the
+voice's bubble on every round, as in a chat: the reviewer's is `--lsr-raised`
+tinted 14% violet, the agent's `--lsr-raised` stepped 5% toward the ink, no hue.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 
