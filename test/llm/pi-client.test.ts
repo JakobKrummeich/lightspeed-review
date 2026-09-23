@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
-import type { Context, Message, Model, MutableModels } from "@earendil-works/pi-ai";
+import {
+  createModels,
+  fauxAssistantMessage,
+  fauxProvider,
+  getCurrentSystemPrompt,
+  withoutInitialSystemMessage,
+} from "@earendil-works/pi-ai";
+import type { Message, Model, MutableModels, TranscriptContext } from "@earendil-works/pi-ai";
 import { runGroupingCall } from "../../src/llm/pi-client.ts";
 import { ReviewError } from "../../src/errors.ts";
 import type { ProviderConfig, ThinkingLevel } from "../../src/config.ts";
@@ -22,7 +28,7 @@ function fauxModels(
   faux.setResponses(
     responses.map(
       (response) =>
-        (context: Context, _options: unknown, _state: unknown, model: Model<string>) => {
+        (context: TranscriptContext, _options: unknown, _state: unknown, model: Model<string>) => {
           seen.context = context;
           seen.model = model;
           return response;
@@ -94,9 +100,9 @@ test("passes the system prompt and messages to the model", async () => {
 
   await call(models, [userMessage]);
 
-  const context = seen.context as { systemPrompt: string; messages: Message[] };
-  assert.equal(context.systemPrompt, "group these files");
-  assert.deepEqual(context.messages, [userMessage]);
+  const context = seen.context as TranscriptContext;
+  assert.equal(getCurrentSystemPrompt(context.messages), "group these files");
+  assert.deepEqual(withoutInitialSystemMessage(context.messages), [userMessage]);
 });
 
 test("an unknown provider reports pi_model_unknown", async () => {
