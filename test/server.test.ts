@@ -1031,6 +1031,30 @@ test("a poll hands the agent each annotation under its minted id", async () => {
   });
 });
 
+test("a tray of general and line comments reaches the agent whole, in the order queued", async () => {
+  // What one Send carries after a reviewer queued through the agent's turn: several general
+  // comments between the line comments, none of them folded into another.
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    const tray = [
+      annotation,
+      { type: "message", comment: "the migration is missing" },
+      { ...annotation, comment: "and roll it back on error" },
+      { type: "message", comment: "and the changelog" },
+      { type: "message", comment: "ship it after that" },
+    ];
+    await postFeedback(url, key, { prompts: tray, ended: false });
+
+    const payload = (await pollAndAck(url, key)) as { prompts: { comment: string }[] };
+
+    assert.deepEqual(
+      payload.prompts.map((prompt) => prompt.comment),
+      tray.map((prompt) => prompt.comment),
+    );
+    assert.deepEqual(store.get(key)?.pending, [], "handed over once, not held to go again");
+  });
+});
+
 test("feedback sent with ended closes the session", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);
@@ -1426,7 +1450,7 @@ test("work on an ended review is refused as ended, and declares nothing", async 
 
 /**
  * Parking is the agent handing the turn back, so a `wait` from one that is
- * mid-edit would unlock Send under it: the reviewer fires at a half-written
+ * mid-edit would hand sending back under it: the reviewer fires at a half-written
  * branch, and neither side ever finds out why. Refused at the door instead.
  */
 test("a wait from an agent that declared work is refused, and the turn stays put", async () => {

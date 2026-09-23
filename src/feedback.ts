@@ -90,9 +90,10 @@ export function withFeedback(
 
 /**
  * A question hands the turn back — it is the agent asking to be answered, and
- * Send has to be live for that. Plain speech does not: an agent that answers one comment
- * and keeps editing is still working, and unlocking Send between its sentences
- * would flap the reviewer's button for the length of a round.
+ * Send has to send for that. Plain speech does not: an agent that answers one comment
+ * and keeps editing is still working, and handing sending back between its
+ * sentences would flip the reviewer's button between Send and Queue for the
+ * length of a round.
  */
 export function withAgentReply(
   session: SessionRecord,

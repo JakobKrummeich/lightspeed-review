@@ -55,3 +55,12 @@ test("a stamp from a round the session no longer names is stale too, not trusted
 test("a pill with no stamp at all is never called stale — absence is not a guess", () => {
   assert.equal(stalePillRound(annotation, 3), undefined);
 });
+
+test("a general comment is never called stale: it has no lines to fall out of line", () => {
+  // The badge warns that an anchor may point at the wrong lines; a message has no anchor, and
+  // a general comment queued on the agent's turn outliving the round is the ordinary case.
+  assert.equal(
+    stalePillRound({ type: "message", comment: "and the tests", round: 1 }, 3),
+    undefined,
+  );
+});

@@ -62,6 +62,8 @@ function presenceWords(state: StatusState): { label: string; detail: string } {
     ? { label: "Waiting for your feedback", detail: "an agent is waiting for your feedback" }
     : {
         label: "No agent is waiting",
-        detail: "no agent is waiting — send anyway, the feedback is queued",
+        // Not "queued": on this page that is the Queue button's word, for pills the
+        // reviewer can still take back, and this Send leaves the page for good.
+        detail: "no agent is waiting — send anyway, it is handed over when the agent next waits",
       };
 }

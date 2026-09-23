@@ -296,21 +296,36 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ │ │ │ selection                  │   │ │ │ .lsr-pill-remove
 │ │ │ │ comment                      │   │ │ │
 │ │ │ └──────────────────────────────┘   │ │ │
-│ │ │ or: "Nothing queued — select diff  │ │ │ .lsr-empty
-│ │ │      text to add feedback."        │ │ │
+│ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │ general comment queued on
+│ │ │ │ general comment text     [×] │   │ │ │  the agent's turn (no badge)
+│ │ │ └──────────────────────────────┘   │ │ │
+│ │ │ or: "Nothing queued — select diff  │ │ │ .lsr-empty (agent's turn adds
+│ │ │      text to add feedback."        │ │ │  ", or type below,": only then
+│ │ │                                    │ │ │  does the box queue)
 │ │ └────────────────────────────────────┘ │ │
 │ └────────────────────────────────────────┘ │
 │ ┌ section.lsr-compose (pinned) ──────────┐ │
 │ │ Every file is approved — Send & End    │ │ .lsr-complete (conditional)
 │ │ when you are ready.                    │ │
 │ │ [General comment — Enter sends…      ] │ │ #lsr-general-comment
-│ │ [Send to Agent]         [Send & End]   │ │ #lsr-send (.lsr-primary)
+│ │ [Send to Agent]         [Send & End]   │ │ #lsr-send (.lsr-primary;
+│ │  or on the agent's turn:               │ │  "Queue" on the agent's turn)
+│ │ [Queue]         [End without Sending]  │ │
 │ └────────────────────────────────────────┘ │ #lsr-send-end (.lsr-secondary)
 └────────────────────────────────────────────┘
 ```
 
-States: sending — primary reads "Sending…", all compose controls disabled;
-ended — "This review has ended.", textarea disabled. The rail auto-reopens a
+States: agent's turn — primary reads "Queue" and stays live, placeholder
+"General comment — Enter queues…": a press (or Enter) turns the box into a
+message pill in `section.lsr-queue`, beside the annotation pills, removable by
+its own ×, and the box empties for the next one; the end button reads "End
+without Sending"; each press focuses the box again and says "Queued — N
+waiting for your next Send" in a visually-hidden `role="status"`
+(`#lsr-queue-status`, `.lsr-visually-hidden`). Reviewer's turn (an agent
+waiting or not) — "Send to Agent", or "Send N to Agent" while N pills wait,
+sends every pill in queue order plus the box. Sending — primary reads
+"Sending…", all compose controls disabled; ended — "This review has ended.",
+textarea and primary disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.
 
 Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's

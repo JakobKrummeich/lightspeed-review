@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   applyNewline,
   enterAction,
+  submitsOnEnter,
   typeNewline,
   type EditableField,
   type EnterKeydown,
@@ -127,4 +128,35 @@ test("a page without execCommand still gets its newline", () => {
   typeNewline(box);
 
   assert.equal(box.value, "one\ntwo");
+});
+
+test("a submitting Enter is swallowed and reported, and types nothing", () => {
+  let prevented = false;
+  const box = field({ value: "ship it", selectionStart: 7, selectionEnd: 7 });
+
+  const submits = submitsOnEnter({ ...keydown(), preventDefault: () => (prevented = true) }, box);
+
+  assert.equal(submits, true);
+  assert.equal(prevented, true);
+  assert.equal(box.value, "ship it");
+});
+
+test("a newline Enter is typed and swallowed, and is not a submit", () => {
+  let prevented = false;
+  const box = field({ value: "onetwo", selectionStart: 3, selectionEnd: 3 });
+  const event = { ...keydown({ ctrlKey: true }), preventDefault: () => (prevented = true) };
+
+  assert.equal(submitsOnEnter(event, box), false);
+  assert.equal(prevented, true);
+  assert.equal(box.value, "one\ntwo");
+});
+
+test("an Enter the browser handles is left alone entirely", () => {
+  let prevented = false;
+  const box = field({ value: "onetwo", selectionStart: 3, selectionEnd: 3 });
+  const event = { ...keydown({ shiftKey: true }), preventDefault: () => (prevented = true) };
+
+  assert.equal(submitsOnEnter(event, box), false);
+  assert.equal(prevented, false);
+  assert.equal(box.value, "onetwo");
 });

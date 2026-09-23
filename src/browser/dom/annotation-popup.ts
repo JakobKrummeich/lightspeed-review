@@ -1,5 +1,5 @@
 import { annotationsFrom, renderAnnotationPopup, type SelectionFragment } from "../annotation.ts";
-import { enterAction, typeNewline } from "./enter-key.ts";
+import { submitsOnEnter } from "./enter-key.ts";
 import { popupPosition } from "./popup-position.ts";
 import { selectionFragments } from "./selection-fragments.ts";
 import type { AnnotationPrompt } from "../../session-store.ts";
@@ -59,17 +59,8 @@ export function mountAnnotationPopup(options: AnnotationPopupOptions): void {
   popup.addEventListener("keydown", (event) => {
     const field = commentBox(popup);
     if (field === null || event.target !== field) return;
-    const action = enterAction(event);
-    if (action === "newline") {
-      event.preventDefault();
-      typeNewline(field);
-      return;
-    }
-    if (action !== "submit") return;
-    // Empty comment: queue nothing and type no newline either — a blank first
-    // line would hide the placeholder explaining what Enter is waiting for.
-    event.preventDefault();
-    queue();
+    // An empty comment queues nothing (`queue` refuses it); the Enter is still swallowed.
+    if (submitsOnEnter(event, field)) queue();
   });
 }
 

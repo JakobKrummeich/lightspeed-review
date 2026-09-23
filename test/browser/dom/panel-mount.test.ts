@@ -243,14 +243,19 @@ test("the working marker arrives on screen rather than just below the fold", (t)
   assert.equal(host.scrollTop, host.scrollHeight);
 });
 
-test("the agent's turn takes Send away and leaves everything else pressable", (t) => {
+test("the agent's turn turns Send into Queue and leaves everything pressable", (t) => {
   const { root, panel } = mount(t);
 
   panel.setTurn(READING);
 
-  assert.equal(root.querySelector("#lsr-send")?.disabled, true);
-  // Send is the only control a turn can take: ending is never gated, and
-  // queueing and typing are how a reviewer keeps working through the silence.
+  // Queue always: the primary button keeps working, it just parks the words in the tray
+  // instead of sending them onto somebody else's turn.
+  assert.equal(root.querySelector("#lsr-send")?.disabled, false);
+  assert.equal(root.querySelector("#lsr-send")?.textContent, "Queue");
+  assert.equal(
+    root.querySelector("#lsr-general-comment")?.placeholder,
+    "General comment — Enter queues…",
+  );
   assert.equal(root.querySelector("#lsr-send-end")?.disabled, false);
   assert.equal(root.querySelector("#lsr-general-comment")?.disabled, false);
 });
@@ -275,19 +280,24 @@ test("the turn coming back hands Send back without replacing the compose box", (
   panel.setTurn(REVIEWERS);
 
   assert.equal(root.querySelector("#lsr-send")?.disabled, false);
+  assert.equal(root.querySelector("#lsr-send")?.textContent, "Send to Agent");
+  assert.equal(
+    root.querySelector("#lsr-general-comment")?.placeholder,
+    "General comment — Enter sends…",
+  );
   assert.equal(box(), typing, "the very element they were typing into");
   assert.equal(typing!.value, "half a thought");
 });
 
-test("a session that opens on the agent's turn is locked before any SSE frame", (t) => {
+test("a session that opens on the agent's turn queues before any SSE frame", (t) => {
   const { root } = mount(t, session({ turn: READING }));
 
   // A reload is not an escape: the turn is server truth, and the page draws it
   // from the session it was handed rather than waiting to be told.
-  assert.equal(root.querySelector("#lsr-send")?.disabled, true);
+  assert.equal(root.querySelector("#lsr-send")?.textContent, "Queue");
 });
 
-test("a press on a locked Send sends nothing at all", (t) => {
+test("a press on Queue sends nothing to the agent", (t) => {
   const { root, panel } = mount(t, session({ pending: [] }));
   const sent = stubFetch(t);
   panel.queue([annotation]);
@@ -295,20 +305,218 @@ test("a press on a locked Send sends nothing at all", (t) => {
 
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
 
-  // Browsers fire nothing off a disabled button, but the handler is the lock:
-  // a stale listener must not put words on somebody else's turn.
+  // Send only on your turn: the pills stay in the tray, and nothing is put on
+  // the wire on somebody else's turn.
   assert.deepEqual(sent, []);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 1, "an empty box queues nothing more");
 });
 
-test("Enter is the same Send, so the same turn takes it away", (t) => {
+test("Enter on the agent's turn queues the comment, like the button beneath it", (t) => {
   const { root, panel, box } = mount(t);
   const sent = stubFetch(t);
   box()!.value = "one more thing";
   panel.setTurn(READING);
 
+  const event = keydown(box(), { key: "Enter" });
+  root.dispatch("keydown", event);
+
+  assert.equal(event.defaultPrevented, true, "the keystroke is a queue, not a newline");
+  assert.deepEqual(sent, []);
+  assert.match(shown(root), /one more thing/);
+  assert.equal(box()?.value, "");
+});
+
+test("general comments queue on the agent's turn one after another, beside the pills", async (t) => {
+  const { root, panel, box, storage } = mount(t);
+  const sent = stubFetch(t);
+  panel.setTurn(working("rewriting the parser"));
+  const second: FeedbackPrompt = { ...annotation, comment: "and roll it back on error" };
+
+  panel.queue([annotation]);
+  type(root, box()!, "the migration is missing");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  panel.queue([second]);
+  type(root, box()!, "  and the changelog  ");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+
+  assert.deepEqual(sent, [], "queueing is not sending");
+  assert.equal(box()?.value, "", "the box is emptied for the next one");
+  const pills = root.querySelectorAll(".lsr-pill-remove");
+  assert.equal(pills.length, 4, "nothing queued overwrote anything else");
+  const order = [
+    /wrap in a transaction/,
+    /the migration is missing/,
+    /roll it back/,
+    /and the changelog/,
+  ];
+  const html = shown(root);
+  const places = order.map((comment) => html.search(comment));
+  assert.deepEqual(
+    places,
+    [...places].sort((one, other) => one - other),
+    "in the order queued",
+  );
+  // Kept like any pill, and the typed half is gone from the draft: a reload must not
+  // offer the same words twice, once as a pill and once in the box.
+  await stored();
+  const remembered = readMemory(storage, "key");
+  assert.deepEqual(
+    remembered.pending.map((pill) => pill.comment),
+    [
+      "wrap in a transaction",
+      "the migration is missing",
+      "and roll it back on error",
+      "and the changelog",
+    ],
+  );
+  assert.equal(remembered.draft, "");
+});
+
+test("everything queued on the agent's turn goes out in order on the next Send", async (t) => {
+  const { root, panel, box } = mount(t);
+  const sent = stubFetch(t);
+  panel.setTurn(READING);
+  panel.queue([annotation]);
+  type(root, box()!, "the migration is missing");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  type(root, box()!, "and the changelog");
   root.dispatch("keydown", keydown(box(), { key: "Enter" }));
 
-  assert.deepEqual(sent, []);
+  panel.setTurn(REVIEWERS);
+  type(root, box()!, "ship it after that");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+
+  // One send, the tray in the order it was built and the box last — exactly what
+  // a queued annotation has always gone out as, with no round stamps on the wire.
+  assert.deepEqual(sent, [
+    {
+      path: "/api/session/key/feedback",
+      prompts: [
+        annotation,
+        { type: "message", comment: "the migration is missing" },
+        { type: "message", comment: "and the changelog" },
+        { type: "message", comment: "ship it after that" },
+      ],
+      ended: false,
+    },
+  ]);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 0, "sent is no longer queued");
+});
+
+test("text in the box and a Queue press on the agent's turn put nothing on the wire", async (t) => {
+  const { root, panel, box } = mount(t);
+  const sent = stubFetch(t);
+  panel.setTurn(READING);
+  type(root, box()!, "the migration is missing");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+
+  assert.deepEqual(sent, [], "no POST: the words wait in the tray for the reviewer's own Send");
+  assert.match(shown(root), /the migration is missing/);
+});
+
+test("a Queue press says what it did to a screen reader, politely", (t) => {
+  const { root, panel, box } = mount(t);
+  panel.setTurn(READING);
+  panel.queue([annotation]);
+  const status = () => root.querySelector("#lsr-queue-status")?.textContent;
+
+  type(root, box()!, "the migration is missing");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+
+  // The box empties and a pill appears out of sight of a reader following the box.
+  assert.equal(status(), "Queued — 2 waiting for your next Send");
+
+  root.dispatch("click", { target: root.querySelector(".lsr-pill-remove") });
+  // Emptied by the next redraw, so queueing the same count again is news again.
+  assert.equal(status(), "");
+});
+
+test("a Queue press hands the box back, so the next comment is typed straight away", (t) => {
+  const { root, panel, box } = mount(t);
+  panel.setTurn(READING);
+  type(root, box()!, "one");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  assert.equal(box()?.focused, true, "back in the box after a queued comment");
+
+  box()!.focused = false;
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  assert.equal(box()?.focused, true, "and after a press on an empty box, which queues nothing");
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
+});
+
+test("a Queue press while an end is on the wire queues nothing", async (t) => {
+  const flight = heldFetch(t);
+  const { root, panel, box } = mount(t);
+  panel.setTurn(READING);
+  type(root, box()!, "one more thing");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send-end") });
+  await tick(0);
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+
+  // The review may be about to close: nothing moves until the end is answered.
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
+  assert.equal(box()?.value, "one more thing");
+  assert.deepEqual(
+    flight.sent.map((sent) => sent.prompts),
+    [[]],
+    "the end carried nothing",
+  );
+});
+
+test("the turn coming back counts the queue on the button, and a send clears the count", async (t) => {
+  const { root, panel, box } = mount(t);
+  const sent = stubFetch(t);
+  panel.setTurn(READING);
+  panel.queue([annotation]);
+  type(root, box()!, "the migration is missing");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+
+  panel.setTurn(REVIEWERS);
+  assert.equal(root.querySelector("#lsr-send")?.textContent, "Send 2 to Agent");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+
+  assert.equal(sent.length, 1);
+  assert.equal(root.querySelector("#lsr-send")?.textContent, "Send to Agent");
+});
+
+test("a general comment restored from a reload in a later round wears no stale badge", (t) => {
+  const storage = new FakeStorage();
+  updateMemory(storage, "key", {
+    pending: [
+      { ...annotation, round: 0 },
+      { type: "message", comment: "and the migration is missing", round: 0 },
+    ],
+  });
+  const rounds = [
+    { index: 0, at: "2025-01-01T00:00:00.000Z" },
+    { index: 1, at: "2025-01-02T00:00:00.000Z" },
+  ];
+
+  const { root } = mount(t, session({ rounds }), storage);
+
+  // The annotation still warns its lines may have moved; the message has no lines to move.
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
+  assert.equal(root.querySelectorAll(".lsr-pill-round").length, 1);
+});
+
+test("a queued general comment comes out of the tray like any pill", (t) => {
+  const { root, panel, box } = mount(t);
+  panel.setTurn(READING);
+  type(root, box()!, "never mind this one");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  assert.match(shown(root), /never mind this one/, "queued first");
+
+  root.dispatch("click", { target: root.querySelector(".lsr-pill-remove") });
+
+  assert.doesNotMatch(shown(root), /never mind this one/);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
 });
 
 test("ending on the agent's turn ends the review and leaves the queue queued", async (t) => {
@@ -978,7 +1186,13 @@ test("a refused send gives the controls back and clears nothing", async (t) => {
   flight.settle(false);
   await settled();
 
-  assert.deepEqual(controls(root), { send: false, end: false, box: false, label: "Send to Agent" });
+  // The two pills are still waiting, and the button still counts them.
+  assert.deepEqual(controls(root), {
+    send: false,
+    end: false,
+    box: false,
+    label: "Send 2 to Agent",
+  });
   assert.equal(box()?.value, "and one more thing", "nothing the reviewer wrote was taken away");
   assert.match(shown(root), /lsr-pill/);
 });

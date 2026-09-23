@@ -16,6 +16,7 @@ export class FakeNode {
   selectionEnd: number | null = 0;
   private locked: boolean | undefined;
   private shown: boolean | undefined;
+  private hint: string | undefined;
   private data: Record<string, string | undefined> | undefined;
   private html = "";
   private children: FakeNode[] = [];
@@ -60,6 +61,15 @@ export class FakeNode {
 
   set disabled(locked: boolean) {
     this.locked = locked;
+  }
+
+  /** Same story as `disabled`: the compose box says what Enter does, and the turn changes that in place. */
+  get placeholder(): string {
+    return this.hint ?? this.attribute("placeholder");
+  }
+
+  set placeholder(hint: string) {
+    this.hint = hint;
   }
 
   /** Same story as `disabled`: the round offer and replay reopen are shown/hidden in place. */

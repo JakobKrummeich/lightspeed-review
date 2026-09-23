@@ -68,3 +68,20 @@ export function applyNewline(field: EditableField): void {
   field.value = `${field.value.slice(0, start)}\n${field.value.slice(end)}`;
   field.setSelectionRange(start + 1, start + 1);
 }
+
+/**
+ * The comment boxes' one Enter: types the newline the browser will not, and
+ * reports whether this keystroke is the box's button. A submit is swallowed
+ * whatever the caller then does with it, so an Enter on an empty box types no
+ * blank first line to hide the placeholder saying what Enter is waiting for.
+ */
+export function submitsOnEnter(
+  event: EnterKeydown & { preventDefault(): void },
+  field: EditableField,
+): boolean {
+  const action = enterAction(event);
+  if (action === "default") return false;
+  event.preventDefault();
+  if (action === "newline") typeNewline(field);
+  return action === "submit";
+}

@@ -316,7 +316,7 @@ test("a turn the agent holds survives the store being reopened", () => {
   );
 
   // A `serve` restart reads the file again; an in-memory flag would have
-  // unlocked Send under an agent still editing.
+  // handed sending back under an agent still editing.
   assert.deepEqual(new SessionStore(dir).get("a3f8c21b9e4d5f60")?.turn, {
     holder: "agent",
     mode: "working",

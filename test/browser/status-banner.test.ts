@@ -67,12 +67,16 @@ test("says nobody is waiting when no agent polls, rather than hiding the fact", 
   assert.equal(presenceText(html), "No agent is waiting");
 });
 
-/** The queued-anyway advice is said nowhere else on the page, so the short
- * label keeps it one hover away rather than dropping it. */
+/** The send-anyway advice is said nowhere else on the page, so the short
+ * label keeps it one hover away rather than dropping it. It does not say
+ * "queued": that is the Queue button's word, and this Send leaves the page. */
 test("keeps the send-anyway advice in the tooltip when nobody is waiting", () => {
   const html = renderStatusBanner(banner({ agentWaiting: false }));
 
-  assert.equal(presenceTitle(html), "no agent is waiting — send anyway, the feedback is queued");
+  assert.equal(
+    presenceTitle(html),
+    "no agent is waiting — send anyway, it is handed over when the agent next waits",
+  );
 });
 
 test("covers the page with what the review came to once it is closed", () => {
