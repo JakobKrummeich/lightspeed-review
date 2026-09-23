@@ -13,14 +13,13 @@ export class FakeElement {
   readonly tagName: string;
   readonly children: FakeElement[] = [];
   parent: FakeElement | undefined;
-  /** Crude layout: this element's own pixel worth. Tests set it on boxes they care about; everything else is zero. */
+  /** Crude layout: tests set it on boxes they care about; everything else is zero. */
   ownHeight = 0;
-  /** How much of a scroller shows at once; zero everywhere else, which makes its offset immovable. */
+  /** Zero everywhere but a scroller, which makes its offset immovable. */
   clientHeight = 0;
   private offset = 0;
   /** Explicit box for the route overlay: the crude layout is vertical only, so 2-D map tests assign rects outright. */
   rect: { left: number; top: number; width: number; height: number } | undefined;
-  /** What the fold writes a height into, and clears again when it settles. */
   readonly style: { height: string } = { height: "" };
   private readonly attributes = new Map<string, string>();
   private ownText = "";
@@ -92,7 +91,7 @@ export class FakeElement {
     };
   }
 
-  /** Own height plus visible children, unless a fold wrote a height. Hidden costs nothing — that is the height a collapse removes. */
+  /** Hidden costs nothing — that is the height a collapse removes. */
   get layoutHeight(): number {
     if (this.hidden) return 0;
     if (this.style.height !== "") return Number.parseFloat(this.style.height);
@@ -111,18 +110,15 @@ export class FakeElement {
     this.offset = Math.max(0, Math.min(offset, this.maxScrollTop()));
   }
 
-  /** Nothing to scroll past when nothing says how much of this element shows. */
   private maxScrollTop(): number {
     if (this.clientHeight === 0) return Number.POSITIVE_INFINITY;
     return Math.max(0, this.scrollHeight - this.clientHeight);
   }
 
-  /** Everything inside this element, on the screen or not yet scrolled to. */
   get scrollHeight(): number {
     return this.children.reduce((total, child) => total + child.layoutHeight, this.ownHeight);
   }
 
-  /** Where this element sits in the viewport: its place in the page, less what is scrolled past. */
   getBoundingClientRect(): { left: number; top: number; width: number; height: number } {
     if (this.rect) return this.rect;
     return {
@@ -147,7 +143,7 @@ export class FakeElement {
     return offset;
   }
 
-  /** The highlighter reads this to drop work on replaced markup: reachable from the mounted root, or nobody's view. */
+  /** The highlighter reads this to drop work on replaced markup. */
   get isConnected(): boolean {
     if (this.parent !== undefined) return this.parent.isConnected;
     return this === mountedRoot;
@@ -163,7 +159,7 @@ export class FakeElement {
     else this.attributes.delete("hidden");
   }
 
-  /** A `<details>` fold, which the browser keeps in the attribute; a test flips it as a press on the summary would. */
+  /** A `<details>` fold; the browser keeps it in the attribute. */
   get open(): boolean {
     return this.attributes.has("open");
   }
@@ -173,13 +169,11 @@ export class FakeElement {
     else this.attributes.delete("open");
   }
 
-  /** Puts an element inside this one: what the parser does for markup, done by hand. */
   append(child: FakeElement): void {
     child.parent = this;
     this.children.push(child);
   }
 
-  /** Detaches this element, as `Element.remove` does; already loose is a no-op. */
   remove(): void {
     const parent = this.parent;
     if (parent === undefined) return;
@@ -188,7 +182,6 @@ export class FakeElement {
     this.parent = undefined;
   }
 
-  /** The overlay pulls its freshly parsed svg back out of a scratch element. */
   get firstElementChild(): FakeElement | null {
     return this.children[0] ?? null;
   }
@@ -205,7 +198,7 @@ export class FakeElement {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
   }
 
-  /** What a delegated listener on this element sees; no bubbling is modelled. */
+  /** No bubbling is modelled. */
   dispatch(type: string, event: unknown): void {
     for (const handler of this.listeners.get(type) ?? []) handler(event);
   }
@@ -230,7 +223,7 @@ export class FakeElement {
     return selector.split(",").some((one) => this.matchesOne(one.trim()));
   }
 
-  /** True once the page scrolled this element on screen: a fake cannot move. */
+  /** A fake cannot move: the scroll is only recorded. */
   scrolledInto = false;
 
   scrollIntoView(): void {
@@ -265,10 +258,7 @@ export class FakeInput extends FakeElement {
   }
 }
 
-/**
- * Keeps a stack (the mount navigates by nesting). A stray close tag is dropped, not thrown:
- * this reads rendered markup, not arbitrary HTML.
- */
+/** A stray close tag is dropped, not thrown: this reads rendered markup, not arbitrary HTML. */
 function parseNodes(html: string): FakeElement[] {
   const roots: FakeElement[] = [];
   const open: FakeElement[] = [];
@@ -307,8 +297,8 @@ const camelCase = (name: string): string =>
     .join("");
 
 /**
- * Globals the mount reaches outside its root. `CSS.escape` is the identity on purpose:
- * the fake compares attribute values literally, so escaping would only break the match.
+ * `CSS.escape` is the identity on purpose: the fake compares attribute values
+ * literally, so escaping would only break the match.
  */
 export function installFakeDom(root: FakeElement): void {
   mountedRoot = root;
@@ -325,10 +315,9 @@ export function installFakeDom(root: FakeElement): void {
   });
 }
 
-/** The root the current test mounted, which is what `isConnected` is measured against. */
+/** What `isConnected` is measured against. */
 let mountedRoot: FakeElement | undefined;
 
-/** Hands a fake to code typed against the real DOM. */
 export function asElement(fake: FakeElement): HTMLElement {
   return fake as unknown as HTMLElement;
 }

@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import { mountOpening } from "../../../src/browser/dom/opening-overlay.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
-/**
- * The page as far as the overlay touches it: the Esc listener and the element
- * holding focus. Listeners removed by identity, so a leak shows as a second close.
- */
+/** Listeners removed by identity, so a leak shows as a second close. */
 class FakeDocument {
   activeElement: FakeNode | null = null;
   private listeners = new Map<string, ((event: unknown) => void)[]>();
@@ -60,7 +57,6 @@ function mounted(t: TestContext, intents: string[], held?: FakeNode): Mounted {
   return state;
 }
 
-/** Where each sheet stands: peeled away, on top, or still to come. */
 function places(root: FakeNode): (string | undefined)[] {
   return root.querySelectorAll(".lsr-opening-sheet").map((sheet) => sheet.dataset.at);
 }
@@ -79,7 +75,6 @@ function press(root: FakeNode, index: number): void {
   button.dispatch("click", {});
 }
 
-/** The room itself: what the flare and the flood are written on. */
 function room(root: FakeNode): FakeNode {
   const field = root.querySelector(".lsr-opening-overlay");
   assert.ok(field, "the stack is in a room");

@@ -8,10 +8,7 @@ import {
 import type { ReplayComment, ReplayData } from "../../../src/rounds/replay.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
-/**
- * The page as far as the overlay touches it: the Esc listener and the element
- * holding focus. Listeners removed by identity, so a leak shows as a second close.
- */
+/** Listeners removed by identity, so a leak shows as a second close. */
 class FakeDocument {
   activeElement: FakeNode | null = null;
   private listeners = new Map<string, ((event: unknown) => void)[]>();

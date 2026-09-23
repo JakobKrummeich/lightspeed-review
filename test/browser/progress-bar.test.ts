@@ -149,7 +149,7 @@ test("a review with nothing in it says so instead of drawing an empty bar", () =
   }
 });
 
-/** The same two chapters, with the bulk where the ordering leaves it: last. */
+/** The bulk where the ordering leaves it: last. */
 const tiered = [groups[0]!, { ...groups[1]!, tier: "sweep" as const }];
 
 test("a swept chapter is marked on the bar, and a studied one is not", () => {

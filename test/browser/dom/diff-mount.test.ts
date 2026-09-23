@@ -24,7 +24,7 @@ function group(name: string, paths: string[]): DiffGroup {
   return { name, rationale: `why ${name}`, files: paths.map(file) };
 }
 
-/** For tests needing a real diff. Extension gates highlighting: `.txt` has no grammar, `.ts` does. */
+/** Extension gates highlighting: `.txt` has no grammar, `.ts` does. */
 function textFile(path: string): DiffFile {
   return {
     path,
@@ -36,7 +36,6 @@ function textFile(path: string): DiffFile {
   };
 }
 
-/** Prior rounds' conversation, for the last-round-feedback tests; default is an unspoken review. */
 type History = Pick<SessionData, "conversation" | "rounds">;
 
 const FIRST_ROUND: History = {
@@ -44,7 +43,6 @@ const FIRST_ROUND: History = {
   rounds: [{ index: 0, at: "2025-01-01T00:00:00.000Z" }],
 };
 
-/** A second round, opened after the reviewer annotated these files in the first. */
 function answered(paths: string[]): History {
   return {
     conversation: [
@@ -87,63 +85,44 @@ function session(
   };
 }
 
-/** What the fake server answers when a file's approved form is asked for. */
 interface FormAnswer {
   data?: ApprovedFormData;
-  /** Set when the server has no such answer, which is a 404 on the wire. */
   missing?: boolean;
 }
 
 interface MountOptions {
   approval?: Record<string, Approval>;
   form?: FormAnswer;
-  /** What the server hands over for the file's whole new side; absent is a 404. */
   contents?: string;
   history?: History;
-  /** What the reviewer had open when they were last on this round. */
   open?: OpenFolds;
-  /** The chapter focus mode was on when they were last on this round. */
   focus?: number;
 }
 
 interface Mounted {
   root: FakeElement;
-  /** The element the review scrolls in, which is what an anchored fold is paid out of. */
   scroller: FakeElement;
   progress: FakeElement;
   view: MountedDiff;
-  /** Every path this page posted as approved, oldest call first. */
   posted: string[][];
-  /** Every fetched-form URL this page asked for — either endpoint — oldest first. */
   asked: string[];
-  /** Every report of whether the whole review is approved, oldest first. */
   reported: boolean[];
-  /** Every report of what stands open, oldest first. */
   opened: OpenFolds[];
-  /** Every report of the focused chapter, oldest first. */
   focused: (number | undefined)[];
-  /** Every whole-file read the highlighting pass made, which is how it is counted. */
   read: string[];
-  /** The press on a chapter's gate: the control that stands for the whole chapter's fold. */
   gatePress(index: number): FakeElement;
-  /** The card's file list: a `<details>` the browser folds, which the mount only keeps. */
+  /** A `<details>` the browser folds; the mount only keeps it. */
   fileList(index: number): FakeElement;
   groupContent(index: number): FakeElement;
   groupTick(index: number): FakeInput;
   fileHeader(path: string): FakeElement;
-  /** The row the file's tick sits in, which is what a tick holds still. */
   fileFoot(path: string): FakeElement;
   fileTick(path: string): FakeInput;
-  /** The reviewer pressing "Read the diff", which is what opens a chapter. */
   open(index: number): void;
-  /** The same for one file, whose header is its own toggle. */
   openFile(path: string): void;
-  /** The reviewer ticking a box, which is a change event with a new state. */
   tick(box: FakeInput, checked: boolean): void;
-  /** The reviewer pressing one side of a file's own diff switch. */
   pickForm(path: string, form: string): void;
   fileBlock(path: string): FakeElement;
-  /** Lets the toggle's fetch and its handler run before anything is asserted. */
   settle(): Promise<void>;
   /** Polls for the highlighting pass: grammars are dynamic imports, several awaits deep, so ticks can't count it. */
   until(ready: () => boolean, what: string): Promise<void>;
@@ -285,7 +264,6 @@ test("ticking a group's last file shuts the group and marks it approved", async 
 
   page.tick(page.fileTick("b.png"), true);
 
-  // Nothing left in it to read: the chapter shuts back onto the card it opened behind.
   assert.equal(isOpen(page.gatePress(0)), false);
   assert.equal(page.groupContent(0).hidden, true);
   assert.equal(page.groupTick(0).checked, true);
@@ -295,7 +273,6 @@ test("ticking a group's last file shuts the group and marks it approved", async 
 test("unticking a file in an approved group opens that file again, under the diff already up", async (t) => {
   const page = mount(t, [group("API", ["a.png", "b.png"])], ["a.png"], { focus: 0 });
   page.open(0);
-  // Read to the end, which is what shuts a chapter and marks it.
   page.tick(page.fileTick("b.png"), true);
   assert.equal(isOpen(page.gatePress(0)), false);
   // A file's tick is under its lines, so reaching it means the diff is up again.
@@ -303,7 +280,6 @@ test("unticking a file in an approved group opens that file again, under the dif
 
   page.tick(page.fileTick("a.png"), false);
 
-  // Untick is asking to look at that file again; the chapter stays as it was left.
   assert.equal(isOpen(page.fileHeader("a.png")), true);
   assert.equal(isOpen(page.gatePress(0)), true);
   assert.equal(page.groupTick(0).checked, false);
@@ -372,7 +348,6 @@ test("a tick that flips a chapter the page is not showing folds nothing", async 
   assert.equal(page.reported.at(-1), true, "and the review is done either way");
 });
 
-/** Three chapters to read in order; `approved` decides which are already done. */
 const threeChapters = (): DiffGroup[] => [
   group("API", ["a.png"]),
   group("Docs", ["b.png"]),
@@ -451,9 +426,7 @@ test("unticking a finished chapter on its card leaves it there, shut and moving 
 });
 
 test("an unread chapter's card offers its tick too, and it moves on the way the diff's does", (t) => {
-  // Every card carries the chapter's tick: a chapter can be settled from its
-  // card as well as from under its lines. The press is the tick's own, so the
-  // card is not opened on the way.
+  // The press is the tick's own, so the card is not opened on the way.
   const page = mount(t, threeChapters(), [], { focus: 0 });
 
   page.tick(page.groupTick(0), true);
@@ -754,7 +727,6 @@ test("switching layout keeps the approved form without asking git again", async 
   assert.match(diffText(page), /Feedback is off in this view/);
 });
 
-/** Two rounds whose recorded blobs prove notes.txt moved between them, unapproved. */
 const CHANGED_ROUNDS: History = {
   conversation: [],
   rounds: [
@@ -771,7 +743,6 @@ const CHANGED_ROUNDS: History = {
   ],
 };
 
-/** A file the agent edited between rounds without ever holding an approval. */
 function changedRoundsPage(t: TestContext, form: FormAnswer): Mounted {
   return mount(t, [{ name: "API", rationale: "why API", files: [textFile("notes.txt")] }], [], {
     form,
@@ -856,7 +827,6 @@ test("a new round asks for the last-round diff again, like every fetched form", 
   assert.equal(page.asked.length, 2, "the new round's diff is a new question");
 });
 
-/** A file with the plainest of switches: modified, no approval history, no grammar. */
 function wholeFilePage(t: TestContext, contents?: string): Mounted {
   return mount(t, [{ name: "API", rationale: "why API", files: [textFile("notes.txt")] }], [], {
     focus: 0,
@@ -1331,8 +1301,7 @@ test("a new round opens as it is rendered, not as the round before it was left",
   assert.equal(page.root.querySelector(".lsr-group"), null, "the new round is a survey again");
   press(page, `.lsr-index-entry[data-group-index="0"]`);
 
-  // b.png was left shut last round; the new round opens as rendered, not as left — and the
-  // chapter behind its gate again, because entering one is entering one.
+  // The chapter is behind its gate again: entering one is entering one.
   assert.equal(isOpen(page.fileHeader("a.png")), true);
   assert.deepEqual(page.opened.at(-1), { groups: [], files: ["a.png", "c.png"] });
 });
@@ -1392,7 +1361,6 @@ test("a file a new round no longer has is not reported as open", (t) => {
   assert.deepEqual(page.opened.at(-1), { groups: [], files: ["b.png"] });
 });
 
-/** The reviewer pressing something in the focus bar, or an index entry. */
 function press(page: Mounted, selector: string): void {
   const target = page.root.querySelector(selector);
   assert.ok(target, `the page rendered ${selector}`);
@@ -1419,7 +1387,6 @@ test("pressing an index entry focuses that chapter and nothing else is rendered"
   assert.equal(page.groupContent(1).hidden, false, "and the press behind it is the diff");
 });
 
-/** A survey with one chapter to read and one of bulk, as the grouping tiered them. */
 function sweptPage(t: TestContext): Mounted {
   return mount(t, [
     group("API", ["a.png"]),
@@ -1432,9 +1399,7 @@ test("the lane's one press ticks every file of every swept chapter", (t) => {
 
   press(page, ".lsr-sweep-approve");
 
-  // The same POST one tick makes, carrying the whole lane.
   assert.deepEqual(page.posted, [["b.png", "c.png"]]);
-  // The survey is redrawn, so the rows say where the review now stands.
   assert.match(page.root.querySelector(".lsr-sweep")?.textContent ?? "", /2\/2 approved/);
   assert.equal(page.progress.querySelectorAll(".lsr-progress-segment").length, 2);
 });
@@ -1473,8 +1438,6 @@ test("leaving a chapter renders the survey again, and only the survey", (t) => {
 });
 
 test("every way into a chapter lands on its gate, the one just read included", (t) => {
-  // Entering a chapter is entering a chapter: stepping sideways into the next one, and coming
-  // back to the one whose diff was already open, both start on the card again.
   const page = mount(t, [group("API", ["a.png"]), group("Docs", ["b.png"])]);
   press(page, `.lsr-index-entry[data-group-index="0"]`);
   page.open(0);

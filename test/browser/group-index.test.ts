@@ -77,8 +77,7 @@ test("an entry shows file count, line counts and approvals", () => {
 });
 
 test("the index singles no group out: every entry reads the same", () => {
-  // A mark that says where to start moved between redraws and told the reviewer
-  // nothing; the index is a plain list, and the entries carry counts only.
+  // A mark that says where to start moved between redraws and told the reviewer nothing.
   const html = renderGroupIndex(groups, []);
 
   assert.doesNotMatch(html, /start here/);
@@ -93,10 +92,10 @@ test("the index singles no group out: every entry reads the same", () => {
 });
 
 /**
- * The rule the rationale moved out under: either the reviewer should read what
- * a chapter is for, and then it must be set as though they should — which is
- * the chapter's own gate, one screen holding nothing else — or they should not,
- * and then a clamped grey line of it here is a line nobody reads twice.
+ * Either the reviewer should read what a chapter is for, and then it must be set
+ * as though they should — the chapter's own gate, one screen holding nothing
+ * else — or they should not, and a clamped grey line of it here is a line
+ * nobody reads twice.
  */
 test("an entry says how big a chapter is, never what it is for", () => {
   const html = renderGroupIndex([group("Auth", [file("src/auth.ts")])], []);
@@ -119,7 +118,6 @@ test("no groups is no index at all", () => {
   assert.equal(renderGroupIndex([], []), "");
 });
 
-/** A chapter of bulk: the model tiered it `sweep`, and the code agreed. */
 function swept(name: string, files: DiffFile[]): DiffGroup {
   return { ...group(name, files), tier: "sweep" };
 }
@@ -144,7 +142,6 @@ test("swept chapters are collected below the studied ones, in one lane", () => {
   const order = [...html.matchAll(/data-group-index="(\d)"|class="(lsr-sweep)"/g)].map(
     (match) => match[1] ?? match[2],
   );
-  // The studied chapter first, then the lane, then the two chapters inside it.
   // The indices only ascend because the array already ends with its bulk
   // (`trailSweeps`): the lane is a heading over the tail, and this cut moves
   // nothing — see `test/browser/chapter-order.test.ts` for the invariant.
@@ -154,7 +151,7 @@ test("swept chapters are collected below the studied ones, in one lane", () => {
 test("a chapter in the lane is pressable exactly as one above it", () => {
   const html = renderGroupIndex(mixed, ["src/a.ts"]);
 
-  // Same button, same counts, and its own index: the lane moves rows, not the way in.
+  // The lane moves rows, not the way in.
   assert.match(
     html,
     /<button type="button" class="lsr-index-entry" data-group-index="1">[\s\S]*?1\/2 approved/,
@@ -181,7 +178,6 @@ test("the lane's press is a union, never a toggle: a second one undoes nothing",
 
   assert.deepEqual(once, ["src/db.ts", "src/a.ts", "src/b.ts", "README.md"]);
   assert.deepEqual(sweepApproved(mixed, once), once);
-  // A studied chapter is never ticked from here.
   assert.deepEqual(sweepApproved(groups, []), []);
 });
 

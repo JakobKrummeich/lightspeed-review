@@ -86,7 +86,6 @@ test("a field reporting no caret takes the newline at its end", () => {
   assert.equal(box.selectionStart, 4);
 });
 
-/** Stands a browser's `execCommand` up for one test, restoring the global after. */
 function stubExecCommand(t: TestContext, inserts: boolean): { calls: unknown[][] } {
   const calls: unknown[][] = [];
   const globals = globalThis as Record<string, unknown>;

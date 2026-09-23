@@ -79,7 +79,6 @@ export class FakeElement {
   }
 }
 
-/** Hands a fake to code typed against the real DOM. */
 export function asElement(fake: FakeElement): Element {
   return fake as unknown as Element;
 }
@@ -94,15 +93,14 @@ export function asRange(bounds: {
   return bounds as unknown as Range;
 }
 
-/** One end of a range: the node the boundary sits in, and how far into it. */
 export interface FakeBoundary {
   node: FakeNode;
   offset: number;
 }
 
 /**
- * Enter/exit numbering per node from one walk. Two numbers, not one flat index: a range boundary
- * can sit *between* children, as browsers report a drag ending on a row or cell.
+ * Two numbers, not one flat index: a range boundary can sit *between* children,
+ * as browsers report a drag ending on a row or cell.
  */
 function spansUnder(root: FakeNode): Map<FakeNode, { enter: number; exit: number }> {
   const spans = new Map<FakeNode, { enter: number; exit: number }>();
@@ -117,8 +115,8 @@ function spansUnder(root: FakeNode): Map<FakeNode, { enter: number; exit: number
 }
 
 /**
- * A range answering `intersectsNode` off the walk above. Over-inclusive at the edges like a
- * browser: a merely touched node counts, which the fragment builder must drop itself.
+ * Over-inclusive at the edges like a browser: a merely touched node counts,
+ * which the fragment builder must drop itself.
  */
 export function fakeRange(root: FakeElement, start: FakeBoundary, end: FakeBoundary): Range {
   const spans = spansUnder(root);
@@ -160,7 +158,7 @@ export function asSelection(range: Range | undefined, collapsed = range === unde
 const element = (tag: string, classes: string[], text = ""): FakeElement =>
   new FakeElement(tag, classes, text);
 
-/** One rendered diff line as diff2html builds it: prefix and code in sibling spans, the code cut into highlight spans. */
+/** As diff2html builds a line: prefix and code in sibling spans, the code cut into highlight spans. */
 export function codeLine(
   prefix: string,
   pieces: string[],
@@ -179,18 +177,15 @@ export function codeLine(
   };
 }
 
-/** One line of a fake file block: its gutter numbers, its marker and its code. */
 export interface FakeDiffLine {
   old?: number;
   new?: number;
   prefix: string;
-  /** The code, in the pieces the highlighter cuts it into. */
   pieces: string[];
 }
 
 export type FakeCodeLine = ReturnType<typeof codeLine>;
 
-/** A unified file block as the diff view renders one: `.lsr-file` wrapping numbered rows. */
 export function diffFileBlock(options: { file: string; group?: string; lines: FakeDiffLine[] }): {
   block: FakeElement;
   lines: FakeCodeLine[];
@@ -216,8 +211,8 @@ const numberText = (number: number | undefined): string =>
   number === undefined ? "" : String(number);
 
 /**
- * Side-by-side render: two column tables under one `.lsr-file`. Which column holds a line decides
- * its version, so a fragment built here proves the anchor follows the column.
+ * Which column holds a line decides its version, so a fragment built here
+ * proves the anchor follows the column.
  */
 export function sideBySideBlock(options: {
   file: string;
@@ -247,12 +242,10 @@ function sideColumn(lines: FakeDiffLine[]): { column: FakeElement; built: FakeCo
   return { column, built };
 }
 
-/** The container the popup scans, holding one or more file blocks. */
 export function diffRoot(...blocks: FakeElement[]): FakeElement {
   return element("div", ["lsr-diff"]).append(...blocks);
 }
 
-/** A unified row: both numbers in one gutter cell, an empty one for "absent". */
 export function unifiedRow(numbers: { old?: number; new?: number }): {
   row: FakeElement;
   line: FakeElement;
@@ -268,7 +261,6 @@ export function unifiedRow(numbers: { old?: number; new?: number }): {
   return { row, line };
 }
 
-/** A side-by-side file: one table per version, one number per row. */
 export function sideBySideFile(numbers: { old?: number; new?: number }): {
   file: FakeElement;
   oldLine: FakeElement;

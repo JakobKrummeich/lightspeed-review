@@ -30,7 +30,6 @@ const review: ClosedReview = {
 const REVIEWERS: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
 const READING: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
 
-/** An open review nobody is doing anything about, unless the case says so. */
 function banner(over: Partial<StatusState> = {}): StatusState {
   return { status: "open", agentWaiting: false, turn: REVIEWERS, review, ...over };
 }
@@ -113,7 +112,6 @@ test("work with no plan still says which of the two silences it is", () => {
   assert.match(html, /the agent is implementing your feedback/i);
 });
 
-/** The plan is the agent's own text, and it is written into the header. */
 test("a plan cannot inject markup into the header", () => {
   const html = renderStatusBanner(
     banner({
@@ -126,9 +124,8 @@ test("a plan cannot inject markup into the header", () => {
     }),
   );
 
-  // Case-insensitive and open-ended: `<SCRIPT>` and `<script src=x>` are the
-  // same escape, and a regexp that only knows the exact lower-case tag would
-  // pass while the banner served one of the others.
+  // Case-insensitive and open-ended: a regexp that only knows the exact lower-case
+  // tag would pass while the banner served `<SCRIPT>` or `<script src=x>`.
   assert.doesNotMatch(html, /<script/i);
   assert.match(html, /&lt;script&gt;/);
 });

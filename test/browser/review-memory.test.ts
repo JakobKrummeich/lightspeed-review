@@ -10,7 +10,7 @@ import {
 import type { AnnotationPrompt, FeedbackPrompt } from "../../src/session-store.ts";
 import { FakeStorage } from "./fake-storage.ts";
 
-/** A store that answers nothing at all, as a browser with cookies off does. */
+/** As a browser with cookies off has it: every access throws. */
 const blocked: ReviewMemoryStorage = {
   get length(): number {
     throw new Error("storage disabled");
@@ -42,7 +42,6 @@ const annotation: AnnotationPrompt = {
   col_end: 9,
 };
 
-/** What is stored under one review, as JSON, so a test can look at the record. */
 function record(storage: FakeStorage, sessionKey: string): Record<string, unknown> {
   const text = storage.getItem(`lsr:memory:${sessionKey}`);
   assert.ok(text, `${sessionKey} was stored`);
@@ -254,7 +253,6 @@ test("half an anchor sends the annotation unanchored rather than at the wrong li
   ]);
 });
 
-/** The stored shape of one queued annotation, with a field spoiled per case. */
 function storedPill(spoiled: Record<string, unknown>): FakeStorage {
   return new FakeStorage({
     "lsr:memory:abc123": JSON.stringify({
@@ -273,7 +271,6 @@ function storedPill(spoiled: Record<string, unknown>): FakeStorage {
   });
 }
 
-/** What a whole record of `storedPill` restores as, anchor and all. */
 function restoredPill(spoiled: Record<string, unknown>): FeedbackPrompt | undefined {
   return readMemory(storedPill(spoiled), "abc123").pending.at(0);
 }

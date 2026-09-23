@@ -6,10 +6,7 @@ import type { DiffFile } from "../../../src/diff-extract.ts";
 import type { ConversationEntry, FeedbackPrompt } from "../../../src/session-store.ts";
 import { FakeNode } from "./fake-panel-dom.ts";
 
-/**
- * The banner's root, standing in for the one the server rendered. Only
- * `querySelector` is stubbed: one node in, markup out is the mount's whole browser contact.
- */
+/** Only `querySelector` is stubbed: one node in, markup out is the mount's whole browser contact. */
 function stubDocument(t: TestContext): FakeNode {
   const root = new FakeNode("div", 'id="lsr-status-banner"');
   const globals = globalThis as Record<string, unknown>;
@@ -62,7 +59,6 @@ function session(over: Partial<SessionData> = {}): SessionData {
   return Object.assign(base, over);
 }
 
-/** The count the card printed against a label, e.g. `comments sent`. */
 function figure(html: string, label: string): string | undefined {
   const found = new RegExp(
     `lsr-closing-count">([^<]+)</span><span class="lsr-closing-label">${label}<`,

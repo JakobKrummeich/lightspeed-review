@@ -4,7 +4,6 @@ import { wireIntent } from "../../../src/browser/dom/intent-mount.ts";
 import { renderIntent } from "../../../src/browser/intent-view.ts";
 import { asElement, FakeElement, installFakeDom } from "./fake-diff-dom.ts";
 
-/** The section the shell renders, with a round's reasons drawn into it and wired. */
 function block(intents: string[] = ["sign the tokens"]): FakeElement {
   const root = new FakeElement("section", 'id="lsr-intent" class="lsr-intent"');
   installFakeDom(root);

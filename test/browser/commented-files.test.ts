@@ -136,8 +136,6 @@ test("a file matches the comment left on the name it had then", () => {
 });
 
 test("a file renamed since the comment was left is still the file it was left on", () => {
-  // The annotation carries the path as last round's diff named it, and this
-  // round's diff names the same file something else.
   const paths = new Set(["src/api.ts"]);
 
   assert.equal(commentedOn(file("src/http/api.ts", "src/api.ts"), paths), true);

@@ -33,7 +33,6 @@ const AGENTS_TURN: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00
 const oneRound = [{ index: 0, at: "2025-01-01T00:00:00.000Z" }];
 const twoRounds = [...oneRound, { index: 1, at: "2025-01-02T00:00:00.000Z" }];
 
-/** A panel with nothing in it, and whichever of those the test is about. */
 function panelState(over: Partial<PanelState> = {}): PanelState {
   return {
     pending: [],
@@ -104,7 +103,6 @@ test("a declaration without a note, or without a matching id, adds nothing", () 
       conversation: [
         { role: "reviewer", at: "2025-01-01T00:00:00.000Z", roundIndex: 0, prompts: [withId] },
       ],
-      // Files-only declaration for this comment; a note for a comment not here.
       declarations: {
         evt_1: { files: ["src/api/users.ts"], at: "2025-01-01T00:06:00.000Z" },
         evt_9: { note: "about someone else", files: [], at: "2025-01-01T00:06:00.000Z" },
@@ -388,7 +386,6 @@ test("comments in one card stand apart: each prompt is its own block", () => {
   assert.match(html, /<div class="lsr-prompt">/);
 });
 
-/** The agent's question and the reviewer's answer, as `ask` leaves them. */
 const question: FeedbackPrompt = {
   type: "message",
   comment: "should the retry be per-request or per-batch?",
@@ -469,9 +466,8 @@ test("a question escapes like everything else the agent writes", () => {
     }),
   );
 
-  // Case-insensitive and open-ended: `<SCRIPT>` and `<script src=x>` are the
-  // same escape, and a regexp that only knows the exact lower-case tag would
-  // pass while the panel served one of the others.
+  // Case-insensitive and open-ended: a regexp that only knows the exact lower-case
+  // tag would pass while the panel served `<SCRIPT>` or `<script src=x>`.
   assert.doesNotMatch(html, /<script/i);
   assert.match(html, /&lt;script&gt;/);
 });

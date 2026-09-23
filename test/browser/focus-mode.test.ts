@@ -23,7 +23,6 @@ function group(name: string): DiffGroup {
   return { name, rationale: `why ${name}`, files: [file(`src/${name}.ts`)] };
 }
 
-/** A gate drawn for one chapter, with everything not under test at its quietest. */
 function gate(group: DiffGroup, counter = "0/1 approved"): string {
   return renderChapterGate({ group, contentId: "lsr-group-content-0", counter });
 }
@@ -91,7 +90,6 @@ test("the gate says what the chapter is for before it says what is in it", () =>
 
   assert.match(html, /<h2 class="lsr-gate-name">Auth<\/h2>/);
   assert.match(html, /<p class="lsr-gate-rationale">The token expiry check moved\.<\/p>/);
-  // What happened reads before the files it happened to.
   assert.ok(html.indexOf("expiry check") < html.indexOf("lsr-gate-files"));
 });
 
@@ -214,8 +212,8 @@ test("the gate carries the chapter's counter, worded as every other counter is",
 });
 
 test("the press is a real button that names the region it reveals", () => {
-  // Same discipline the group header had: the diff is rendered and shut, and
-  // the button that opens it says so to anything reading the page aloud.
+  // The diff is rendered and shut, and the button that opens it says so to
+  // anything reading the page aloud.
   const html = gate(group("API"));
 
   assert.match(
@@ -228,7 +226,6 @@ test("a sweep chapter's card says why it offers its tick, in the survey's words"
   const html = gate({ ...group("Docs"), tier: "sweep" });
 
   assert.match(html, /<p class="lsr-gate-tier">Mechanical — nothing to decide<\/p>/);
-  // A label on the chapter, under its name and before the sentences about it.
   assert.ok(html.indexOf("lsr-gate-name") < html.indexOf("lsr-gate-tier"));
   assert.ok(html.indexOf("lsr-gate-tier") < html.indexOf("lsr-gate-rationale"));
 });
@@ -250,7 +247,6 @@ test("every word the grouping wrote is escaped, never injected", () => {
   assert.match(html, /&lt;img/);
 });
 
-/** Chapters in reading order, each one file, named by letter so the approved list reads easily. */
 function chapters(...names: string[]): DiffGroup[] {
   return names.map((name) => group(name));
 }

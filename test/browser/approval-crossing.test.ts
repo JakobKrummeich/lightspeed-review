@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { crossings } from "../../src/browser/approval-crossing.ts";
 
-/** A crossing counter, which is all there is to watch here. */
 function watcher(): { report: (complete: boolean) => void; crossed: () => number } {
   let count = 0;
   return { report: crossings(() => (count += 1)), crossed: () => count };

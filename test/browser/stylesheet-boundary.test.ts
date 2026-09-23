@@ -19,33 +19,26 @@ const CEILING = 300; // the same ceiling eslint.config.js puts on src/**/*.ts
 /**
  * Areas allowed past the ceiling, with the size they may not exceed. A budget
  * only ever goes down, and an entry is deleted when its file no longer needs
- * one: `base.css`, the un-split remainder of chrome.css, was carried here from
- * 1,744 content lines to nothing across twelve steps and is gone. New rules go
- * in the area they belong to, never into a file with a budget.
+ * one. New rules go in the area they belong to, never into a file with a
+ * budget. The number is content lines, the unit this file measures and the
+ * unit eslint's `max-lines` counts.
  *
- * The number is content lines, the unit this file measures and the unit
- * eslint's `max-lines` counts.
- *
- * `index.css` is the one area that lands past the ceiling, and it is past it by
- * breadth rather than by depth: the chapter index, the focus bar, the file cards
- * and their tick boxes are one screen of
- * the review, read top to bottom, and several of their rules are about the seam
- * between two of those things — `.lsr-group:has(.lsr-tick-all:checked)
- * .lsr-file` is one. The cascade
- * puts the whole run between the panel and the popup, so splitting it would draw
- * an arbitrary line through one screen rather than a boundary. It stays whole,
- * and it stays listed here so the next area past the ceiling has to argue its
- * case in this comment.
+ * `index.css` is past the ceiling by breadth rather than by depth: the chapter
+ * index, the focus bar, the file cards and their tick boxes are one screen of
+ * the review, read top to bottom, and several of their rules are about the
+ * seam between two of those things — `.lsr-group:has(.lsr-tick-all:checked)
+ * .lsr-file` is one. The cascade puts the whole run between the panel and the
+ * popup, so splitting it would draw an arbitrary line through one screen
+ * rather than a boundary. It stays whole, and it stays listed here so the
+ * next area past the ceiling has to argue its case in this comment.
  */
 const REMAINDER_BUDGET: Record<string, number> = { "index.css": 328 };
 
-/** The area stylesheets the entry imports, in cascade order. */
 function importedNames(): string[] {
   const entry = readFileSync(ENTRY, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   return [...entry.matchAll(/^@import "\.\/css\/([\w.-]+\.css)";$/gm)].map(([, n]) => n ?? "");
 }
 
-/** Lines that are a rule: neither blank nor comment. */
 function contentLines(css: string): number {
   return css
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -79,19 +72,15 @@ test("no area stylesheet is past the ceiling eslint holds every module to", () =
   assert.deepEqual(over, [], `split an area out, or argue the case here:\n${over.join("\n")}`);
 });
 
-/** One render module, the area that paints what it draws, and the markup to read its classes off. */
 interface AreaOwner {
-  /** The module emitting the classes, by the path a grep for one of them lands in. */
   module: string;
-  /** The area stylesheet under `css/` that has to paint every one of them. */
   area: string;
-  /** That module rendered with one of everything it draws. */
+  /** Must draw one of everything the module emits. */
   render: () => string;
   /** A class the render must contain, so a fixture that draws nothing cannot pass. */
   marker: string;
 }
 
-/** A closed review holding one of everything the summary counts. */
 const CLOSED_REVIEW: ClosedReview = {
   groups: [
     {
@@ -121,7 +110,7 @@ const CLOSED_REVIEW: ClosedReview = {
   endedBy: "reviewer",
 };
 
-/** One replay card wearing every part a card can draw: quote, note, and an answer file of each kind. */
+/** Every part a card can draw: quote, note, and an answer file of each kind. */
 const REPLAY_CARD: ReplayComment = {
   id: "c1",
   file: "src/db.ts",
@@ -170,7 +159,6 @@ function replayOverlay(): string {
   ].join("");
 }
 
-/** One fetched form, in the state that draws a diff; the others differ only in `state`. */
 const FETCHED_FORM: ApprovedFormData = {
   path: "src/db.ts",
   paths: ["src/db.ts"],
@@ -181,9 +169,7 @@ const FETCHED_FORM: ApprovedFormData = {
 };
 
 /**
- * Every band the fetched forms draw: the diff with the note above it, the
- * sentence a state with no diff gets instead, and the two the store swaps in
- * while git answers or after it fails. The last two are exported markup rather
+ * Every band the fetched forms draw. The last two are exported markup rather
  * than a render, and `lsr-approved-pending` is drawn nowhere else — leaving
  * them out would leave that class unguarded.
  */
@@ -201,20 +187,18 @@ function approvedForms(): string {
  * Who paints what, module by module: the half of the boundary the import list
  * cannot state. A rule that drifts into another area still reaches the browser
  * — it is served one stylesheet either way — so nothing on screen and no other
- * test says an area has started painting a second module's screen. That is how
- * the 2,916-line file these areas came out of was written, one rule at a time.
+ * test says an area has started painting a second module's screen.
  *
- * One module lands per run: the emitters not listed here are the ones still
- * guarded by nothing, and adding one is an entry plus a fixture — where every
- * class the module draws is painted in one area. Measured 2026-09-01, three of
- * the remaining eleven still are: progress-bar.ts and intent-view.ts
- * (page.css), annotation.ts (popup.css). The rest are a different edit, not
- * this one: diff-view.ts, html-template.ts, conversation-panel.ts,
- * round-offer.ts, status-banner.ts and full-file.ts each draw across two or
- * more areas by design (the `.lsr-switch*` pair sits in code.css and is shared
- * by two modules), and several emit a class no area paints at all
- * (`.lsr-index-item`, `.lsr-focus-prev`, `.lsr-form-option`). Both want a
- * decision about where an area's edge runs that this table has no shape for.
+ * The emitters not listed here are guarded by nothing; adding one is an entry
+ * plus a fixture, where every class the module draws is painted in one area.
+ * Measured 2026-09-01, three of the remaining eleven qualify: progress-bar.ts
+ * and intent-view.ts (page.css), annotation.ts (popup.css). The rest want a
+ * decision about where an area's edge runs that this table has no shape for:
+ * diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts,
+ * status-banner.ts and full-file.ts each draw across two or more areas by
+ * design (the `.lsr-switch*` pair sits in code.css and is shared by two
+ * modules), and several emit a class no area paints at all
+ * (`.lsr-index-item`, `.lsr-focus-prev`, `.lsr-form-option`).
  */
 const AREA_OWNERS: AreaOwner[] = [
   {
@@ -249,7 +233,6 @@ const AREA_OWNERS: AreaOwner[] = [
   },
 ];
 
-/** Every distinct class in a render, however many elements wear it. */
 function classesIn(html: string): string[] {
   return [
     ...new Set(
@@ -258,16 +241,15 @@ function classesIn(html: string): string[] {
   ];
 }
 
-/** One area's rules, comments stripped so a class named in prose does not count as painted. */
+/** Comments stripped so a class named in prose does not count as painted. */
 function areaRules(area: string): string {
   return readFileSync(new URL(area, CSS_DIR), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 /**
- * Whether these rules name this class at all — on its own, inside a compound
- * selector, or under a media query. Naming it is the whole question: an element
- * no rule mentions is an element nobody painted, and it is found on screen or
- * not at all. Which rule paints it is the stylesheet's business, not the test's.
+ * Naming the class anywhere is the whole question: an element no rule mentions
+ * is an element nobody painted. Which rule paints it is the stylesheet's
+ * business, not the test's.
  */
 function paints(rules: string, cls: string): boolean {
   return new RegExp(`\\.${cls}(?![\\w-])`).test(rules);

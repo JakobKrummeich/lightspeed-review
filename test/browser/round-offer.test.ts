@@ -7,7 +7,6 @@ import {
   type ReviewerPlace,
 } from "../../src/browser/round-offer.ts";
 
-/** A reviewer who has just loaded the page and touched nothing. */
 function place(over: Partial<ReviewerPlace> = {}): ReviewerPlace {
   return { scrolled: 0, queued: 0, focus: undefined, ...over };
 }
@@ -54,9 +53,9 @@ test("the popup counts one file the way the offer does", () => {
 });
 
 /**
- * Queue always. Nothing in the page has ever dropped a queued pill on a new
- * round, but a reviewer holding six unsent comments cannot know that — and the
- * cost of guessing wrong is pressing "keep reading" on a round they wanted.
+ * Nothing in the page has ever dropped a queued pill on a new round, but a
+ * reviewer holding six unsent comments cannot know that — and the cost of
+ * guessing wrong is pressing "keep reading" on a round they wanted.
  */
 test("the offer says the reviewer's unsent comments are kept", () => {
   assert.equal(roundOfferLabel(1, 4, 2), "Round 2 is ready · 4 files · 2 comments kept");

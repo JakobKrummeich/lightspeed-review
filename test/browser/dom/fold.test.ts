@@ -9,10 +9,7 @@ import {
 import { FOLD_DURATION_MS, foldProgress } from "../../../src/browser/scroll-anchor.ts";
 import { asElement, FakeElement } from "./fake-diff-dom.ts";
 
-/**
- * Page as a fold sees it: banner, then scroller holding spacer/above/header/content/below —
- * the shape both arithmetic cases need (height above the anchor, foldable block below).
- */
+/** The shape both arithmetic cases need: height above the anchor, a foldable block below. */
 interface Page {
   scroller: FakeElement;
   /** 8000px of review already scrolled through. */
@@ -50,15 +47,11 @@ function page(): Page {
 
 const topOf = (element: FakeElement): number => element.getBoundingClientRect().top;
 
-/** What every caller but a finished group asks for: hold this, wherever it is. */
 const hold = (element: FakeElement): Anchor => ({ element: asElement(element), walk: false });
 
-/** And what a finished group asks for: bring this back onto the screen. */
 const walk = (element: FakeElement): Anchor => ({ element: asElement(element), walk: true });
 
-/** A frame clock the test drives, standing in for the browser's. */
 interface Clock {
-  /** Runs every frame waiting, `ms` later. Returns how many there were. */
   frame(ms: number): number;
   pending(): number;
 }
@@ -315,7 +308,6 @@ test("a second fold of the same block takes it over rather than fighting it", (t
   foldAnchored([{ content: asElement(above), expanded: false, animated: true }], hold(header));
   clock.frame(40);
 
-  // The reviewer changed their mind mid-fold: it opens again from where it got to.
   foldAnchored([{ content: asElement(above), expanded: true, animated: true }], hold(header));
   const resumed = Number.parseFloat(above.style.height);
 
@@ -376,7 +368,7 @@ test("an offset the browser clamps is not mistaken for the reviewer scrolling", 
   assert.equal(topOf(header), 4560, "which is where the anchor was all along");
 });
 
-/** A fixed end to a scroller, whatever its content does: what a browser clamps against. */
+/** A fixed end whatever the content does: what a browser clamps against. */
 function installCap(scroller: FakeElement, cap: number): void {
   let offset = scroller.scrollTop;
   Object.defineProperty(scroller, "scrollTop", {
@@ -392,7 +384,6 @@ test("a change with no fold at all is anchored the same way", () => {
   scroller.scrollTop = 8500;
   const before = topOf(header);
 
-  // Diff-form swap: no animation, no clock, one correction after heights change.
   const returned = anchored(hold(header), () => {
     above.ownHeight = 2000;
     return content;

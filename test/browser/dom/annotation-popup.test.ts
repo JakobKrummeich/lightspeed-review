@@ -13,16 +13,12 @@ import {
   type FakeSelectionRect,
 } from "./fake-popup-dom.ts";
 
-/** Where the reviewer dragged, and the screen they dragged on. */
 interface Drag {
   rect?: Partial<FakeSelectionRect>;
   screen?: Partial<FakeScreen>;
 }
 
-/**
- * The popup over one selected line, drag already played: every test starts
- * here, since the popup only exists once a selection put it on screen.
- */
+/** Every test starts here: the popup only exists once a selection put it on screen. */
 async function popupOverSelection(
   t: TestContext,
   drag: Drag = {},
@@ -58,7 +54,6 @@ async function popupOverSelection(
   return { dom, queued, root, selection };
 }
 
-/** What the popup queued, flattened to the one annotation these tests make. */
 const only = (queued: AnnotationPrompt[][]): AnnotationPrompt | undefined => queued[0]?.[0];
 
 test("a selection puts the popup on screen with a comment box", async (t) => {

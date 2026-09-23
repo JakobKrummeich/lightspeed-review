@@ -17,13 +17,10 @@ import {
 
 const stubRenderer: DiffRenderer = { renderFile: (diff) => `<pre class="stub">${diff}</pre>` };
 
-/** A round nobody left a comment in before, which is what most of these are about. */
 const noComments = new Set<string>();
 
-/** A round whose files all stood still since the last one, ditto. */
 const noChanges = new Set<string>();
 
-/** A draw with everything not under test at its quietest; each test names only what it asserts on. */
 function render(review: Partial<ReviewRender> & Pick<ReviewRender, "groups">): string {
   return renderGroups({
     approved: [],
@@ -35,7 +32,7 @@ function render(review: Partial<ReviewRender> & Pick<ReviewRender, "groups">): s
   });
 }
 
-/** A draw of one chapter — the only view a diff is drawn in; the overview has no headers or rows. */
+/** The only view a diff is drawn in: the overview has no headers or rows. */
 function chapter(review: Partial<ReviewRender> & Pick<ReviewRender, "groups">, focus = 0): string {
   return render({ ...review, focus });
 }
@@ -256,8 +253,7 @@ test("the file tick sits after its diff, where reading the file ends", () => {
 });
 
 test("the chapter's rationale heads it once, on the gate, and never over the diff", () => {
-  // It used to head the first file's diff, where the eye went to the code and the sentence
-  // was never read. Now the gate says it, and the diff below carries no copy of it.
+  // Over the first file's diff the eye went to the code and the sentence was never read.
   const html = chapter({ groups: [group("API", ["a.ts"])] });
   const content = html.slice(html.indexOf(`class="lsr-group-content"`));
 
@@ -308,8 +304,6 @@ test("a binary or oversized file is a file the review is not done without", () =
 
 test("each tick box sits outside the section it marks, so collapsing keeps it", () => {
   const html = chapter({ groups: [group("API", ["a.ts"])] });
-  // A tick nested in the section it marks would vanish exactly when needed; collapsing hides the
-  // content element only, so both ticks stay on screen.
   assert.ok(
     html.indexOf(`class="lsr-group-content"`) < html.indexOf(`class="lsr-tick-all"`),
     "the chapter tick sits below the collapsible content, outside it",
@@ -336,7 +330,7 @@ test("a file approved in an earlier round is dimmed and closed, and says nothing
   assert.match(html, /<div class="lsr-file" data-file="b.ts" data-approval="unapproved"/);
   // The tick and the dimming already say "approved"; a badge would repeat them.
   assert.ok(!html.includes("lsr-file-approval"));
-  // Closed, diff hidden, and left where the group put it: being read is not a reason to move.
+  // Left where the group put it: being read is not a reason to move.
   const blocks = html.split('<div class="lsr-file"');
   assert.match(blocks[1]!, /data-file="a.ts"/);
   assert.match(blocks[1]!, /aria-expanded="false"/);
@@ -379,7 +373,6 @@ test("a file edited after approval offers the second diff, with the branch one p
     /class="lsr-switch-option lsr-form-option" data-form="approved" aria-pressed="false">Since approval</,
   );
   assert.match(html, /aria-label="Which diff to show for a.ts"/);
-  // The whole-file view joins the pair rather than displacing it, and comes last.
   assert.match(
     html,
     /Since approval<\/button>[^]*data-form="full" aria-pressed="false">Whole file</,
@@ -512,7 +505,6 @@ test("a group's files keep the model's order whatever the reviewer approved", ()
   );
 });
 
-/** The same reading from the other side: approving a file moves nothing. */
 test("the order a group renders in is the same before and after a file is approved", () => {
   const groups = [group("API", ["z.ts", "a.ts", "m.ts"])];
   const paths = (html: string): (string | undefined)[] =>

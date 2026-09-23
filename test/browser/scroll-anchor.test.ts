@@ -8,7 +8,7 @@ import {
   type ScrollAnchor,
 } from "../../src/browser/scroll-anchor.ts";
 
-/** A fold of something the reviewer can see, which is the case that must not move. */
+/** An anchor on screen: the case that must not move. */
 function visible(anchor: Partial<ScrollAnchor>): ScrollAnchor {
   return {
     scrollTop: 4000,
@@ -47,8 +47,8 @@ test("no offset is ever negative, however much height a fold near the top gave b
 });
 
 test("an anchor off the top of the screen is held there unless the walk is asked for", () => {
-  // The case the rule turns on: holding never travels, however far up the anchor;
-  // only a caller that says `walkTo` gets a scroll.
+  // Holding never travels, however far up the anchor; only a caller that says
+  // `walkTo` gets a scroll.
   const offScreen = { scrollTop: 4000, beforeTop: -940, afterTop: -940 };
 
   assert.equal(anchoredScrollTop({ ...offScreen, progress: 0 }), 4000);
@@ -91,7 +91,6 @@ test("the height walks from where it started to where it is going", () => {
   assert.equal(foldHeight(800, 0, 0), 800);
   assert.equal(foldHeight(800, 0, 0.25), 600);
   assert.equal(foldHeight(0, 800, 1), 800);
-  // Nothing outside the two ends, whatever a caller hands in.
   assert.equal(foldHeight(800, 0, 2), 0);
   assert.equal(foldHeight(800, 0, -1), 800);
 });

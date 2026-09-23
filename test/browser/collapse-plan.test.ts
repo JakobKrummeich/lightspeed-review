@@ -38,10 +38,9 @@ test("that tick is one movement: the group folds and the file inside it does not
 });
 
 test("unticking a group opens its files and leaves the group's own fold where it is", () => {
-  // An untick is a withdrawal, not a request to read: made on the chapter's
-  // card it must leave the card standing, and made under the lines it must
-  // leave the lines. So the group gets no step either way — only the diff's
-  // own press opens a chapter — and its files open behind whatever it is.
+  // An untick is a withdrawal, not a request to read: it must leave the card
+  // standing, or the lines in place. So the group gets no step either way —
+  // only the diff's own press opens a chapter.
   const plan = tickCollapsePlan(
     [
       { path: "a.ts", approved: false },

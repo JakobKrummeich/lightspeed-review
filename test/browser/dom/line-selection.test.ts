@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { selectionInLine } from "../../../src/browser/dom/line-selection.ts";
 import { FakeElement, asElement, asRange, codeLine, type FakeNode } from "./fake-dom.ts";
 
-/** A range that starts and ends inside the same line, as a drag over it does. */
 const within = (node: FakeNode, start: number, end: number) =>
   asRange({ startContainer: node, startOffset: start, endContainer: node, endOffset: end });
 

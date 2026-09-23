@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { opensFor, renderOpening } from "../../src/browser/opening-view.ts";
 
-/** The sheets of the stack, whole, in the order the markup lays them down. */
 function sheets(html: string): string[] {
   return [...html.matchAll(/<section class="lsr-opening-sheet"[\s\S]*?<\/section>/g)].map(
     ([sheet]) => sheet,
@@ -49,9 +48,9 @@ test("the cover says who it is from and that there is something, and no more", (
 });
 
 test("the cover does not count the reasons: the dots say how many, the sheets say what", () => {
-  // "Four reasons, one at a time." was a line to read before the reasons
-  // could be; a cover with nothing to say in a body has no body element,
-  // rather than an empty paragraph the stylesheet would still lay out.
+  // "Four reasons, one at a time." was a line to read before the reasons could
+  // be; a cover with nothing to say has no body element, rather than an empty
+  // paragraph the stylesheet would still lay out.
   const cover = sheets(renderOpening(["one", "two", "three", "four"]))[0] ?? "";
 
   assert.doesNotMatch(cover, /reason/);
@@ -71,8 +70,8 @@ test("a reason sheet carries the reason and the way on, and nothing else", () =>
 });
 
 test("each reason says which of how many it is, to whoever cannot see the dots", () => {
-  // The counter costs no pixels now: it is the reason section's own label, so
-  // a screen reader still hears how far through the stack it is.
+  // The counter is the reason section's own label, so a screen reader still
+  // hears how far through the stack it is.
   const labels = sheets(renderOpening(["one", "two", "three"])).map((sheet) =>
     attribute(sheet, "aria-label"),
   );
@@ -166,7 +165,6 @@ test("a round that stated no reason has nothing to unwrap", () => {
   assert.equal(renderOpening([]), "");
 });
 
-/** The one review that opens: everything else below is one field off it. */
 const FIRST_ROUND = {
   round: 0,
   intents: ["sign the tokens"],
