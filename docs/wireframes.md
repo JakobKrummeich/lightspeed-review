@@ -146,7 +146,7 @@ diff rendered but shut behind one press.
 │ ‹ All chapters                    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar
 │   ┌─ section.lsr-group (shut: 84ch, centred, lifted) ────┐        │
 │   │ Chapter name                                         │        │ .lsr-gate-name (title)
-│   │ What happened, one sentence.                         │        │ .lsr-gate-rationale (lead)
+│   │ ┃ What happened, one sentence.                       │        │ .lsr-gate-rationale (lead, strong, 500, accent bar)
 │   │ ▸ 2 files · +16 −3                                   │        │ details.lsr-gate-files / -summary (shut)
 │   │   src/path/file.ts              +12 −3               │        │ .lsr-gate-files-list / -file, once opened
 │   │   src/old/a.ts → src/new/a.ts   moved · +4 −0        │        │ .lsr-gate-path / -lines
@@ -198,6 +198,14 @@ held is the diff's:
   diff, they never do. A sweep chapter's card says why its tick is the press
   to make, under a `.lsr-gate-tier` label in the survey lane's words: there is
   nothing in it to decide.
+- The rationale is the chapter's subtitle and the one sentence the card is
+  there to have read before the press, so `.lsr-gate-rationale` is marked, not
+  merely unmuted: `--lsr-strong` ink, weight 500 — a half-step under the
+  name's 600, so the two never read as one heading — and a 3px
+  `--lsr-accent` bar down its left edge, the agent's speaker bar from the
+  conversation, since the sentence is the model's. The bar's width comes back
+  off the padding (`calc(var(--lsr-space-4) - 3px)`), so its words share the
+  files summary's edge below.
 - The file list is folded behind one line — `<details class="lsr-gate-files">`,
   its `.lsr-gate-files-summary` reading `2 files · +16 −3` in the survey's own
   words — because the count and the size are what a card is read for at a

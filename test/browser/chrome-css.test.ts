@@ -251,6 +251,23 @@ test("the chapter's rationale is set to be read, not to be skipped past", () => 
     /\.lsr-gate-(rationale|name)[^{]*\{[^}]*color: var\(--lsr-muted\)/,
     "nothing else may mute it either",
   );
+  // Not muting it is not enough: set in body weight and body ink, the one
+  // sentence the reviewer must read before pressing through was the one skimmed.
+  assert.match(sentence, /color: var\(--lsr-strong\);/);
+  assert.match(sentence, /font-weight: 500;/);
+  assert.match(sentence, /border-left: 3px solid var\(--lsr-accent\);/);
+  // The bar's 3px come back off the padding, so the words share the files
+  // summary's edge below them rather than sitting a pixel short of it.
+  assert.match(sentence, /padding-left: calc\(var\(--lsr-space-4\) - 3px\);/);
+  assert.match(
+    rulesFor(".lsr-gate-files-summary").join(""),
+    /padding: 0 0 0 var\(--lsr-space-4\);/,
+  );
+  // Set in the name's weight, name and sentence read as one heading.
+  const name = rulesFor(".lsr-gate-name").join("");
+  const weight = (body: string) => /font-weight: (\d+);/.exec(body)?.[1];
+  assert.doesNotMatch(sentence, /font-weight: 600;/);
+  assert.notEqual(weight(sentence), weight(name), "the sentence reads as part of the heading");
   // And the card goes away the moment the diff is up: the room is the diff's.
   assert.match(
     rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="true"]) .lsr-gate').join(""),
