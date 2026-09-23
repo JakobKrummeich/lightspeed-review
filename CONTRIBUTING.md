@@ -7,7 +7,7 @@ pnpm install
 cp .lightspeed.conf.example.json .lightspeed.conf.json   # only to review this repo with lightspeed itself
 ```
 
-Node >= 22.18. Tests and the CLI run TypeScript sources directly, so there is
+Node >= 22.19. Tests and the CLI run TypeScript sources directly, so there is
 nothing to build before working; `dist/` is built by `pnpm run build` and is not
 checked in.
 

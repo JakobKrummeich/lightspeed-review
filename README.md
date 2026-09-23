@@ -63,7 +63,7 @@ root-owned, rather than asking for a sudo. To upgrade: `git pull &&
 dev dependency that builds the bundle. Install from a clone, or from a tarball
 made with `npm pack`.)
 
-Requires Node >= 22.18 and a `.lightspeed.conf.json` in the repo root of every
+Requires Node >= 22.19 and a `.lightspeed.conf.json` in the repo root of every
 repository you review, which is the next section.
 
 Sessions and the feedback ledger live in `~/.lightspeed` — state left behind by
