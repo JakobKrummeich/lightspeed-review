@@ -49,7 +49,7 @@ Developer working in TUI with Pi agent:
 
 ## Tech Stack
 
-- **Runtime:** Node.js ≥22.18 (ESM). Native type stripping — `node src/cli.ts` runs TypeScript directly, verified on 22.22.
+- **Runtime:** Node.js ≥22.19 (ESM). Native type stripping — `node src/cli.ts` runs TypeScript directly, verified on 22.22.
 - **Language:** **TypeScript** (`.ts` sources, `tsc --noEmit` typecheck, no separate runtime step)
 - **AXI SDK:** `axi-sdk-js` (MIT) — provides `runAxiCli`, TOON output, structured errors
 - **Server:** `node:http` + a ~60-line router (6 routes total). No Express — nothing to learn, zero dep. **D1 decided.** Capability parity confirmed: the annotation popup, selection handling and conversation panel are pure client-side code; the server only serves HTML, JSON and an SSE stream, all of which `node:http` does natively.
@@ -800,7 +800,7 @@ Only one state is stated on screen: `needs-reapproval` carries the amber pill `c
 6. **LLM:** CLI owns prompts, uses the pi-ai **SDK** in-process, Pi-only MVP
 7. **Multi-session:** Explicit `<branch> [base]` args per command; key = hash(repo+branch+base)
 8. **Interface style:** AXI — TOON, content-first, contextual disclosure, structured errors
-9. **Language:** TypeScript, run directly by Node ≥22.18 type stripping
+9. **Language:** TypeScript, run directly by Node ≥22.19 type stripping
 10. **Config:** `.lightspeed.conf.json` in repo root; `model`/`thinking` required, fail fast. No env vars
 11. **Ordering:** LLM returns an ordered array; position is the order, no `order` field
 12. **Grouping threshold:** ≤7 changed files → skip the LLM
