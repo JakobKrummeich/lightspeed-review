@@ -407,29 +407,31 @@ test("each voice of the sidechat is one hue, worn as a bar down the card and on 
   // the pills sharing the base padding.
   assert.match(card, /padding-left: calc\(var\(--lsr-space-3\) - 3px\);/);
 
+  // Two fifths hue: the night reviewer's card is the ceiling, where the violet is 4.67:1 at
+  // two fifths and 4.52:1 at half (paper 6.10:1); the accent on the agent's card is 6.14:1.
   assert.match(
     rulesFor(".lsr-entry[data-role] .lsr-entry-role").join(""),
-    /color: color-mix\(in oklab, var\(--lsr-speaker\) 80%, var\(--lsr-text\)\);/,
+    /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
   );
 });
 
 test("the reviewer's bubble is violet and the agent's is grey, on every round", () => {
   // Neutral against violet, not cobalt against violet: at 14% each, a cobalt card and a violet
-  // card differ by 0.010 of oklab lightness on paper and 0.008 at night, one hue step apart for
-  // whoever cannot tell the two blues apart; the grey card sits 0.038 and 0.039 away. 14% is
-  // the night scheme's ceiling for AAA body text on the violet card (7.36:1; 7.01:1 at 16%),
-  // and 5% of ink is the grey that reads as a card on the light panel (1.07:1) without closing
-  // on the violet one.
+  // card differ by 0.021 of oklab lightness on paper and 0.018 at night, one hue step apart for
+  // whoever cannot tell the two blues apart; the grey card sits 0.080 and 0.083 away. 30% is
+  // 0.154 of lightness off the card's base on paper and 0.146 at night, and where the night
+  // labels stop it: at 32% the widest violet label that clears AA is 4.51:1, at 30% 4.67:1.
+  // 11% of ink is 0.074 and 0.064 off the base, and 0.063 and 0.104 off the panel.
   const reviewer = rulesFor('.lsr-entry[data-role="reviewer"]').join("");
   assert.match(
     reviewer,
-    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-violet\) 14%, var\(--lsr-raised\)\);/,
+    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-violet\) 30%, var\(--lsr-raised\)\);/,
   );
 
   const agent = rulesFor('.lsr-entry[data-role="agent"]').join("");
   assert.match(
     agent,
-    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-text\) 5%, var\(--lsr-raised\)\);/,
+    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-text\) 11%, var\(--lsr-raised\)\);/,
   );
   assert.doesNotMatch(
     agent,
@@ -447,31 +449,34 @@ test("the reviewer's bubble is violet and the agent's is grey, on every round", 
 });
 
 test("the small print on a bubble steps toward the text: the caption, and the accent labels", () => {
-  // Muted grey at 80% is under AA on the night reviewer's card from 8% violet (4.48:1); at 60%
-  // it is 4.70:1 on the 14% card. The accent raw is 4.46:1 on the light agent's card and 3.98:1
-  // on the light reviewer's; the same fifth of a step the role label takes puts the question
-  // label at 5.40:1 and the answer label at 4.81:1. Not on hover, which keeps the accent it
-  // answers with.
+  // Every share is set by the night reviewer's card. Muted at 15% is 4.76:1 there (4.58:1 at
+  // 20%; paper 6.81:1). The question label is the card's own voice and takes the role label's
+  // two fifths (6.14:1 on the night agent's card). The answer label is the accent on the
+  // violet, where a quarter is 4.69:1 and two fifths 4.35:1 (paper 6.23:1). Not on hover,
+  // which keeps the accent it answers with.
   const caption = rulesFor(".lsr-entry[data-role] .lsr-prompt-file:not(:hover)").join("");
-  assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 60%, var\(--lsr-text\)\);/);
+  assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 15%, var\(--lsr-text\)\);/);
 
-  for (const label of [".lsr-question-label", ".lsr-prompt-answer-label"]) {
-    assert.match(
-      rulesFor(`.lsr-entry[data-role] ${label}`).join(""),
-      /color: color-mix\(in oklab, var\(--lsr-accent\) 80%, var\(--lsr-text\)\);/,
-      `${label} is left raw on the bubble`,
-    );
-  }
+  assert.match(
+    rulesFor(".lsr-entry[data-role] .lsr-question-label").join(""),
+    /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
+    "the question label is left raw on the bubble",
+  );
+  assert.match(
+    rulesFor(".lsr-entry[data-role] .lsr-prompt-answer-label").join(""),
+    /color: color-mix\(in oklab, var\(--lsr-accent\) 25%, var\(--lsr-text\)\);/,
+    "the answer label is left raw on the bubble",
+  );
 });
 
 test("the seam between two comments is drawn off the bubble, not off the border token", () => {
-  // The border token sits at the bubble's own lightness on the tinted cards: 1.00:1 on the
-  // night reviewer's card, 1.10:1 on the light one. 15% of ink into the bubble is 1.33:1 to
-  // 1.40:1 on every card in both schemes, where the token sat on the plain card (1.28 to 1.36).
+  // The border token sits at the bubble's own lightness on the night agent's card (1.01:1).
+  // A fifth of ink into the bubble is 1.43:1 to 1.55:1 on every card in both schemes; 15% is
+  // 1.30:1 on the light reviewer's, at the floor.
   const seam = rulesFor(".lsr-prompt + .lsr-prompt").join("");
   assert.match(
     seam,
-    /border-top: 1px solid\s+color-mix\(in oklab, var\(--lsr-text\) 15%, var\(--lsr-bubble, var\(--lsr-raised\)\)\);/,
+    /border-top: 1px solid\s+color-mix\(in oklab, var\(--lsr-text\) 20%, var\(--lsr-bubble, var\(--lsr-raised\)\)\);/,
   );
 });
 

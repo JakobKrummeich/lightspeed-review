@@ -109,15 +109,16 @@
  * the word, for whoever cannot tell cobalt from violet.
  *
  * The bubbles are a chat's two, the reviewer's coloured and the agent's grey:
- * cobalt against violet is the rejected pair, since at 14% each the two cards
- * differ by 0.010 of oklab lightness on paper and 0.008 at night, one hue step
- * apart, where the grey card sits 0.038 and 0.039 from the violet one and
- * carries no hue to confuse with it. 14% is the night scheme's ceiling for AAA
- * body text on the violet card (7.36:1; 7.01:1 at 16%), and 5% of ink is the
- * grey that reads as a card on the light panel (1.07:1) without closing on the
- * violet one. Every round keeps its bubbles: a flat earlier card would take
- * the agent's grey off the page, and opacity would take the reviewer's own
- * words down with it.
+ * cobalt against violet is the rejected pair, since at 30% each the two cards
+ * differ by 0.021 of oklab lightness on paper and 0.018 at night, one hue step
+ * apart, where the grey card sits 0.080 and 0.083 from the violet one and
+ * carries no hue to confuse with it. 30% violet is 0.154 of lightness off the
+ * card's base on paper and 0.146 at night, and where the night labels stop it:
+ * at 32% the widest violet label that clears AA on its own card is 4.51:1, at
+ * 30% 4.67:1. 11% of ink is 0.074 and 0.064 off the base and 0.063 and 0.104
+ * off the panel, a grey that is a card on both. Every round keeps its
+ * bubbles: a flat earlier card would take the agent's grey off the page, and
+ * opacity would take the reviewer's own words down with it.
  *
  * The bar is inside the box, so its width comes back off the padding: with it
  * left in, a card's words sat 3px right of the pills that share the base
@@ -125,12 +126,12 @@
  */
 .lsr-entry[data-role="agent"] {
   --lsr-speaker: var(--lsr-accent);
-  --lsr-bubble: color-mix(in oklab, var(--lsr-text) 5%, var(--lsr-raised));
+  --lsr-bubble: color-mix(in oklab, var(--lsr-text) 11%, var(--lsr-raised));
 }
 
 .lsr-entry[data-role="reviewer"] {
   --lsr-speaker: var(--lsr-violet);
-  --lsr-bubble: color-mix(in oklab, var(--lsr-violet) 14%, var(--lsr-raised));
+  --lsr-bubble: color-mix(in oklab, var(--lsr-violet) 30%, var(--lsr-raised));
 }
 
 .lsr-entry[data-role] {
@@ -140,35 +141,33 @@
 }
 
 /*
- * A fifth of the way from the hue to the text, not the hue raw: the bubble
- * takes contrast off everything on the card, and the label is the one thing
- * on it set in the hue. The raw accent is 4.46:1 on the light agent's card;
- * this is 5.40:1 (night 5.66:1), and the raw violet 5.49:1 on the light
- * reviewer's, this 6.18:1 (night 5.71:1).
+ * Two fifths hue, the rest text: the bubble takes contrast off everything on
+ * the card, and the label is the one thing on it set in the hue. The night
+ * reviewer's card sets the share, where the violet is 4.67:1 at two fifths
+ * and 4.52:1 at half (paper 6.10:1); the accent on the agent's card is 6.14:1
+ * (paper 6.99:1). The question label is the card's own voice and takes the
+ * same step.
  */
-.lsr-entry[data-role] .lsr-entry-role {
-  color: color-mix(in oklab, var(--lsr-speaker) 80%, var(--lsr-text));
+.lsr-entry[data-role] .lsr-entry-role,
+.lsr-entry[data-role] .lsr-question-label {
+  color: color-mix(in oklab, var(--lsr-speaker) 40%, var(--lsr-text));
 }
 
 /*
- * Two fifths of the way from muted to the text: at a fifth the caption is
- * under AA on the night reviewer's card from 8% violet (4.48:1), and at two
- * fifths it is 4.70:1 on the 14% card (paper 5.84:1). Not on hover, which
- * keeps the accent it answers with.
+ * The agent's answer sits on the reviewer's violet, where the accent needs a
+ * smaller share than the violet does: a quarter is 4.69:1 at night and two
+ * fifths 4.35:1 (paper 6.23:1).
+ */
+.lsr-entry[data-role] .lsr-prompt-answer-label {
+  color: color-mix(in oklab, var(--lsr-accent) 25%, var(--lsr-text));
+}
+
+/*
+ * Muted at 15%, the rest text: 4.76:1 on the night reviewer's card, 4.58:1 at
+ * 20% (paper 6.81:1). Not on hover, which keeps the accent it answers with.
  */
 .lsr-entry[data-role] .lsr-prompt-file:not(:hover) {
-  color: color-mix(in oklab, var(--lsr-muted) 60%, var(--lsr-text));
-}
-
-/*
- * The accent labels inside a card take the role label's step: raw, the accent
- * is 4.46:1 on the light agent's bubble under the question label and 3.98:1
- * on the light reviewer's under the answer label; stepped, 5.40:1 and 4.81:1
- * (night 5.66:1 and 4.88:1).
- */
-.lsr-entry[data-role] .lsr-question-label,
-.lsr-entry[data-role] .lsr-prompt-answer-label {
-  color: color-mix(in oklab, var(--lsr-accent) 80%, var(--lsr-text));
+  color: color-mix(in oklab, var(--lsr-muted) 15%, var(--lsr-text));
 }
 
 .lsr-entry-role,
@@ -207,13 +206,13 @@
  * The seam between two comments of one turn: without it quote, comment and
  * the next file's caption run into one block at the same indent. Drawn off
  * the bubble rather than with the border token, which sits at the bubble's
- * own lightness on the tinted cards — 1.00:1 on the night reviewer's, 1.10:1
- * on the light one; 15% of ink into the bubble is 1.33:1 to 1.40:1 on every
- * card in both schemes, the token's own 1.28:1 to 1.36:1 on the plain card.
+ * own lightness on the night agent's card (1.01:1). A fifth of ink into the
+ * bubble is 1.43:1 to 1.55:1 on every card in both schemes; 15% is 1.30:1 on
+ * the light reviewer's, at the floor.
  */
 .lsr-prompt + .lsr-prompt {
   border-top: 1px solid
-    color-mix(in oklab, var(--lsr-text) 15%, var(--lsr-bubble, var(--lsr-raised)));
+    color-mix(in oklab, var(--lsr-text) 20%, var(--lsr-bubble, var(--lsr-raised)));
   margin-top: var(--lsr-space-3);
   padding-top: var(--lsr-space-3);
 }

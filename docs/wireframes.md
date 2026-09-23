@@ -301,7 +301,8 @@ Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's
 hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — as a
 3px left bar and the `.lsr-entry-role` label colour; the card itself is the
 voice's bubble on every round, as in a chat: the reviewer's is `--lsr-raised`
-tinted 14% violet, the agent's `--lsr-raised` stepped 5% toward the ink, no hue.
+tinted 30% violet, the agent's `--lsr-raised` stepped 11% toward the ink, no
+hue, and every label on either bubble is stepped toward the text to stay AA.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 
