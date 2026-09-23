@@ -1,8 +1,4 @@
-/**
- * The read side of a review: the page shell, the session payload, whole file
- * contents, approved-form diffs, the between-rounds replay, and static assets.
- * Nothing here writes to the store or the ledger.
- */
+/** The read side of a review: nothing here writes to the store or the ledger. */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readDiffBetween, readFileAtCommit } from "../git-file.ts";
 import { renderReviewPage } from "../html-template.ts";
@@ -72,8 +68,6 @@ export function handleSessionFile(
 }
 
 /**
- * What the agent did to a file since the reviewer approved it: diff from the
- * ticked round's head to the current round's, plus the intervening intents.
  * On demand, not shipped with the session — a git subprocess per file, and most
  * files are never toggled. Only `needs-reapproval` files have one (live ticks
  * deliberately not consulted, so a just-re-ticked page still gets an answer),
@@ -102,13 +96,7 @@ export function handleApprovedForm(
   sendJson(response, 200, approvedFormData(session, path, form));
 }
 
-/**
- * Same question for a never-approved file: the change between the two newest
- * rounds, proven by recorded blob shas. On demand for the same cost reason.
- * Only a file both rounds list with differing blobs has one; `needs-reapproval`
- * files are refused — they carry the approved-form switch instead, one
- * comparison per file, never two.
- */
+/** On demand for the same cost reason; `lastRoundForm` says which files have one. */
 export function handleLastRoundForm(
   context: ServerContext,
   request: IncomingMessage,
@@ -132,12 +120,6 @@ export function handleLastRoundForm(
   sendJson(response, 200, approvedFormData(session, path, form));
 }
 
-/**
- * Between-rounds replay: last round's comments with the agent's declared answer
- * or the mechanical fallback. Recomputed from session + git on every read — the
- * ledger is never consulted, so replay works with it off. First round or no
- * comments answers an empty list: "nothing to replay" is a definitive answer.
- */
 export function handleReplay(
   context: ServerContext,
   _request: IncomingMessage,
@@ -158,8 +140,8 @@ export function handleReplay(
 }
 
 /**
- * Serves the start-time snapshot. The name is a map key, never joined onto a
- * directory: traversal is impossible by construction, not by pattern.
+ * The name is a map key, never joined onto a directory: traversal is impossible
+ * by construction, not by pattern.
  */
 export function handleStatic(
   context: ServerContext,

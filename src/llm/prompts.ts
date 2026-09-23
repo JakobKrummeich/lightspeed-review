@@ -10,9 +10,9 @@ import { GROUPING_SCHEMA_JSON } from "./schema.ts";
 export const MAX_PROMPT_CHARS = 120_000;
 
 /**
- * Cap on the stated intent — the one free-written part of the prompt. A pasted
- * design document used to be unanswerable: 200,000 chars of intent made a
- * 200,171-char prompt, budget or no budget. No honest intent meets this cap.
+ * Cap on the stated intent — the one free-written part of the prompt: a pasted
+ * design document of 200,000 chars made a 200,171-char prompt, budget or no
+ * budget. No honest intent meets this cap.
  */
 export const MAX_INTENT_CHARS = 8_000;
 
@@ -125,7 +125,6 @@ export const GROUPING_SYSTEM_PROMPT = [
   GROUPING_SCHEMA_JSON,
 ].join("\n");
 
-/** One group of the grouping the reviewer read last round, by file path. */
 export interface PreviousGroup {
   name: string;
   files: string[];
@@ -133,11 +132,8 @@ export interface PreviousGroup {
 
 export interface GroupingPromptInput {
   files: DiffFile[];
-  /** Why the branch exists, as the agent that opened the review stated it. */
   intents: string[];
-  /** The grouping the reviewer read last round, in the order they read it. */
   previous?: PreviousGroup[];
-  /** The repository's own classify globs; absent leaves the classifier's defaults alone. */
   classify?: ClassifyConfig;
 }
 
@@ -180,7 +176,6 @@ export function buildGroupingPrompt(input: GroupingPromptInput): string {
   return [header, "", ...sections].join("\n");
 }
 
-/** Follow-up user message that keeps the failed attempt in the conversation. */
 export function buildRepairPrompt(problem: string): string {
   return [
     `That reply was rejected: ${problem}`,
@@ -262,7 +257,6 @@ function dropped(count: number, kept: number, files: number): string {
 }
 
 interface FitInput<T> {
-  /** In the order they will be read; the prefix that fits is what survives. */
   items: T[];
   /** What one item adds to the running total, in characters. */
   cost: (item: T) => number;
@@ -311,10 +305,9 @@ function clip(text: string, limit: number): string {
 }
 
 /**
- * Approval is deliberately not on this line. The model was once told, with a
- * sink-approved-groups rule; both are gone — approval moving the review between
- * rounds is what loses the reviewer their place, and telling without the rule
- * is the same sinking minus the determinism.
+ * Approval is deliberately not on this line: approval moving the review between
+ * rounds is what loses the reviewer their place, and telling the model without
+ * a sink-approved-groups rule is the same sinking minus the determinism.
  */
 function inventoryLine(file: DiffFile, classify?: ClassifyConfig): string {
   const measured = `${file.status}${renameMark(file)}, +${file.insertions}/-${file.deletions}`;
@@ -322,7 +315,6 @@ function inventoryLine(file: DiffFile, classify?: ClassifyConfig): string {
 }
 
 /**
- * What `src/classify.ts` settled about this file, in one word after the numbers.
  * The system prompt already asks for mechanical change to be quarantined last
  * and for scripts, hooks and dependencies to rank high; the mark hands the model
  * the fact instead of asking it to infer one from a path. Guardrail is printed

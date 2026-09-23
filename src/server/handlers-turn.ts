@@ -1,7 +1,6 @@
 /**
- * `lightspeed work "<plan>"`: the agent declaring the silence it is about to
- * keep. The only endpoint gated on the turn, because it is the only one that
- * claims to hold it — speaking, waiting and ending are legal from either side.
+ * The only endpoint gated on the turn, because it is the only one that claims
+ * to hold it — speaking, waiting and ending are legal from either side.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionRecord } from "../session-store.ts";

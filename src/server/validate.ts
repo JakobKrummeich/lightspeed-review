@@ -1,6 +1,6 @@
 /**
- * Request-body parsing for every POST the server takes. All input is untrusted:
- * anything malformed becomes `undefined` (a 400 upstream), never an exception.
+ * All input is untrusted: anything malformed becomes `undefined` (a 400
+ * upstream), never an exception.
  */
 import type { IncomingMessage } from "node:http";
 import {
@@ -12,7 +12,6 @@ import { parseFeedbackRequest } from "../feedback.ts";
 import type { CreateSessionRequest } from "../rounds/session-round.ts";
 import { readJsonSafely, type DomainErrorBody } from "./http.ts";
 
-/** Anything unexpected in a create-session body becomes a 400. */
 export async function parseCreateSession(
   request: IncomingMessage,
 ): Promise<CreateSessionRequest | undefined> {
@@ -39,20 +38,14 @@ export async function parseCreateSession(
   };
 }
 
-/**
- * Untrusted: anything but the three modes is dropped, which reads as `llm` —
- * same as every round from before this was recorded.
- */
 function isGroupingMode(value: unknown): value is "skipped" | "llm" | "fallback" {
   return value === "skipped" || value === "llm" || value === "fallback";
 }
 
-/** Untrusted input: anything that is not a list of strings is an empty list. */
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
 }
 
-/** Commits are optional: a caller that could not resolve them sends neither. */
 function commitsOf(
   baseCommit: unknown,
   headCommit: unknown,
@@ -99,7 +92,6 @@ export async function readReply(request: IncomingMessage): Promise<AgentReply | 
   };
 }
 
-/** The three bodies that would land in the conversation as words nobody said. */
 function rejected(
   body: ReplyBody,
   comment: string | undefined,
@@ -109,27 +101,20 @@ function rejected(
   if (body.comment !== undefined && comment === undefined) return true;
   // A question with nothing to ask is not a question; only spoken words carry it.
   if (body.kind === "question" && comment === undefined) return true;
-  // Neither spoken nor pinned: nothing to deliver at all.
   return comment === undefined && declarations.length === 0;
 }
 
-/** Words the reviewer could read, or nothing. Blank is nothing. */
 function spokenWords(value: unknown): string | undefined {
   if (typeof value !== "string" || value.trim() === "") return undefined;
   return value;
 }
 
-/**
- * `delivered`: the id of the handover the agent is confirming. Untrusted like
- * every body here — an unreadable one is absent, and confirms nothing.
- */
 export async function readDelivered(request: IncomingMessage): Promise<string | undefined> {
   const delivery = (await readJsonSafely<{ delivery?: unknown }>(request))?.delivery;
   if (typeof delivery !== "string" || delivery === "") return undefined;
   return delivery;
 }
 
-/** `work`: the plan the agent is about to go quiet over. */
 export async function readWork(request: IncomingMessage): Promise<string | undefined> {
   const plan = (await readJsonSafely<{ plan?: unknown }>(request))?.plan;
   if (typeof plan !== "string" || plan.trim() === "") return undefined;

@@ -1,7 +1,7 @@
 /**
- * The ledger hooks the handlers call. Each one composes records and hands them
- * to `recordSafely`, which is the only place a write failure is swallowed — so
- * a broken ledger can never change what a handler does next.
+ * Every hook hands its records to `recordSafely`, the only place a write
+ * failure is swallowed — so a broken ledger can never change what a handler
+ * does next.
  */
 import { readDiffBetween } from "../git-file.ts";
 import { outcomeRecords } from "../ledger/outcomes.ts";
@@ -21,15 +21,12 @@ import type { CommentDeclaration } from "../declarations.ts";
 import type { FeedbackPrompt, SessionRecord } from "../session-store.ts";
 import { readSessionFile } from "./session-files.ts";
 
-/** What every hook shares: the store written through, and the id order of this run. */
 export interface LedgerLog {
   /** Absent when `feedbackLog` is `off`: there is then nothing to write through. */
   ledger?: LedgerStore;
-  /** One id source per server: it orders every record this run writes. */
   nextId: IdSource;
 }
 
-/** What `start` prints about the ledger: healthy with a path, off, or degraded. */
 export interface LedgerReport {
   status: "on" | "off" | "degraded";
   path?: string;
@@ -56,9 +53,8 @@ export function logRound(
 }
 
 /**
- * What became of the earlier rounds' annotations, judged now that the agent's
- * answer is a round of its own. Written after the round record, so the ledger
- * reads as: this is the new round, and this is what the last ones came to.
+ * Written after the round record, so the ledger reads as: this is the new
+ * round, and this is what the last ones came to.
  */
 export function logOutcomes(
   log: LedgerLog,
@@ -130,9 +126,9 @@ export function logRoundEnd(log: LedgerLog, session: SessionRecord, now: string)
 }
 
 /**
- * This session's annotations by its round ids. Filters go to the store so the
- * cost is this session's lines, not the whole ledger — this runs inside
- * `POST /api/sessions`. The first round's timestamp bounds the read.
+ * Filters go to the store so the cost is this session's lines, not the whole
+ * ledger — this runs inside `POST /api/sessions`. The first round's timestamp
+ * bounds the read.
  */
 function sessionAnnotations(ledger: LedgerStore, session: SessionRecord): AnnotationRecord[] {
   const rounds = session.rounds

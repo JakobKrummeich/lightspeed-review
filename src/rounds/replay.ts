@@ -16,17 +16,14 @@ import { MAX_APPROVED_FORM_BYTES } from "./approved-form.ts";
 import { changedBetween, currentName, fileApproval, fileHistory } from "./history.ts";
 
 /**
- * Between-rounds replay: last round's comments with the agent's answers. "Last
- * round" is read exactly as the browser's "commented last round" badge reads it
- * (`src/browser/commented-files.ts`, whose `roundOf` this shares) — the two must
- * name the same comments. Recomputed from session + git, never the ledger: the
- * replay must work with the ledger off. Pure: the caller asks git.
+ * "Last round" is read exactly as the browser's "commented last round" badge
+ * reads it (`src/browser/commented-files.ts`, whose `roundOf` this shares) — the
+ * two must name the same comments. Recomputed from session + git, never the
+ * ledger: the replay must work with the ledger off. Pure: the caller asks git.
  */
 
-/** `readDiffBetween` bound to the session's repository. */
 export type ReadBetween = (from: string, to: string, paths: string[]) => DiffBetween;
 
-/** `readFileAtCommit` bound to the same repository, for context slicing. */
 export type ReadFileAt = (commit: string, path: string) => string | undefined;
 
 /**
@@ -45,7 +42,6 @@ export type ReplayStatus = "addressed" | "unchanged" | "repeated" | "unknown";
  */
 export type ReplayState = "ok" | "unrecorded" | "unreachable" | "oversize";
 
-/** One file's contribution to a comment's answer set. */
 export interface ReplayAnswer {
   /** The file's name today — a rename since the comment shows the new name. */
   file: string;
@@ -60,7 +56,6 @@ export interface ReplayAnswer {
   oversized?: true;
 }
 
-/** One card: a comment the reviewer made last round, and what became of it. */
 export interface ReplayComment {
   /** Null on comments stored before ids existed; such a card is never declared. */
   id: string | null;
@@ -70,14 +65,12 @@ export interface ReplayComment {
   anchor: LineAnchor | null;
   selected_text: string;
   comment: string;
-  /** The code around the selection, cut from last round's own commit. */
   context?: string;
   status: ReplayStatus;
   /** Whether the agent declared this comment's answer; false means mechanical. */
   declared: boolean;
   state: ReplayState;
   answers: ReplayAnswer[];
-  /** The agent's per-comment note, present exactly when one was declared. */
   note?: string;
 }
 
@@ -86,7 +79,6 @@ export interface ReplayData {
   comments: ReplayComment[];
 }
 
-/** Everything one card is judged from, shared across the cards of a replay. */
 interface Review {
   session: SessionRecord;
   made: SessionRound;
@@ -105,8 +97,8 @@ export function replayData(
   const rounds = session.rounds;
   const current = rounds.at(-1);
   const made = rounds.at(-2);
-  // A first round, or a session with no rounds: there is no round before this
-  // one, so an empty replay is the definitive answer, not a degraded one.
+  // No round before this one: an empty replay is the definitive answer, not a
+  // degraded one.
   if (current === undefined || made === undefined) return { comments: [] };
   const review: Review = {
     session,
@@ -124,9 +116,8 @@ export function replayData(
 }
 
 /**
- * The reviewer's annotations from the rounds `match` accepts, in the order
- * they were made. Only annotations: a general message is about the review, not
- * a file, and has no code to replay.
+ * Only annotations: a general message is about the review, not a file, and has
+ * no code to replay.
  */
 function annotations(
   conversation: readonly ConversationEntry[],
@@ -233,7 +224,6 @@ function statusOf(review: Review, path: string): ReplayStatus {
   return verdict === "ignored" ? "unchanged" : verdict;
 }
 
-/** The anchor as the card carries it: whole, or honestly absent. */
 function anchorOf(prompt: AnnotationPrompt): LineAnchor | null {
   if (prompt.side === undefined) return null;
   const { side, line_start, line_end, col_start, col_end } = prompt;
@@ -261,7 +251,6 @@ function contextOf(review: Review, prompt: AnnotationPrompt): { context?: string
   return sliced.context === undefined ? {} : { context: sliced.context };
 }
 
-/** The name one side of last round's diff knew the file by. */
 function sideName(made: SessionRound, path: string, side: AnnotationSide): string {
   if (side === "new") return path;
   return made.files.find((entry) => entry.path === path)?.previousPath ?? path;
@@ -297,7 +286,6 @@ function mechanicalAnswers(prompt: AnnotationPrompt, path: string, patch: string
   return [{ ...answer, hunks: anchoredHunks(prompt, answer.hunks) }];
 }
 
-/** A file's hunks, unless its patch outgrew what a card should render. */
 function cappedHunks(file: string, diff: string): ReplayAnswer {
   if (Buffer.byteLength(diff, "utf8") > MAX_APPROVED_FORM_BYTES) {
     return { file, hunks: [], oversized: true };

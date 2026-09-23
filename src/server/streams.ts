@@ -1,8 +1,7 @@
 /**
- * The server's push transport: SSE streams to browser pages and long-poll
- * waiters per session. Every collection lives behind this class so handlers
- * cannot mutate shared transport state directly — half of presence is derived
- * from the pollers, and the other half is read off the stored turn.
+ * Every collection lives behind this class so handlers cannot mutate shared
+ * transport state directly — half of presence is derived from the pollers, and
+ * the other half is read off the stored turn.
  */
 import type { ServerResponse } from "node:http";
 import type { Turn } from "../session-store.ts";
@@ -16,12 +15,10 @@ export type WakeReason = "feedback" | "shutdown";
  */
 export type Waker = (reason: WakeReason) => boolean;
 
-/** The stored turn of one session, or none when no such session is on disk. */
 export type TurnReader = (key: string) => Turn | undefined;
 
 export class SessionTransport {
   private readonly streams = new Map<string, Set<ServerResponse>>();
-  /** Long-polling agents, woken when their session receives feedback or the server stops. */
   private readonly pollers = new Map<string, Set<Waker>>();
 
   /**
@@ -48,7 +45,6 @@ export class SessionTransport {
     this.streams.get(key)?.delete(response);
   }
 
-  /** Several agents may wait on one session; each is parked under its wake call. */
   addPoller(key: string, wake: Waker): void {
     const waiting = this.pollers.get(key) ?? new Set<Waker>();
     waiting.add(wake);
@@ -73,12 +69,10 @@ export class SessionTransport {
     }
   }
 
-  /** Pushes an SSE event to every browser watching one session. */
   publish(key: string, event: string, data: unknown): void {
     for (const response of this.streams.get(key) ?? []) response.write(sseFrame(event, data));
   }
 
-  /** Who is on the review now: a waiter on the wire, and whose turn it is. */
   publishPresence(key: string): void {
     for (const response of this.streams.get(key) ?? []) response.write(this.presenceFrame(key));
   }
@@ -98,7 +92,6 @@ export class SessionTransport {
     });
   }
 
-  /** Open streams plus parked pollers. */
   watcherCount(): number {
     return [...this.streams.values(), ...this.pollers.values()].reduce(
       (total, set) => total + set.size,
@@ -106,7 +99,6 @@ export class SessionTransport {
     );
   }
 
-  /** Shutdown: every poller is told the wait is over, every stream is ended. */
   closeAll(): void {
     for (const waiting of this.pollers.values()) {
       for (const wake of [...waiting]) wake("shutdown");

@@ -1,21 +1,20 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 
 /**
- * Every test file, pulled into one group at the end. The prompt asks and the
- * model does not comply — it pairs each source file with its test; blind review
- * of real diffs wanted the checks in one place at the end. An instruction the
- * model ignores twice is a rule the code should keep, so this runs on every
- * model grouping and on the fallback. Last means last of the chapters a
- * reviewer ranks, behind a chapter the model merely named mechanical: the first
- * shape put tests ahead of mechanical bulk, and a diff whose only other group
- * was mechanical then opened on tests with the intent at the bottom.
+ * The prompt asks for tests in one group at the end — blind review of real
+ * diffs wanted the checks in one place — and the model does not comply: it
+ * pairs each source file with its test. An instruction the model ignores twice
+ * is a rule the code should keep, so this runs on every model grouping and on
+ * the fallback. Last means behind a chapter the model merely named mechanical:
+ * with tests ahead of mechanical bulk, a diff whose only other group was
+ * mechanical opened on tests with the intent at the bottom.
  *
- * A chapter tiered `sweep` is the one thing that now sits behind the tests, and
- * `trailSweeps` puts it there afterwards (`src/group-tier.ts`) rather than this
- * rule letting it through: the survey has drawn swept chapters below the
- * reading since its lane shipped, and the array saying the same is what keeps
- * the bar, the lane and the chapter counter naming one order. Tests are read,
- * so they cannot be filed under a heading that says nothing here needs reading.
+ * A chapter tiered `sweep` is the one thing that sits behind the tests, and
+ * `trailSweeps` (`src/group-tier.ts`) puts it there afterwards rather than this
+ * rule letting it through: the array saying the order the survey draws is what
+ * keeps the bar, the lane and the chapter counter naming one order. Tests are
+ * read, so they cannot be filed under a heading that says nothing here needs
+ * reading.
  */
 export function trailTests(groups: DiffGroup[]): DiffGroup[] {
   const tests = groups.flatMap((group) => group.files.filter((file) => isTestFile(file.path)));
@@ -27,9 +26,8 @@ export function trailTests(groups: DiffGroup[]): DiffGroup[] {
 }
 
 /**
- * Named for what the reviewer does with it, like every other group name, and
- * its rationale says what these files are — true wherever this group lands,
- * including a grouping where it is the only one left.
+ * The rationale says what these files are, not where they sit: it must stay
+ * true in a grouping where this is the only group left.
  */
 function testGroup(files: DiffFile[]): DiffGroup {
   return {
@@ -44,7 +42,6 @@ function testGroup(files: DiffFile[]): DiffGroup {
 }
 
 export interface TestPathConvention {
-  /** The ecosystem and the shape, as someone looking for a missing one reads it. */
   name: string;
   pattern: RegExp;
   /** Paths this rule must claim. Every extension the rule names gets one. */
@@ -95,7 +92,6 @@ export const TEST_PATH_CONVENTIONS: readonly TestPathConvention[] = [
       "src/protest.ts",
       "src/attestation.ts",
       "internal/attest/attest.go",
-      // Rust's unit tests are inside this file, behind `#[cfg(test)]`.
       "src/lib.rs",
     ],
   },
@@ -258,7 +254,6 @@ export const TEST_PATH_CONVENTIONS: readonly TestPathConvention[] = [
   },
 ];
 
-/** Whether any convention claims this path. `src/testing-utils.ts` is not one. */
 export function isTestFile(path: string): boolean {
   return TEST_PATH_CONVENTIONS.some((convention) => convention.pattern.test(path));
 }

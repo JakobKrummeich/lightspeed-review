@@ -1,7 +1,3 @@
-/**
- * The two live connections: the browser's SSE event stream and the agent's
- * long poll. Both register with `SessionTransport`.
- */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { drainPending, type PollPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
@@ -43,8 +39,8 @@ export function handleEvents(
 }
 
 /**
- * Long-poll: blocks until the reviewer sends. No timeout and no heartbeat —
- * the agent is expected to run `wait` in the foreground and wait.
+ * No timeout and no heartbeat — the agent is expected to run `wait` in the
+ * foreground and wait.
  */
 export function handlePoll(
   context: ServerContext,
@@ -79,11 +75,10 @@ export function handlePoll(
     return true;
   };
   context.transport.addPoller(session.key, wake);
-  // Parking is the agent handing the turn back: it is listening, not editing,
-  // and a lock that outlasted the work by a whole round is exactly the stale
-  // Send this design exists to prevent. Done after the poller is on the books,
-  // because the other order announced a waiterless review for one frame — just
-  // as an agent arrived.
+  // Parking hands the turn back: a lock that outlasted the work by a whole round
+  // is exactly the stale Send this design exists to prevent. Done after the
+  // poller is on the books, because the other order announced a waiterless
+  // review for one frame — just as an agent arrived.
   handTurnBack(context, session.key);
   request.on("close", () => {
     context.transport.removePoller(session.key, wake);
@@ -92,9 +87,9 @@ export function handlePoll(
 }
 
 /**
- * The agent confirming it read a handover. Idempotent and unauthenticated like
- * every route here: an id that is not the one in flight confirms nothing, which
- * is what a retry of an already-confirmed delivery looks like.
+ * Idempotent and unauthenticated like every route here: an id that is not the
+ * one in flight confirms nothing, which is what a retry of an already-confirmed
+ * delivery looks like.
  */
 export async function handleDelivered(
   context: ServerContext,
@@ -153,10 +148,9 @@ function deliverFeedback(context: ServerContext, key: string, response: ServerRe
 }
 
 /**
- * The record as the handover leaves it, and the form its answer carries. A
- * payload that hands nothing over is an ended review's account of what it left
- * — read once, acted on once, never shortened — so it takes no turn and spends
- * none of the round's help budget.
+ * A payload that hands nothing over is an ended review's account of what it
+ * left — read once, acted on once, never shortened — so it takes no turn and
+ * spends none of the round's help budget.
  */
 function handOver(
   session: SessionRecord,
@@ -169,10 +163,9 @@ function handOver(
 }
 
 /**
- * The batch held until the agent confirms it, as the two things it adds: the
- * field on the record and the id on the answer, minted together so they cannot
- * disagree. A payload carrying no prompts holds nothing — an ended review with
- * an empty queue has nothing to lose on the way out.
+ * The field on the record and the id on the answer, minted together so they
+ * cannot disagree. A payload carrying no prompts holds nothing — an ended
+ * review with an empty queue has nothing to lose on the way out.
  */
 function heldForConfirmation(
   context: ServerContext,
@@ -217,7 +210,6 @@ function recoverDelivery(context: ServerContext, key: string): void {
   });
 }
 
-/** The record with nothing in flight, spelt once so no writer leaves a stale batch. */
 function withoutDelivery(session: SessionRecord): SessionRecord {
   const settled = { ...session };
   delete settled.delivering;
@@ -225,10 +217,8 @@ function withoutDelivery(session: SessionRecord): SessionRecord {
 }
 
 /**
- * The turn back to the reviewer, published even when it was already theirs: the
- * frame is also how a page learns an agent has arrived on the wire. Parking is
- * the agent saying it is listening rather than editing, which is why it hands
- * back at all.
+ * Published even when the turn was already the reviewer's: the frame is also
+ * how a page learns an agent has arrived on the wire.
  *
  * An agent that declared `work` never reaches here: that poll is refused with
  * `turn_still_yours` at the top of `handlePoll`, which runs to this call without
@@ -245,13 +235,11 @@ function handTurnBack(context: ServerContext, key: string): void {
 }
 
 /**
- * A `wait` from an agent that is mid-edit. Parking would hand the review back
- * under it — the reviewer's Send goes live while the branch is half-written —
- * so the poll is refused with the moves that are actually legal from here:
- * publish the round the work produced, or ask a question, both of which give
- * the turn up deliberately before they block. Those moves come from the same
- * list the commands print, so a refusal and a `help[]` can never disagree about
- * what is legal.
+ * Refused with the moves that are actually legal from here: publish the round
+ * the work produced, or ask a question, both of which give the turn up
+ * deliberately before they block. Those moves come from the same list the
+ * commands print, so a refusal and a `help[]` can never disagree about what is
+ * legal.
  */
 function stillYours(session: SessionRecord): DomainErrorBody {
   return {

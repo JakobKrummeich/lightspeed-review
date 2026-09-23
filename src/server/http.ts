@@ -1,7 +1,3 @@
-/**
- * The wire vocabulary every server module shares: JSON responses, SSE frames,
- * and body reading that treats malformed input as absent rather than an error.
- */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ReviewErrorCode } from "../errors.ts";
 import { readJsonBody } from "../router.ts";
@@ -27,7 +23,6 @@ export function sendJson(response: ServerResponse, status: number, body: unknown
   response.end(JSON.stringify(body));
 }
 
-/** The one 400 every malformed body gets: same shape, handler-specific message. */
 export function badRequest(response: ServerResponse, message: string): void {
   sendJson(response, 400, { error: { code: "invalid_request", message } });
 }

@@ -28,14 +28,8 @@ export const GROUPING_SCHEMA = Type.Object(
 
 export type GroupingReply = Static<typeof GROUPING_SCHEMA>;
 
-/**
- * Inlined into the *system* prompt so the model sees the exact contract while
- * the per-call user message stays pure data — which keeps the whole instruction
- * prefix identical between calls, and so cacheable.
- */
 export const GROUPING_SCHEMA_JSON = JSON.stringify(GROUPING_SCHEMA, null, 2);
 
-/** An accepted reply: the groups exactly as the model sent them. */
 export interface ValidatedGrouping {
   groups: GroupingReply["groups"];
 }

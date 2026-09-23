@@ -13,23 +13,19 @@ import type { SessionTransport } from "./streams.ts";
 
 export interface ServerContext {
   store: SessionStore;
-  /** The ledger hooks' shared context; its id source is `nextId`, below. */
   log: LedgerLog;
   /** Mints round and annotation ids; shared with `log` so one sequence orders the run. */
   nextId: IdSource;
-  /** The browser bundle snapshot taken at server start. */
   assets: AssetSnapshot;
   staticDir: string;
   transport: SessionTransport;
   /** The bound port once listening; the configured port before that. */
   currentPort(): number;
   baseUrl(): string;
-  /** A request's URL resolved against this server's own origin. */
   requestUrl(request: IncomingMessage): URL;
   stop(): Promise<void>;
 }
 
-/** Every route handler: the shared context first, then the plain HTTP triple. */
 export type ContextHandler = (
   context: ServerContext,
   request: IncomingMessage,

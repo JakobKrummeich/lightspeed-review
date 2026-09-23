@@ -1,7 +1,6 @@
 /**
- * The conversation endpoints: the reviewer's approvals and feedback in, the
- * agent's reply back. Everything here writes the store first and the ledger
- * second, so a broken ledger never changes an answer.
+ * Everything here writes the store first and the ledger second, so a broken
+ * ledger never changes an answer.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { validateDeclarations, withDeclarations } from "../declarations.ts";
@@ -98,9 +97,8 @@ export async function handleAgentReply(
     );
     return;
   }
-  // Words spoken into a review that is over reach nobody: the reviewer's page is
-  // showing the closing summary, and only they ask for another round. Refused
-  // the way a tick after the end is refused, rather than filed where nobody looks.
+  // Words spoken into a review that is over reach nobody, and only the reviewer
+  // asks for another round: refused rather than filed where nobody looks.
   if (session.status === "ended") {
     sendJson(response, 409, {
       error: {
@@ -151,9 +149,9 @@ function toldThisRound(
 }
 
 /**
- * The conversation after the agent's words. `say --for <id>` pins its whole
- * answer under one comment and says nothing in the open, so it appends no entry:
- * the same sentence in both places would read as the agent saying it twice.
+ * `say --for <id>` pins its whole answer under one comment and says nothing in
+ * the open, so it appends no entry: the same sentence in both places would read
+ * as the agent saying it twice.
  */
 function spoken(session: SessionRecord, reply: AgentReply, now: string): SessionRecord {
   if (reply.comment === undefined) return session;

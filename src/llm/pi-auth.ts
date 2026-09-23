@@ -65,15 +65,13 @@ export function piAuthStore(path = piAuthPath()): CredentialStore {
  */
 export const LOGIN_PROVIDERS = ["anthropic", "openai-codex", "github-copilot"] as const;
 
-/** Lightspeed's own credential file, beside the sessions in the state dir. */
 export function lightspeedAuthPath(stateDir: string): string {
   return join(stateDir, "auth.json");
 }
 
 /**
- * The credentials `lightspeed login` writes: same shape and store body as pi's,
- * in lightspeed's own state dir — a login must never edit pi's file, where a
- * mistake would log the human out of another tool.
+ * Same shape and store body as pi's, in lightspeed's own state dir: a login must
+ * never edit pi's file, where a mistake would log the human out of another tool.
  */
 export function lightspeedAuthStore(stateDir: string): CredentialStore {
   return piAuthStore(lightspeedAuthPath(stateDir));

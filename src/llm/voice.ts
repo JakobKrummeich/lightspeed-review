@@ -1,18 +1,17 @@
 import type { GroupingReply } from "./schema.ts";
 
 /**
- * The voice a chapter's rationale has to be written in, checked rather than
- * asked for. The system prompt has forbidden questions and orders in detail
- * since the field existed, and models write them anyway — "Does the change
- * correctly distinguish...?" over a diff the reviewer has not opened, "verify
- * the intent is to split the cases" over a chapter they came to judge. A rule
- * the model keeps breaking is not a rule until something rejects the reply, so
- * this is the enforcement half of those prompt lines.
+ * The system prompt has forbidden questions and orders in the rationale since
+ * the field existed, and models write them anyway — "Does the change correctly
+ * distinguish...?" over a diff the reviewer has not opened, "verify the intent
+ * is to split the cases" over a chapter they came to judge. A rule the model
+ * keeps breaking is not a rule until something rejects the reply, so this is
+ * the enforcement half of those prompt lines.
  *
- * It is deliberately blunt: it catches the shapes, not the meanings, and a
- * failure costs a repair round rather than the grouping (see `groupWithModel`).
- * That asymmetry is what lets it be strict — the worst a false rejection can do
- * is spend one more call.
+ * Deliberately blunt: it catches the shapes, not the meanings, and a failure
+ * costs a repair round rather than the grouping (see `groupWithModel`). That
+ * asymmetry is what lets it be strict — the worst a false rejection can do is
+ * spend one more call.
  */
 
 /**
@@ -32,10 +31,6 @@ const OPENING_ORDER = /^(?:check|review|watch|note|consider|look|see|ask|test|re
 /** Nobody in this text is a "you": the sentence is about the code. */
 const SECOND_PERSON = /\b(?:you|your|yours)\b/i;
 
-/**
- * The first rationale that breaks the voice, named so the repair message can
- * quote it back. `undefined` when every one is a statement about code.
- */
 export function voiceProblem(groups: GroupingReply["groups"]): string | undefined {
   for (const group of groups) {
     const fault = faultIn(group.rationale);
@@ -46,7 +41,6 @@ export function voiceProblem(groups: GroupingReply["groups"]): string | undefine
   return undefined;
 }
 
-/** What is wrong with one sentence, in the words the repair message uses. */
 function faultIn(sentence: string): string | undefined {
   // Code the model quoted is the repository's vocabulary, not the model's: a
   // function named `verifyToken` is not an order to verify anything.

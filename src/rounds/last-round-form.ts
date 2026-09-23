@@ -4,17 +4,14 @@ import type { ApprovedForm } from "./approved-form.ts";
 import { fileApproval, sameBlob } from "./history.ts";
 
 /**
- * "What changed since the round I read" — the toggle for a never-approved file
- * the agent kept editing: the branch diff shows all 406 lines again, with no
- * way to find the new six. Pure, like `approved-form.ts`, whose `ApprovedForm`
- * shape it answers with — the same two-commits-and-names question, different rounds.
+ * The toggle for a never-approved file the agent kept editing: the branch diff
+ * shows all 406 lines again, with no way to find the new six. Pure, like
+ * `approved-form.ts`, whose `ApprovedForm` shape it answers with.
  */
 
 /**
- * The last two rounds' commits and the file's names in them; undefined when the
- * question does not arise: first round, file absent from either round, blobs
- * that match (or cannot be held to), or a `needs-reapproval` file — that one
- * carries the approved-form switch instead. One comparison per file, never two.
+ * Undefined for a `needs-reapproval` file: that one carries the approved-form
+ * switch instead — one comparison per file, never two.
  */
 export function lastRoundForm(rounds: SessionRound[], path: string): ApprovedForm | undefined {
   const current = rounds.at(-1);
@@ -31,7 +28,6 @@ export function lastRoundForm(rounds: SessionRound[], path: string): ApprovedFor
   };
 }
 
-/** A head commit as `ApprovedForm` spells it: null for a round that stored none. */
 function headOf(round: SessionRound): string | null {
   return round.headCommit ?? null;
 }

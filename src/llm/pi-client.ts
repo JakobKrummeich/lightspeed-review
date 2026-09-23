@@ -23,12 +23,10 @@ export interface GroupingCallInput {
   /** `provider/model-id`, exactly as written in `.lightspeed.conf.json`. */
   model: string;
   thinking: ThinkingLevel;
-  /** The providers `.lightspeed.conf.json` names, layered over pi-ai's builtins. */
   providers?: Record<string, ProviderConfig>;
   /** The config's state dir, where `lightspeed login` keeps its own credentials. */
   stateDir: string;
   systemPrompt: string;
-  /** Conversation so far; the reply is appended to it in the result. */
   messages: Message[];
   /** Injected in tests. Defaults to every built-in pi-ai provider. */
   models?: MutableModels;
@@ -37,7 +35,6 @@ export interface GroupingCallInput {
 
 export interface GroupingCallResult {
   text: string;
-  /** `input.messages` plus the assistant reply, ready for a repair round. */
   messages: Message[];
 }
 
@@ -135,10 +132,6 @@ function configuredEndpoint(input: GroupingCallInput): string | undefined {
     : `Check that ${baseUrl} is reachable — it is \`providers.${providerId}.baseUrl\` in .lightspeed.conf.json`;
 }
 
-/**
- * Which of the three ways a request can fail this one is: no credential at all,
- * a credential the provider rejected, or anything else.
- */
 function authError(detail: string, reference: string, endpoint?: string): ReviewError {
   if (looksUnconfigured(detail)) {
     return piError("pi_auth_missing", `no credentials for the provider behind \`${reference}\``, {
@@ -166,11 +159,8 @@ function authError(detail: string, reference: string, endpoint?: string): Review
   });
 }
 
-/**
- * The one-command fix goes first, when there is one: the three subscription
- * providers lightspeed can sign itself into. Everyone else keeps the env and
- * config routes unshifted.
- */
+/** The one-command fix goes first, when there is one: the three subscription
+ * providers lightspeed can sign itself into. */
 function withLoginSuggestion(
   reference: string,
   rest: [string, ...string[]],
@@ -185,9 +175,8 @@ function withLoginSuggestion(
 }
 
 /**
- * No credential was found at all, as opposed to one the provider rejected.
- * pi-ai reads credentials from the environment only, so this means nothing was
- * exported — a setup mistake the reviewer must be told about, not a bad key.
+ * No credential was found at all, as opposed to one the provider rejected: a
+ * setup mistake the reviewer must be told about, not a bad key.
  */
 function looksUnconfigured(message: string): boolean {
   return /\bnot configured\b|\bno (api[ _-]?key|credential)/i.test(message);
