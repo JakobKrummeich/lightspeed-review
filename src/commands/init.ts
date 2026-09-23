@@ -17,15 +17,10 @@ import { hasFlag, lastValue, scanArgs } from "./args.ts";
 import { HELP_START } from "./home.ts";
 
 export interface InitArgs {
-  /** Undefined is the point of the type: `init` with no agent has to name the
-   * ids that exist rather than guess one — unless `--config` gave it other work. */
   agent: string | undefined;
   /** Undefined when the flag was absent, which is not the same as `global`:
-   * `--scope` decides where a skill goes and nothing else, so naming one with
-   * no agent is a flag that cannot apply. */
+   * naming a scope with no agent is a flag that cannot apply. */
   scope: string | undefined;
-  /** `--config`: leave a starter `.lightspeed.conf.json` behind. Enough on its
-   * own — a config has one place to go, so nothing is being guessed. */
   config: boolean;
   dryRun: boolean;
 }
@@ -34,14 +29,13 @@ export type InitInput = InitArgs & InitRoots;
 
 interface ConfigReport {
   path: string;
-  /** `exists` is a report, not a failure: the config is the user's file. */
   status: "written" | "exists";
 }
 
 /**
- * The step the setup instructions never had. A skill is scanned when the agent
- * starts, so the session that ran `init` is the one session that cannot see
- * what it wrote — which made a correct install look like nothing happened.
+ * A skill is scanned when the agent starts, so the session that ran `init` is
+ * the one session that cannot see what it wrote — which made a correct install
+ * look like nothing happened.
  */
 export const HELP_RESTART_AGENT =
   "Restart your agent so it scans the new skill — in pi, `/reload` does it without" +
@@ -58,9 +52,9 @@ const CONFIG_PLACEHOLDER_HELP =
   " no review can run until it names one";
 
 /**
- * The write side of `skill`. `skill` prints the document and trusts a human to
- * redirect it into the right file; nobody did, and the path they were told to
- * redirect it to was wrong for pi. This puts it where the named agent reads.
+ * `skill` prints the document and trusts a human to redirect it into the right
+ * file; nobody did, and the path they were told was wrong for pi. This puts it
+ * where the named agent reads.
  */
 export function runInit(input: InitInput): StructuredOutput {
   const agent = readAgent(input);
@@ -152,10 +146,9 @@ interface InitOutcome {
 }
 
 /**
- * Every path written is named, so the agent that ran this can say what changed
- * without going and looking. A run that installed no skill reports no `init`
- * block and no `skill` block at all: an agent and a scope it was never given
- * would be invented, and an empty one would still have to be read.
+ * A run that installed no skill reports no `init` block and no `skill` block at
+ * all: an agent and a scope it was never given would be invented, and an empty
+ * one would still have to be read.
  */
 function initOutput({ skill, config, dryRun }: InitOutcome): StructuredOutput {
   return {
@@ -171,8 +164,8 @@ function initOutput({ skill, config, dryRun }: InitOutcome): StructuredOutput {
 function initHelp(installed: boolean, dryRun: boolean, config: ConfigReport | undefined): string[] {
   return [
     ...(dryRun ? [DRY_RUN_HELP] : []),
-    // Only where a skill was actually written: nothing is waiting on a restart
-    // after a run that wrote a config and left every agent alone.
+    // Nothing is waiting on a restart after a run that wrote a config and left
+    // every agent alone.
     ...(installed ? [HELP_RESTART_AGENT] : []),
     ...configHelp(config),
     HELP_START,
@@ -187,11 +180,6 @@ function configHelp(config: ConfigReport | undefined): string[] {
   return config.status === "exists" ? [CONFIG_KEPT_HELP] : [CONFIG_PLACEHOLDER_HELP];
 }
 
-/**
- * Mirrors `start`'s `intent_missing`: the one thing only the caller knows is
- * asked for by name and refused before a single path is touched, because every
- * agent reads a different file and a default would install into the wrong one.
- */
 function agentMissing(): ReviewError {
   return new ReviewError({
     code: "agent_missing",

@@ -40,8 +40,8 @@ async function portInUse(error: unknown, port: number): Promise<unknown> {
   });
 }
 
-/** Runs the review server in the foreground until `lightspeed stop` or Ctrl+C.
- * `start` spawns this detached; a human can run it directly to see startup failures. */
+/** `start` spawns this detached; a human can run it directly to see startup
+ * failures. */
 export async function runServe(input: ServeInput): Promise<StructuredOutput> {
   const server = createReviewServer({
     store: new SessionStore(input.stateDir),

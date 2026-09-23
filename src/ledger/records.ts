@@ -25,10 +25,8 @@ export const VERDICTS = ["addressed", "ignored", "repeated", "unknown"] as const
 
 export type Verdict = (typeof VERDICTS)[number];
 
-/** Which side of the diff a selection was made on. */
 export type AnnotationSide = "old" | "new";
 
-/** The line range a selection covers in one version of a file. */
 export interface LineAnchor {
   side: AnnotationSide;
   line_start: number;
@@ -42,10 +40,7 @@ export interface LineAnchor {
   col_end?: number;
 }
 
-/**
- * An anchor flattened into the record that carries it. The union makes half an
- * anchor — which locates nothing — unrepresentable.
- */
+/** The union makes half an anchor — which locates nothing — unrepresentable. */
 export type AnchorFields =
   | LineAnchor
   | {
@@ -56,13 +51,12 @@ export type AnchorFields =
       col_end?: undefined;
     };
 
-/** How an annotation's stored context was located in the file it was made on. */
 export type ContextSource = "anchor" | "search" | "none";
 
 /**
- * Stored context and where it came from, paired so neither can appear alone:
- * text is always attributable, and "none" never carries text. Both are absent
- * on annotations written before context slicing existed.
+ * Paired so neither can appear alone: text is always attributable, and "none"
+ * never carries text. Both are absent on annotations written before context
+ * slicing existed.
  */
 export type ContextFields =
   | { context: string; context_source: "anchor" | "search" }
@@ -158,7 +152,6 @@ export interface AgentReplyRecord extends RecordBase {
 }
 
 /**
- * The agent's own account of one comment: files it led to, the answering note.
  * Recorded verbatim beside the mechanical `outcome`, never merged with it.
  * Every accepted declaration is appended (re-sends, corrections); the standing
  * answer is the last record per `about` — the session keeps only that winner.
@@ -170,9 +163,7 @@ export interface DeclarationRecord extends RecordBase {
   repo: RepoRef;
   branch: string;
   base: string;
-  /** Id of the annotation this declaration is about. */
   about: string;
-  /** Paths the comment led to changes in; empty for a question or a decision. */
   files: string[];
   note?: string;
   truncated: CappedField[];
@@ -196,7 +187,6 @@ export interface RoundEndRecord extends RecordBase {
 export interface OutcomeRecord extends RecordBase {
   kind: "outcome";
   repo: RepoRef;
-  /** Id of the annotation this outcome judges. */
   about: string;
   next_round: string;
   from_commit: string | null;
@@ -223,8 +213,8 @@ export type CappedField =
   "selected_text" | "comment" | "context" | "note" | "patch" | "response_patch";
 
 /**
- * Hard caps per stored string. The ledger copies code so items stay readable
- * without git; these numbers stop one pathological round from filling a disk.
+ * The ledger copies code so items stay readable without git; these numbers stop
+ * one pathological round from filling a disk.
  */
 export const FIELD_CAPS: Record<CappedField, { bytes: number; lines?: number }> = {
   selected_text: { bytes: 4 * 1024 },
@@ -381,10 +371,8 @@ export type AnnotationInput = {
 } & AnchorFields &
   ContextFields;
 
-/**
- * The anchor of anything that carries one, as fields to spread. Absent fields
- * are left out entirely so an anchorless record serialises without them.
- */
+/** Absent fields are left out entirely so an anchorless record serialises
+ * without them. */
 export function anchorOf(source: AnchorFields): AnchorFields {
   if (source.side === undefined) return {};
   return {
@@ -397,9 +385,9 @@ export function anchorOf(source: AnchorFields): AnchorFields {
 }
 
 /**
- * Context as fields to spread, taking `capped` over the original text when the
- * caller has a shortened copy. Context with no text to store serialises without
- * either field, so an annotation that found none stays a small line.
+ * Takes `capped` over the original text when the caller has a shortened copy.
+ * Context with no text to store serialises without either field, so an
+ * annotation that found none stays a small line.
  */
 export function contextOf(source: ContextFields, capped?: string): ContextFields {
   if (source.context === undefined) {

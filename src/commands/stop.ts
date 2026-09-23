@@ -6,8 +6,8 @@ export interface StopInput {
   port: number;
 }
 
-/** Shuts the background server down. Already stopped is success, not an error:
- * the caller asked for a state, not for an event. */
+/** Already stopped is success, not an error: the caller asked for a state, not
+ * for an event. */
 export async function runStop(input: StopInput): Promise<StructuredOutput> {
   const running = await requestShutdown(input.port);
   return {

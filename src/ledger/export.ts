@@ -15,11 +15,10 @@ import type {
 } from "./records.ts";
 
 /**
- * Read side of the ledger: raw records in, self-contained items out. A miner
- * has no git and the repo may be gone, so an item copies everything it needs
- * from the annotation, its round file and its outcome. Pure: the store reads
- * lines, this joins and formats. `message`/`agent_reply` are deliberately not
- * items — an item is one piece of feedback about one file; raw JSONL keeps the rest.
+ * A miner has no git and the repo may be gone, so an item copies everything it
+ * needs from the annotation, its round file and its outcome. `message` and
+ * `agent_reply` are deliberately not items — an item is one piece of feedback
+ * about one file; raw JSONL keeps the rest.
  */
 export interface ItemOutcome {
   next_round: string;
@@ -48,14 +47,11 @@ export type ExportItem = {
   blob_old: string | null;
   selected_text: string;
   comment: string;
-  /** The file's patch for that round, present only with `withPatches`. */
   patch?: string;
   /** Set when a patch existed but the render dropped it, so nothing is silent. */
   patch_omitted?: true;
-  /** The same mark for the copied code context, dropped by the same switch. */
   context_omitted?: true;
   truncated: CappedField[];
-  /** `unknown` until an outcome judges the annotation. */
   verdict: Verdict;
   outcome?: ItemOutcome;
 } & AnchorFields &
@@ -75,7 +71,6 @@ export interface ItemFilters {
 export interface SelectResult {
   /** Oldest first, so a slice reads as a transcript. */
   items: ExportItem[];
-  /** How many items matched the filters before `limit` cut the list. */
   matched: number;
   hasMore: boolean;
   /** Last id returned — the caller's next `cursor`. */
@@ -100,7 +95,6 @@ export function selectItems(records: LedgerRecord[], filters: ItemFilters): Sele
 }
 
 export interface VerdictCounts extends Record<Verdict, number> {
-  /** Items no outcome has judged yet — the summary's `unresolved`. */
   unresolved: number;
 }
 
@@ -125,7 +119,6 @@ export interface RepoRow extends Record<Verdict, number> {
   items: number;
 }
 
-/** Per-repository aggregates for the summary, so an agent never sums rows itself. */
 export function repoRows(items: ExportItem[]): RepoRow[] {
   const rows = new Map<string, RepoRow>();
   for (const item of items) {
@@ -180,7 +173,6 @@ export type RenderedItems =
 
 type Renderer = (items: ExportItem[], maxBytes: number | undefined) => RenderedItems;
 
-/** One named function per format; `Record<ExportFormat, …>` keeps the set closed. */
 const RENDERERS = {
   toon: renderToonItems,
   jsonl: renderJsonlItems,
@@ -287,7 +279,6 @@ function lineRange(item: ExportItem): string {
   return `${position(item.line_start, item.col_start)}-${position(item.line_end, item.col_end)} (${item.side})`;
 }
 
-/** `214:5` when the reviewer clipped that line, plain `214` when they took it whole. */
 function position(line: number, column: number | undefined): string {
   return column === undefined ? `${line}` : `${line}:${column}`;
 }
@@ -375,10 +366,8 @@ function joinItem(
   };
 }
 
-/**
- * What the annotation knows about the file, filled in from the round file where
- * a stale browser tab left it blank — and the round's patch for that file.
- */
+/** Filled in from the round file where a stale browser tab left the annotation
+ * blank. */
 function fileFacts(
   record: AnnotationRecord,
   roundFile: RoundFileRecord | undefined,
@@ -473,11 +462,7 @@ const UNIT_MS = {
 
 type DurationUnit = keyof typeof UNIT_MS;
 
-/**
- * `--since` takes either an instant (`2026-01-04`, a full ISO timestamp) or a
- * duration back from now (`30d`, `12h`, `2w`), and always yields an ISO string,
- * so filtering stays a plain string comparison.
- */
+/** Always yields an ISO string, so filtering stays a plain string comparison. */
 export function parseSince(value: string, now = new Date()): string {
   const trimmed = value.trim();
   const duration = DURATION.exec(trimmed);

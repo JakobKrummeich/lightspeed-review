@@ -70,10 +70,9 @@ interface ListCaps {
 }
 
 /**
- * The caps a list runs under. They default only for TOON, which reports the
- * arithmetic in `count` and prints the cursor: `jsonl` and `md` return raw text
- * with no such block, so a cut nobody asked for would be invisible to the pipe
- * reading them. An explicit flag always wins over the default.
+ * Defaults only for TOON, which reports the arithmetic in `count` and prints the
+ * cursor: `jsonl` and `md` return raw text with no such block, so a cut nobody
+ * asked for would be invisible to the pipe reading them.
  */
 function listCaps(parsed: ParsedArgs, format: ExportFormat): ListCaps {
   const defaulted = format === "toon";
@@ -87,8 +86,8 @@ function cap(parsed: ParsedArgs, flag: string, fallback: number | undefined): nu
   return parsed.values[flag] === undefined ? fallback : readCount(parsed, flag);
 }
 
-/** Whether a cap the caller never chose is what held items back — the only case
- * where the answer owes them the flags that lift it. */
+/** A cap the caller never chose is the only case where the answer owes them the
+ * flags that lift it. */
 function cutByDefault(
   parsed: ParsedArgs,
   rendered: RenderedItems,

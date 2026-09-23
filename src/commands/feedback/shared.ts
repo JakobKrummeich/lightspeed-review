@@ -4,8 +4,6 @@ import { EXPORT_FORMATS, type ExportFormat } from "../../ledger/export.ts";
 import type { LedgerStore } from "../../ledger/store.ts";
 import { scanArgs } from "../args.ts";
 
-/** What every feedback subcommand shares: the dispatcher's context, the flag scan
- * and readers, and the help lines subcommands point at one another with. */
 export interface FeedbackContext {
   /** Absent when `feedbackLog` is `off` — there is nothing to read or prune. */
   store: LedgerStore | undefined;
@@ -16,9 +14,8 @@ export interface FeedbackContext {
 
 /**
  * A bare `list` is read by an agent with a context window, so the unguarded
- * command must cost about one answer, not the whole ledger. Twenty items is a
- * page a reader still holds in one head, and the cursor makes the rest one
- * command away.
+ * command must cost about one answer, not the whole ledger; twenty items is a
+ * page a reader still holds in one head.
  */
 export const DEFAULT_LIST_LIMIT = 20;
 
@@ -54,17 +51,12 @@ export const HELP_BULK_FIELDS =
 
 export interface ParsedArgs {
   positional: string[];
-  /** Raw flag values, converted by the subcommand that accepts them. */
   values: Partial<Record<string, string>>;
   present: Set<string>;
 }
 
-/** Flags that stand alone; everything else in the allow-list takes a value. */
 const BOOLEAN_FLAGS = new Set(["--with-patches", "--dry-run"]);
 
-/** One scan per subcommand, given its allow-list: an unknown or misplaced flag is
- * exit 2, not a quiet positional. `values: "bare"` + `onMissingValue` means a flag
- * never eats the flag after it — `--since --format` is a missing value. */
 export function parseArgs(args: string[], allowed: readonly string[]): ParsedArgs {
   const scanned = scanArgs(args, {
     value: allowed.filter((flag) => !BOOLEAN_FLAGS.has(flag)),
@@ -97,9 +89,8 @@ export function unknownFlag(flag: string, allowed: readonly string[]): Error {
   ]);
 }
 
-/** Bulk formats print raw: an agent piping JSONL must not strip a TOON envelope,
- * and the TOON path carries the aggregates. The CLI terminates the last line,
- * hence the trim. */
+/** Bulk formats print raw: an agent piping JSONL must not strip a TOON envelope.
+ * The CLI terminates the last line, hence the trim. */
 export function rawText(text: string): string {
   return text.trimEnd();
 }
@@ -132,7 +123,6 @@ export function readCount(parsed: ParsedArgs, flag: string): number {
   return count;
 }
 
-/** `--repo .` is the repository the command runs in; anything else is a path. */
 export function readRepo(parsed: ParsedArgs, context: FeedbackContext): string | undefined {
   const value = parsed.values["--repo"];
   if (value === undefined) return undefined;
@@ -141,8 +131,8 @@ export function readRepo(parsed: ParsedArgs, context: FeedbackContext): string |
   return context.repoRoot;
 }
 
-/** Reading the ledger needs no repository, but `--repo .` names one and there is
- * none here — filtering by the wrong repo would answer a question nobody asked. */
+/** `--repo .` names a repository and there is none here: filtering by the wrong
+ * repo would answer a question nobody asked. */
 function noRepoHere(): ReviewError {
   return new ReviewError({
     code: "git_repo_not_found",

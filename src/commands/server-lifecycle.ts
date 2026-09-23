@@ -6,26 +6,22 @@ import { probePort, requestShutdown, reviewServerIsUp, serverHealth } from "./se
 
 export interface EnsureServerOptions {
   port: number;
-  /** Injected in tests; production spawns a detached `serve` process. */
+  /** Injected in tests. */
   spawnServer?: () => void;
-  /** How long the spawned server has to answer `/health`. */
   timeoutMs?: number;
-  /** Where the built browser bundle lives. Defaults to `dist/browser/`. */
   staticDir?: string;
 }
 
 const READY_POLL_MS = 25;
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-/** How long a server of another version gets to release the port. */
 const STALE_SHUTDOWN_MS = 2_000;
 
-/** Makes sure a review server owns `port`, starting one in the background if not.
- * The server outlives the command — that is what lets `start` hand out a URL and exit. */
+/** The server outlives the command — that is what lets `start` hand out a URL
+ * and exit. */
 export async function ensureServerRunning(options: EnsureServerOptions): Promise<void> {
-  // Who owns the port decides everything: our own server of this version means
-  // nothing to do, one of another version has to go, and anything else means
-  // spawning would turn a clear conflict into a startup timeout.
+  // Checked before spawning: into a port something else holds, spawning would
+  // turn a clear conflict into a startup timeout.
   if (await portIsHeldByCurrentServer(options.port)) return;
   // The spawned server checks the bundle too, but detached with no stdio its error
   // is just a startup timeout. Asking here costs two stat calls and answers exactly.
@@ -44,11 +40,10 @@ export async function ensureServerRunning(options: EnsureServerOptions): Promise
 }
 
 /**
- * Whether the port already holds what this command is for. A server of another
- * version is shut down here rather than reported: `start` is the command that
- * spawns servers, so an agent told to run `stop` would spend a turn on a
- * decision this command has already made. Waiting polls reconnect on their own
- * once the port answers again.
+ * A server of another version is shut down here rather than reported: `start`
+ * is the command that spawns servers, so an agent told to run `stop` would
+ * spend a turn on a decision this command has already made. Waiting polls
+ * reconnect on their own once the port answers again.
  */
 async function portIsHeldByCurrentServer(port: number): Promise<boolean> {
   if ((await probePort(port)) !== "open") return false;
@@ -60,10 +55,9 @@ async function portIsHeldByCurrentServer(port: number): Promise<boolean> {
 }
 
 /**
- * The old server, asked to go. Its own `/api/shutdown` answers before it stops
- * listening, so the port is polled until it is really free — spawning into a
- * port the outgoing process still holds is the one way to turn a clean replace
- * into a startup timeout.
+ * `/api/shutdown` answers before the server stops listening, so the port is
+ * polled until it is really free — spawning into a port the outgoing process
+ * still holds turns a clean replace into a startup timeout.
  */
 async function shutDownStale(port: number): Promise<void> {
   await requestShutdown(port);
@@ -74,7 +68,6 @@ async function shutDownStale(port: number): Promise<void> {
   }
 }
 
-/** Polls `/health` until the spawned server answers or the deadline passes. */
 async function answersWithin(port: number, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -85,16 +78,13 @@ async function answersWithin(port: number, timeoutMs: number): Promise<boolean> 
 }
 
 /**
- * The handshake for every command that talks to a server it did not start. A
- * `serve` left running from an older install answers `/health` and speaks a
- * protocol this CLI no longer reads — it sent no `turn` and no `round`, and the
- * client filled both in with defaults, so the agent read an invented turn off a
- * server that had never heard of turns. Nothing is assumed here: the command
- * stops before it blocks, and names what clears it.
- *
- * A port with nothing on it is not this function's business — `longPoll` and
- * `apiRequest` diagnose that, with the retries that tell a dead server from a
- * slow one.
+ * A `serve` left running from an older install answers `/health` and speaks a
+ * protocol this CLI no longer reads — it sent no `turn` and no `round`, the
+ * client filled both in with defaults, and the agent read an invented turn off
+ * a server that had never heard of turns. So the command stops before it
+ * blocks. A port with nothing on it is not this function's business: `longPoll`
+ * and `apiRequest` diagnose that, with the retries that tell a dead server from
+ * a slow one.
  */
 export async function assertServerCurrent(port: number, target: string): Promise<void> {
   const health = await serverHealth(port);

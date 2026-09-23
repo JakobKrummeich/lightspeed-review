@@ -26,10 +26,8 @@ import {
 import type { LedgerStore } from "./store.ts";
 
 /**
- * Turns what the server already knows — the session, its grouping and one
- * reviewer action — into ledger records. Pure: ids and timestamps come from the
- * caller's clock and id source only, so the server's handlers stay one line
- * each and nothing here keeps state between calls.
+ * Pure: ids and timestamps come from the caller's clock and id source only, so
+ * nothing here keeps state between calls.
  */
 interface WriteContext {
   repo: RepoRef;
@@ -43,9 +41,9 @@ export interface RoundInput extends WriteContext {
 }
 
 /**
- * One whole file of the review as it stands on one side, or undefined when git
- * has no such version. Injected so composing records stays pure and testable —
- * the server passes a reader restricted to this session's own files.
+ * Undefined when git has no such version. Injected so composing records stays
+ * pure and testable — the server passes a reader restricted to this session's
+ * own files.
  */
 export type ReadSideFile = (path: string, side: AnnotationSide) => string | undefined;
 
@@ -69,7 +67,6 @@ export interface EndInput extends WriteContext {
   session: SessionRecord;
 }
 
-/** What a caller reports to the reviewer: healthy, switched off, or failing. */
 export interface LedgerWriteResult {
   status: "on" | "off" | "degraded";
   written: number;
@@ -188,9 +185,8 @@ function annotationRecord(input: FeedbackInput, prompt: AnnotationPrompt): Ledge
 }
 
 /**
- * What the round's diff knows about an annotated file. A file the grouping does
- * not list — a stale browser tab, a hand-written prompt — yields nulls rather
- * than a guess.
+ * A file the grouping does not list — a stale browser tab, a hand-written
+ * prompt — yields nulls rather than a guess.
  */
 function fileFields(file: DiffFile | undefined): {
   previous_path: string | null;
@@ -247,8 +243,8 @@ export function agentReplyRecords(input: ReplyInput): LedgerRecord[] {
 }
 
 /**
- * One record per declared comment, written only after the whole declaration
- * validated: the ledger holds what the session accepted, nothing else.
+ * Written only after the whole declaration validated: the ledger holds what the
+ * session accepted, nothing else.
  */
 export function declarationRecords(input: DeclareInput): LedgerRecord[] {
   const { session, repo, now } = input;

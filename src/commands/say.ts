@@ -10,9 +10,7 @@ import { parseVerb, type VerbArgs } from "./verb-args.ts";
 import { serverOrigin } from "./server-address.ts";
 
 export interface SayArgs extends VerbArgs {
-  /** `--for <id>`: the comment this answers, by the id `wait` printed with it. */
   for: string | undefined;
-  /** `--files a,b`: the paths that comment led to changes in. */
   files: string[];
 }
 
@@ -57,12 +55,11 @@ function splitFiles(value: string | undefined): string[] {
 }
 
 /**
- * Speech that costs nothing. It does not block and it does not move the turn:
- * an agent that answers one comment and keeps editing is still editing, and a
- * Send that flickered on between its sentences would be worse than one that
- * stays off. `--for` pins the whole answer under the comment it answers, where
- * the reviewer is already looking, instead of adding a line to the conversation
- * they have to match up themselves.
+ * Does not move the turn: an agent that answers one comment and keeps editing
+ * is still editing, and a Send that flickered on between its sentences would be
+ * worse than one that stays off. `--for` pins the whole answer under the
+ * comment it answers, where the reviewer is already looking, instead of a
+ * conversation line they have to match up themselves.
  */
 export async function runSay(input: SayInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
@@ -80,7 +77,6 @@ export async function runSay(input: SayInput): Promise<StructuredOutput> {
     said: input.text,
     ...(input.for === undefined ? {} : { for: input.for }),
     ...(input.files === undefined || input.files.length === 0 ? {} : { files: input.files }),
-    // Speaking moves nothing, so the moves that were legal before it still are.
     // A server too old to state a turn predates the turn itself: `wait` was the
     // only way to get one there, which is what the reviewer's turn offers.
     help: turnHelp(answered.turn ?? "reviewer", target, answered.helpForm),

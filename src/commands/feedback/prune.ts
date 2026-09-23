@@ -60,7 +60,6 @@ export function pruneFeedback(args: string[], context: FeedbackContext): Structu
   };
 }
 
-/** The range actually deleted, absent when the cutoff matched nothing. */
 function removedSpan(plan: PrunePlan): { oldest_removed?: string; newest_removed?: string } {
   if (plan.oldestRemoved === undefined) return {};
   return { oldest_removed: plan.oldestRemoved, newest_removed: plan.newestRemoved };

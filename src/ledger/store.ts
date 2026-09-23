@@ -12,18 +12,16 @@ import type { FeedbackLogMode } from "../config.ts";
 import { feedbackDirPath } from "../paths.ts";
 import { LEDGER_KINDS, type LedgerRecord } from "./records.ts";
 
-/** Resume/filter window for a read. `cursor` is the last id a caller already saw. */
+/** `cursor` is the last id a caller already saw. */
 export interface LedgerQuery {
   since?: string;
   cursor?: string;
   limit?: number;
-  /** Only this kind of record. */
   kind?: LedgerRecord["kind"];
-  /** Only records written for this repository root. */
   repo?: string;
   /**
-   * Only records carrying one of these round ids. An `outcome` has no round of
-   * its own (it names the round it judges), so this filter never matches one.
+   * An `outcome` has no round of its own (it names the round it judges), so
+   * this filter never matches one.
    */
   rounds?: readonly string[];
 }
@@ -31,7 +29,6 @@ export interface LedgerQuery {
 export interface LedgerReadResult {
   /** Oldest first, so a slice reads as a transcript. */
   records: LedgerRecord[];
-  /** How many records matched before `limit` cut the list. */
   matched: number;
   /**
    * Unparseable lines seen among the lines the query looked at — a filtered read
@@ -189,7 +186,6 @@ function hasContent(line: string): boolean {
   return line.trim().length > 0;
 }
 
-/** Parses a month file's matching lines into `into`, returning corrupt lines. */
 function collectMatches(contents: string, query: LedgerQuery, into: LedgerRecord[]): number {
   let corrupt = 0;
   for (const line of contents.split("\n")) {
@@ -226,10 +222,7 @@ function matchesRound(record: LedgerRecord, rounds: readonly string[] | undefine
   return "round" in record && rounds.includes(record.round);
 }
 
-/**
- * A month whose every timestamp predates `since` holds nothing to read. Both
- * sides are ISO, so comparing the `YYYY-MM` prefixes is comparing the dates.
- */
+/** Both sides are ISO, so comparing the `YYYY-MM` prefixes is comparing the dates. */
 function monthInRange(file: string, since: string | undefined): boolean {
   return since === undefined || file.slice(0, 7) >= since.slice(0, 7);
 }
@@ -285,7 +278,6 @@ function notBefore(record: LedgerRecord, since: string | undefined): boolean {
   return since === undefined || record.at >= since;
 }
 
-/** `YYYY-MM` of the record's own timestamp; today's month if it is unreadable. */
 function monthOf(at: string): string {
   const month = /^\d{4}-\d{2}/.exec(at);
   return month?.[0] ?? new Date().toISOString().slice(0, 7);

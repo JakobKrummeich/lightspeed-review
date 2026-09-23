@@ -23,10 +23,8 @@ export function parseWorkArgs(args: string[]): VerbArgs {
 }
 
 /**
- * Declares the silence. The turn is already the agent's — `work` does not take
- * it, it only says what is being done with it — so the reviewer's banner stops
- * saying "the agent has your feedback" and names the plan instead. Nothing here
- * blocks: the agent says it and goes and edits.
+ * `work` does not take the turn, it only says what is being done with it;
+ * nothing here blocks.
  */
 export async function runWork(input: WorkInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);

@@ -5,11 +5,9 @@ import { SessionStore, type SessionRecord } from "../session-store.ts";
 import type { HomeInput } from "./home.ts";
 
 /**
- * Home view must always render, so nothing here throws — but what stopped a
- * review from running is the answer, not something to swallow. A bare catch
- * turned a missing config into `sessions: 0`, which is the one reading that is
- * both false and costs a turn: the sessions were on disk and the command it
- * then offered fails the same way.
+ * Nothing here throws, but what stopped a review from running is the answer,
+ * not something to swallow: a bare catch once turned a missing config into
+ * `sessions: 0`, which was false — the sessions were on disk — and cost a turn.
  */
 export function homeInput(all: boolean): HomeInput {
   const repoRoot = repoRootOrNone(process.cwd());

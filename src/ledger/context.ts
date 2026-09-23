@@ -1,21 +1,18 @@
 import type { AnchorFields, ContextFields } from "./records.ts";
 
 /**
- * Lines kept either side of the annotated range. Wide enough to hold the
- * enclosing function in most files, small enough that a round of annotations
- * stays a readable ledger rather than a copy of the repository.
+ * Wide enough to hold the enclosing function in most files, small enough that a
+ * round of annotations stays a readable ledger rather than a copy of the
+ * repository.
  */
 export const CONTEXT_RADIUS = 30;
 
-/** What the reviewer marked: a line range when the browser captured one, plus the text itself. */
 export type ContextTarget = { selected_text: string } & AnchorFields;
 
 /**
- * Code around an annotation, cut so the ledger reads without the repository.
- * Pure: the caller picks `fileText` and passes `undefined` when git has none.
- * Anchor wins (it says exactly which lines); else the selected text is located
- * in the file, and an unfindable selection (stale tab, edited since, gutter
- * text) stores nothing rather than a guess.
+ * Cut so the ledger reads without the repository. Anchor wins (it says exactly
+ * which lines); an unfindable selection (stale tab, edited since, gutter text)
+ * stores nothing rather than a guess.
  */
 export function sliceContext(fileText: string | undefined, target: ContextTarget): ContextFields {
   if (fileText === undefined || fileText === "") return { context_source: "none" };
@@ -34,9 +31,9 @@ interface LineRange {
 }
 
 /**
- * The anchor's own range, clamped to the file. Nothing upstream of here checks
- * the numbers against a real file: `parseFeedbackRequest` only knows they are
- * integers ≥ 1, and the file may have changed since the browser read it.
+ * Clamped because nothing upstream checks the numbers against a real file:
+ * `parseFeedbackRequest` only knows they are integers ≥ 1, and the file may
+ * have changed since the browser read it.
  */
 function anchoredRange(target: ContextTarget, count: number): LineRange | undefined {
   if (target.side === undefined) return undefined;
@@ -45,7 +42,6 @@ function anchoredRange(target: ContextTarget, count: number): LineRange | undefi
 }
 
 /**
- * Where the selection sits in the file, found by its first non-blank line.
  * Matching a substring rather than a whole line keeps a selection that starts
  * mid-line, or that the browser trimmed of its indentation, locatable.
  */

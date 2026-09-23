@@ -17,14 +17,12 @@ import {
 import { showFeedback } from "./feedback/show.ts";
 import { HELP_START } from "./home.ts";
 
-/** The mining agent's read command: whole-ledger summary, filtered list, one item
- * in full, prune. Everything printed comes from `ledger/export.ts` — command files
- * only parse flags, shape output and compose `help[]`. This file dispatches and
- * answers the bare summary; subcommands live in `feedback/` on `feedback/shared.ts`. */
+/** Everything printed comes from `ledger/export.ts`: command files only parse
+ * flags, shape output and compose `help[]`. */
 export interface FeedbackInput {
   args: string[];
-  /** What `--repo .` resolves to. Absent when run outside a repository, which is
-   * allowed: the ledger spans repositories. */
+  /** Absent when run outside a repository, which is allowed: the ledger spans
+   * repositories. */
   repoRoot?: string;
   stateDir: string;
   feedbackLog: FeedbackLogMode;
@@ -59,7 +57,6 @@ export function runFeedback(input: FeedbackInput): StructuredOutput | string {
   return SUBCOMMANDS[name as SubcommandName](rest, context);
 }
 
-/** The bare command has three states — off, empty, populated — and no flags. */
 function summary(context: FeedbackContext): StructuredOutput {
   if (context.store === undefined) return disabledSummary(context.path);
   const read = context.store.read({});
@@ -77,7 +74,6 @@ function disabledSummary(path: string): StructuredOutput {
   };
 }
 
-/** Records without items means rounds happened but nobody commented yet. */
 function emptySummary(path: string, records: number): StructuredOutput {
   return {
     ledger: { path, status: "on", records },

@@ -6,7 +6,6 @@ import { renderToon, type StructuredOutput } from "../output.ts";
 import { HELP_RESTART_AGENT } from "./init.ts";
 import { BLOCKS_IN_FOREGROUND, TURN_RULE } from "./home.ts";
 
-/** The two positionals every agent verb ends with, worded once. */
 const SESSION_ARGUMENTS = {
   "[branch]": "branch under review; omit it when the repo has one live session",
   "[base]": "base branch, defaults to main",
@@ -206,8 +205,6 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
     flags: {
       "--agent <id>": `one of ${SKILL_AGENTS.join(", ")}; defaults to pi`,
     },
-    // The same table `init` writes by: pi scans `~/.pi/agent/skills`, and the
-    // `~/.pi/skills` this once named is a directory pi never looks in.
     destinations: destinationHelp(),
     examples: [
       "lightspeed init --agent claude-code --scope project",
@@ -232,9 +229,9 @@ export function commandHelp(command: string): string | undefined {
 }
 
 /**
- * The line top-level help gives a command, taken from the help it prints itself
- * so the two can never drift. A command nobody wrote help for is still listed —
- * pointing at its own `--help` beats hiding it or rendering `undefined`.
+ * Taken from the help the command prints itself so the two can never drift. A
+ * command nobody wrote help for is still listed: pointing at its own `--help`
+ * beats hiding it or rendering `undefined`.
  */
 export function commandSummary(command: string): string {
   const description = COMMAND_HELP[command]?.description;

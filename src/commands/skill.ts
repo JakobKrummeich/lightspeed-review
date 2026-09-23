@@ -6,9 +6,9 @@ export interface SkillInput {
   agent: string;
 }
 
-/** A document generator: stdout is redirected straight into the file the named
- * agent reads, so the answer is raw markdown — deliberately not TOON, no trailing
- * `help[]`. Failures are still TOON like every other command's. */
+/** stdout is redirected straight into the file the named agent reads, so the
+ * answer is raw markdown — deliberately not TOON, no trailing `help[]`. Failures
+ * are still TOON like every other command's. */
 export function runSkill(input: SkillInput): string {
   const { agent } = input;
   if (!isSkillAgent(agent)) throw unknownAgent(agent);

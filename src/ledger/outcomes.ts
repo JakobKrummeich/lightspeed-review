@@ -11,21 +11,18 @@ import {
 } from "./records.ts";
 
 /**
- * What became of each annotation, judged when the next round opens. Every
- * `start` re-judges all earlier annotations — evidence keeps arriving, and the
- * read side keeps the newest outcome per annotation as the standing one. Pure:
- * round facts come from `src/rounds/history.ts`; the caller injects the one
- * thing only git knows, the diff between two commits.
+ * Every `start` re-judges all earlier annotations — evidence keeps arriving,
+ * and the read side keeps the newest outcome per annotation as the standing
+ * one.
  */
 
 /**
- * The diff of some paths between two commits, or undefined when git cannot
- * produce one. A rebase or force-push makes a commit unreachable, and that is
- * the normal case rather than an error: it yields `unknown`, never a guess.
+ * Undefined when git cannot produce one: a rebase or force-push makes a commit
+ * unreachable, and that is the normal case rather than an error — it yields
+ * `unknown`, never a guess.
  */
 export type ReadFileDiff = (from: string, to: string, paths: string[]) => string | undefined;
 
-/** Everything a verdict is decided from, and nothing else. */
 export interface OutcomeFacts {
   /** Whether both commits were reachable, so the rounds can be compared at all. */
   comparable: boolean;
@@ -38,16 +35,13 @@ export interface OutcomesInput {
   repo: RepoRef;
   now: string;
   nextId: IdSource;
-  /** Ledger id of the round `start` has just opened. */
   nextRound: string;
   /** The session as it stands after that `start`, so its newest round is the open one. */
   session: SessionRecord;
-  /** This session's annotations as the ledger has them, oldest first. */
   annotations: AnnotationRecord[];
   diffFile: ReadFileDiff;
 }
 
-/** The session's rounds seen from the one now opening: what a judgement reads. */
 interface Review {
   rounds: SessionRound[];
   current: SessionRound;
@@ -55,7 +49,6 @@ interface Review {
   diffFile: ReadFileDiff;
 }
 
-/** One annotation's evidence: the facts plus what they were read from. */
 interface Judgement extends OutcomeFacts {
   fromCommit: string | null;
   toCommit: string | null;
@@ -100,9 +93,8 @@ function roundWithId(review: Review, id: string): SessionRound | undefined {
 }
 
 /**
- * The round an annotation was made in, or undefined when it is not one this
- * session still remembers, or is the round now opening — whose annotations
- * nothing has responded to yet.
+ * Undefined for a round this session no longer remembers, and for the round now
+ * opening — whose annotations nothing has responded to yet.
  */
 function earlierRound(review: Review, id: string): SessionRound | undefined {
   const made = roundWithId(review, id);
@@ -123,7 +115,6 @@ function judge(review: Review, annotation: AnnotationRecord, made: SessionRound)
   };
 }
 
-/** What the agent did to the file between the two rounds' head commits. */
 function responsePatch(review: Review, made: SessionRound, paths: string[]): string | undefined {
   const from = made.headCommit;
   const to = review.current.headCommit;
@@ -132,7 +123,6 @@ function responsePatch(review: Review, made: SessionRound, paths: string[]): str
 }
 
 /**
- * Whether the reviewer marked the same file again in a round after this one.
  * `path` is the annotated file's name in the round now opening, which is what
  * every other annotation's file is compared under.
  */
@@ -155,7 +145,6 @@ function madeAfter(review: Review, id: string, index: number): boolean {
   return round !== undefined && round.index > index;
 }
 
-/** Whether the reviewer's approval of the file still stands today. */
 function heldApproval(rounds: SessionRound[], path: string): boolean {
   const { approvedAtBlob, changedSince } = settled(rounds, path);
   return approvedAtBlob !== null && !changedSince;
@@ -187,25 +176,21 @@ function outcomeRecord(
 
 type VerdictTest = (facts: OutcomeFacts) => boolean;
 
-/** No diff between the two rounds: the commits are gone, so nothing is provable. */
 const unjudgeable: VerdictTest = (facts) => !facts.comparable;
 
-/** The reviewer marked the same file again after this comment. */
 const raisedAgain: VerdictTest = (facts) => facts.comparable && facts.reAnnotated;
 
-/** The agent changed the file, or the reviewer signed it off as it stands. */
 const respondedTo: VerdictTest = (facts) =>
   facts.comparable && !facts.reAnnotated && (facts.fileTouched || facts.approved);
 
-/** Comparable, never raised again, and nothing moved: the comment went nowhere. */
 const wentNowhere: VerdictTest = (facts) =>
   facts.comparable && !facts.reAnnotated && !facts.fileTouched && !facts.approved;
 
 /**
- * The question behind each verdict, keyed by the union so a new verdict fails to
- * typecheck until it has one. The four tests are mutually exclusive and cover
- * every combination of the facts — an invariant the tests pin — so the order
- * they are asked in does not matter.
+ * Keyed by the union so a new verdict fails to typecheck until it has a test.
+ * The four tests are mutually exclusive and cover every combination of the
+ * facts — an invariant the tests pin — so the order they are asked in does not
+ * matter.
  */
 const VERDICT_TESTS: Record<Verdict, VerdictTest> = {
   addressed: respondedTo,

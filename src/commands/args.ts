@@ -1,28 +1,23 @@
 /**
- * The one flag scanner behind every command that takes flags. Commands keep their
- * own vocabulary and error text; this walks tokens left to right in one pass,
- * throwing the caller's error at the exact token — which mistake is reported first
- * stays per-command. No command may ignore a flag it does not know: silently
- * collecting one as a positional is how `start` came to open a browser that
- * `--no-opne` had asked it not to.
+ * Throws the caller's error at the exact token, so which mistake is reported
+ * first stays per-command. No command may ignore a flag it does not know:
+ * silently collecting one as a positional is how `start` came to open a browser
+ * that `--no-opne` had asked it not to.
  */
 export interface ScanSpec {
   /** Flags that consume the next token as their value. */
   value?: readonly string[];
-  /** Flags that stand alone. */
   boolean?: readonly string[];
-  /** The error an unknown flag-like token raises, thrown where the token was met. */
   onUnknown: (flag: string) => Error;
-  /** What a value flag with nothing to eat does. Absent, the hit is recorded
-   * valueless and the caller decides (`start` drops it, `say` raises errors that
-   * depend on earlier flags); a factory throws at the flag itself (`feedback`). */
+  /** Absent, the hit is recorded valueless and the caller decides (`start` drops
+   * it, `say` raises errors that depend on earlier flags); a factory throws at
+   * the flag itself (`feedback`). */
   onMissingValue?: (flag: string) => Error;
-  /** Whether a flag-like token can be a value. `"any"` (default) eats whatever comes
-   * next — a `say --for` note may be "-1 on that"; `"bare"` refuses, so `--since --format`
-   * is a missing value, not a value. */
+  /** `"any"` (default) eats whatever comes next — a `say --for` note may be "-1 on
+   * that"; `"bare"` refuses, so `--since --format` is a missing value, not a value. */
   values?: "any" | "bare";
-  /** What marks an unknown token as flag-like: the agent verbs only `--x` (a branch named
-   * `-x` stays positional), `feedback` any `-x`. */
+  /** The agent verbs take only `--x`, so a branch named `-x` stays positional;
+   * `feedback` any `-x`. */
   flagPrefix?: "-" | "--";
 }
 
@@ -53,7 +48,6 @@ function isKnown(flags: readonly string[] | undefined, token: string): boolean {
   return flags !== undefined && flags.includes(token);
 }
 
-/** A token nobody declared is positional unless it looks like a flag. */
 function unknownChecked(spec: ScanSpec, token: string): string {
   if (token.startsWith(spec.flagPrefix ?? "--")) throw spec.onUnknown(token);
   return token;
@@ -72,20 +66,17 @@ function readValueFlag(
   return value === undefined ? 0 : 1;
 }
 
-/** Whether the next token is one this flag may take as its value at all. */
 function edible(spec: ScanSpec, next: string | undefined): next is string {
   if (next === undefined) return false;
   return spec.values !== "bare" || !next.startsWith("-");
 }
 
-/** Every value the flag was given, in order, so a repeatable flag keeps them all. */
 export function allValues(scanned: ScannedArgs, flag: string): string[] {
   return scanned.flags
     .filter((hit) => hit.flag === flag && hit.value !== undefined)
     .map((hit) => hit.value!);
 }
 
-/** Repeating a single-valued flag means the last one wins. */
 export function lastValue(scanned: ScannedArgs, flag: string): string | undefined {
   return allValues(scanned, flag).at(-1);
 }
