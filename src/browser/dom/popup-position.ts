@@ -1,6 +1,6 @@
 /**
- * Where the annotation popup goes. Split from the mount because it is
- * arithmetic, not DOM: off-screen popups are preventable by a table of numbers.
+ * Split from the mount because it is arithmetic, not DOM: off-screen popups
+ * are preventable by a table of numbers.
  */
 
 /** Between the selection and the popup, so the marked code stays readable. */
@@ -19,9 +19,8 @@ export interface PopupPlacementInput {
    * be negative: an upward autoscrolling drag leaves it above the screen.
    */
   selection: { top: number; bottom: number; left: number };
-  /** The popup's size as rendered, after the stylesheet has capped it. */
+  /** As rendered, after the stylesheet has capped it. */
   popup: { width: number; height: number };
-  /** The visible area, in the same screen coordinates as `selection`. */
   viewport: { width: number; height: number };
   /**
    * Document scroll offset. Always zero on this page (the diff scrolls inside
@@ -31,7 +30,7 @@ export interface PopupPlacementInput {
   scroll: { x: number; y: number };
 }
 
-/** The popup's own corner, in page coordinates, ready for `style.top`/`left`. */
+/** Page coordinates, ready for `style.top`/`left`. */
 export interface PopupPlacement {
   top: number;
   left: number;
@@ -48,7 +47,6 @@ export function popupPosition(input: PopupPlacementInput): PopupPlacement {
   };
 }
 
-/** Below the selection if it fits, above it if that does, the bottom edge otherwise. */
 function fitVertically({ selection, popup, viewport }: PopupPlacementInput): number {
   // Floored before measuring: a selection above the screen has room under it
   // by arithmetic alone, where nobody could see the popup.
@@ -62,9 +60,8 @@ function fitVertically({ selection, popup, viewport }: PopupPlacementInput): num
 }
 
 /**
- * Selection's left edge, clamped on screen. Left, not reading-order start: the
- * page is `lang="en"` with no `dir`, and RTL would only anchor at the wrong
- * end — still on screen.
+ * Left, not reading-order start: the page is `lang="en"` with no `dir`, and
+ * RTL would only anchor at the wrong end — still on screen.
  */
 function fitHorizontally({ selection, popup, viewport }: PopupPlacementInput): number {
   return Math.max(EDGE, Math.min(selection.left, viewport.width - EDGE - popup.width));

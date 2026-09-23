@@ -4,32 +4,28 @@ import type { SessionData } from "./session-api.ts";
 
 export interface MountedRoundOffer {
   /**
-   * A round arrived mid-read. Session held whole, not refetched on take: what
-   * is offered has to be what arrives. `queued` is what the reviewer has not
-   * sent yet, which the offer names — it is the thing they would expect a new
-   * round to cost them.
+   * Session held whole, not refetched on take: what is offered has to be what
+   * arrives. `queued` is the unsent count the offer names — the thing a
+   * reviewer would expect a new round to cost them.
    */
   offer(fresh: SessionData, queued: number): void;
-  /** The round went on screen by another route, so there is nothing to offer. */
   clear(): void;
   /**
-   * Popup dismissed: the offer is now the page's only word that a round
-   * waits, so it glows (stylesheet reads the mark). Ends with the offer.
+   * The offer is now the page's only word that a round waits, so it glows
+   * (stylesheet reads the mark).
    */
   beckon(): void;
 }
 
 export interface RoundOfferOptions {
-  /** The button in the header, hidden until there is something to say. */
   root: HTMLElement;
-  /** The reviewer pressed it: this is the round they just asked for. */
   onTake(fresh: SessionData): void;
 }
 
 /**
- * The header offer and its round. One at a time, always the newest: taking an
- * older round would open a diff the repository has moved past. A new offer
- * replaces the held one, which is why the label rewrites on every offer.
+ * One at a time, always the newest: taking an older round would open a diff
+ * the repository has moved past, so a new offer replaces the held one and the
+ * label rewrites.
  */
 export function mountRoundOffer(options: RoundOfferOptions): MountedRoundOffer {
   const { root, onTake } = options;
@@ -61,7 +57,7 @@ export function mountRoundOffer(options: RoundOfferOptions): MountedRoundOffer {
   };
 }
 
-/** Size of the waiting round: unique files — a file in two groups reads once. */
+/** Unique files: a file in two groups reads once. */
 export function filesIn(fresh: SessionData): number {
   return new Set(fresh.groups.flatMap((group) => group.files.map((file) => file.path))).size;
 }

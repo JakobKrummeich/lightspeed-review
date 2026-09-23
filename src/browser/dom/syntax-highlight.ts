@@ -11,7 +11,6 @@ type Side = "old" | "new";
 
 const SIDES: Side[] = ["old", "new"];
 
-/** Both versions of one file, as far as the server could produce them. */
 type FileText = Partial<Record<Side, string>>;
 
 /**
@@ -26,10 +25,9 @@ const SIDES_BY_STATUS: Record<string, Side[]> = {
 };
 
 /**
- * Colours an already-rendered diff, one grammar per file. Runs after the diff
- * is on screen: momentary monochrome beats nothing until highlight.js loads.
- * Files are read whole out of git — a hunk is not a program, and meaning
- * depends on the surrounding lines a diff leaves out.
+ * Runs after the diff is on screen: momentary monochrome beats nothing until
+ * highlight.js loads. Files are read whole out of git — a hunk is not a
+ * program, and meaning depends on the surrounding lines a diff leaves out.
  */
 export async function highlightDiff(root: HTMLElement, sessionKey?: string): Promise<void> {
   await highlightBlocks(
@@ -39,9 +37,8 @@ export async function highlightDiff(root: HTMLElement, sessionKey?: string): Pro
 }
 
 /**
- * Same for a named set of blocks (a form toggle replaces one block's lines);
- * repainting the whole review would merge a second set of spans into
- * already-coloured lines.
+ * For a form toggle that replaced one block's lines: repainting the whole
+ * review would merge a second set of spans into already-coloured lines.
  */
 export async function highlightBlocks(blocks: HTMLElement[], sessionKey?: string): Promise<void> {
   const files = blocks
@@ -94,10 +91,7 @@ function paint(file: HTMLElement, hljs: HLJSApi, language: string, text: FileTex
   for (const [line, html] of new Map([...fromDiff, ...fromFile])) apply(line, html);
 }
 
-/**
- * Highlights each version as its own document, handing every diff row its
- * line. Rows the file cannot account for are left for the diff-only pass.
- */
+/** Rows the file cannot account for are left for the diff-only pass. */
 function paintFromFile(
   file: HTMLElement,
   hljs: HLJSApi,
@@ -120,10 +114,7 @@ function paintFromFile(
   return painted;
 }
 
-/**
- * Fallback: highlight what is on screen. Multi-line constructs cut by the
- * hunk read wrongly — the price of having no file.
- */
+/** Multi-line constructs cut by the hunk read wrongly — the price of having no file. */
 function paintFromDiff(sides: Element[][], hljs: HLJSApi, language: string): Map<Element, string> {
   const painted = new Map<Element, string>();
   for (const side of sides) {
@@ -138,7 +129,6 @@ function paintFromDiff(sides: Element[][], hljs: HLJSApi, language: string): Map
   return painted;
 }
 
-/** Rendered rows of one version, each with diff2html's printed line number. */
 function rowsOf(file: HTMLElement, side: Side): { line: Element; row: DiffRow }[] {
   const columns = sideColumns(file);
   const scope = columns.length > 0 ? columns[side === "old" ? 0 : 1] : file;
@@ -150,10 +140,9 @@ function rowsOf(file: HTMLElement, side: Side): { line: Element; row: DiffRow }[
 }
 
 /**
- * Line elements grouped into the texts they came from: only each version on
- * its own is a document highlight.js can read. Side-by-side: a column each;
- * unified: removed+context, then added+context. Context lines belong to both
- * and are painted by the newer one.
+ * Only each version on its own is a document highlight.js can read.
+ * Side-by-side: a column each; unified: removed+context, then added+context.
+ * Context lines belong to both and are painted by the newer one.
  */
 function sidesOf(file: HTMLElement): Element[][] {
   const columns = [...file.querySelectorAll(".d2h-file-side-diff")];

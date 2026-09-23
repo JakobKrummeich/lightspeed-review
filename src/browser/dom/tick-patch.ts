@@ -1,6 +1,5 @@
 /**
- * What a tick changes without a redraw: checkboxes, counters, progress bar —
- * patched in place so diff2html output and folds survive every press. The
+ * Patched in place so diff2html output and folds survive every press. The
  * chapter index is deliberately absent: ticks happen inside chapters, the
  * index only on the overview, so there is never one on screen to patch.
  */
@@ -15,7 +14,7 @@ import {
 import { progressSegments, segmentFillStyle, segmentLabel } from "../progress-bar.ts";
 import { fileBlock, groupSection } from "./diff-folds.ts";
 
-/** Returns the new approved list for a checkbox change, or undefined if it was some other input. */
+/** Undefined when the input was not a tick. */
 export function nextApproved(
   groups: DiffGroup[],
   approved: string[],
@@ -31,11 +30,7 @@ export function nextApproved(
   return undefined;
 }
 
-/**
- * Patches checkboxes and counters in place: re-rendering would throw away
- * fold state and re-run diff2html per tick. Open/shut is not patched here;
- * it follows the flips in the tick handler.
- */
+/** Open/shut is not patched here; it follows the flips in the tick handler. */
 export function applyApprovedState(
   root: HTMLElement,
   groups: DiffGroup[],
@@ -55,9 +50,8 @@ export function applyApprovedState(
 }
 
 /**
- * Header bar and count: patched, not redrawn. A redraw hands segments new
- * elements, so the fill would jump instead of running to its width — the one
- * moment the bar is there to be watched.
+ * A redraw hands segments new elements, so the fill would jump instead of
+ * running to its width — the one moment the bar is there to be watched.
  */
 export function applyProgressState(
   progress: HTMLElement,

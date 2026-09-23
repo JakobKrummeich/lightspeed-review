@@ -1,8 +1,7 @@
 /**
- * One round's fetched forms — the since-approval and since-last-round diffs:
- * which files are showing one, and what git has answered for each. Fetches
- * once per file and form, keeps the answer, and repaints only the block it
- * swapped.
+ * One round's fetched forms (since-approval, since-last-round, whole file):
+ * fetched once per file and form, the answer kept, only the swapped block
+ * repainted.
  */
 import type { DiffGroup } from "../../diff-extract.ts";
 import type { ApprovedFormData } from "../../rounds/approved-form.ts";
@@ -26,7 +25,6 @@ import { anchored } from "./fold.ts";
 import { fetchApprovedForm, fetchFileSide, fetchLastRoundForm } from "./session-api.ts";
 import { highlightBlocks } from "./syntax-highlight.ts";
 
-/** What is known about one file's fetched form, before and after the server answers. */
 type FormAnswer = "pending" | "failed" | FormPayload;
 
 /**
@@ -36,10 +34,7 @@ type FormAnswer = "pending" | "failed" | FormPayload;
 type FormPayload =
   { form: ComparisonForm; data: ApprovedFormData } | { form: "full"; body: string };
 
-/**
- * Each fetched form's own endpoint, keyed so the store can hold a press it
- * cannot fetch for — a form missing here does not compile.
- */
+/** Keyed by form so a form missing here does not compile. */
 const FETCHERS: Record<
   FetchedForm,
   (key: string, path: string) => Promise<FormPayload | undefined>
@@ -81,20 +76,18 @@ async function highlightWhole(path: string, contents: string): Promise<FileHighl
 }
 
 export interface ApprovedFormStore {
-  /** The reviewer pressed one side of a file's diff switch. */
   pick(option: HTMLElement): Promise<void>;
-  /** Re-renders every fetched form on show, after a redraw replaced the lines. */
+  /** After a redraw replaced the lines. */
   restore(): void;
-  /** Drops every answer and every showing form with the round they were about. */
   forget(): void;
 }
 
 export interface ApprovedFormStoreOptions {
   root: HTMLElement;
   key: string;
-  /** The grouping the diff is currently drawn from — live, it moves per round. */
+  /** Live: moves per round. */
   groups(): DiffGroup[];
-  /** The renderer of the current layout — live, it moves on a format switch. */
+  /** Live: moves on a format switch. */
   renderer(): DiffRenderer;
 }
 
@@ -108,12 +101,11 @@ export function createApprovedFormStore(options: ApprovedFormStoreOptions): Appr
    */
   const answers = new Map<string, FormAnswer>();
   /**
-   * Which files show a fetched form. Page-lifetime only: it is a question, not
-   * a setting, and a reload should open on the branch diff.
+   * Page-lifetime only: it is a question, not a setting, and a reload should
+   * open on the branch diff.
    */
   const showing = new Map<string, FetchedForm>();
 
-  /** One file's diff switch pressed; the rest of the review is untouched. */
   async function pick(option: HTMLElement): Promise<void> {
     const block = option.closest(".lsr-file");
     const path = block instanceof HTMLElement ? block.dataset.file : undefined;
@@ -125,9 +117,8 @@ export function createApprovedFormStore(options: ApprovedFormStoreOptions): Appr
   }
 
   /**
-   * The side that costs a round trip: git asked once per file and form, answer
-   * kept. A file already being asked about is left alone — the press that
-   * started it will paint what comes back.
+   * A file already being asked about is left alone — the press that started
+   * it will paint what comes back.
    */
   async function showFetchedForm(path: string, form: FetchedForm): Promise<void> {
     showing.set(path, form);
@@ -169,15 +160,11 @@ export function createApprovedFormStore(options: ApprovedFormStoreOptions): Appr
   };
 }
 
-/** One key per question asked of the server, which is a path under a form. */
 function answerKey(form: FetchedForm, path: string): string {
   return `${form}:${path}`;
 }
 
-/**
- * Swaps one file's diff for another form. Only diff and switch change: place,
- * collapse state and tick stay put.
- */
+/** Only diff and switch change: place, collapse state and tick stay put. */
 function showForm(
   root: HTMLElement,
   path: string,
@@ -213,10 +200,7 @@ function repaint(key: string, path: string, block: HTMLElement | null): void {
   );
 }
 
-/**
- * One file's fetched form as it stands now. A question still with git reads
- * as pending, not failed.
- */
+/** A question still with git reads as pending, not failed. */
 function fetchedBody(
   answers: Map<string, FormAnswer>,
   options: ApprovedFormStoreOptions,

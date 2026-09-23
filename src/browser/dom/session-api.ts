@@ -15,40 +15,27 @@ import type {
 
 /** The slice of the stored session the review page renders. */
 export interface SessionData {
-  /** Why the branch exists, as this round states it. */
   intents: string[];
-  /** Subjects of the commits the branch adds, newest first. */
+  /** Subjects, newest first. */
   commits: string[];
   groups: DiffGroup[];
   approved: string[];
-  /**
-   * Where each file of this round stands with the reviewer, derived server-side
-   * from the rounds before it.
-   */
   approval: Record<string, Approval>;
   conversation: ConversationEntry[];
   /**
-   * Every round, oldest first; the panel rules the conversation along it. The
-   * type claims only what the page reads: marks, plus per-round files whose
-   * blobs decide the `Since last round` switch (`round-changes.ts`). `files`
-   * optional because only the wire carries it.
+   * Oldest first. The type claims only what the page reads: marks, plus
+   * per-round files whose blobs decide the `Since last round` switch
+   * (`round-changes.ts`). `files` optional because only the wire carries it.
    */
   rounds: (RoundMark & { files?: RoundFile[] })[];
   pending: FeedbackPrompt[];
-  /**
-   * Agent's per-comment answers (`say --for <id>`), keyed by comment id; the
-   * panel shows each note under the comment it answers.
-   */
+  /** Keyed by comment id (`say --for <id>`). */
   declarations?: Record<string, DeclaredAnswer>;
   status: SessionStatus;
-  /**
-   * Whose move it is, so a reload draws the lock the server already holds
-   * rather than a live Send that goes away one SSE frame later.
-   */
   turn: Turn;
   /**
-   * Who closed it, when recorded. Absent reads as "not written down", not as
-   * either party — the closing summary says so in words.
+   * Absent reads as "not written down", not as either party — the closing
+   * summary says so in words.
    */
   endedBy?: ReviewCloser;
 }
@@ -60,8 +47,8 @@ export async function fetchSession(key: string): Promise<SessionData> {
 }
 
 /**
- * One whole version of a file. Undefined is an ordinary answer: added,
- * deleted, renamed or binary on that side — the diff is all the code there is.
+ * Undefined is an ordinary answer: added, deleted, renamed or binary on that
+ * side — the diff is all the code there is.
  */
 export async function fetchFileSide(
   key: string,
@@ -75,9 +62,9 @@ export async function fetchFileSide(
 }
 
 /**
- * What the agent did to a file after approval. Fetched only on toggle press:
- * costs a git subprocess, most files are never toggled, and the payload is
- * large enough. Undefined is an answer, not a failure to handle later.
+ * Fetched only on toggle press: costs a git subprocess, most files are never
+ * toggled, and the payload is large enough. Undefined is an answer, not a
+ * failure to handle later.
  */
 export async function fetchApprovedForm(
   key: string,
@@ -89,11 +76,7 @@ export async function fetchApprovedForm(
   return (await response.json()) as ApprovedFormData;
 }
 
-/**
- * What the agent did between the last two rounds to an unapproved file: the
- * diff switch's other endpoint, fetched on press for the same reasons.
- * Undefined is an answer here too.
- */
+/** Fetched on press for the same reasons as `fetchApprovedForm`; undefined is an answer here too. */
 export async function fetchLastRoundForm(
   key: string,
   path: string,
@@ -105,9 +88,8 @@ export async function fetchLastRoundForm(
 }
 
 /**
- * What became of last round's comments. Asked once per round (load and
- * re-group), never per card. Failure is the caller's to swallow: the diff
- * must never wait on the replay.
+ * Asked once per round (load and re-group), never per card. Failure is the
+ * caller's to swallow: the diff must never wait on the replay.
  */
 export async function fetchReplay(key: string): Promise<ReplayData> {
   const response = await fetch(`/api/session/${key}/replay`);
@@ -120,10 +102,10 @@ export async function persistApproved(key: string, approved: string[]): Promise<
 }
 
 /**
- * Send timeout. The compose row is locked while this call runs, so an answer
- * that never comes would lock the review for good. A minute dwarfs a local
- * kilobyte write yet can be waited out; being wrong is cheap — nothing is
- * cleared on failure, and a send that landed echoes back down the stream.
+ * The compose row is locked while the send runs, so an answer that never
+ * comes would lock the review for good. A minute dwarfs a local kilobyte write
+ * yet can be waited out; being wrong is cheap — nothing is cleared on failure,
+ * and a send that landed echoes back down the stream.
  */
 const FEEDBACK_TIMEOUT_MS = 60_000;
 

@@ -1,15 +1,14 @@
 import { anchoredScrollTop, foldHeight, foldProgress } from "../scroll-anchor.ts";
 
 /**
- * Folds collapsible blocks while holding one element at its exact viewport
- * position every frame, so nothing drifts. Anchor rule: hold a landmark that
- * survives the gesture; walk to the top edge (`Anchor.walk`, asked for by
- * name) only where none does — e.g. a group fold takes its tick row down with
- * it. Arithmetic lives in `../scroll-anchor.ts`; here is only what a browser
- * can answer: rectangles, media queries, frames.
+ * Holds one element at its exact viewport position every frame while blocks
+ * fold, so nothing drifts. Anchor rule: hold a landmark that survives the
+ * gesture; walk to the top edge (`Anchor.walk`) only where none does — a group
+ * fold takes its tick row down with it. Arithmetic lives in
+ * `../scroll-anchor.ts`; here is only what a browser can answer.
  */
 
-/** The one scrolling element of the review; its offset is what a fold is paid out of. */
+/** The one scrolling element; a fold is paid out of its offset. */
 const SCROLLER = ".lsr-review";
 
 /**
@@ -27,28 +26,22 @@ const FOLDING_CLASS = "lsr-folding";
  */
 export const MAX_ANIMATED_FOLD_PX = 20000;
 
-/** One block to open or shut. */
 export interface Fold {
-  /** The element that shows and hides: a group's content, or one file's diff. */
   content: HTMLElement;
   expanded: boolean;
-  /** Whether it should be watched happening rather than simply done. */
   animated: boolean;
 }
 
-/** What a gesture holds still, and what it is allowed to do with it. */
 export interface Anchor {
-  /** The element whose viewport position the gesture is measured against. */
   element: HTMLElement;
   /**
-   * Whether an element already above the screen may be walked down onto the
-   * scroller's top edge. Only a caller that knows nothing on the screen will
-   * survive its own gesture asks for this; everyone else holds what they have.
+   * May an anchor already above the screen be walked down onto the scroller's
+   * top edge? Only a caller that knows nothing on the screen will survive its
+   * own gesture asks for this.
    */
   walk: boolean;
 }
 
-/** A fold in flight, and where its height is going. */
 interface Running {
   content: HTMLElement;
   from: number;
@@ -63,8 +56,8 @@ interface Running {
 const owners = new WeakMap<HTMLElement, object>();
 
 /**
- * Folds blocks as one gesture, holding `anchor` still. No anchor (or one
- * outside the scroller): folds still happen, only the correction is skipped.
+ * No anchor (or one outside the scroller): folds still happen, only the
+ * correction is skipped.
  */
 export function foldAnchored(folds: Fold[], anchor: Anchor | null): void {
   const hold = beginHold(anchor);
@@ -76,10 +69,7 @@ export function foldAnchored(folds: Fold[], anchor: Anchor | null): void {
   animate(running, hold);
 }
 
-/**
- * Runs `change` with `anchor` held: the one-shot fold — no clock, one
- * correction after the page has moved.
- */
+/** The one-shot fold: no clock, one correction after `change` has moved the page. */
 export function anchored<T>(anchor: Anchor | null, change: () => T): T {
   const hold = beginHold(anchor);
   const result = change();
@@ -87,9 +77,7 @@ export function anchored<T>(anchor: Anchor | null, change: () => T): T {
   return result;
 }
 
-/** Starts every fold of one gesture; returns the ones worth animating. */
 function startAll(folds: Fold[]): Running[] {
-  // Queried once per gesture: the answer cannot change between two blocks.
   const motion = hasFrames() && !reducedMotion();
   // All heights read before any fold is applied: a group measured after its
   // inner file settled would animate from a height already missing that diff.
@@ -105,7 +93,6 @@ function startAll(folds: Fold[]): Running[] {
   return running;
 }
 
-/** Runs every fold of one gesture off a single clock, correcting once a frame. */
 function animate(running: Running[], hold: Hold | undefined): void {
   const owner = {};
   for (const fold of running) owners.set(fold.content, owner);
@@ -134,14 +121,13 @@ function animate(running: Running[], hold: Hold | undefined): void {
 }
 
 /**
- * Height a block folds from: its current rendered height, mid-fold included,
- * so an interrupted fold carries on instead of snapping.
+ * Current rendered height, mid-fold included, so an interrupted fold carries
+ * on instead of snapping.
  */
 function startingHeight(fold: Fold): number {
   return fold.content.hidden ? 0 : fold.content.getBoundingClientRect().height;
 }
 
-/** Moves a block onto an explicit height and measures where it is heading. */
 function start(fold: Fold, from: number): Running {
   const { content, expanded } = fold;
   content.hidden = false;
@@ -152,7 +138,6 @@ function start(fold: Fold, from: number): Running {
   return { content, from, to, expanded };
 }
 
-/** The resting state either way: no inline height, no folding class, `hidden` says it all. */
 function settle(content: HTMLElement, expanded: boolean): void {
   owners.delete(content);
   content.style.height = "";
@@ -160,10 +145,7 @@ function settle(content: HTMLElement, expanded: boolean): void {
   content.hidden = !expanded;
 }
 
-/**
- * Worth a clock? Taller of the two heights against the budget above; over it,
- * done at once — and still anchored.
- */
+/** Over the budget, a fold is done at once — and still anchored. */
 function animates(run: Running): boolean {
   return Math.max(run.from, run.to) <= MAX_ANIMATED_FOLD_PX;
 }
@@ -176,18 +158,13 @@ function reducedMotion(): boolean {
   return globalThis.window?.matchMedia("(prefers-reduced-motion: reduce)").matches === true;
 }
 
-/** The anchor, the scroller it lives in, and where the anchor stood before anything moved. */
 interface Hold {
   scroller: HTMLElement;
   anchor: HTMLElement;
   walk: boolean;
   beforeTop: number;
-  /**
-   * Offset last written, or undefined. If the scroller no longer stands there
-   * at the top of a frame, the reviewer moved it.
-   */
+  /** If the scroller no longer stands at the offset last written, the reviewer moved it. */
   wrote: number | undefined;
-  /** Set when it was, after which the fold is theirs and this stops writing. */
   released: boolean;
 }
 
@@ -205,7 +182,6 @@ function beginHold(anchor: Anchor | null): Hold | undefined {
 }
 
 /**
- * One correction: measure the anchor, pay the difference out of the offset.
  * A wheel flick mid-fold must win, so each write is read back (browsers clamp
  * past-the-end offsets; a clamp is not a reviewer) and a differing offset next
  * frame releases the hold for good.

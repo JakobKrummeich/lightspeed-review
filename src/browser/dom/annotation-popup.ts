@@ -5,17 +5,16 @@ import { selectionFragments } from "./selection-fragments.ts";
 import type { AnnotationPrompt } from "../../session-store.ts";
 
 export interface AnnotationPopupOptions {
-  /** The grouped diff container; selections outside it are ignored. */
+  /** Selections outside it are ignored. */
   diffRoot: HTMLElement;
   onQueue(prompts: AnnotationPrompt[]): void;
 }
 
 /**
- * Turns a diff text selection into queued annotations. One popup element
- * reused per selection, appended to `<body>` to float above the scrolling
- * diff. Deliberately not persisted across reload (unlike the panel's queue,
- * `review-memory.ts`): a reload takes the selection with it, and a restored
- * comment with no fragments would be a sentence about nothing.
+ * One popup element reused per selection, appended to `<body>` to float above
+ * the scrolling diff. Deliberately not persisted across reload (unlike the
+ * panel's queue, `review-memory.ts`): a reload takes the selection with it,
+ * and a restored comment with no fragments would be a sentence about nothing.
  */
 export function mountAnnotationPopup(options: AnnotationPopupOptions): void {
   const popup = document.createElement("div");
@@ -39,7 +38,6 @@ export function mountAnnotationPopup(options: AnnotationPopupOptions): void {
     }, 0);
   });
 
-  /** The one queue path, taken by the button and by Enter alike. */
   function queue(): boolean {
     const box = commentBox(popup);
     const prompts = annotationsFrom(fragments, box?.value ?? "");
@@ -59,7 +57,6 @@ export function mountAnnotationPopup(options: AnnotationPopupOptions): void {
   });
 
   popup.addEventListener("keydown", (event) => {
-    // Compared against the box: only the comment field's keystrokes are the popup's to take.
     const field = commentBox(popup);
     if (field === null || event.target !== field) return;
     const action = enterAction(event);

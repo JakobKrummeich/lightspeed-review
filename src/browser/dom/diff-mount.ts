@@ -33,86 +33,68 @@ import { changedSinceLastRound } from "../round-changes.ts";
 import { highlightDiff } from "./syntax-highlight.ts";
 
 /**
- * What a `session` event turned out to be. The diff cannot tell on its own
- * (rounds are the page's business), and the two want opposite things: regroup
- * draws fresh, same-round must leave the reviewer's view alone.
+ * The diff cannot tell on its own what a `session` event was (rounds are the
+ * page's business), and the two want opposite things: regroup draws fresh,
+ * same-round must leave the reviewer's view alone.
  */
 export type SessionChange = "regrouped" | "same-round";
 
 export interface MountedDiff {
-  /** Redraws everything, keeping the reviewer's place unless the round moved. */
   update(session: SessionData, change: SessionChange): void;
-  /** Redraws everything in the other layout: unified ↔ side-by-side. */
   setFormat(format: DiffOutputFormat): void;
   /**
-   * Puts a file back on screen: enter its chapter, unfold it, scroll to the
-   * line (or the file when none). How the panel asks for a comment's lines.
+   * How the panel asks for a comment's lines: enters the chapter, unfolds the
+   * file, scrolls to the line (or the file when none).
    */
   reveal(file: string, place?: LinePlace): void;
 }
 
 export interface DiffViewOptions {
   root: HTMLElement;
-  /** Header element holding the progress bar and the count beside it. */
   progress: HTMLElement;
   key: string;
   session: SessionData;
   format: DiffOutputFormat;
-  /**
-   * What was open last time on this round; undefined for an unread round.
-   * Undefined is not "everything shut": it means the round opens as rendered.
-   */
+  /** Undefined is not "everything shut": an unread round opens as rendered. */
   open: OpenFolds | undefined;
-  /**
-   * Focus-mode chapter when the round was last left; undefined for the
-   * overview, which renumbered indexes also collapse to.
-   */
+  /** Undefined is the overview, which renumbered indexes also collapse to. */
   focus: number | undefined;
-  /** Focus mode changed; reported for reload restore. Never called for initial state. */
+  /** Never called for the initial state. */
   onFocus(focus: number | undefined): void;
   /**
-   * What stands open, reported after every draw and fold for reload restore.
-   * The page, not the diff, stamps which round it belongs to.
+   * Reported after every draw and fold; the page, not the diff, stamps which
+   * round it belongs to.
    */
   onOpen(open: OpenFolds): void;
   /**
-   * Every file ticked? The approved list lives only in here, so this is the
-   * page's only way to know — reported on every draw and tick, so a round that
-   * opens fully approved is right from the first frame.
+   * The approved list lives only in here, so this is the page's only way to
+   * know — reported on every draw and tick, so a round that opens fully
+   * approved is right from the first frame.
    */
   onApproved(allApproved: boolean): void;
 }
 
-/** Everything the diff view holds between draws, shared by the handlers below. */
 interface DiffViewState {
   groups: DiffGroup[];
   approved: string[];
   approval: SessionData["approval"];
   /**
-   * Files last round's feedback was about. Derived, not sent: the payload
-   * already carries conversation and rounds, and a round is only redrawn from
-   * a whole `SessionData`.
+   * Derived, not sent: the payload already carries conversation and rounds,
+   * and a round is only redrawn from a whole `SessionData`.
    */
   commented: Set<string>;
-  /**
-   * Files the agent provably edited since the round before (they offer the
-   * `Since last round` switch). Derived for the same reason as `commented`.
-   */
+  /** Derived for the same reason as `commented`. */
   sinceLastRound: Set<string>;
   renderer: DiffRenderer;
   /**
-   * What stands open. Held across redraws on purpose: a format switch is a
-   * question about the lines, not an instruction to shut the review.
+   * Held across redraws on purpose: a format switch is a question about the
+   * lines, not an instruction to shut the review.
    */
   open: OpenFolds | undefined;
-  /**
-   * Focused chapter, or undefined for the overview. Clamped on the way in: a
-   * stored index may point into a grouping that is gone.
-   */
+  /** Clamped on the way in: a stored index may point into a grouping that is gone. */
   focus: number | undefined;
 }
 
-/** One mounted diff: its options, its held state and its approved-form store. */
 interface DiffView {
   readonly options: DiffViewOptions;
   readonly state: DiffViewState;
@@ -150,7 +132,6 @@ export function mountDiffView(options: DiffViewOptions): MountedDiff {
       state.groups = fresh.groups;
       state.approved = fresh.approved;
       state.approval = fresh.approval;
-      // Recomputed per round: what this round answers is not what the last one did.
       state.commented = commentedLastRound(fresh.conversation, fresh.rounds);
       state.sinceLastRound = changedSinceLastRound(fresh.rounds);
       if (change === "regrouped") forgetRound(view);
@@ -171,10 +152,9 @@ export function mountDiffView(options: DiffViewOptions): MountedDiff {
 }
 
 /**
- * The jump a comment's file name makes. Entering the chapter is a real focus
- * press (reported, remembered), so a reload opens where the jump landed. The
- * fold opens like a click would: a jump onto an approved-shut file must show
- * the lines, not the lid.
+ * Entering the chapter is a real focus press (reported, remembered), so a
+ * reload opens where the jump landed. The fold opens like a click would: a
+ * jump onto an approved-shut file must show the lines, not the lid.
  */
 function reveal(view: DiffView, file: string, place?: LinePlace): void {
   const index = view.state.groups.findIndex((held) =>
@@ -192,7 +172,6 @@ function reveal(view: DiffView, file: string, place?: LinePlace): void {
   target.scrollIntoView({ block: "center" });
 }
 
-/** Opens a file's fold the way a click on its header would, if it is shut. */
 function unfoldFile(view: DiffView, block: HTMLElement): void {
   const header = block.querySelector<HTMLElement>(".lsr-file-header");
   if (!header || isExpanded(header)) return;
@@ -201,9 +180,8 @@ function unfoldFile(view: DiffView, block: HTMLElement): void {
 }
 
 /**
- * Passes a chapter's gate: the diff comes up in place of the card that stood
- * for it. Switched rather than folded, because the card goes away in the same
- * moment — there is no landmark left for a height animation to hold still.
+ * Switched rather than folded: the card goes away in the same moment, so there
+ * is no landmark left for a height animation to hold still.
  */
 function openGate(view: DiffView, press: HTMLElement): void {
   if (isExpanded(press)) return;
@@ -211,7 +189,6 @@ function openGate(view: DiffView, press: HTMLElement): void {
   reportOpen(view);
 }
 
-/** The same gate, found by chapter number: how a jump gets past a card nobody asked it for. */
 function openChapter(view: DiffView, index: number): void {
   const gate = groupSection(view.options.root, index)?.querySelector<HTMLElement>(
     ".lsr-gate-press",
@@ -239,10 +216,9 @@ function draw(view: DiffView): void {
   if (view.state.open) applyOpenFolds(root, view.state.open);
   applyOpenFileLists(root, fileLists);
   reportOpen(view);
-  // Approved forms on show come back in the fresh layout: see the store.
   view.forms.restore();
   // The one place the bar is built: a re-group replaces its segments, a tick
-  // only repaints them. Focus rides along to mark the current chapter.
+  // only repaints them.
   progress.innerHTML = renderProgressBar(groups, approved, focus);
   view.options.onApproved(reviewApproved(groups, approved));
   // Not awaited: the diff is readable before its colours land.
@@ -268,16 +244,13 @@ function handleClick(view: DiffView, event: Event): void {
     if (press) setFocus(view, press.to);
     return;
   }
-  // Anchored on the pressed header: a press that moved it would cost the
-  // reviewer their place.
   foldSection(target, !isExpanded(target));
   reportOpen(view);
 }
 
 /**
- * The presses that do their whole job on the spot, rather than moving the
- * focus or folding what they sit on. True when one of them took the press;
- * everything else falls through to the fold below.
+ * True when a press did its whole job on the spot; everything else falls
+ * through to the fold below.
  */
 function answeredItself(view: DiffView, target: HTMLElement): boolean {
   if (target.classList.contains("lsr-form-option")) {
@@ -291,30 +264,25 @@ function answeredItself(view: DiffView, target: HTMLElement): boolean {
   }
   const press = gatePressOf(target);
   if (press) {
-    // A press on a shut card, anywhere on it: the button names the action and
-    // the whole card takes it. Once the diff is up the section is just the room
+    // Anywhere on a shut card is a press: the button names the action and the
+    // whole card takes it. Once the diff is up the section is just the room
     // the lines are read in, and a press there is a press on nothing.
     if (isExpanded(press)) return true;
     openGate(view, press);
-    // Top of the chapter, exactly as entering one does: the press was answered
-    // with a screen of diff, and its first line is where reading starts.
+    // Top of the chapter, as entering one does: the press was answered with a
+    // screen of diff, and its first line is where reading starts.
     view.options.root.scrollIntoView({ block: "start" });
     return true;
   }
   return false;
 }
 
-/** The gate a press was on, whether it hit the button or the card around it. */
 function gatePressOf(target: HTMLElement): HTMLElement | undefined {
   if (target.classList.contains("lsr-gate-press")) return target;
   if (!target.classList.contains("lsr-group")) return undefined;
   return target.querySelector<HTMLElement>(".lsr-gate-press") ?? undefined;
 }
 
-/**
- * A press on a header-bar segment: same focus move as an index entry, read
- * off the same attribute. Anything else in the strip falls through.
- */
 function handleSegmentClick(view: DiffView, event: Event): void {
   const target =
     event.target instanceof Element ? event.target.closest(".lsr-progress-segment") : null;
@@ -324,15 +292,13 @@ function handleSegmentClick(view: DiffView, event: Event): void {
 }
 
 /**
- * The mechanical lane's one press: every file of every swept chapter ticked at
- * once. Nothing new reaches the server — it is the tick the reviewer already
- * has, in bulk, so it goes down the same POST as one box.
- *
- * A redraw and not a patch, because this is the survey and the survey has no
- * in-place patch: `applyApprovedState` walks chapters that are on screen, and
- * on this screen none of them are. The counters that must change are the index
- * rows themselves, which only a draw writes. Silent when the press changes
- * nothing, so a second press does not repost a list the server already has.
+ * Nothing new reaches the server: it is the tick the reviewer already has, in
+ * bulk, down the same POST as one box. A redraw and not a patch, because the
+ * survey has no in-place patch: `applyApprovedState` walks chapters that are
+ * on screen, and on this screen none of them are; the counters that must
+ * change are the index rows, which only a draw writes. Silent when the press
+ * changes nothing, so a second press does not repost a list the server already
+ * has.
  */
 function approveSweep(view: DiffView): void {
   const { state } = view;
@@ -359,8 +325,7 @@ function handleTick(view: DiffView, event: Event): void {
   state.approved = next;
   const onward = chapterToReadNext(state, groupFlips);
   if (onward !== undefined) {
-    // The tick finished the chapter on screen: the next one still to read
-    // takes its place, on its card. A whole draw, so nothing below is patched.
+    // A whole draw, so nothing below is patched.
     setFocus(view, onward);
   } else {
     applyApprovedState(root, state.groups, state.approved);
@@ -378,10 +343,8 @@ function handleTick(view: DiffView, event: Event): void {
 }
 
 /**
- * Where a tick that finished the focused chapter moves on to, or nowhere: a
- * tick that finished nothing, or finished a chapter with none left to read,
- * leaves the reviewer where they are. Read off the group flips, so a file tick
- * that happens to complete the chapter and the chapter's own tick are one case.
+ * Read off the group flips, so a file tick that happens to complete the
+ * chapter and the chapter's own tick are one case.
  */
 function chapterToReadNext(state: DiffViewState, flips: GroupApprovalFlip[]): number | undefined {
   const { focus } = state;
@@ -390,47 +353,43 @@ function chapterToReadNext(state: DiffViewState, flips: GroupApprovalFlip[]): nu
   return nextChapterToRead(state.groups, state.approved, focus);
 }
 
-/** Whatever the page just left standing open, said out loud once. */
 function reportOpen(view: DiffView): void {
   view.state.open = readOpenFolds(view.options.root);
   view.options.onOpen(view.state.open);
 }
 
 /**
- * Drops everything only true of the replaced round. A new round is a new head
- * commit: fetched forms answer a diff that no longer exists, and paths recur,
- * so a kept answer would be served as the new round's. Folds likewise: the old
- * round's open list may name files this one does not have.
+ * A new round is a new head commit: fetched forms answer a diff that no longer
+ * exists, and paths recur, so a kept answer would be served as the new round's.
+ * Folds likewise: the old round's open list may name files this one does not
+ * have.
  */
 function forgetRound(view: DiffView): void {
   view.forms.forget();
   view.state.open = undefined;
-  // Old grouping's chapter numbers say nothing about the new one. Only the
-  // held copy needs clearing: the stored one dies with the round, since the
-  // next `onOpen` carries the new round number and `review-memory` empties on
-  // round change.
+  // Only the held copy needs clearing: the stored one dies with the round,
+  // since the next `onOpen` carries the new round number and `review-memory`
+  // empties on round change.
   view.state.focus = undefined;
 }
 
 /**
- * Moves between overview and chapters. Folds deliberately let go: each view
- * opens as rendered, and carrying one's folds into the other would name
- * blocks it does not draw.
+ * Folds deliberately let go: each view opens as rendered, and carrying one's
+ * folds into the other would name blocks it does not draw.
  */
 function setFocus(view: DiffView, next: number | undefined): void {
   view.state.focus = clampFocus(next, view.state.groups.length);
   view.state.open = undefined;
   draw(view);
   view.options.onFocus(view.state.focus);
-  // Scroll to the top of what was entered. Instant: everything on screen is
-  // a fresh draw anyway.
+  // Instant: everything on screen is a fresh draw anyway.
   view.options.root.scrollIntoView({ block: "start" });
 }
 
 /**
- * The presses the browser answers by itself, which the card they sit on must
- * not read as a request to open: a tick fires `change`, and the file list's
- * summary folds its own `<details>`.
+ * Answered by the browser itself, so the card they sit on must not read them
+ * as a request to open: a tick fires `change`, and the file list's summary
+ * folds its own `<details>`.
  */
 const BROWSER_PRESSES = ["lsr-tick", "lsr-gate-files-summary"];
 
@@ -438,7 +397,6 @@ function isBrowserPress(target: HTMLElement): boolean {
   return BROWSER_PRESSES.some((name) => target.classList.contains(name));
 }
 
-/** The controls that move the focus: the index's entries and the bar's buttons. */
 const FOCUS_CONTROLS = ["lsr-index-entry", "lsr-focus-exit", "lsr-focus-prev", "lsr-focus-next"];
 
 function isFocusControl(target: HTMLElement): boolean {
@@ -446,9 +404,9 @@ function isFocusControl(target: HTMLElement): boolean {
 }
 
 /**
- * Where a focus-control press moves. Wrapped rather than bare: "to the
- * overview" is undefined and so is "nowhere", and `Number` on a missing
- * attribute would read 0 and focus the wrong chapter.
+ * Wrapped rather than bare: "to the overview" is undefined and so is
+ * "nowhere", and `Number` on a missing attribute would read 0 and focus the
+ * wrong chapter.
  */
 function focusPress(
   target: HTMLElement,
@@ -464,15 +422,14 @@ function focusPress(
 }
 
 /**
- * One chapter sideways, nothing at the edges: the disabled ends never fire,
- * but if one did, the clamp would read -1 as "leave focus mode".
+ * The disabled ends never fire, but if one did, the clamp would read -1 as
+ * "leave focus mode".
  */
 function step(focus: number, by: number, count: number): { to: number } | undefined {
   const to = focus + by;
   return to >= 0 && to < count ? { to } : undefined;
 }
 
-/** An index entry names its chapter by number, and only a number is a press. */
 function indexPress(target: HTMLElement): { to: number } | undefined {
   const index = Number(target.dataset.groupIndex);
   return Number.isInteger(index) ? { to: index } : undefined;

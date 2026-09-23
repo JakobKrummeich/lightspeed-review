@@ -16,7 +16,6 @@ const TEXT_NODE = 3;
 const PREFIX_SELECTOR = ".d2h-code-line-prefix";
 const CONTENT_SELECTOR = ".d2h-code-line-ctn";
 
-/** What a selection takes from one rendered diff line. */
 export interface LineSelection {
   /**
    * The characters the reviewer marked. A line taken whole keeps its `+`/`-`
@@ -25,16 +24,15 @@ export interface LineSelection {
    * line that does not exist.
    */
   text: string;
-  /** Where the selection clipped the line; absent when it took the whole line. */
+  /** Absent when the selection took the whole line. */
   columns?: SelectedColumns;
 }
 
 /**
- * One line's share of a selection; nothing when the range marks none of its
- * characters (a range ending where a line begins touches without marking).
- * Ends outside the line cover it to its edges — the middle of a multi-line
- * selection — and marker-only selections are whole lines: the marker is not
- * code, so there is no character range to cut to.
+ * Nothing when the range marks none of the line's characters (a range ending
+ * where a line begins touches without marking). Ends outside the line cover
+ * it to its edges, and marker-only selections are whole lines: the marker is
+ * not code, so there is no character range to cut to.
  */
 export function selectionInLine(line: Element, range: Range): LineSelection | undefined {
   const content = line.querySelector(CONTENT_SELECTOR);
@@ -54,17 +52,14 @@ export function selectionInLine(line: Element, range: Range): LineSelection | un
   };
 }
 
-/** Which side of the line's code a range end that is not inside it falls on. */
 type Side = "before" | "after";
 
-/** 0-based offsets into the code, "whole" for all of it, nothing for none of it. */
+/** 0-based offsets into the code. */
 type Clip = { start: number; end: number } | "whole" | undefined;
 
-/** Where the range's two ends fall in the line's code. */
 function clipOf(content: Element, code: string, range: Range): Clip {
   const start = boundaryIn(content, range.startContainer, range.startOffset, "before");
   const end = boundaryIn(content, range.endContainer, range.endOffset, "after");
-  // The range passes this line by: it starts after the code, or ends before it.
   if (start === "after" || end === "before") return undefined;
   return spanOf(start === "before" ? 0 : start, end === "after" ? code.length : end, code.length);
 }
@@ -75,7 +70,6 @@ function spanOf(start: number, end: number, length: number): Clip {
 }
 
 /**
- * One range end as an offset into the line's code, or which side it falls on.
  * A container wrapping the code (the row cell a downward drag ends in, as
  * browsers routinely report) is answered exactly by child index. Any other
  * node is another line, so the end falls on the side being asked about.
@@ -92,7 +86,6 @@ function boundaryIn(
   return childHolding(container, content) < offset ? "after" : "before";
 }
 
-/** Which child of an ancestor the code sits in. */
 function childHolding(container: Node, content: Element): number {
   return [...container.childNodes].findIndex((child) => child.contains(content));
 }
@@ -102,10 +95,9 @@ function prefixOf(line: Element): string {
 }
 
 /**
- * How many characters of `root` come before a range boundary, or undefined when
- * the boundary is not inside `root` at all. Walked by hand rather than with a
- * second `Range`: the code span is a tree of highlight spans, and its text is
- * the only thing the boundary has to be measured against.
+ * Walked by hand rather than with a second `Range`: the code span is a tree of
+ * highlight spans, and its text is the only thing the boundary has to be
+ * measured against. Undefined when the boundary is not inside `root` at all.
  */
 function offsetIn(root: Node, container: Node, offset: number): number | undefined {
   if (root === container) {

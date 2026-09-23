@@ -3,14 +3,11 @@ import { renderReplayOverlay } from "../round-replay.ts";
 import type { ReplayData } from "../../rounds/replay.ts";
 
 export interface ReplayOverlayHost {
-  /** The reserved landmark the overlay is drawn into, emptied when it closes. */
   root: HTMLElement;
   renderer: DiffRenderer;
-  /** After the overlay is gone, however it closed: skip, Done, Esc. */
   onClose(): void;
 }
 
-/** What the mount is asked to show; who may ask, and when, is `main.ts`'s call. */
 export interface ReplayOpening {
   data: ReplayData;
   roundReply?: string;
@@ -21,10 +18,9 @@ export interface ReplayOverlayControl {
 }
 
 /**
- * Clicks around `round-replay.ts`'s markup. Card moves are full redraws (cards
- * are static; nothing to preserve), and every exit goes through one `close` so
- * skip, Done and Esc land in the same place. Dialog focus: primary button on
- * open, previous holder on close.
+ * Card moves are full redraws (cards are static; nothing to preserve), and
+ * every exit goes through one `close` so skip, Done and Esc land in the same
+ * place. Dialog focus: primary button on open, previous holder on close.
  */
 export function mountReplayOverlay(host: ReplayOverlayHost): ReplayOverlayControl {
   let open: ReplayOpening | undefined;

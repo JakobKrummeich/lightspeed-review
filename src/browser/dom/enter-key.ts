@@ -1,16 +1,11 @@
-/**
- * What a keypress in a comment box means: bare Enter sends, modifiers write
- * multi-line comments.
- */
+/** Bare Enter sends, modifiers write multi-line comments. */
 export type EnterAction =
-  /** Take the same path the send button takes. */
   | "submit"
   /** Break the line here, because the browser will not do it itself. */
   | "newline"
-  /** Not our keystroke — leave it to the browser. */
   | "default";
 
-/** The parts of a `keydown` this decision reads, so it can be decided without a DOM. */
+/** So the decision can be made without a DOM. */
 export interface EnterKeydown {
   key: string;
   shiftKey: boolean;
@@ -37,7 +32,6 @@ export function enterAction(event: EnterKeydown): EnterAction {
   return "submit";
 }
 
-/** The parts of a text field `applyNewline` writes through; a textarea is one. */
 export interface EditableField {
   value: string;
   /** Null in fields that report no caret, which is read as the end of the text. */
@@ -67,11 +61,7 @@ function insertedByBrowser(): boolean {
   );
 }
 
-/**
- * Splices a newline in where the caret is, replacing whatever is selected, and
- * leaves the caret after it. Exported for the tests; `typeNewline` is what the
- * page calls.
- */
+/** Exported for the tests; `typeNewline` is what the page calls. */
 export function applyNewline(field: EditableField): void {
   const start = field.selectionStart ?? field.value.length;
   const end = field.selectionEnd ?? start;

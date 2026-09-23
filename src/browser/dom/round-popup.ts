@@ -10,38 +10,30 @@ import type { SessionData } from "./session-api.ts";
 export const FOLD_MS = 260;
 
 export interface MountedRoundPopup {
-  /** A round is waiting and the reviewer has not been asked about it yet.
-   * `queued` is their unsent comment count, which the card promises to keep. */
+  /** `queued` is the unsent comment count, which the card promises to keep. */
   offer(fresh: SessionData, queued: number): void;
-  /** The round went on screen by another route: nothing to announce. */
   clear(): void;
 }
 
 export interface RoundPopupOptions {
-  /** The reserved landmark the card is drawn into, emptied when it closes. */
   root: HTMLElement;
-  /** The reviewer pressed the card's own take: this is the round they asked for. */
   onTake(fresh: SessionData): void;
-  /** The card is gone and the header's offer is the one thing left saying it. */
   onDismissed(): void;
 }
 
-/** One mounted popup: its options, and what it holds between presses. */
 interface PopupView {
   readonly options: RoundPopupOptions;
   held: SessionData | undefined;
-  /** The round the card last went up for; what "not news twice" is judged by. */
   announced: number | undefined;
   fold: ReturnType<typeof setTimeout> | undefined;
   onKey(event: KeyboardEvent): void;
 }
 
 /**
- * Round-arrival announcement over the review: the header's offer alone proved
- * missable. Dismissing is not declining — the card folds into the offer it
- * duplicates. Each round announced once, however many session events it
- * sends; a newer round is fresh news, announced over the last card's fold if
- * need be.
+ * The header's offer alone proved missable. Dismissing is not declining — the
+ * card folds into the offer it duplicates. Each round announced once, however
+ * many session events it sends; a newer round is fresh news, announced over
+ * the last card's fold if need be.
  */
 export function mountRoundPopup(options: RoundPopupOptions): MountedRoundPopup {
   const view: PopupView = {
@@ -119,7 +111,6 @@ function hide(view: PopupView): void {
   document.removeEventListener("keydown", view.onKey);
 }
 
-/** Whatever fold was in flight is nobody's future now. */
 function settle(view: PopupView): void {
   if (view.fold !== undefined) clearTimeout(view.fold);
   view.fold = undefined;

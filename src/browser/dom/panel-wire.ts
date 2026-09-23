@@ -1,8 +1,6 @@
 /**
- * The panel's boxes and the wire under them: where the reviewer's words are
- * read from, how they reach the server, and how they land in the conversation
- * without waiting for a round trip. Separate from the mount because none of it
- * knows anything about the mount — give it a root and prompts, and it works.
+ * Separate from the mount because none of it knows anything about the mount:
+ * give it a root and prompts, and it works.
  */
 import type { PanelState } from "../conversation-panel.ts";
 import { currentRound } from "../conversation-rounds.ts";
@@ -11,12 +9,12 @@ import type { ConversationEntry, FeedbackPrompt } from "../../session-store.ts";
 import { sendFeedback } from "./session-api.ts";
 
 /**
- * Echoes the sent prompts onto the conversation, stamped like the server
- * stamps them. Empty sends append nothing (a bare "reviewer" turn reads as
- * lost words). Stands down if the conversation moved since the send began:
- * the server writes feedback before publishing `feedback`, so a fresh read
- * already carries these words and echoing would double them; a read that
- * raced ahead is one round trip from the one that does — a beat late beats double.
+ * Stamped like the server stamps them. Empty sends append nothing (a bare
+ * "reviewer" turn reads as lost words). Stands down if the conversation moved
+ * since the send began: the server writes feedback before publishing
+ * `feedback`, so a fresh read already carries these words and echoing would
+ * double them; a read that raced ahead is one round trip from the one that
+ * does — a beat late beats double.
  */
 export function echoSent(
   state: PanelState,
@@ -54,13 +52,15 @@ export function generalCommentBox(root: HTMLElement): HTMLTextAreaElement | null
   return root.querySelector<HTMLTextAreaElement>("#lsr-general-comment");
 }
 
-/** The open question's box, or none — there is at most one open question. */
+/** There is at most one open question. */
 export function answerBox(root: HTMLElement): HTMLTextAreaElement | null {
   return root.querySelector<HTMLTextAreaElement>(".lsr-answer-box");
 }
 
-/** Written back rather than rendered in, for the reason the compose draft is:
- * text ending in whitespace or looking like a tag does not survive markup. */
+/**
+ * Written back rather than rendered in, for the reason the compose draft is:
+ * text ending in whitespace or looking like a tag does not survive markup.
+ */
 export function restoreAnswer(root: HTMLElement, said: string): void {
   if (said === "") return;
   const box = answerBox(root);
@@ -68,8 +68,8 @@ export function restoreAnswer(root: HTMLElement, said: string): void {
 }
 
 /**
- * What goes on the wire: pills minus the page's round stamps (the server
- * records arrival rounds itself), plus the comment box as one more message.
+ * Pills minus the page's round stamps (the server records arrival rounds
+ * itself), plus the comment box as one more message.
  */
 export function withGeneralComment(
   root: HTMLElement,
