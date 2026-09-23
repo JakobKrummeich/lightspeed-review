@@ -1,16 +1,10 @@
 /*
- * Grouping is done with space alone, in steps of the scale: a file sits 2 from
- * its own diff, 6 from the next file and 12 from the next group, so the
- * hierarchy is legible before a single word is read. Each step is a clear
- * multiple of the one below, which is what makes it readable as a hierarchy
- * rather than as three similar gaps. The tick box is positioned against these
- * rows, hence `relative`.
+ * Grouping is done with space alone: a file sits 2 from its own diff, 6 from
+ * the next file and 12 from the next group, each step a clear multiple of the
+ * one below, so the hierarchy reads before a word does.
  */
-/*
- * The chapter index the review opens with. It sits on the page surface rather
- * than in a card of its own, so it reads as a table of contents for the cards
- * below it and not as one more group to open.
- */
+/* The index sits on the page surface, not in a card: a table of contents for
+ * the cards below, not one more group to open. */
 .lsr-index {
   margin-bottom: var(--lsr-space-12);
 }
@@ -43,8 +37,6 @@
 
 .lsr-index-name {
   font-weight: 600;
-  /* The survey's headline: the index is the one screen the chapter names ARE
-   * the content of, so they speak at the title size the closing screen uses. */
   font-size: var(--lsr-size-title);
   line-height: var(--lsr-leading-tight);
   overflow: hidden;
@@ -52,11 +44,8 @@
   white-space: nowrap;
 }
 
-/*
- * Counts, wherever they are read: on a survey row and on a chapter's gate
- * card. One paint for one kind of thing — sizes and lines quiet, approvals in
- * the accent, because how far a chapter got is the one number that is news.
- */
+/* Counts on a survey row and on a gate card, painted alike: sizes and lines
+ * quiet, approvals in the accent, because how far a chapter got is the news. */
 .lsr-index-files,
 .lsr-index-lines,
 .lsr-gate-lines {
@@ -76,14 +65,12 @@
 }
 
 /*
- * On a narrow window the counts and the badge are wider than the room the
- * name is left with: `1fr` shrinks to nothing before any `auto` column does,
- * and the one line the entry is named by ellipsizes down to a word. So below
- * the width where both fit, the name takes the whole first row and wraps, and
- * the counts move to a row of their own beneath it — the same words, one line
- * lower, instead of a name cut to "Auth …". A flex row rather than a grid,
- * because the counts row must itself wrap when the badge joins it: grid `auto`
- * columns overflow the pane sooner than they break a line.
+ * Below 860px the counts and the badge are wider than the room the name is
+ * left with: `1fr` shrinks to nothing before any `auto` column does, and the
+ * name ellipsizes to a word. So the name takes the whole first row and wraps,
+ * and the counts move beneath it. A flex row rather than a grid, because the
+ * counts row must itself wrap when the badge joins it: grid `auto` columns
+ * overflow the pane sooner than they break a line.
  */
 @media (max-width: 860px) {
   .lsr-index-entry {
@@ -99,11 +86,8 @@
   }
 }
 
-/*
- * Mechanical, not logical: the quietest thing on the row it explains. The
- * word and git's percentage (`moved, 96% identical`); the paths are in the
- * row's path, which wraps, so this may stay on one line and be cut short.
- */
+/* The word and git's percentage only; the paths are in the row's path, which
+ * wraps, so this may stay on one line and be cut short. */
 .lsr-file-rename {
   color: var(--lsr-muted);
   font-size: var(--lsr-size-label);
@@ -113,11 +97,8 @@
   text-overflow: ellipsis;
 }
 
-/*
- * Where the review's added branching is concentrated. Quiet on purpose: it is
- * an observation about the code, not a verdict on it, so it is outlined rather
- * than filled: the only thing on the row that is not a plain count.
- */
+/* An observation about the code, not a verdict on it: outlined rather than
+ * filled, the only thing on the row that is not a plain count. */
 .lsr-index-logic,
 .lsr-file-logic {
   padding: 0 var(--lsr-space-2);
@@ -129,13 +110,6 @@
   white-space: nowrap;
 }
 
-/*
- * Focus mode: one chapter on the page, under a bar that says which chapter
- * this is and holds the way out and the way sideways. The bar sticks to the
- * top of the scroll and owns a fixed height, because the file rows below
- * stick directly under it and need to know where that is without measuring
- * anything.
- */
 .lsr-focus-bar {
   position: sticky;
   top: 0;
@@ -149,12 +123,8 @@
   background: var(--lsr-bg);
 }
 
-/*
- * The way out stands at the left; the place and the neighbours keep the right,
- * pushed there by this margin whenever the name between them is away. The
- * name itself is the gate's doing — shown only while the diff is up — and
- * is set with the gate, in `gate.css`.
- */
+/* Pushes the place and the neighbours right whenever the name between them is
+ * away; the name is shown only while the diff is up and set in `gate.css`. */
 .lsr-focus-exit {
   margin-right: auto;
 }
@@ -166,7 +136,6 @@
   white-space: nowrap;
 }
 
-/* Quiet controls: the chapter is the loud thing on this screen. */
 .lsr-focus-bar button {
   background: var(--lsr-raised);
   color: var(--lsr-text);
@@ -174,12 +143,9 @@
   white-space: nowrap;
 }
 
-/*
- * The narrow pane leaves the bar less room than its words: the panel keeps its
- * column, so at 746px the review is a few hundred pixels wide. The controls
- * are what the bar is for and they stay; the place goes (and the name, where
- * it is set), and mid-scroll the sticky file row says where you are.
- */
+/* The panel keeps its column, so at 746px the review is a few hundred pixels
+ * wide: the controls stay, the place goes, and the sticky file row says where
+ * you are. */
 @media (max-width: 860px) {
   .lsr-focus-count {
     display: none;
@@ -187,11 +153,10 @@
 }
 
 /*
- * The sticky path header. While the focused chapter scrolls, the row naming
- * the file being read holds the top of the viewport directly under the bar,
- * and hands over to the next file's row where their blocks meet. Scoped by the
- * bar itself — only focus mode renders one — and only there is the row ever
- * drawn over code, which is why it turns opaque here and nowhere else.
+ * The file's row holds the top of the viewport under the bar while the chapter
+ * scrolls. Scoped by the bar itself — only focus mode renders one — and only
+ * there is the row ever drawn over code, which is why it turns opaque here and
+ * nowhere else.
  */
 .lsr-focus-bar ~ .lsr-group .lsr-file > .lsr-row:first-child {
   position: sticky;
@@ -200,11 +165,8 @@
   background: var(--lsr-surface);
 }
 
-/*
- * Three surfaces, one per level: the page is darkest, a group card sits on it,
- * and each diff sits darker again inside its card. Depth does the grouping that
- * borders used to do, and every level is visibly a level.
- */
+/* Three surfaces, one per level: the page, a group card on it, and each diff
+ * darker again inside its card. Depth does the grouping, not borders. */
 .lsr-group {
   background: var(--lsr-surface);
   border-radius: 0.75rem;
@@ -216,12 +178,9 @@
   margin-bottom: 0;
 }
 
-/*
- * One row, two targets: the expand/collapse button on the left, the tick box
- * right-aligned and centred against it. The gap between them is dead space on
- * purpose, so the cursor drops back to a plain arrow on the way over and the
- * two can never be mistaken for one another.
- */
+/* Two targets on one row, with dead space between on purpose: the cursor drops
+ * back to a plain arrow on the way over, so the two are never mistaken for one
+ * another. */
 .lsr-row {
   display: flex;
   align-items: center;
@@ -229,13 +188,10 @@
 }
 
 /*
- * The file's own row: a button reset back to text, wrapping rather than
- * spilling. A file can carry four remarks at once — renamed, densest logic,
- * commented last round, changed after approval — and the row it shares with
- * the two-diff switch has a fixed width; without the wrap the last badge is
- * drawn over the switch, since nothing in a nowrap pill can shrink. A row that
- * reacts to the pointer is a row that can be pressed, and the marker says what
- * pressing does: without both, a bare cursor change is the only hint.
+ * A button reset back to text, wrapping rather than spilling: a file can carry
+ * four remarks at once — renamed, densest logic, commented last round, changed
+ * after approval — and without the wrap the last badge is drawn over the
+ * two-diff switch, since nothing in a nowrap pill can shrink.
  */
 .lsr-file-header {
   position: relative;
@@ -285,11 +241,7 @@
   transform: rotate(45deg);
 }
 
-/*
- * The checkboxes are the only controls on their line, so they sit at the far
- * right where the eye can run down a single column of them. The label pads the
- * box out to a comfortable target that is all checkbox.
- */
+/* The label pads the box out to a target that is all checkbox. */
 .lsr-tick {
   display: flex;
   align-items: center;
@@ -300,12 +252,9 @@
 }
 
 /*
- * Both ticks close what they mark rather than heading it, so they sit at the
- * right edge under the lines they stand for, in one column. Each says its own
- * word: a lone box at the end of 400 lines says nothing by itself, and at the
- * chapter's foot it sits directly under a file's own "approve", which is the
- * one thing it must not be read as. The chapter's tick stands a step further
- * off, because it answers the whole card above it and not the last file.
+ * Both ticks close what they mark, in one column at the right edge. The
+ * chapter's stands a step further off, because it sits directly under a file's
+ * own "approve" and answers the whole card above it, not the last file.
  */
 .lsr-file-foot,
 .lsr-group-foot {
@@ -328,10 +277,8 @@
   color: var(--lsr-strong);
 }
 
-/*
- * Drawn rather than native: the browser's own box is painted from the OS theme,
- * which lands as a plain grey square in the middle of the palette.
- */
+/* Drawn rather than native: the browser's own box is painted from the OS theme,
+ * a plain grey square in the middle of the palette. */
 .lsr-tick input[type="checkbox"] {
   appearance: none;
   width: 1.5rem;
@@ -369,7 +316,6 @@
   outline-offset: 2px;
 }
 
-/* A path is a path: the same monospace on a file's row and on a gate's list. */
 .lsr-file-path,
 .lsr-gate-path {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -377,7 +323,7 @@
   line-height: var(--lsr-leading-tight);
 }
 
-/* A relocated file's path is two paths and an arrow: wrapped, like the gate's, never run off the row. */
+/* A relocated file's path is two paths and an arrow: wrapped, never run off the row. */
 .lsr-file-path {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -388,12 +334,10 @@
 }
 
 /*
- * A file approved in an earlier round that nothing has touched since is work
- * the reviewer has already done: it stays reachable, but it recedes so the
- * round's real work is what the eye lands on. Unticking it is how the reviewer
- * says they want to look again, so the tick - not the history - drives the
- * dimming; hover and keyboard focus restore it too, because receding must not
- * mean hard to read.
+ * Work the reviewer has already done recedes. The tick, not the history,
+ * drives the dimming: unticking is how the reviewer says they want to look
+ * again. Hover and keyboard focus restore it, because receding must not mean
+ * hard to read.
  */
 .lsr-file[data-approval="approved"]:has(.lsr-approved:checked) {
   opacity: 0.55;
@@ -405,11 +349,9 @@
 }
 
 /*
- * A group whose every file is ticked is finished work: it shuts itself back
- * onto its gate card and recedes exactly as an approved file does, so what the
- * eye lands on is what is still to read. The group's own tick is the whole
- * state behind this — nothing per group is stored, so the card can never
- * disagree with the boxes inside it.
+ * A group whose every file is ticked recedes as an approved file does. The
+ * group's own tick is the whole state behind this: nothing per group is
+ * stored, so the card can never disagree with the boxes inside it.
  */
 .lsr-group:has(.lsr-tick-all:checked) {
   opacity: 0.55;
@@ -429,11 +371,7 @@
   opacity: 1;
 }
 
-/*
- * Amber, never red: a file the agent edited after it was approved is work
- * waiting, not an error — amber, the palette's "time moved on" hue, already
- * deepened for paper and brightened for night by its own token.
- */
+/* Amber, never red: a file edited after approval is work waiting, not an error. */
 .lsr-file-approval {
   font-size: var(--lsr-size-label);
   line-height: var(--lsr-leading-tight);
@@ -445,12 +383,8 @@
   background: color-mix(in oklab, var(--lsr-amber) 13%, transparent);
 }
 
-/*
- * The same pill as the badge above it, in violet: the two can share a row, and
- * amber is a verdict about the file while this is only a note about where the
- * reviewer was last looking. Violet rather than the accent blue, which is what
- * the logic badge outlines itself in a few pixels to the left.
- */
+/* Violet, not the accent: the logic badge outlines itself in the accent a few
+ * pixels to the left, and violet is the reviewer's own hue. */
 .lsr-file-commented {
   font-size: var(--lsr-size-label);
   line-height: var(--lsr-leading-tight);
@@ -462,23 +396,13 @@
   background: color-mix(in oklab, var(--lsr-violet) 12%, transparent);
 }
 
-/*
- * The per-file switch between the branch diff and what changed after the
- * approval. Same segmented control as the header's, so the reviewer has one
- * thing to learn; it sits at the end of the file row, off the header button it
- * cannot be a child of.
- */
+/* At the end of the file row, off the header button a button cannot be a child of. */
 .lsr-form-switch {
   flex: none;
   align-self: center;
   margin-right: var(--lsr-space-2);
 }
 
-/*
- * The second view reads as a note about the file rather than as the file: it is
- * indented from the diff's own edge and sits on the quiet band, which is the
- * one shade that says "not the red and green lines".
- */
 .lsr-approved-form {
   display: flex;
   flex-direction: column;
@@ -487,7 +411,6 @@
   background: var(--lsr-code-quiet);
 }
 
-/* Why a selection here files no feedback, said quietly and left in place. */
 .lsr-approved-note,
 .lsr-approved-pending {
   margin: 0;
@@ -495,13 +418,10 @@
   color: var(--lsr-muted);
 }
 
-/* The diff itself, back on the page's own background so it reads as code. */
 .lsr-approved-diff {
   background: var(--lsr-surface);
 }
 
-/* Every reason there is no diff to show: identical, unreachable, oversize, or
- * the ask itself having failed. Stated, never papered over. */
 .lsr-approved-missing {
   margin: 0;
   padding: var(--lsr-space-3);
@@ -510,10 +430,6 @@
   background: var(--lsr-surface);
 }
 
-/*
- * The diff is the content the file row is about, so it stays close to it and
- * carries the surface tint that says "this belongs to the row above".
- */
 .lsr-file-diff {
   margin-top: var(--lsr-space-2);
   background: var(--lsr-bg);
@@ -523,17 +439,16 @@
 }
 
 /*
- * A block for as long as it is folding. Its height is written frame by frame
- * from `dom/fold.ts`, so what is inside has to be clipped to that height rather
- * than spilling past it, and nothing inside may insist on a minimum the fold
- * cannot go under. Only the class carries this: a block at rest is styled
- * exactly as it was before folding existed.
+ * A block for as long as it is folding: its height is written frame by frame
+ * from `dom/fold.ts`, so what is inside is clipped to that height and nothing
+ * inside may insist on a minimum the fold cannot go under. Only the class
+ * carries this; a block at rest is styled as if folding did not exist.
  *
- * Deliberately no `transition`. The fold is driven from a frame loop because
- * the same frame has to correct the scroll offset that keeps the reviewer's
- * anchor still — a transition would move the height on the compositor's clock
- * and the correction would trail it. `prefers-reduced-motion` is read there, in
- * JavaScript, for the same reason: it decides whether there is a loop at all.
+ * Deliberately no `transition`: the same frame has to correct the scroll
+ * offset that keeps the reviewer's anchor still, and a transition would move
+ * the height on the compositor's clock with the correction trailing it.
+ * `prefers-reduced-motion` is read in that JavaScript for the same reason: it
+ * decides whether there is a loop at all.
  */
 .lsr-folding {
   overflow: hidden;

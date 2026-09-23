@@ -18,24 +18,21 @@
   overflow-y: auto;
   min-height: 0;
   /*
-   * Chat is full of things with no space in them to break at: a type name, an
-   * attribute, a path, a quoted identifier. The `overflow-y` above makes this a
-   * scroll container on both axes — a non-visible overflow on one axis forces
-   * the other from `visible` to `auto` — so a token wider than 22rem did not
-   * widen the panel or get clipped by it: it grew this box a sideways scrollbar,
-   * and the reviewer had to drag to read the end of their own sentence. Wrapping
-   * mid-token is what leaves nothing to scroll to. Inherited, which is the
-   * point: reply, comment, queued pill, file path and the empty line are one
+   * Chat is full of things with no space to break at: a type name, a path, a
+   * quoted identifier. The `overflow-y` above makes this a scroll container on
+   * both axes — a non-visible overflow on one axis forces the other from
+   * `visible` to `auto` — so a token wider than 22rem grew this box a sideways
+   * scrollbar; wrapping mid-token leaves nothing to scroll to. Inherited on
+   * purpose: reply, comment, queued pill, file path and the empty line are one
    * declaration rather than a list the next kind of content is missing from.
    */
   overflow-wrap: anywhere;
 }
 
 /*
- * The panel is 22rem of every screen, which a reviewer who is reading rather
- * than commenting pays for on every line of code: shut, it gives back 36
- * columns at 1440. The rail stays behind as the way back, and carries the count
- * of queued feedback, which is the one thing a shut panel hides.
+ * Shut, the panel gives back 36 columns at 1440. The rail stays behind as the
+ * way back, and carries the count of queued feedback, the one thing a shut
+ * panel hides.
  */
 .lsr-panel-rail {
   grid-column: 2;
@@ -53,8 +50,7 @@
   font-size: var(--lsr-size-label);
 }
 
-/* The whole strip lights up, not just the glyph: that is what says the strip -
- * and not the character in the middle of it - is the thing being pressed. */
+/* The whole strip lights up, not just the glyph: the strip is the thing being pressed. */
 .lsr-panel-rail:hover {
   background: var(--lsr-raised);
   color: var(--lsr-accent);
@@ -65,11 +61,7 @@
   outline-offset: -2px;
 }
 
-/*
- * The chevron points at what the click does: away to shut, back to open. It is
- * the only mark on a 2rem column, so it is drawn at heading size and in the
- * text colour: at label size in muted it was a speck the eye skipped over.
- */
+/* Points at what the click does: away to shut, back to open. */
 .lsr-panel-rail::before {
   content: "›";
   font-size: var(--lsr-size-icon);

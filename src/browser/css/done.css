@@ -1,10 +1,7 @@
 /*
- * The finish, said once over the review: the card that goes up as the last
- * file is ticked. A sibling of the round announcement — same scrim, same card,
- * same layer — because it is the same kind of thing, news with a press on it,
- * and a reviewer who has seen one should know the other on sight. Below the
- * ended overlay, whose word is last: pressing "End review" here is what puts
- * that one up.
+ * A sibling of the round announcement — same scrim, same card, same layer —
+ * so a reviewer who has seen one knows the other on sight. Below the ended
+ * overlay, whose word is last: pressing "End review" here is what puts it up.
  */
 .lsr-done-overlay {
   position: fixed;
@@ -17,12 +14,8 @@
   z-index: 19;
 }
 
-/*
- * The card arrives as the round's does and then, once, glows: this is the one
- * moment in a review that is a finish, and a card that simply appeared would
- * read as another interruption. One glow and done — the reviewer is about to
- * make a decision, and nothing on the card keeps moving while they do.
- */
+/* One glow and done: the reviewer is about to make a decision, and nothing on
+ * the card keeps moving while they do. */
 .lsr-done-card {
   display: flex;
   flex-direction: column;
@@ -54,12 +47,6 @@
   }
 }
 
-/*
- * The mark: the same tick the reviewer has been pressing all review, grown to
- * a badge and filled with the accent, because it is the last one and the only
- * one the page makes on their behalf. It lands a beat after the card, from
- * slightly too small — the one flourish the finish allows itself.
- */
 .lsr-done-mark {
   display: grid;
   place-items: center;
@@ -81,7 +68,6 @@
   }
 }
 
-/* The closing card's own eyebrow: where the reviewer is, before what the card wants. */
 .lsr-done-eyebrow {
   margin: 0;
   color: var(--lsr-muted);
@@ -92,7 +78,6 @@
   letter-spacing: 0.06em;
 }
 
-/* The news, at the title size the chapter names wear: one loud line, in the text colour. */
 .lsr-done-title {
   margin: 0;
   color: var(--lsr-strong);

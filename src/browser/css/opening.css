@@ -1,16 +1,13 @@
 /*
- * The opening: the first round of a review handed over one reason at a time.
- * Not a card on a scrim but a room — the field is opaque and full-bleed, so
- * until the last press there is no review behind it to look at instead of the
- * reason being read. The replay overlay, which is a card on a scrim, belongs
- * to every round after a commented one; the two never meet, because a first
- * round has no previous round to replay.
+ * The opening is a room, not a card on a scrim: the field is opaque and
+ * full-bleed, so until the last press there is no review behind it to look at
+ * instead of the reason being read. It never meets the replay overlay, because
+ * a first round has no previous round to replay.
  *
- * Both schemes are painted from the locals below, and they are declared here
- * rather than on `:root` because nothing else on the page is in this room. All
- * of them go through `light-dark()` for one reason: the reviewer can pick a
- * scheme by hand, on top of whatever the machine asked for, so a
- * `prefers-color-scheme` query would paint this room the machine's way while
+ * The locals below are declared here rather than on `:root` because nothing
+ * else on the page is in this room. All of them go through `light-dark()`: the
+ * reviewer can pick a scheme by hand on top of what the machine asked for, so
+ * a `prefers-color-scheme` query would paint this room the machine's way while
  * the rest of the page followed the pick.
  */
 .lsr-opening-overlay {
@@ -21,10 +18,7 @@
     color-mix(in oklab, var(--lsr-bg) 52%, oklch(0.09 0.01 280))
   );
   /* The four parts of the light, always all painted and each transparent in
-     the scheme it is not for. Dark hangs a cobalt lamp over the sheets and
-     lets a faint pool of it gather on the floor; light keeps the paper, puts
-     a breath of the accent behind the words, and darkens toward the edges
-     the way paper does under a lamp. */
+     the scheme it is not for. */
   --lsr-opening-lamp: light-dark(
     transparent,
     color-mix(in oklab, var(--lsr-accent) 44%, transparent)
@@ -41,9 +35,7 @@
     transparent,
     color-mix(in oklab, var(--lsr-accent) 10%, transparent)
   );
-  /* The dust in the light: the accent itself, a shade denser in the dark
-     room where a faint mote would vanish — and there it gets a glow with it,
-     which is the lamp catching on something rather than a dot. */
+  /* A shade denser in the dark room, where a faint mote would vanish. */
   --lsr-opening-dust: light-dark(
     color-mix(in oklab, var(--lsr-accent) 55%, transparent),
     color-mix(in oklab, var(--lsr-accent) 65%, transparent)
@@ -52,8 +44,6 @@
     color-mix(in oklab, var(--lsr-accent) 20%, transparent),
     color-mix(in oklab, var(--lsr-accent) 45%, transparent)
   );
-  /* The flood the last press ends on: white with a trace of the accent on
-     paper, the night scheme's own near-white in the dark room. */
   --lsr-opening-bloom-core: light-dark(white, var(--lsr-strong));
   --lsr-opening-bloom-edge: light-dark(
     color-mix(in oklab, var(--lsr-accent) 22%, white),
@@ -87,13 +77,10 @@
 }
 
 /*
- * The flare: the room takes a hit on the press itself, not only on what the
- * press reveals. In fast and out slow, so it reads as a strike rather than as
- * a fade in and out again.
- *
- * It is opacity on this one layer and nothing else. A `filter` would be the
- * shorter way to brighten everything underneath, but a filter value cannot be
- * switched per scheme the way a colour can, and this room is painted in both.
+ * The flare on a press: in fast and out slow, so it reads as a strike rather
+ * than a fade. Opacity on this one layer and nothing else — a `filter` would
+ * be the shorter way to brighten everything underneath, but a filter value
+ * cannot be switched per scheme the way a colour can.
  */
 .lsr-opening-overlay::after {
   content: "";
@@ -110,9 +97,8 @@
   transition-duration: 90ms;
 }
 
-/* Dust drifting up through the light: sparse and slow, and never over a word.
- * Where each mote is and how long it takes is the renderer's business — it
- * hands every one of them its own life, delay and drift. */
+/* Each mote's `--life`, `--delay` and `--drift` are the renderer's: it hands
+ * every one of them its own. */
 .lsr-opening-motes {
   position: absolute;
   inset: 0;
@@ -133,17 +119,11 @@
 }
 
 /*
- * Where the sheets are dealt. Its children are laid on top of one another
- * rather than after one another, which leaves it no height of its own: it
- * states one, and the sheets fill it. Wide and tall enough that the longest
- * reason still sits in the middle of the room rather than against its edges.
- */
-/*
  * Every sheet lies in the same grid cell, so the room is as tall as the
  * longest reason in it: a long one pushes its button down rather than
  * scrolling behind it. The floor keeps short reasons from shrinking the room
- * to a strip, and the ceiling is the viewport — the overlay is a flex column,
- * so when the screen runs out the stack gives way and the sheet scrolls.
+ * to a strip; the ceiling is the viewport, since the overlay is a flex column
+ * and the stack gives way when the screen runs out.
  */
 .lsr-opening-stack {
   display: grid;
@@ -155,11 +135,8 @@
   min-height: 19rem;
 }
 
-/*
- * A sheet is not a card here: no surface, no border, no shadow. There is
- * nothing behind it to be a card against, and the room's whole point is that
- * one sentence is the only thing on screen.
- */
+/* A sheet is not a card here — no surface, border or shadow: there is nothing
+ * behind it to be a card against. */
 .lsr-opening-sheet {
   grid-area: 1 / 1;
   display: grid;
@@ -176,12 +153,8 @@
     opacity 340ms ease;
 }
 
-/*
- * There is no pile any more, so there is no depth to draw: the sheets cross in
- * the middle of the room instead. What is coming rises from below, what is
- * done lifts away above, and both are invisible while they do it — the only
- * sheet ever readable is the one being spoken.
- */
+/* Both moving sheets are invisible: the only sheet ever readable is the one
+ * being spoken. */
 .lsr-opening-sheet[data-at="gone"] {
   transform: translateY(-3.5rem) scale(0.94);
   opacity: 0;
@@ -199,8 +172,6 @@
   opacity: 1;
 }
 
-/* Where this came from, in the accent, above the one loud line on the cover.
- * The reasons carry no lead: it said the same thing on every one of them. */
 .lsr-opening-lead {
   margin: 0;
   color: var(--lsr-accent);
@@ -211,9 +182,7 @@
   font-weight: 600;
 }
 
-/* The cover's headline. Its glow is the lamp again, which means it is cobalt
- * in the dark room and simply absent in the light one, where there is no
- * lamp. */
+/* The glow is the lamp again: cobalt in the dark room, absent in the light one. */
 .lsr-opening-headline {
   margin: 0;
   max-width: 16ch;
@@ -225,8 +194,7 @@
   text-shadow: 0 0 2.25rem var(--lsr-opening-lamp);
 }
 
-/* One reason, set nearly as large as the headline: the size is what stops the
- * skim, and the width is what keeps it a sentence rather than a paragraph. */
+/* 30ch is what keeps a reason a sentence rather than a paragraph. */
 .lsr-opening-body {
   margin: 0;
   max-width: 30ch;
@@ -237,20 +205,15 @@
   letter-spacing: -0.012em;
 }
 
-/* The words land rather than appear: they arrive from just below, a beat
- * behind the sheet carrying them, which is what makes a press feel answered. */
 .lsr-opening-sheet[data-at="top"] .lsr-opening-body {
   animation: lsr-opening-land 520ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 /*
- * The one thing to do in the room, and it says so: it breathes on its own,
- * lifts to meet the pointer and squashes under the press. A filled pill: the
- * one solid block of the accent in the room, which is what makes it read as
- * the way out rather than as one more line of type.
- *
- * The floor under its width keeps the label changing on the last sheet from
- * moving the button out from under a pointer already on its way to it.
+ * The one solid block of the accent in the room, which is what makes it read
+ * as the way out rather than one more line of type. The floor under its width
+ * keeps the label changing on the last sheet from moving the button out from
+ * under a pointer already on its way to it.
  */
 .lsr-opening-press {
   min-width: 8rem;
@@ -275,13 +238,8 @@
   transform: scale(0.97);
 }
 
-/*
- * How many sheets there are and how far through them the reviewer is. The
- * count is itself news — it says how much was asked for — so it is under the
- * stack from the first frame rather than appearing with the second sheet. It
- * is positioned so the light does not wash over it: the beam is a layer of
- * this element, and everything not positioned paints under it.
- */
+/* Positioned so the light does not wash over it: the beam is a layer of the
+ * overlay, and everything not positioned paints under it. */
 .lsr-opening-dots {
   position: relative;
   display: flex;
@@ -304,8 +262,6 @@
   box-shadow: 0 0 0.75rem color-mix(in oklab, var(--lsr-accent) 60%, transparent);
 }
 
-/* The last press floods the room before it hands the review over, so the way
- * out is a light rather than a screen being taken away. */
 .lsr-opening-bloom {
   position: absolute;
   inset: 0;
