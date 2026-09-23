@@ -1,10 +1,9 @@
 /*
  * "Porcelain & Cobalt": porcelain neutrals — warm near-white paper in light,
  * cool graphite-blue night in dark — under one cobalt accent at hue 262. Red
- * and green stay reserved for the diff, and the accent lives far from both,
- * so nothing else on screen can be misread as add or remove. Every colour
- * literal on this page lives in this token block; everything after it is a
- * token or a mix of two, so nothing is eyeballed.
+ * and green are reserved for the diff, and the accent lives far from both, so
+ * nothing else on screen can be misread as add or remove. Every colour literal
+ * lives in this block; everything after it is a token or a mix of two.
  */
 :root {
   /*
@@ -17,11 +16,10 @@
   --lsr-bg: light-dark(oklch(0.966 0.004 90), oklch(0.22 0.01 262));
   --lsr-surface: light-dark(oklch(0.984 0.003 90), oklch(0.252 0.011 262));
   /*
-   * One step off the surface: separates without drawing a line. A chrome token —
-   * it is measured from `--lsr-surface`, so it belongs on things that sit on a
-   * surface (a group card, a header a pointer is over) and nowhere in the diff,
-   * which is painted on `--lsr-bg` a shade below. Down there the same step lands
-   * two shades up and reads as a highlight; `--lsr-code-quiet` is that step.
+   * One step off the surface: separates without drawing a line. Measured from
+   * `--lsr-surface`, so it belongs on things that sit on a surface and nowhere
+   * in the diff, which is painted on `--lsr-bg`: `--lsr-code-quiet` is that
+   * step down there.
    */
   --lsr-raised: light-dark(oklch(0.995 0.002 90), oklch(0.292 0.012 262));
   --lsr-border: light-dark(oklch(0.89 0.006 90), oklch(0.36 0.014 262));
@@ -32,12 +30,11 @@
    */
   --lsr-selected: light-dark(oklch(0.935 0.012 262), oklch(0.34 0.022 262));
   /*
-   * The row of a diff that is not a change to read: the `@@` header between
-   * hunks. Built off `--lsr-bg`'s own bases, because that is what the diff is
-   * painted on — the chrome tokens above are measured from `--lsr-surface`, and
-   * taken down into the diff they land two shades above their neighbours, a pale
-   * blue-grey band the reviewer cannot name. One step is all this needs: it says
-   * "not one of the red and green lines", and nothing louder.
+   * The `@@` header between hunks. Built off `--lsr-bg`'s own bases, because
+   * that is what the diff is painted on: the chrome tokens above are measured
+   * from `--lsr-surface`, and taken down into the diff they land two shades
+   * above their neighbours and read as a highlight. One step says "not one of
+   * the red and green lines", and nothing louder.
    */
   --lsr-code-quiet: light-dark(oklch(0.976 0.003 90), oklch(0.236 0.01 262));
   --lsr-text: light-dark(oklch(0.32 0.012 270), oklch(0.87 0.008 262));
@@ -79,20 +76,12 @@
   --lsr-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /*
-   * Type, chosen once instead of inherited element by element. Every size on
-   * this page used to be whatever the first draft reached for — five ad-hoc
-   * steps in the chrome, and diff2html's 13px in the diff — at the browser's
-   * `normal` leading throughout.
-   *
    * Code and chrome are both 1rem: the reviewer reads their editor at 16px, and
    * a comment about a line should not be smaller than the line. 1.5 leading is
    * the accessibility floor for body text and what editors sit at for code;
    * headings and single-line labels take the tight step, because leading there
    * only pushes a lone line's box around. Meta and label sit below the reading
    * size on purpose: stats and badges are glanced at, not read.
-   *
-   * The gutter is four digits of 1rem monospace plus its padding, which is what
-   * the line-number column needs and no more.
    */
   --lsr-leading: 1.5;
   --lsr-leading-tight: 1.25;
@@ -105,39 +94,34 @@
    * drawn at 1rem a chevron is a speck, and the eye skips the strip it is on. */
   --lsr-size-icon: 1.75rem;
   /*
-   * The steps above the reading size, and the page speaks at them only on the
-   * screens with no code to shout over: the survey, whose chapter names are the
-   * headlines of the whole review; the gate a chapter opens behind, whose two
-   * sentences are set a half-step up at the lead size because they are all
-   * there is to read on it; and the closing summary of a finished review.
-   * Everything else here is chrome around the diff and has no business being
-   * louder than the code.
+   * Above the reading size, and used only on the screens with no code to shout
+   * over: the survey, the gate a chapter opens behind (its two sentences at the
+   * lead size), and the closing summary. Everything else is chrome around the
+   * diff and has no business being louder than the code.
    */
   --lsr-size-lead: 1.1875rem;
   --lsr-size-title: 1.5rem;
   /*
-   * Louder still, and only ever in the opening. It is the review's other end
-   * and the one screen with nothing on it but a sentence: no diff, no index, no
-   * comment — so the rule about not shouting over the code has nothing here to
-   * shout over. The cover is a headline and is set like one; a reason is set
-   * halfway between that and the reading size, which is what stops it being
-   * skimmed. Both take their own leading: at these sizes 1.5 is a gap, not a
-   * line.
+   * Only ever in the opening, the one screen with nothing on it but a sentence
+   * and so no code to shout over. The cover is a headline; a reason sits
+   * halfway between that and the reading size so it is not skimmed. Both take
+   * their own leading: at these sizes 1.5 is a gap, not a line.
    */
   --lsr-size-cover: 3.125rem;
   --lsr-size-reason: 1.5625rem;
   --lsr-leading-display: 1.05;
   --lsr-leading-reason: 1.32;
+  /* Four digits of 1rem monospace plus padding: what the line-number column
+   * needs and no more. */
   --lsr-gutter: 3.4rem;
   /* The focus bar's height is a token because the sticky file rows under it
    * pin at exactly this offset; the two must agree without measuring. */
   --lsr-focus-bar: 3.25rem;
 
   /*
-   * One spacing scale, on 4px. The stylesheet used to hold 23 different gaps —
-   * 0.45 next to 0.5, 0.65 next to 0.7 — because each was picked alone. Steps
-   * 1–4 are the inside of a control, 6 and 8 hold two things apart, 12 says the
-   * thing below belongs to a different concern.
+   * One spacing scale, on 4px. Steps 1–4 are the inside of a control, 6 and 8
+   * hold two things apart, 12 says the thing below belongs to a different
+   * concern.
    */
   --lsr-space-1: 0.25rem;
   --lsr-space-2: 0.5rem;
@@ -166,10 +150,9 @@
   --lsr-code-deletion: var(--lsr-red);
 
   /*
-   * diff2html's own variables, so the diff is painted from this palette instead
-   * of its GitHub-flavoured defaults. Added and removed lines are the palette's
-   * green and red thinned into the page background: legible in both schemes,
-   * and never brighter than the code they mark.
+   * diff2html's own variables, so the diff is painted from this palette rather
+   * than its GitHub-flavoured defaults; a changed line is never brighter than
+   * the code it marks.
    */
   --d2h-bg-color: var(--lsr-bg);
   --d2h-border-color: var(--lsr-border);

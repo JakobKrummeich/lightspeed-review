@@ -45,8 +45,7 @@ test("the view says feedback is off in it, where the reviewer would try to give 
   const html = render();
 
   assert.match(html, /Feedback is off in this view/);
-  // Nothing on screen names the two commits any more, so the note may not point
-  // at them; it names the press that gets the reviewer a view they can comment on.
+  // Nothing on screen names the two commits, so the note may not point at them.
   assert.doesNotMatch(html, /these two commits/);
   assert.match(
     html,
@@ -56,8 +55,7 @@ test("the view says feedback is off in it, where the reviewer would try to give 
 });
 
 test("a view with no diff in it does not talk about line numbers it is not showing", () => {
-  // Each state is one sentence about why there is nothing to read; nothing to select either,
-  // so the note would answer a question the reviewer cannot ask.
+  // Nothing to select in these states, so the note would answer a question the reviewer cannot ask.
   for (const state of ["identical", "binary", "unreachable", "unrecorded", "oversize"] as const) {
     assert.doesNotMatch(render({ state, diff: undefined }), /Feedback is off/, state);
   }

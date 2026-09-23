@@ -2,20 +2,17 @@ import type { SessionRound } from "../session-store.ts";
 import { fileApproval, fileHistory } from "./history.ts";
 
 /**
- * "What changed after approval" — the second half of the per-file toggle: what
- * the agent did to the file after sign-off, which the branch diff cannot say
- * without re-reading the whole file. Pure, like the rest of `src/rounds/`: it
- * names which two commits to diff, the caller asks git.
+ * What the agent did to a file after sign-off, which the branch diff cannot
+ * say. Pure, like the rest of `src/rounds/`: it names which two commits to
+ * diff, the caller asks git.
  */
 
-/** Which two commits hold the reviewer's approved form and today's. */
 export interface ApprovedForm {
   /**
-   * Head commit of the round whose close recorded the standing approval — the
-   * tree the reviewer read — or null when that round recorded none (pre-commit session).
+   * Head commit of the round whose close recorded the standing approval, or
+   * null when that round recorded none (pre-commit session).
    */
   fromCommit: string | null;
-  /** The head commit of the round being reviewed, by the same rule. */
   toCommit: string | null;
   /**
    * Every name the file has gone by from the approval to now, oldest first and
@@ -26,7 +23,6 @@ export interface ApprovedForm {
 }
 
 /**
- * Undefined when the question does not arise: the file is not `needs-reapproval`.
  * A withdrawn approval counts as none — `fileApproval` reads it that way — so an
  * unticked file offers no toggle either.
  */
@@ -66,7 +62,6 @@ export type ApprovedFormState =
 
 /** What `GET /api/session/:key/approved-form` answers. */
 export interface ApprovedFormData {
-  /** The file's name today, as the reviewer asked for it. */
   path: string;
   /**
    * Every name git was given, oldest first. Shipped so the page can hand the

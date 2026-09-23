@@ -13,7 +13,6 @@ const rounds: RoundMark[] = [
   { index: 2, at: "2025-01-03T00:00:00.000Z" },
 ];
 
-/** What each segment claims, which is all these tests are about. */
 function shape(segments: ReturnType<typeof roundSegments>) {
   return segments.map(({ round, current, entries }) => ({
     round,

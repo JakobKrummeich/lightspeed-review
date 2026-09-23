@@ -8,16 +8,13 @@ import type { ConversationEntry, ReviewCloser, RoundMark } from "../session-stor
  * page (session payload) render it, and neither may count fields differently.
  */
 export interface ClosedReview {
-  /** The grouping on screen, which is the review the reviewer just read. */
   groups: DiffGroup[];
   conversation: ConversationEntry[];
   rounds: RoundMark[];
-  /** Paths ticked approved when it closed. */
   approved: string[];
   endedBy?: ReviewCloser;
 }
 
-/** One count and what it counts, already named for the number in front of it. */
 export interface ClosingFigure {
   count: number;
   /** Singular or plural to match `count`: "1 round", "4 rounds". */
@@ -25,14 +22,11 @@ export interface ClosingFigure {
 }
 
 export interface ClosingSummary {
-  /** How much of the review was approved, as a sentence of its own. */
   verdict: string;
   figures: ClosingFigure[];
-  /** Who closed it, where the words went, and that there is nothing left to do. */
   note: string;
 }
 
-/** The review's outcome, counted off the session record, never estimated. */
 export function closingSummary(review: ClosedReview): ClosingSummary {
   const paths = reviewPaths(review.groups);
   const commentsSent = commentCount(review.conversation, "reviewer");
@@ -46,8 +40,7 @@ export function closingSummary(review: ClosedReview): ClosingSummary {
 /**
  * Largest unit first, zeros dropped: a short review must not read as a list of
  * things the reviewer failed to do. No files means no figures at all — the
- * verdict says everything about an empty review. `lines changed` is taken from
- * the diff, not recounted: see `linesChanged`.
+ * verdict says everything about an empty review.
  */
 function figures(review: ClosedReview, paths: Set<string>, commentsSent: number): ClosingFigure[] {
   if (paths.size === 0) return [];
@@ -83,10 +76,9 @@ function verdict(paths: Set<string>, approved: string[]): string {
 }
 
 /**
- * The last line: who ended it, and that the reviewer is free to go. The
- * delivery half only claims what this page can answer for — nothing is still
- * sitting in the browser — not that an agent picked the prompts up, which is
- * unknowable here.
+ * The delivery half only claims what this page can answer for — nothing is
+ * still sitting in the browser — not that an agent picked the prompts up,
+ * which is unknowable here.
  */
 function note(endedBy: ReviewCloser | undefined, commentsSent: number): string {
   const delivered = commentsSent === 0 ? "" : " Everything you sent has left this page.";
@@ -136,10 +128,6 @@ function digits(count: number): string {
   return String(count).replace(/\B(?=(\d{3})+$)/g, ",");
 }
 
-/**
- * The closing summary, the last thing the page says. Deliberately quiet:
- * verdict, figures under a rule, one closing line.
- */
 export function renderClosingSummary(review: ClosedReview): string {
   const summary = closingSummary(review);
   // No list rather than an empty one: the list draws the rule above the

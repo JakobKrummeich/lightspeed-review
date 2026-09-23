@@ -12,8 +12,8 @@ import type { MountedRail } from "./panel-rail.ts";
 import type { MountedStatusBanner } from "./status-mount.ts";
 
 /**
- * Landmarks a session event writes into. A subset of the page: taking the
- * whole `Page` would make this module and the hub import each other.
+ * A subset of the page: taking the whole `Page` would make this module and
+ * the hub import each other.
  */
 export interface RoundHosts {
   key: string;
@@ -24,13 +24,11 @@ export interface RoundHosts {
   roundPopup: HTMLElement;
 }
 
-/** The round on screen and the talk so far, as the hub holds them. */
 export interface LiveSession {
   round: number;
   conversation: SessionData["conversation"];
 }
 
-/** Everything a session event may have to move, and who to ask before it does. */
 export interface Wired {
   page: RoundHosts;
   live: LiveSession;
@@ -38,14 +36,11 @@ export interface Wired {
   panel: MountedPanel;
   banner: MountedStatusBanner;
   railControl: MountedRail;
-  /** The finish card, which says what its own end press will carry. */
   finish: TurnAware;
   refreshReplay(fresh: SessionData): void;
-  /** Where the reviewer stands in the round on screen, asked at the moment. */
   place(): ReviewerPlace;
 }
 
-/** Anything outside the panel that has to be told the turn moved. */
 export interface TurnAware {
   setTurn(turn: SessionData["turn"]): void;
 }
@@ -104,9 +99,8 @@ export function wireSessionEvents(wired: Wired): void {
       live.conversation = fresh.conversation;
     });
   });
-  // Everything that speaks for the turn hears it at once: the header states it
-  // in words, the panel gates Send on it, and the finish card promises to carry
-  // the queue only when the queue can still go anywhere.
+  // Everything that speaks for the turn hears it at once: the finish card
+  // promises to carry the queue only when the queue can still go anywhere.
   events.addEventListener("presence", (event: MessageEvent<string>) => {
     const presence = readPresence(event.data);
     banner.setPresence(presence);
@@ -116,9 +110,8 @@ export function wireSessionEvents(wired: Wired): void {
 }
 
 /**
- * Whether this round must wait for the reviewer. Only over a live review: an
- * ended one is the review stopping, and holding that back would leave the
- * reviewer typing into a closed page.
+ * Only over a live review: an ended one is the review stopping, and holding
+ * that back would leave the reviewer typing into a closed page.
  */
 function waits(wired: Wired, fresh: SessionData): boolean {
   if (currentRound(fresh.rounds) === wired.live.round) return false;
@@ -126,13 +119,8 @@ function waits(wired: Wired, fresh: SessionData): boolean {
   return holdsRound(wired.place());
 }
 
-/**
- * Puts the round on screen. Reached from the event itself when the reviewer
- * has nothing to lose, from the offer when they do.
- */
 function applyRound(wired: Wired, fresh: SessionData): void {
   const { page, live, diff, panel, banner, railControl } = wired;
-  // A new round may be about something else than the last one.
   page.intentRoot.innerHTML = renderIntent(fresh);
   // Stamped before the redraw: the redraw reports this round's opening folds,
   // which must not be written under the old round's number.
@@ -154,10 +142,9 @@ function applyRound(wired: Wired, fresh: SessionData): void {
 }
 
 /**
- * What taking a round does to the reviewer's place: replay, top of the re-cut
- * diff, intent block back beside the survey. The old offset pointed into a
- * diff that no longer exists; within one round the page has no business
- * moving anyone — true of a waiting round too, until taken.
+ * The old offset pointed into a diff that no longer exists; within one round
+ * the page has no business moving anyone — true of a waiting round too, until
+ * taken.
  */
 function openRound(wired: Wired, fresh: SessionData): void {
   wired.refreshReplay(fresh);

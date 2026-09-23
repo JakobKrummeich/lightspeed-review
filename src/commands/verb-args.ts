@@ -1,32 +1,25 @@
 /**
- * The grammar the agent's speaking verbs share: what it has to say comes first,
- * the session it is saying it about follows.
+ * The grammar the agent's speaking verbs share:
  *
  *   lightspeed <verb> "<message>" [branch] [base] [flags]
  *
- * The message is a positional and never a flag, because it is the point of the
- * command — a verb whose subject hides behind `--something` reads as optional.
- * Branch and base resolve exactly as they do everywhere else when omitted.
+ * The message is a positional and never a flag: a verb whose subject hides
+ * behind `--something` reads as optional.
  */
 import { invocationError } from "../errors.ts";
 import { scanArgs, type ScannedArgs } from "./args.ts";
 
 export interface VerbSpec {
-  /** The command's own name, for its errors and its `--help` pointer. */
   verb: string;
-  /** Flags that consume the next token as their value. */
   value?: readonly string[];
-  /** Flags that stand alone. */
   boolean?: readonly string[];
   /**
-   * What the verb calls its message in `<angle brackets>`, worded the same here
-   * and in `--help`: `ask` once asked for a `<text>` in its error and a
-   * `<question>` in its help, which is two names for one argument.
+   * Worded the same here and in `--help`: `ask` once asked for a `<text>` in its
+   * error and a `<question>` in its help, which is two names for one argument.
    */
   placeholder?: string;
 }
 
-/** What every speaking verb reads off its command line. */
 export interface VerbArgs {
   message: string;
   /** Unset when the agent left it to `resolveSession` to work out. */
@@ -36,9 +29,9 @@ export interface VerbArgs {
 }
 
 /**
- * Scans a verb's line and takes the message off the front. Unknown flags are
- * loud: one read as the message would put `--flu` in front of the reviewer, and
- * one read as a branch would speak into the wrong review — or none.
+ * Unknown flags are loud: one read as the message would put `--flu` in front of
+ * the reviewer, and one read as a branch would speak into the wrong review — or
+ * none.
  */
 export function parseVerb(args: string[], spec: VerbSpec, wanted: string): VerbArgs {
   const scanned = scanArgs(args, {

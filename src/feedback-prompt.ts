@@ -16,7 +16,6 @@ export function parsePrompt(value: unknown): FeedbackPrompt | undefined {
   return parseAnnotation(prompt, comment);
 }
 
-/** An annotation without a file, a group and the text it was taken from anchors nothing. */
 function parseAnnotation(
   prompt: Record<string, unknown>,
   comment: string,
@@ -53,15 +52,14 @@ function parseAnchor(prompt: Record<string, unknown>): LineAnchor | undefined | 
  */
 export const ANCHOR_FIELDS = ["line_start", "line_end", "side", "col_start", "col_end"];
 
-/** No anchor field at all means the reviewer selected without one, not badly. */
 function anchorAttempted(prompt: Record<string, unknown>): boolean {
   return ANCHOR_FIELDS.some((field) => prompt[field] !== undefined);
 }
 
 /**
- * Partial-line selection range. Either end may be missing on its own (start
- * mid-line, run to end). Single-line ranges must run forwards; across lines the
- * columns sit on different lines, so their order says nothing.
+ * Either end may be missing on its own (start mid-line, run to end). Only a
+ * single-line range must run forwards: across lines the columns sit on
+ * different lines, so their order says nothing.
  */
 function parseColumns(
   prompt: Record<string, unknown>,
@@ -93,7 +91,6 @@ function lineRange(
   return { line_start: start, line_end: end };
 }
 
-/** An absent column is not a broken one: that end of the selection is unclipped. */
 function isColumn(value: unknown): value is number | undefined {
   return value === undefined || isPosition(value);
 }

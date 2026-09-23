@@ -1,9 +1,10 @@
 import type { DiffFileStatus } from "../diff-extract.ts";
+import { renamedFrom } from "../file-relocation.ts";
 import type { RoundFile, SessionRound } from "../session-store.ts";
 
 /**
- * What one round says about one file. `round` is the round's index, so a caller
- * can line an appearance up with the session's own `rounds[]`.
+ * `round` is the round's index, so a caller can line an appearance up with the
+ * session's own `rounds[]`.
  */
 export interface FileAppearance {
   round: number;
@@ -11,7 +12,6 @@ export interface FileAppearance {
   path: string;
   blob: string | null;
   status: DiffFileStatus;
-  /** Whether the file was ticked approved when that round closed. */
   approved: boolean;
 }
 
@@ -25,17 +25,16 @@ export interface FileAppearance {
  */
 export type Approval = "needs-reapproval" | "unapproved" | "approved";
 
-/** What a file's approval is worth today: what was approved, and whether it held. */
 export interface SettledFile {
-  /** The blob the reviewer last approved, or null when they never did. */
   approvedAtBlob: string | null;
-  /** Whether the file changed in any round after that approval. */
   changedSince: boolean;
 }
 
 /**
  * Every round a file took part in, oldest first, under whatever name it had at
  * the time — a rename is followed backwards, so callers pass today's path only.
+ * An earlier name on any other status is not followed: the file's history
+ * begins where it appeared (`renamedFrom`).
  */
 export function fileHistory(rounds: SessionRound[], path: string): FileAppearance[] {
   const appearances: FileAppearance[] = [];
@@ -52,19 +51,20 @@ export function fileHistory(rounds: SessionRound[], path: string): FileAppearanc
       status: file.status,
       approved: round.approvedAtEnd.includes(name),
     });
-    if (file.previousPath !== undefined) name = file.previousPath;
+    name = renamedFrom(file) ?? name;
   }
   return appearances.reverse();
 }
 
 /**
  * The name `path` goes by in a later round: a rename since makes the file show
- * up there as the new name's `previousPath`. Shared by the ledger's outcomes
- * and the between-rounds replay, so the two cannot disagree on which file a
- * verdict is about.
+ * up there as the new name's `previousPath`; a file that merely carries `path`
+ * as an earlier name leaves it where it is (`renamedFrom`). Shared by the
+ * ledger's outcomes and the between-rounds replay, so the two cannot disagree
+ * on which file a verdict is about.
  */
 export function currentName(current: SessionRound, path: string): string {
-  return current.files.find((file) => file.previousPath === path)?.path ?? path;
+  return current.files.find((file) => renamedFrom(file) === path)?.path ?? path;
 }
 
 /**
@@ -75,7 +75,7 @@ export function currentName(current: SessionRound, path: string): string {
  */
 export function changedBetween(a: SessionRound, b: SessionRound, path: string): boolean {
   const later = fileIn(b, path);
-  const earlier = fileIn(a, later?.previousPath ?? path);
+  const earlier = fileIn(a, (later && renamedFrom(later)) ?? path);
   return !sameBlob(later?.blob ?? null, earlier?.blob ?? null);
 }
 
@@ -93,14 +93,8 @@ export function sameBlob(a: string | null, b: string | null): boolean {
   return a.slice(0, width) === b.slice(0, width);
 }
 
-/** Git's own shortest abbreviation, and the shortest that can vouch for a file. */
 const SHORTEST_TRUSTED_SHA = 7;
 
-/**
- * The reviewer's standing verdict on a file: the blob they last approved and
- * whether anything moved since. A file nobody ever ticked has neither, and
- * neither has one whose approval the reviewer took back.
- */
 export function settled(rounds: SessionRound[], path: string): SettledFile {
   const history = fileHistory(rounds, path);
   const approvedAt = history.findLastIndex((appearance) => appearance.approved);
@@ -170,10 +164,9 @@ export function carriedApproval(rounds: SessionRound[]): string[] {
 }
 
 /**
- * Where every file of the newest round stands given the live ticks. `approved`
- * decides by itself — a just-unticked file is unapproved whatever earlier rounds
- * say. The rounds decide the other half: a file edited out from under its
- * approval reads `needs-reapproval`, not plain `unapproved`.
+ * `approved` decides by itself — a just-unticked file is unapproved whatever
+ * earlier rounds say. The rounds decide the other half: a file edited out from
+ * under its approval reads `needs-reapproval`, not plain `unapproved`.
  */
 export function roundApproval(
   rounds: SessionRound[],

@@ -1,18 +1,14 @@
 import type { AuthEvent, AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
 
-/** The terminal as the login flow sees it: `ask` reads one line, `say` prints one.
- * Both live on stderr/stdin — stdout carries TOON and nothing else, even here.
- * Injectable so tests can drive the flow with a scripted reader. */
+/** Injectable so tests can drive the flow with a scripted reader. */
 export interface InteractionIo {
   ask(question: string, signal?: AbortSignal): Promise<string>;
   say(line: string): void;
 }
 
-/** pi-ai's `AuthInteraction` over a plain terminal: URLs and device codes printed,
- * questions asked a line at a time, `select` a numbered list. `signal` aborts the
- * whole flow (SIGINT, wired by the caller); a prompt's own `signal` goes to the
- * reader because a raced prompt — codex's paste-the-code against its callback
- * server — is cancelled the moment the other side wins. */
+/** `signal` aborts the whole flow (SIGINT, wired by the caller); a prompt's own
+ * `signal` goes to the reader because a raced prompt — codex's paste-the-code
+ * against its callback server — is cancelled the moment the other side wins. */
 export function loginInteraction(io: InteractionIo, signal: AbortSignal): AuthInteraction {
   return {
     signal,
@@ -76,9 +72,8 @@ async function chooseByNumber(
   }
 }
 
-/** text, secret and manual_code all read one line. An empty answer passes through
- * untouched: only the provider knows what empty means (github-copilot's
- * enterprise-URL prompt reads it as "public github.com"). */
+/** An empty answer passes through untouched: only the provider knows what empty
+ * means (github-copilot's enterprise-URL prompt reads it as "public github.com"). */
 function oneLineQuestion(prompt: AuthPrompt & { type: "text" | "secret" | "manual_code" }): string {
   const placeholder = prompt.placeholder === undefined ? "" : ` [${prompt.placeholder}]`;
   return `${prompt.message}${placeholder}: `;

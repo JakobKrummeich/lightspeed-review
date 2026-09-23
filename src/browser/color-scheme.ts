@@ -4,21 +4,17 @@ export interface ColorSchemeStorage {
   setItem(key: string, value: string): void;
 }
 
-/** What the reviewer picked: an explicit scheme, or "follow the OS". */
 export type ColorSchemePreference = "system" | "light" | "dark";
 
-/** The scheme actually painted, once the OS has been asked. */
 export type ColorScheme = "light" | "dark";
 
-/** Matches while the operating system asks for dark. */
 export const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
-/** An undecided reviewer gets whatever the rest of their desktop is doing. */
 export const DEFAULT_SCHEME: ColorSchemePreference = "system";
 
 /**
- * All three choices, in switch order. "Auto" comes first so following the OS
- * stays reachable after an explicit pick, instead of being a one-way door.
+ * "Auto" comes first so following the OS stays reachable after an explicit
+ * pick, instead of being a one-way door.
  */
 export const COLOR_SCHEME_OPTIONS: readonly {
   scheme: ColorSchemePreference;
@@ -45,7 +41,6 @@ export function writeColorScheme(storage: ColorSchemeStorage, scheme: ColorSchem
   attempt(() => storage.setItem(STORAGE_KEY, scheme));
 }
 
-/** Narrows a `data-scheme` attribute, which is text the DOM may have lost. */
 export function parseColorScheme(value: string | undefined): ColorSchemePreference | undefined {
   return COLOR_SCHEME_OPTIONS.find((option) => option.scheme === value)?.scheme;
 }

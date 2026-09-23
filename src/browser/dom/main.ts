@@ -28,10 +28,9 @@ import { trackReader } from "./reader-place.ts";
 import { wireSessionEvents, type LiveSession } from "./session-events.ts";
 import { mountViewToggle } from "./view-toggle.ts";
 
-/** The page the server rendered, or nothing when this is not that page. */
 interface Page {
   key: string;
-  /** The one scroll container: the intent and the groups move through it. */
+  /** The one scroll container. */
   reviewRoot: HTMLElement;
   intentRoot: HTMLElement;
   diffRoot: HTMLElement;
@@ -43,11 +42,8 @@ interface Page {
   openingRoot: HTMLElement;
   replayRoot: HTMLElement;
   replayReopen: HTMLElement;
-  /** Where a round that arrived mid-read waits until the reviewer takes it. */
   roundOffer: HTMLElement;
-  /** Where that round's arrival is announced, once, over the review. */
   roundPopup: HTMLElement;
-  /** Where the last tick is answered, over the review, with the press it calls for. */
   donePopup: HTMLElement;
 }
 
@@ -129,7 +125,6 @@ async function main(): Promise<void> {
 
   rememberScrollPlace(page, live, place);
 
-  // A comment's file-name press lands back on its lines: the diff owns the jump.
   const side = mountPanelSide(
     page,
     session,
@@ -157,10 +152,7 @@ async function main(): Promise<void> {
   wireSessionEvents({ page, live, diff, ...side, finish, refreshReplay, place: reader.place });
 }
 
-/**
- * What the page opens on: round, remembered place, chapter. A place is only
- * handed back to the round it was read in — see `review-memory.ts`.
- */
+/** A place is only handed back to the round it was read in — see `review-memory.ts`. */
 function openedOn(
   page: Page,
   session: SessionData,
@@ -175,10 +167,7 @@ function openedOn(
   return { live, place, focus: clampFocus(place?.focus, session.groups.length) };
 }
 
-/**
- * On chapter enter/leave: store the place for reload, and toggle the intent
- * block — it belongs beside the survey, dead space beside a diff.
- */
+/** The intent block is toggled too: it belongs beside the survey, dead space beside a diff. */
 function focusMoved(page: Page, live: LiveSession, focus: number | undefined): void {
   updateMemory(localStorage, page.key, { round: live.round, focus });
   showIntentFor(page.intentRoot, focus);
@@ -190,7 +179,6 @@ function focusMoved(page: Page, live: LiveSession, focus: number | undefined): v
  */
 function roomWatch(): {
   hasRoom(): boolean;
-  /** The reviewer folded the panel away, or brought it back. */
   toggle(): void;
   onChange(refresh: () => void): void;
 } {
@@ -221,8 +209,8 @@ function mountScheme(schemeSwitch: HTMLElement): void {
 }
 
 /**
- * Restores the scroll offset, then keeps it stored. After the first draw, so
- * the review is at full height: restoring against a folded page lands at the end.
+ * Called after the first draw, so the review is at full height: restoring
+ * against a folded page lands at the end.
  */
 function rememberScrollPlace(page: Page, live: LiveSession, place: ReviewPlace | undefined): void {
   if (place) page.reviewRoot.scrollTop = place.scroll;
@@ -235,7 +223,6 @@ function rememberScrollPlace(page: Page, live: LiveSession, place: ReviewPlace |
   window.addEventListener("pagehide", () => rememberScroll.now());
 }
 
-/** The panel column: the status banner, the rail beside the panel, the panel itself. */
 function mountPanelSide(
   page: Page,
   session: SessionData,
@@ -277,8 +264,8 @@ function mountPanelSide(
 }
 
 /**
- * The between-rounds replay. Closing it lands at the top of the diff, where a
- * new round starts anyway. Returns the refresh run on load and every re-group.
+ * Closing the replay lands at the top of the diff, where a new round starts
+ * anyway. Returns the refresh run on load and every re-group.
  */
 function wireReplay(page: Page, live: LiveSession): (fresh: SessionData) => void {
   const replayOverlay = mountReplayOverlay({
@@ -294,7 +281,7 @@ function wireReplay(page: Page, live: LiveSession): (fresh: SessionData) => void
     if (replay !== undefined) replayOverlay.open(replay);
   });
   // Ordering (which round a response belongs to, what failed fetches leave)
-  // lives in the refresher; this only ties its hands to the page.
+  // lives in the refresher.
   const replayRefresh = createReplayRefresher({
     fetch: () => fetchReplay(page.key),
     wasReplayed: (shown) => readMemory(localStorage, page.key).replayed === shown,
@@ -314,9 +301,8 @@ function wireReplay(page: Page, live: LiveSession): (fresh: SessionData) => void
 }
 
 /**
- * The two overlays a round can open on — opening for a first round, replay
- * after a commented one — and the one place that knows a round never opens on
- * both. Returns the replay's refresh.
+ * The one place that knows a round never opens on both overlays: opening for
+ * a first round, replay after a commented one.
  */
 function wireOverlays(
   page: Page,
@@ -330,10 +316,9 @@ function wireOverlays(
 }
 
 /**
- * The opening ceremony. Whether it opens is `opensFor`'s question alone; the
- * page asks and records that this browser opened it (once per review, not per
- * load). Wired last, over a drawn page: closing it must reveal the review,
- * not one still being built.
+ * Whether it opens is `opensFor`'s question alone; the page records that this
+ * browser opened it (once per review, not per load). Wired last, over a drawn
+ * page: closing it must reveal the review, not one still being built.
  */
 function wireOpening(page: Page, session: SessionData, round: number): void {
   const review = {

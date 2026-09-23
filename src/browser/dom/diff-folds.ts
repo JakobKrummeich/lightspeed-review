@@ -1,15 +1,9 @@
-/**
- * The diff view's fold state: which groups and files stand open, how a press
- * or a tick folds them, and the lookups that turn a group's number or a file's
- * path into the section rendered for it.
- */
 import type { CollapsePlan, FoldTarget, OpenFolds } from "../collapse-plan.ts";
 import { foldAnchored, type Anchor, type Fold } from "./fold.ts";
 
 /**
- * Which blocks stand open, read off the controls themselves — a file's header,
- * and the press on a chapter's gate. Complete state, never stale: names only
- * blocks this draw has, so dropped files cannot survive.
+ * Read off the controls themselves, so it is complete and never stale: names
+ * only blocks this draw has, and dropped files cannot survive.
  */
 export function readOpenFolds(root: HTMLElement): OpenFolds {
   const groups = [...root.querySelectorAll<HTMLElement>(".lsr-group")]
@@ -24,8 +18,8 @@ export function readOpenFolds(root: HTMLElement): OpenFolds {
 }
 
 /**
- * Puts the review back the way it was left. Switched, not folded: runs on a
- * draw nobody has seen yet, so there is nothing to animate for.
+ * Switched, not folded: runs on a draw nobody has seen yet, so there is
+ * nothing to animate for.
  */
 export function applyOpenFolds(root: HTMLElement, open: OpenFolds): void {
   for (const section of root.querySelectorAll<HTMLElement>(".lsr-group")) {
@@ -45,9 +39,37 @@ function isOpen(block: HTMLElement, selector: string): boolean {
 }
 
 /**
- * Applies a tick's folds as one anchored gesture. Headers take their new state
- * at once — a shut group must read as shut to anything asking, whatever its
- * animation is still doing — and the blocks fold together under one correction.
+ * Not part of `OpenFolds`: that list is what the mount folds itself, so every
+ * read is fresh because the mount made the last fold. The file list is a
+ * `<details>` the browser folds on its own — no press of the mount's says when
+ * it moved, so a held copy would be stale by the next draw. Read off the
+ * markup a draw is about to replace, and put back once it has: keyed by
+ * chapter number, which a same-round redraw (an agent's reply, a layout
+ * switch) keeps and every other draw changes — a focus move draws another
+ * chapter, and a re-group falls to the overview, where there is no card.
+ */
+export function readOpenFileLists(root: HTMLElement): number[] {
+  return [...root.querySelectorAll<HTMLElement>(".lsr-group")]
+    .filter((section) => fileList(section)?.open === true)
+    .map((section) => Number(section.dataset.groupIndex))
+    .filter((index) => Number.isInteger(index));
+}
+
+export function applyOpenFileLists(root: HTMLElement, open: number[]): void {
+  for (const index of open) {
+    const list = fileList(groupSection(root, index));
+    if (list) list.open = true;
+  }
+}
+
+function fileList(section: HTMLElement | null): HTMLDetailsElement | null {
+  return section?.querySelector<HTMLDetailsElement>(".lsr-gate-files") ?? null;
+}
+
+/**
+ * Headers take their new state at once — a shut group must read as shut to
+ * anything asking, whatever its animation is still doing — and the blocks
+ * fold together under one correction.
  */
 export function applyCollapsePlan(root: HTMLElement, plan: CollapsePlan): void {
   const folds: Fold[] = [];
@@ -62,13 +84,12 @@ export function applyCollapsePlan(root: HTMLElement, plan: CollapsePlan): void {
 }
 
 /**
- * What a tick holds still while folding. File: the tick row just pressed — on
- * screen by construction and it survives the fold; the header may be a
- * thousand lines up. Group: the section, not the gate inside it — the gate is
- * drawn only while the chapter is shut, so it is measurable on one side of
- * the gesture and not the other, while the section's top edge is where its
- * card lands. It is the one allowed to walk down onto the top edge as it
- * closes, because nothing inside it survives.
+ * File: the tick row just pressed — on screen by construction and it survives
+ * the fold; the header may be a thousand lines up. Group: the section, not the
+ * gate inside it — the gate is drawn only while the chapter is shut, so it is
+ * measurable on one side of the gesture and not the other, while the section's
+ * top edge is where its card lands. It is the one allowed to walk down onto
+ * the top edge as it closes, because nothing inside it survives.
  */
 function foldAnchor(root: HTMLElement, target: FoldTarget): Anchor | null {
   if (target.kind === "group") {
@@ -79,10 +100,6 @@ function foldAnchor(root: HTMLElement, target: FoldTarget): Anchor | null {
   return foot ? { element: foot, walk: false } : null;
 }
 
-/**
- * The control that stands for one block of the plan, whichever kind it names:
- * a file's header, or the press on a chapter's gate.
- */
 function foldControl(root: HTMLElement, target: FoldTarget): HTMLElement | null {
   const scope =
     target.kind === "group" ? groupSection(root, target.index) : fileBlock(root, target.path);
@@ -90,12 +107,10 @@ function foldControl(root: HTMLElement, target: FoldTarget): HTMLElement | null 
   return scope?.querySelector<HTMLElement>(selector) ?? null;
 }
 
-/** The one place that turns a group's number into the section rendered for it. */
 export function groupSection(root: HTMLElement, index: number): HTMLElement | null {
   return root.querySelector<HTMLElement>(`.lsr-group[data-group-index="${index}"]`);
 }
 
-/** The same for a file, whose path is a selector only once escaped. */
 export function fileBlock(root: HTMLElement, path: string): HTMLElement | null {
   return root.querySelector<HTMLElement>(`.lsr-file[data-file="${CSS.escape(path)}"]`);
 }
@@ -105,9 +120,8 @@ export function isExpanded(header: HTMLElement): boolean {
 }
 
 /**
- * Header state and content visibility in one step. Switched, not folded: on a
- * draw nobody has seen yet, and on the gate press, where the card the fold
- * would have been anchored to is itself what goes away.
+ * Switched, not folded: for a draw nobody has seen yet, and for the gate
+ * press, where the card a fold would anchor to is itself what goes away.
  */
 export function switchSection(header: HTMLElement, expanded: boolean): void {
   markExpanded(header, expanded);
@@ -115,7 +129,6 @@ export function switchSection(header: HTMLElement, expanded: boolean): void {
   if (content) content.hidden = !expanded;
 }
 
-/** The same, folded rather than switched, with the header itself held still. */
 export function foldSection(header: HTMLElement, expanded: boolean): void {
   markExpanded(header, expanded);
   const content = contentOf(header);
@@ -128,7 +141,6 @@ function markExpanded(header: HTMLElement, expanded: boolean): void {
   header.setAttribute("aria-expanded", String(expanded));
 }
 
-/** The block a header opens and shuts, which the markup names by id. */
 function contentOf(header: HTMLElement): HTMLElement | null {
   const contentId = header.getAttribute("aria-controls");
   return contentId === null ? null : document.getElementById(contentId);

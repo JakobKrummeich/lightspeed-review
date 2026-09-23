@@ -62,15 +62,12 @@ export function loadPiProviders(path = piModelsPath()): Record<string, PiProvide
 
 const PI_VALUE_TOKEN = /\$\$|\$!|\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g;
 
-/** One piece of a Pi config value: text to keep as it stands, or a name to look up. */
 type PiValuePart = { literal: string } | { variable: string };
 
 /**
- * Pi's value grammar, parsed in one place for both resolvers below. They may
- * differ in where a name is looked up — a stored credential's environment, or
- * this process's — and in nothing else. Held together because the grammar was
- * written out twice: the day it grows a token, one copy would keep the old
- * reading, and since the two serve different fields (provider credentials
+ * Pi's value grammar, parsed once for both resolvers below, which differ only
+ * in where a name is looked up. Two copies would drift the day the grammar
+ * grows a token, and since they serve different fields (provider credentials
  * against model headers) the same config would resolve for one and be reported
  * as the other one's fault.
  */

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   carriedApproval,
   changedBetween,
+  currentName,
   fileApproval,
   fileHistory,
   firstSeenRound,
@@ -11,7 +12,6 @@ import {
 } from "../../src/rounds/history.ts";
 import type { RoundFile, SessionRound } from "../../src/session-store.ts";
 
-/** A round as `start` writes it, closed with whatever was ticked approved. */
 function round(index: number, files: RoundFile[], approvedAtEnd: string[] = []): SessionRound {
   return {
     index,
@@ -30,6 +30,14 @@ function file(path: string, blob: string | null, previousPath?: string): RoundFi
     blob,
     ...(previousPath === undefined ? {} : { previousPath }),
   };
+}
+
+/**
+ * A copy, as rounds recorded one while `src/diff-extract.ts` still asked git for copies:
+ * `modified` with an earlier name that is another file, still in the review under its own name.
+ */
+function earlierName(path: string, blob: string | null, previousPath: string): RoundFile {
+  return { path, status: "modified", blob, previousPath };
 }
 
 test("fileHistory lists a file's rounds oldest first", () => {
@@ -64,6 +72,42 @@ test("fileHistory follows a rename back to the name the file had then", () => {
   ]);
 });
 
+test("fileHistory does not follow an earlier name on a file git did not call renamed", () => {
+  // The earlier name is a file that did not go anywhere — walking into its
+  // rounds would hand a new file another's past.
+  const rounds = [
+    round(0, [file("src/a.ts", "aaa1111")], ["src/a.ts"]),
+    round(1, [file("src/a.ts", "aaa1111"), earlierName("src/b.ts", "bbb1111", "src/a.ts")]),
+  ];
+
+  assert.deepEqual(fileHistory(rounds, "src/b.ts"), [
+    { round: 1, path: "src/b.ts", blob: "bbb1111", status: "modified", approved: false },
+  ]);
+});
+
+test("currentName follows a rename forward, not an earlier name git did not call a rename", () => {
+  const current = round(1, [
+    file("src/new.ts", "5ee1111", "src/old.ts"),
+    file("src/a.ts", "aaa1111"),
+    earlierName("src/b.ts", "bbb1111", "src/a.ts"),
+  ]);
+
+  assert.equal(currentName(current, "src/old.ts"), "src/new.ts");
+  // A comment left on `src/a.ts` is about `src/a.ts`, which is still here.
+  assert.equal(currentName(current, "src/a.ts"), "src/a.ts");
+});
+
+test("a file carrying an approved file's name as its earlier name arrives unapproved", () => {
+  // Nobody ticked the new file; the tick on `src/a.ts` is `src/a.ts`'s.
+  const rounds = [
+    round(0, [file("src/a.ts", "aaa1111")], ["src/a.ts"]),
+    round(1, [file("src/a.ts", "aaa1111"), earlierName("src/b.ts", "aaa1111", "src/a.ts")]),
+  ];
+
+  assert.equal(fileApproval(rounds, "src/b.ts"), "unapproved");
+  assert.equal(fileApproval(rounds, "src/a.ts"), "approved");
+});
+
 test("changedBetween compares the blobs of the two rounds", () => {
   const first = round(0, [file("src/a.ts", "aaa1111")]);
   const same = round(1, [file("src/a.ts", "aaa1111")]);
@@ -78,6 +122,16 @@ test("changedBetween resolves the earlier round's name across a rename", () => {
   const renamedOnly = round(1, [file("src/new.ts", "aaa1111", "src/old.ts")]);
 
   assert.equal(changedBetween(first, renamedOnly, "src/new.ts"), false);
+});
+
+test("changedBetween reports a file with an unfollowed earlier name as new, whatever that file's blob was", () => {
+  const first = round(0, [file("src/a.ts", "aaa1111")]);
+  const second = round(1, [
+    file("src/a.ts", "aaa1111"),
+    earlierName("src/b.ts", "aaa1111", "src/a.ts"),
+  ]);
+
+  assert.equal(changedBetween(first, second, "src/b.ts"), true);
 });
 
 test("changedBetween sees through an abbreviation git widened between rounds", () => {
@@ -325,7 +379,6 @@ test("roundApproval follows the reviewer's ticks the moment they change", () => 
     "src/a.ts": "unapproved",
     "src/b.ts": "unapproved",
   });
-  // Ticked a file for the first time, in the round still open.
   assert.deepEqual(roundApproval(rounds, ["src/a.ts", "src/b.ts"]), {
     "src/a.ts": "approved",
     "src/b.ts": "approved",

@@ -13,35 +13,25 @@ import type {
 } from "../session-store.ts";
 
 export interface PanelState {
-  /** Queued in the browser, not sent yet. */
   pending: QueuedPill[];
-  /** Already delivered, oldest first. */
+  /** Oldest first. */
   conversation: ConversationEntry[];
-  /** Every round of the review, oldest first: what the history is cut along. */
+  /** Oldest first. */
   rounds: RoundMark[];
   status: SessionStatus;
-  /** Every file of the review is ticked: there is nothing left to read. */
   allApproved: boolean;
-  /**
-   * Whose move it is. The agent holding it takes Send away and nothing else:
-   * queueing, ending and typing stay live whatever it says.
-   */
   turn: Turn;
   /**
-   * The agent's per-comment answers (`say --for <id>`), keyed by the comment's
-   * own id. Optional because only the live session carries them; everything
-   * else that builds a panel builds conversation and rounds.
+   * `say --for <id>` answers, keyed by comment id. Optional because only the
+   * live session carries them; everything else that builds a panel builds
+   * conversation and rounds.
    */
   declarations?: Record<string, DeclaredAnswer>;
 }
 
-/** The compose row's half of that state, which is all `renderCompose` needs. */
 export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
 
-/**
- * Said once every file is ticked. Holds even with feedback still queued:
- * `Send & End` sends the queue on its way out.
- */
+/** Holds even with feedback still queued: `Send & End` sends the queue on its way out. */
 const APPROVED_EVERYTHING = "Every file is approved — Send & End when you are ready.";
 
 /**
@@ -52,23 +42,21 @@ const APPROVED_EVERYTHING = "Every file is approved — Send & End when you are 
 export const SEND_LABEL = "Send to Agent";
 export const SENDING_LABEL = "Sending…";
 export const SEND_END_LABEL = "Send & End";
-/** Ending is never gated, but on the agent's turn it takes nothing with it. */
 export const END_ONLY_LABEL = "End without Sending";
-/** The question card's own press. One word, because it does one thing. */
 export const ANSWER_LABEL = "Answer";
 
 /**
- * Whether Send is off. The one gate in the page, and it gates one control: an
- * ended review is locked by its own status, and everything else is locked only
- * while the agent holds the turn.
+ * The one gate in the page, and it gates one control: an ended review is
+ * locked by its own status, and everything else is locked only while the
+ * agent holds the turn.
  */
 export function sendIsLocked(state: ComposeState): boolean {
   return state.status === "ended" || state.turn.holder === "agent";
 }
 
 /**
- * The whole right-hand panel. Drawn once at mount; afterwards only
- * `renderScroll` is redrawn, so the compose box being typed into is never replaced.
+ * Drawn once at mount; afterwards only `renderScroll` is redrawn, so the
+ * compose box being typed into is never replaced.
  */
 export function renderPanel(state: PanelState): string {
   return `<div class="lsr-panel-scroll">${renderScroll(state)}</div>
@@ -76,8 +64,8 @@ export function renderPanel(state: PanelState): string {
 }
 
 /**
- * Conversation and queued pills. They share one scroll container so the
- * compose box stays pinned: a long conversation must not push send out of reach.
+ * One scroll container for conversation and queue, so the compose box stays
+ * pinned: a long conversation must not push send out of reach.
  */
 export function renderScroll(state: PanelState): string {
   const current = currentRound(state.rounds);
@@ -91,17 +79,16 @@ export function renderScroll(state: PanelState): string {
 `;
 }
 
-/** All-approved note; empty for an ended review. */
 export function composeNote(state: ComposeState): string {
   return state.status !== "ended" && state.allApproved ? APPROVED_EVERYTHING : "";
 }
 
 /**
- * Compose box and send buttons. Ending is never gated — not by the turn, not by
- * anything but the review already being over — so only Send carries the turn's
- * lock, and the end button says what it will do instead of being taken away.
- * The `role="status"` region is always in the markup, only filled/emptied: a
- * region added on demand is announced by no screen reader reliably.
+ * Ending is never gated — not by the turn, not by anything but the review
+ * already being over — so only Send carries the turn's lock, and the end
+ * button says what it will do instead of being taken away. The `role="status"`
+ * region is always in the markup, only filled/emptied: a region added on
+ * demand is announced by no screen reader reliably.
  */
 export function renderCompose(state: ComposeState): string {
   const ended = state.status === "ended";
@@ -117,10 +104,9 @@ export function renderCompose(state: ComposeState): string {
 }
 
 /**
- * What ending does from here. On the agent's turn the queue is not the
- * reviewer's to send, so the press ends the review and leaves the pills behind
- * — said on the button, because learning it from the conversation afterwards is
- * how a reviewer loses six comments.
+ * On the agent's turn the queue is not the reviewer's to send, so the press
+ * ends the review and leaves the pills behind — said on the button, because
+ * learning it from the conversation afterwards is how a reviewer loses six comments.
  */
 export function endLabel(state: ComposeState): string {
   return state.turn.holder === "agent" && state.status !== "ended"
@@ -129,10 +115,10 @@ export function endLabel(state: ComposeState): string {
 }
 
 /**
- * Whose move it is, at the foot of the conversation, where the answer will
- * appear — after Send the eye is here, not on the header's corner. The
- * reviewer's own turn says nothing: Send is live and the page is theirs.
- * Silent once ended: the closing summary is about to cover the page.
+ * At the foot of the conversation, where the answer will appear — after Send
+ * the eye is here, not on the header's corner. The reviewer's own turn says
+ * nothing: Send is live and the page is theirs. Silent once ended: the closing
+ * summary is about to cover the page.
  */
 function renderTurnLine(state: PanelState): string {
   if (state.turn.holder !== "agent" || state.status === "ended") return "";
@@ -145,11 +131,10 @@ function renderTurnLine(state: PanelState): string {
 }
 
 /**
- * The question the reviewer still owes an answer to, or none. A question is open
- * while nothing has been said after it: the agent asked and then blocked, so the
- * next words in the conversation are the answer, whatever else they are about.
- * Identity, not a flag — the renderer below asks "is this that prompt?" and two
- * questions with the same words are still two questions.
+ * A question is open while nothing has been said after it: the agent asked and
+ * then blocked, so the next words in the conversation are the answer, whatever
+ * else they are about. Identity, not a flag — the renderer below asks "is this
+ * that prompt?" and two questions with the same words are still two questions.
  */
 function openQuestion(state: PanelState): FeedbackPrompt | undefined {
   if (state.status === "ended") return undefined;
@@ -159,16 +144,14 @@ function openQuestion(state: PanelState): FeedbackPrompt | undefined {
   return asked?.type === "message" && asked.kind === "question" ? asked : undefined;
 }
 
-/** What an entry needs from the panel's state, so the walk below passes one thing. */
 interface EntryContext {
   declarations?: Record<string, DeclaredAnswer>;
-  /** The one question drawn with a live answer box, by identity. */
   open?: FeedbackPrompt;
 }
 
 /**
- * History ruled into rounds. A conversation that never crossed a round
- * boundary stays a plain stream: one label over everything is furniture.
+ * A conversation that never crossed a round boundary stays a plain stream: one
+ * label over everything is furniture.
  */
 function renderConversation(state: PanelState): string {
   const segments = roundSegments(state.conversation, state.rounds);
@@ -184,10 +167,6 @@ function renderConversation(state: PanelState): string {
   return parts.join("\n  ");
 }
 
-/**
- * The line between two rounds: which round follows, and whether it is the one
- * on screen — answers "was this the round I already had?" while scrolling.
- */
 function renderRoundMark(segment: RoundSegment): string {
   // Escaped: comes from a session file, which may be hand-edited.
   const name = escapeHtml(`Round ${segment.round + 1}`);
@@ -224,23 +203,19 @@ function isQuestion(prompt: FeedbackPrompt): boolean {
 }
 
 /**
- * A question wears its label even once answered. The card is how a reviewer
- * scrolling back tells the sentence they were asked from the sentences the agent
- * merely said — and a card that lost its label on being answered would make the
- * history read as if nobody had ever asked anything.
+ * A question wears its label even once answered: a card that lost its label on
+ * being answered would make the history read as if nobody had ever asked anything.
  */
 function renderQuestionLabel(asked: boolean): string {
   return asked ? `<p class="lsr-question-label">the agent is asking</p>\n    ` : "";
 }
 
 /**
- * The answer box under the open question, and the reason `ask` exists as its own
- * verb: the reviewer answers in one press, and the queue they have been building
- * stays queued. Sending the queue along would make answering a question cost
- * them six half-finished comments.
- *
- * Only the open question gets one. An answered question with a box under it
- * would invite an answer to a question the agent has stopped waiting on.
+ * The reviewer answers in one press and the queue they have been building
+ * stays queued: sending it along would make answering a question cost them
+ * six half-finished comments. Only the open question gets a box — one under
+ * an answered question would invite an answer to a question the agent has
+ * stopped waiting on.
  */
 function renderAnswerBox(open: boolean): string {
   if (!open) return "";
@@ -250,11 +225,7 @@ function renderAnswerBox(open: boolean): string {
     </div>`;
 }
 
-/**
- * The agent's declared answer (`say "<text>" --for <id>`), rendered inside the
- * prompt it answers. Files-only declarations show nothing: "I touched these"
- * is the between-rounds diff's story.
- */
+/** Files-only declarations show nothing: "I touched these" is the between-rounds diff's story. */
 function renderAnswer(
   prompt: FeedbackPrompt,
   declarations?: Record<string, DeclaredAnswer>,
@@ -275,10 +246,7 @@ function renderPill(pill: QueuedPill, index: number, current: number): string {
   </div>`;
 }
 
-/**
- * Badge on a pill that outlived its round: still sendable, but its lines may
- * no longer be the lines on screen. No stamp, no badge: absence is not a claim.
- */
+/** No stamp, no badge: absence is not a claim. */
 function renderStaleBadge(pill: QueuedPill, current: number): string {
   const stale = stalePillRound(pill, current);
   if (stale === undefined) return "";
@@ -299,10 +267,8 @@ function renderPromptBody(prompt: FeedbackPrompt): string {
 }
 
 /**
- * The comment's file as a press leading back to its lines. Basename only; full
- * path in the tooltip — every comment paying the path's width glued the card
- * into one block. Anchor rides along as data; without one the press still
- * opens the file.
+ * Basename only; full path in the tooltip — every comment paying the path's
+ * width glued the card into one block. Without an anchor the press still opens the file.
  */
 function renderFilePress(prompt: AnnotationPrompt): string {
   const path = escapeHtml(prompt.file);

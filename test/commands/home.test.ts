@@ -58,9 +58,9 @@ test("a stored session becomes a row carrying its turn, round and queue", () => 
 });
 
 /**
- * S1: the plan an agent declared is the one thing on the record only it knows,
- * and an agent resumed after compaction reads this view to find out where it
- * was. `agent working` without the plan is the state and not the work.
+ * The plan an agent declared is the one thing on the record only it knows, and
+ * an agent resumed after compaction reads this view to find out where it was.
+ * `agent working` without the plan is the state and not the work.
  */
 test("the plan a working agent declared is a column, so a resumed agent can read it", () => {
   const summaries = sessionSummaries([
@@ -108,11 +108,8 @@ test("empty state offers exactly the start command as next step", () => {
 });
 
 /**
- * B1: `lightspeed` in a repository with no `.lightspeed.conf.json` swallowed
- * the `config_missing` in a bare catch and printed `sessions: 0` with `start`
- * as the next step. Both were false — the sessions were on disk and `start`
- * fails the same way — so the one command that tells an agent where it stands
- * cost it a turn instead.
+ * Regression: a bare catch swallowed `config_missing` and printed `sessions: 0`
+ * with `start` as the next step — both false.
  */
 test("a repository with no config says so, instead of reporting no sessions", () => {
   const output = homeOutput({
@@ -189,9 +186,8 @@ test("active sessions are listed as uniform rows", () => {
 });
 
 /**
- * S1: the store is one directory for the whole machine, so the view listed
- * eight rows from four repositories with no column saying which — including
- * repositories that no longer exist on the machine at all.
+ * The store is one directory for the whole machine: unscoped, the view listed
+ * rows from repositories that no longer exist on the machine at all.
  */
 test("sessions are scoped to the repository the command ran in", () => {
   const output = homeOutput({
@@ -259,7 +255,6 @@ test("nothing elsewhere, nothing said about elsewhere", () => {
   assert.ok(!("elsewhere" in output));
 });
 
-/** The way out of the repo-scoped view, and the column that makes it readable. */
 test("--all lists every repository's sessions, each under the repo it belongs to", () => {
   const output = homeOutput({
     repoRoot: "/repo",
@@ -275,10 +270,9 @@ test("--all lists every repository's sessions, each under the repo it belongs to
 });
 
 /**
- * S2: the static help offered `wait` to a session showing `agent working`,
- * which the poll refuses with `turn_still_yours` and exit 2. `legalMoves` is
- * the one list no answer may contradict, so with one session to be about, the
- * home view is built from it too.
+ * Regression: the static help offered `wait` to a session showing `agent
+ * working`, which the poll refuses with `turn_still_yours`. `legalMoves` is the
+ * one list no answer may contradict.
  */
 test("one session in the repo: the help is that session's own legal moves", () => {
   const output = homeOutput({
@@ -335,7 +329,7 @@ test("wait help warns it must block in the foreground", () => {
 });
 
 /**
- * S4: the same four-line block was printed by `wait`, `ask`, `say`, `work` and
+ * The same four-line block was printed by `wait`, `ask`, `say`, `work` and
  * every turn refusal in that state — 146 of an `ask` answer's 187 tokens, and
  * one 17-token clause 19 times in a single transcript. After the first answer
  * of a round has spelt the moves out, the reminder is one line.
@@ -357,7 +351,6 @@ test("the short form names the same moves, in the same order, on one line", () =
   );
 });
 
-/** One list, two renderings: a move may never appear in one and not the other. */
 test("no turn offers a move in one form that the other form leaves out", () => {
   for (const turn of ["reviewer", "agent reading", "agent working", "ended"] as const) {
     const short = nextMoves(turn, "b m");
@@ -373,9 +366,6 @@ test("the full block is what a turn's first answer carries, the short line the r
   assert.deepEqual(turnHelp("agent working", "b m", undefined), legalMoves("agent working", "b m"));
 });
 
-/** B3: every `wait`/`ask` answer closed with a `start` line that had no
- * `--intent`, which the CLI refuses with `intent_missing` and exit 2 — one
- * wasted turn per round, spent on a command we printed ourselves. */
 test("the next-round line carries the --intent start refuses to run without", () => {
   assert.equal(
     helpNextRound("feat/tokens main"),
@@ -385,8 +375,6 @@ test("the next-round line carries the --intent start refuses to run without", ()
   );
 });
 
-/** The same refusal from the other move that publishes a round: `start --wait`
- * without `--intent` exits 2 before it ever reaches git. */
 test("the publish-and-block line carries --intent too", () => {
   assert.equal(
     helpPublishAndWait("feat/tokens main"),
@@ -396,8 +384,6 @@ test("the publish-and-block line carries --intent too", () => {
   );
 });
 
-/** S10: the reopen line named `<branch> [base]` while the branch and base were
- * on the command line, and left out the `--intent` the reopened round needs. */
 test("the reopen line names this session and the intent a new round needs", () => {
   assert.equal(
     helpReopen("feat/tokens main"),

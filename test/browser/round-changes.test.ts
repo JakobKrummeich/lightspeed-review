@@ -12,7 +12,6 @@ function file(path: string, blob: string | null, previousPath?: string): RoundFi
   };
 }
 
-/** A round as the wire carries it, of which this question reads only `files`. */
 function round(files: RoundFile[]): { files: RoundFile[] } {
   return { files };
 }

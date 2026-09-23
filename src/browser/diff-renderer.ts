@@ -1,9 +1,5 @@
-/**
- * The seam between grouped session data and whatever draws a unified diff.
- * diff2html is the MVP implementation; keeping the surface to one method is
- * what makes swapping it (or unit-testing the view without a DOM) cheap.
- */
+/** One method, so swapping diff2html (or unit-testing the view without a DOM) stays cheap. */
 export interface DiffRenderer {
-  /** Takes one file's unified diff (header included) and returns HTML. */
+  /** `diff` includes the file header. */
   renderFile(diff: string): string;
 }

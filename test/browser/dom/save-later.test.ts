@@ -7,7 +7,6 @@ const DELAY = 20;
 
 const after = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** A write that counts itself, and says what it was handed each time. */
 function counted(): { runs: () => number; write: () => void } {
   let runs = 0;
   return { runs: () => runs, write: () => void (runs += 1) };

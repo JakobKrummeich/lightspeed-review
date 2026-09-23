@@ -28,9 +28,9 @@ export interface GroupingResult {
   /** Why the LLM was skipped or abandoned; absent when `mode` is `llm`. */
   reason?: string;
   /**
-   * The edit that turns grouping back on, where one exists. `start` exits 0 on
-   * a degraded grouping — the review still opens — so this line is the whole of
-   * the warning an agent gets that the product's main feature is off.
+   * `start` exits 0 on a degraded grouping — the review still opens — so this
+   * edit is the whole of the warning an agent gets that the product's main
+   * feature is off.
    */
   fix?: string;
 }
@@ -38,12 +38,10 @@ export interface GroupingResult {
 export interface GroupDiffInput {
   files: DiffFile[];
   config: LightspeedConfig;
-  /** Why the branch exists, as the agent that opened the review stated it. */
   intents: string[];
   /**
    * Last round's grouping in reading order, so the model holds it steady rather
-   * than re-deriving one the reviewer must relearn. Absent on first rounds and
-   * paths that never reach the model.
+   * than re-deriving one the reviewer must relearn.
    */
   previous?: PreviousGroup[];
   /** Injected in tests; defaults to pi-ai's built-in providers. */
@@ -51,10 +49,10 @@ export interface GroupDiffInput {
 }
 
 /**
- * Turns a diff into review groups. A bad model answer degrades to one group
- * rather than blocking the review. Missing credentials are the exception — an
- * unfinished install, not weather — otherwise they would read as a successful
- * review of an ungrouped diff, the exact failure grouping exists to prevent.
+ * A bad model answer degrades to one group rather than blocking the review.
+ * Missing credentials are the exception — an unfinished install, not weather —
+ * otherwise they would read as a successful review of an ungrouped diff, the
+ * exact failure grouping exists to prevent.
  */
 export async function groupDiff(input: GroupDiffInput): Promise<GroupingResult> {
   const { files } = input;
@@ -73,16 +71,14 @@ export async function groupDiff(input: GroupDiffInput): Promise<GroupingResult> 
   }
 }
 
-/** What the fallback costs, said the same way wherever it is reported. */
 const UNGROUPED = "the diff is one group instead of semantic ones";
 
 /**
- * Why the grouping degraded, and what changes it back. The reason used to be
- * `detail ?? message`, which threw the failure itself away: an unknown model
- * printed the format rule — `model` must be `<provider>/<model-id>` — over a
- * reference whose format was right, blaming the one part that was correct and
- * never naming the model that does not exist. Single-file diffs skip the model
- * altogether, so a review can run this way for rounds without anyone noticing.
+ * Not `detail ?? message`, which throws the failure itself away: an unknown
+ * model then prints the format rule — `model` must be `<provider>/<model-id>`
+ * — over a reference whose format was right, never naming the model that does
+ * not exist. Single-file diffs skip the model altogether, so a review can run
+ * degraded for rounds without anyone noticing.
  */
 function degraded(error: unknown): { reason: string; fix?: string } {
   if (!(error instanceof ReviewError)) return { reason: `${String(error)} — ${UNGROUPED}` };
@@ -123,12 +119,10 @@ async function groupWithModel(input: GroupDiffInput): Promise<GroupingResult> {
     if (validation.ok) {
       const voice = voiceComplaint(validation.value.groups, round);
       if (voice === undefined) {
-        // Tiers settled after the tests are pulled out, so the `Tests` chapter
-        // `trailTests` mints is tiered like every other chapter rather than
-        // being the one chapter nobody tiered. The bulk sinks last of all,
-        // because only a settled tier says which chapters it is: a chapter the
-        // model called `sweep` and `raiseToStudy` raised is a chapter to read,
-        // and it keeps the place the model gave it.
+        // Order matters: `trailTests` first, so the `Tests` chapter it mints is
+        // tiered like every other; `trailSweeps` last, because only a settled
+        // tier says which chapters sink — one the model called `sweep` and
+        // `raiseToStudy` raised keeps the place the model gave it.
         const ordered = trailTests(toDiffGroups(validation.value.groups, files));
         return { groups: trailSweeps(raiseToStudy(ordered, config.classify)), mode: "llm" };
       }
@@ -145,20 +139,17 @@ async function groupWithModel(input: GroupDiffInput): Promise<GroupingResult> {
 }
 
 /**
- * What is wrong with a chapter's rationale, while there is still a round to
- * spend fixing it. The last round takes it as it comes: a grouping whose
- * `rationale` orders the reviewer about is worth incomparably more than the
- * fallback's one undivided chapter, and after that round there is nowhere left
- * to send the complaint.
+ * The last round takes the rationale as it comes: a grouping whose `rationale`
+ * orders the reviewer about is worth incomparably more than the fallback's one
+ * undivided chapter.
  */
 function voiceComplaint(groups: GroupingReply["groups"], round: number): string | undefined {
   return round === MAX_REPAIR_ROUNDS ? undefined : voiceProblem(groups);
 }
 
 /**
- * The rejected attempt plus what was wrong with it, ready to send back. One
- * line per rejection on stderr: when a review opens on "fallback", this trail
- * is the only record of what the model kept getting wrong.
+ * One line per rejection on stderr: when a review opens on "fallback", this
+ * trail is the only record of what the model kept getting wrong.
  */
 function repairRound(call: GroupingCallResult, problem: string, round: number): Message[] {
   console.error(`grouping attempt ${round + 1} rejected: ${problem}`);
@@ -178,18 +169,13 @@ function toDiffGroups(groups: GroupingReply["groups"], files: DiffFile[]): DiffG
   }));
 }
 
-/**
- * The subtitle when no model ordered the diff (degraded path and one-file diff
- * alike): says what happened, and follows the prompt's own rule — a statement,
- * not a question.
- */
+/** Follows the prompt's own rule for a rationale: a statement, not a question. */
 export const UNGROUPED_RATIONALE =
   "Not ordered by a model: the files are in the order git listed them.";
 
 /**
- * The whole diff in one group, untouched. A one-file diff takes this path and
- * is reported as `skipped` with "nothing to order": ordering it anyway would
- * contradict the sentence the same call prints.
+ * Untouched: a one-file diff is reported as `skipped` with "nothing to order",
+ * and ordering it anyway would contradict the sentence the same call prints.
  */
 function singleGroup(files: DiffFile[]): { groups: DiffGroup[] } {
   if (files.length === 0) return { groups: [] };

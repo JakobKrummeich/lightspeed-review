@@ -30,7 +30,6 @@ test("a value flag takes the token after it, wherever it sits on the line", () =
   assert.equal(lastValue(parsed.scanned, "--for"), "evt_a");
 });
 
-/** A message that starts with a dash is still the message, not a flag. */
 test("a message that looks like a flag value is still the message", () => {
   const parsed = parseVerb(["-1 on that, see notes"], { verb: "say" }, "something");
 
@@ -86,9 +85,8 @@ test("a missing or blank message is refused, naming what the verb wanted", () =>
 });
 
 /**
- * N3: the placeholder the error prints is the one `--help` prints. `ask` asked
- * for a `<text>` here and a `<question>` there, which is two names for the one
- * argument an agent has to get right.
+ * Regression: `ask` asked for a `<text>` in the error and a `<question>` in
+ * `--help` — two names for the one argument an agent has to get right.
  */
 test("the example in the error names the verb's own argument", () => {
   const names = (spec: Parameters<typeof parseVerb>[1]): string => {

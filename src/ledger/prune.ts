@@ -1,13 +1,5 @@
 import type { LedgerRecord } from "./records.ts";
 
-/**
- * The arithmetic of a prune, apart from the deleting: which records a cutoff
- * removes, bucketed by the month files the store keeps on disk. The command
- * prints this plan whether or not it goes on to rewrite, which is what makes
- * `--dry-run` trustworthy.
- */
-
-/** How a month file ends up after the rewrite, named from the file's point of view. */
 export type MonthFate = "deleted" | "rewritten" | "kept";
 
 export interface MonthRow {

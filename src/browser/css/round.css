@@ -1,10 +1,9 @@
 /*
- * The next round, waiting to be taken. It appears in the header rather than
- * over the review because it is news, not an interruption: the reviewer is in
- * the middle of a group and the whole point of holding the round is that they
- * get to finish it. Filled with the accent, unlike the quiet reopen control
- * beside it — this is the one thing in the header that was not there a second
- * ago, and it has to be found without being hunted for.
+ * The next round waits in the header rather than over the review: the whole
+ * point of holding it is that the reviewer gets to finish the group they are
+ * in. Filled with the accent, unlike the quiet reopen control beside it, so
+ * the one thing in the header that was not there a second ago is found
+ * without being hunted for.
  */
 .lsr-round-offer {
   background: var(--lsr-accent);
@@ -14,9 +13,8 @@
   font-size: var(--lsr-size-meta);
   padding: var(--lsr-space-1) var(--lsr-space-3);
   border-radius: 0.5rem;
-  /* One arrival, one movement: it grows in from slightly under its place and
-   * stops. Nothing here pulses on and on — a round can wait ten minutes for a
-   * break in the reading, and ten minutes of blinking is a thing to switch off. */
+  /* One arrival and then still: a round can wait ten minutes for a break in
+   * the reading, and ten minutes of blinking is a thing to switch off. */
   animation: lsr-offer-arrive 220ms ease-out;
 }
 
@@ -25,13 +23,10 @@
 }
 
 /*
- * The offer once the popup's card has folded into it: for a moment it glows,
- * and then a spark rides its border until it is pressed. This is the one
- * ongoing animation the page allows itself, and it earns the exception the
- * offer's own comment above denies to blinking: the reviewer just waved the
- * announcement away, so the news is known — the spark is not telling them
- * something, it is holding the place they said they would come back to.
- * Ends with the offer, however the offer ends.
+ * The one ongoing animation the page allows itself, and the exception to the
+ * rule above: the reviewer just waved the announcement away, so the spark is
+ * not telling them something, it is holding the place they said they would
+ * come back to.
  */
 .lsr-round-offer[data-beckon="true"] {
   position: relative;
@@ -47,12 +42,10 @@
 }
 
 /*
- * The spark: a streak whose bright end leads, lapping the button's own
- * border. `offset-path: border-box` is what makes the orbit hug the pill
- * whatever width its label gives it; a browser without it shows no spark and
- * misses nothing but a flourish — the glow above already pointed here.
- * Invisible through the animation's delay (no fill), so it appears only once
- * the glow has handed over.
+ * `offset-path: border-box` is what makes the orbit hug the pill whatever
+ * width its label gives it; a browser without it shows no spark and misses
+ * nothing but a flourish. Invisible through the animation's delay (no fill),
+ * so it appears only once the glow has handed over.
  */
 @supports (offset-path: border-box) {
   .lsr-round-offer[data-beckon="true"]::after {
@@ -82,11 +75,8 @@
 }
 
 /*
- * The announcement that a round arrived: one card over the same scrim as the
- * replay, above it in the stack because it can only appear while the reviewer
- * is somewhere — and below the ended overlay, whose word is last. Dismissing
- * folds the card into the header's offer: it shrinks away toward the corner
- * the offer lives in, which is the animation saying where the round went.
+ * Above the replay in the stack, because it can only appear while the
+ * reviewer is somewhere, and below the ended overlay, whose word is last.
  */
 .lsr-round-overlay {
   position: fixed;
@@ -133,12 +123,8 @@
   font-size: var(--lsr-size-meta);
 }
 
-/*
- * The promise about the reviewer's own words, and the one line on this card
- * they need rather than merely want: it is the answer to "do I lose what I have
- * written if I take this?". In the accent, because it is the only reassurance
- * here — the two lines above it are facts about the round.
- */
+/* In the accent because it is the only reassurance on the card; the lines
+ * above it are facts about the round. */
 .lsr-round-queue {
   margin: 0;
   color: var(--lsr-accent);
@@ -159,10 +145,9 @@
 }
 
 /*
- * The fold: the card flies to where the offer sits — up and to the right,
- * shrinking to nothing — while the scrim lets go underneath it. The corner is
- * aimed by viewport measure rather than measured to the pixel; the glow the
- * offer answers with is what closes the gap between roughly-there and there.
+ * The card flies to where the offer sits, aimed by viewport measure rather
+ * than measured to the pixel: the glow the offer answers with closes the gap
+ * between roughly-there and there.
  */
 #lsr-round-popup[data-state="folding"] .lsr-round-overlay {
   background: transparent;

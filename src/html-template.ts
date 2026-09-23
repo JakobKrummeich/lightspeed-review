@@ -7,9 +7,9 @@ import { DEFAULT_FORMAT, VIEW_FORMAT_OPTIONS } from "./browser/view-format.ts";
 import type { SessionRecord } from "./session-store.ts";
 
 /**
- * The review page shell. Groups and diffs are fetched from
- * `/api/session/:key/data` by the browser bundle rather than inlined, so the
- * HTML stays small and a re-group is a fetch instead of a reload.
+ * Groups and diffs are fetched from `/api/session/:key/data` by the browser
+ * bundle rather than inlined, so the HTML stays small and a re-group is a fetch
+ * instead of a reload.
  */
 export function renderReviewPage(session: SessionRecord): string {
   const title = `${session.branch} ← ${session.base}`;

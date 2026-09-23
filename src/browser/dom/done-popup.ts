@@ -1,37 +1,28 @@
 import { renderReviewDone } from "../review-done.ts";
 
 export interface MountedDonePopup {
-  /**
-   * The last file was just ticked: the card goes up over the review.
-   * `sendsQueue` is false on the agent's turn, where ending takes nothing with it.
-   */
+  /** `sendsQueue` is false on the agent's turn, where ending takes nothing with it. */
   open(queued: number, sendsQueue: boolean): void;
-  /** The review is no longer finished (a round took the page, a box came unticked): nothing to say. */
   close(): void;
 }
 
 export interface DonePopupOptions {
-  /** The reserved landmark the card is drawn into, emptied when it closes. */
   root: HTMLElement;
-  /** The reviewer pressed the card's own end: the sidebar's Send & End, from here. */
   onEnd(): void;
 }
 
-/** One mounted popup: its options, and what it holds while the card is up. */
 interface PopupView {
   readonly options: DonePopupOptions;
-  /** Who had the caret before the card took it, handed back when it goes. */
   before: Element | null;
   onKey(event: KeyboardEvent): void;
 }
 
 /**
- * The finish, announced over the review. Goes up on the crossing alone — the
- * page's caller decides what a crossing is — and comes down on either press,
- * on Esc, or when the review stops being finished under it. Ending goes
- * through the panel, which owns the send: the card only says the word. Focus
- * is a dialog's: the end press takes the caret on open, the previous holder
- * gets it back on close.
+ * Goes up on the crossing alone — the page's caller decides what a crossing
+ * is — and comes down on either press, on Esc, or when the review stops being
+ * finished under it. Ending goes through the panel, which owns the send: the
+ * card only says the word. Focus is a dialog's: the end press takes the caret
+ * on open, the previous holder gets it back on close.
  */
 export function mountDonePopup(options: DonePopupOptions): MountedDonePopup {
   const view: PopupView = {

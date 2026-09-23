@@ -69,9 +69,7 @@ function mount(
   panel: ReturnType<typeof mountPanel>;
   box: () => FakeNode | null;
   storage: FakeStorage;
-  /** The page the panel is on, which a reviewer can leave. */
   page: FakeWindow;
-  /** Whether the panel has told the page the reviewer is done. */
   ended: () => boolean;
 } {
   // Clicks are checked against HTMLElement, so it is installed here rather than by each clicking
@@ -100,7 +98,6 @@ function mount(
   };
 }
 
-/** The reviewer typing into the compose box, keystrokes and all. */
 function type(root: FakeNode, box: FakeNode, text: string): void {
   box.value = text;
   root.dispatch("input", { target: box });
@@ -109,7 +106,6 @@ function type(root: FakeNode, box: FakeNode, text: string): void {
 /** Long enough for a put-off write to have run. */
 const stored = (): Promise<void> => tick(SAVE_DELAY_MS + 20);
 
-/** What the panel posted, so a keystroke can be checked against the wire. */
 interface SentFeedback {
   path: string;
   prompts: FeedbackPrompt[];
@@ -502,7 +498,6 @@ test("a keystroke from anywhere else in the panel is not a send", async (t) => {
   assert.deepEqual(sent, []);
 });
 
-/** The live region above the compose box, which is where the note lands. */
 function note(root: FakeNode): FakeNode | null {
   return root.querySelector(".lsr-complete");
 }
@@ -554,7 +549,6 @@ test("Send & End with nothing queued ends the review", async (t) => {
 });
 
 test("the word given elsewhere ends the review exactly as the panel's own button does", async (t) => {
-  // The finish card's press: queue and comment go with it, the page locks, the controls too.
   const sent = stubFetch(t);
   const { root, panel, ended, box } = mount(t);
   type(root, box()!, "one last thing");
@@ -775,7 +769,6 @@ test("feedback the server refused is still queued for the next try", async (t) =
   );
 });
 
-/** Everything the scroll half is showing: the history and the queue under it. */
 function shown(root: FakeNode): string {
   return root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "";
 }
@@ -893,7 +886,6 @@ test("feedback the server refused is not echoed as though it had landed", async 
   assert.match(shown(root), /lsr-pill/, "the pills are still there to try again with");
 });
 
-/** A POST that hangs until the test says how it ended, like a slow network. */
 function heldFetch(t: TestContext): { sent: SentFeedback[]; settle: (ok: boolean) => void } {
   const sent: SentFeedback[] = [];
   const waiting: ((ok: boolean) => void)[] = [];
@@ -919,7 +911,6 @@ function heldFetch(t: TestContext): { sent: SentFeedback[]; settle: (ok: boolean
 /** Long enough for the send's own promise chain to have run to the end. */
 const settled = (): Promise<void> => tick(5);
 
-/** The three controls the reviewer sends with, as they stand right now. */
 function controls(root: FakeNode): { send: boolean; end: boolean; box: boolean; label: string } {
   return {
     send: root.querySelector("#lsr-send")?.disabled ?? false,
@@ -1078,7 +1069,6 @@ test("a press on a comment without an anchor still names the file", (t) => {
   assert.deepEqual(jumps, [{ file: "src/api.ts", anchor: undefined }]);
 });
 
-/** The conversation `ask` leaves behind: a question, and nothing said after it. */
 const asked: ConversationEntry = {
   role: "agent",
   at: "2025-01-01T00:05:00.000Z",
@@ -1086,7 +1076,6 @@ const asked: ConversationEntry = {
   prompts: [{ type: "message", comment: "per-request or per-batch?", kind: "question" }],
 };
 
-/** The open question's own box, which lives in the scroll and not the compose row. */
 function answerOf(root: FakeNode): FakeNode | null {
   return root.querySelector(".lsr-answer-box");
 }
@@ -1152,8 +1141,7 @@ test("the box goes once the answer is on the wire", async (t) => {
   assert.match(root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "", /per-batch/);
 });
 
-/** Every redraw replaces the scroll, and queueing a pill mid-answer is the
- * ordinary way that happens. The half-written answer must outlive it. */
+/** Every redraw replaces the scroll, and queueing a pill mid-answer is the ordinary way that happens. */
 test("a pill queued mid-answer does not cost the reviewer their sentence", (t) => {
   const { root, panel } = mount(t, session({ conversation: [asked] }));
   answerOf(root)!.value = "per-batch, becau";
@@ -1174,7 +1162,6 @@ test("a redraw on the agent's turn hands back an Answer that is still disabled",
   panel.setTurn(READING);
   assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);
 
-  // A pill queued from the diff: the ordinary way the scroll is redrawn.
   panel.queue([annotation]);
 
   assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);

@@ -67,10 +67,8 @@ test("starts a background server and waits for it to answer", async () => {
 });
 
 /**
- * N6: the stale server is ours, answers `/health`, and speaks a protocol this
- * CLI no longer reads — so "a review server is listening" is not the question.
- * `start` owns the spawn, so `start` clears it: shut the old one down and put
- * this version in its place.
+ * "A review server is listening" is not the question. `start` owns the spawn,
+ * so `start` clears it: shut the old one down and put this version in its place.
  */
 test("a server of another version is replaced, not talked to", async () => {
   const port = await freePort();

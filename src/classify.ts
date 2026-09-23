@@ -1,46 +1,30 @@
 import type { DiffFile } from "./diff-extract.ts";
+import { unchangedRelocationOf } from "./file-relocation.ts";
 
 /**
- * Which files of a diff are bulk with nothing to decide, and which ones no
- * verdict may downgrade. A reviewer reading a 41-file review approves most of
- * it on autopilot, because every file costs the same tick and nothing tells
- * them which files are worth judgement. These two marks are the facts that let
- * the rest of the tool spend the reviewer's attention where it buys something.
- *
- * They are two independent questions and not two ends of one scale, and
  * `guardrail` always wins: a deploy script whose whole change is re-indentation
- * is still a deploy script, and a lockfile is generated bulk a reviewer must
- * see anyway. So a guardrail file is never marked mechanical, whatever the
- * mechanical rules — or a model reading the marks later — would otherwise say.
+ * is still a deploy script, and a lockfile is generated bulk a reviewer must see
+ * anyway, so a guardrail file is never marked mechanical.
  *
- * The anti-overfit contract, which every default below is held to:
- * - every default rule keys on a git-derivable fact or a language-agnostic
- *   extension/filename class, never on a path from this repository;
- * - no lightspeed-specific path (`src/browser/`, `src/llm/`, …) appears
- *   anywhere in the defaults;
- * - a rule that cannot be justified for a Rails app and a Go service does not
- *   ship.
- * A repository's own paths belong in the user's `classify` globs, which add to
- * these defaults and never replace them — the defaults are what every project
- * gets right without configuring anything, so a rule that needs local knowledge
- * is one this table cannot hold.
+ * The anti-overfit contract every default below is held to: a rule keys on a
+ * git-derivable fact or a language-agnostic extension/filename class, never on
+ * a path from this repository (`src/browser/`, `src/llm/`, …), and a rule that
+ * cannot be justified for a Rails app and a Go service does not ship. A
+ * repository's own paths belong in the user's `classify` globs, which add to
+ * these defaults and never replace them.
  */
 
 export interface Classification {
-  /** Bulk with nothing to decide: a pure rename, a reformat, generated output, prose. */
   mechanical: boolean;
-  /** Never mechanical, whatever else is true of it: scripts, CI, hooks, dependencies, infra. */
   guardrail: boolean;
 }
 
-/** The user's own globs, from `.lightspeed.conf.json`; both lists add to the defaults. */
 export interface ClassifyConfig {
   mechanical: string[];
   guardrail: string[];
 }
 
 export interface PathRule {
-  /** The class of file and why it is in this table, as someone hunting a miss reads it. */
   name: string;
   pattern: RegExp;
   /** Paths this rule must claim. Every filename and extension the rule names gets one. */
@@ -50,9 +34,8 @@ export interface PathRule {
 }
 
 /**
- * A rule reading the patch rather than the name. These have no example paths:
- * what they claim is a property of the diff body, so `test/classify.test.ts`
- * pins them against whole realistic patches instead of a list of names.
+ * No example paths: what these claim is a property of the diff body, so
+ * `test/classify.test.ts` pins them against whole realistic patches instead.
  */
 export interface DiffRule {
   name: string;
@@ -60,11 +43,10 @@ export interface DiffRule {
 }
 
 /**
- * All case-insensitive: these are filename conventions whose casing varies by
- * platform and by generator (`Dockerfile` and `dockerfile` are one file to
- * docker, `Makefile` and `makefile` one file to make), and every pattern is
- * anchored on a whole segment or a whole extension, so no lowercase spelling of
- * any of them is plausibly something else.
+ * All case-insensitive: filename conventions whose casing varies by platform and
+ * by generator (`Dockerfile` and `dockerfile` are one file to docker), and every
+ * pattern is anchored on a whole segment or a whole extension, so no lowercase
+ * spelling of any of them is plausibly something else.
  */
 export const GUARDRAIL_PATH_RULES: readonly PathRule[] = [
   {
@@ -146,13 +128,9 @@ export const GUARDRAIL_PATH_RULES: readonly PathRule[] = [
 ];
 
 /**
- * Whole classes of file whose extension settles it: prose, styling and
- * translation catalogues. Deliberately short and language-agnostic — every
- * entry is a file type a Rails app and a Go service both have, and each is bulk
- * a reviewer skims rather than judges. Nothing that carries logic is in here,
- * however boring it usually is: a `.yml`, a `.json` or a `.sql` decides
- * behaviour, and a mark saying otherwise is how a config change gets waved
- * through. Case-insensitive: `README.MD` is prose too.
+ * Nothing that carries logic is in here, however boring it usually is: a `.yml`,
+ * a `.json` or a `.sql` decides behaviour, and a mark saying otherwise is how a
+ * config change gets waved through. Case-insensitive: `README.MD` is prose too.
  */
 export const MECHANICAL_PATH_RULES: readonly PathRule[] = [
   {
@@ -182,29 +160,22 @@ export const MECHANICAL_PATH_RULES: readonly PathRule[] = [
 ];
 
 /**
- * The rules that read the patch rather than the name, in the order the README
- * lists them: what git measured about the change, what survived it, and what the
- * file says about itself. Any one of them is enough, so the order is how they
- * are explained and not a procedure — no rule here can contradict another.
+ * In the order the README lists them; any one of them is enough, so the order
+ * is how they are explained and not a procedure.
  */
 export const MECHANICAL_DIFF_RULES: readonly DiffRule[] = [
   {
     name: "a rename git scored 100% identical, with no line changed on top of it",
-    applies: (file) =>
-      file.status === "renamed" &&
-      file.similarity === 100 &&
-      file.insertions === 0 &&
-      file.deletions === 0,
+    applies: (file) => unchangedRelocationOf(file) !== undefined,
   },
   { name: "a change no line survived except as whitespace", applies: isWhitespaceOnly },
   { name: "a file whose own banner says a generator wrote it", applies: isGenerated },
 ];
 
 /**
- * The one entry point. `extra` is the user's `classify` block; absent, only the
- * defaults decide. Pure and total: the same file classifies the same way
- * wherever it is asked, which is what lets the answer be handed to a model as a
- * fact about the file instead of a suggestion about it.
+ * Pure and total: the same file classifies the same way wherever it is asked,
+ * which is what lets the answer be handed to a model as a fact about the file
+ * instead of a suggestion about it.
  */
 export function classifyFile(file: DiffFile, extra?: ClassifyConfig): Classification {
   const guardrail = isGuardrail(file, extra?.guardrail ?? []);
@@ -234,13 +205,12 @@ function isMechanical(file: DiffFile, globs: string[]): boolean {
 }
 
 /**
- * Every added line answered by a removed one carrying the same content, and the
- * other way round. Compared as multisets rather than as sets: a patch that
- * removes one `log(order)` and adds two is a duplicated line, which is a change
- * however identical the copies look, and set comparison would call it bulk.
- * A patch with no added line at all is not whitespace-only either — a
- * mode-only change (`chmod +x` on a script) has nothing in common with a
- * reformat, and the empty case would swallow it.
+ * Compared as multisets rather than as sets: a patch that removes one
+ * `log(order)` and adds two is a duplicated line, which is a change however
+ * identical the copies look, and set comparison would call it bulk. A patch
+ * with no added line at all is not whitespace-only either — a mode-only change
+ * (`chmod +x` on a script) has nothing in common with a reformat, and the empty
+ * case would swallow it.
  */
 function isWhitespaceOnly(file: DiffFile): boolean {
   const added = changedContent(file.diff, "+");
@@ -254,9 +224,8 @@ function sameLines(added: string[], removed: string[]): boolean {
 }
 
 /**
- * One side of the patch, whitespace-normalised. `---`/`+++` are excluded the
- * way `countChangedLines` excludes them, so the file header is never read as
- * content.
+ * `---`/`+++` are excluded the way `countChangedLines` excludes them, so the
+ * file header is never read as content.
  */
 function changedContent(diff: string, marker: "+" | "-"): string[] {
   const header = marker.repeat(3);
@@ -278,21 +247,19 @@ function changedContent(diff: string, marker: "+" | "-"): string[] {
  * the line it replaced by this same reading (`src/browser/hunk-complexity.ts`):
  * two definitions of "the same line, differently spaced" would let a file this
  * module calls a reformat still be named the densest logic in the review.
- * Runtime-safe for the bundle — this module's only import is a type.
  */
 export function collapseWhitespace(content: string): string {
   return content.replace(/\s+/g, " ").trim();
 }
 
 /**
- * Generated files announce themselves in a banner at the top of the file: Go's
- * `Code generated by … DO NOT EDIT.`, and `@generated` for everyone else. Read
- * from added and context lines only, because a patch that *removes* the banner
- * is a generated file becoming a hand-written one — the opposite of bulk. Read
- * near the top only, because `DO NOT EDIT` further down is as likely to be a
- * string the program prints as a claim about the file holding it. Case-sensitive
- * for the same reason: the conventions are shouted, and prose asking politely
- * not to edit something is prose.
+ * Go's `Code generated by … DO NOT EDIT.`, and `@generated` for everyone else.
+ * Read from added and context lines only, because a patch that *removes* the
+ * banner is a generated file becoming a hand-written one — the opposite of
+ * bulk. Read near the top only, because `DO NOT EDIT` further down is as likely
+ * to be a string the program prints as a claim about the file holding it.
+ * Case-sensitive for the same reason: the conventions are shouted, and prose
+ * asking politely not to edit something is prose.
  *
  * A modified generated file whose first hunk starts past its banner is missed.
  * That is the honest answer — the marker is not in the diff — and the
@@ -313,12 +280,10 @@ const GENERATED_MARKER = /@generated|DO NOT EDIT/;
 const GENERATED_BANNER_LINES = 20;
 
 /**
- * The smallest glob that answers what this key is actually asked: `docs/api/**`,
- * a whole directory, and the occasional single file. `*` stops at a separator,
- * a `**` segment crosses them, everything else is literal — no character
- * classes, no braces, and no dependency for a matcher this size. Compiled per
- * call and never cached: a config holds globs in single digits, and the cost
- * next to the patches this module already reads is invisible.
+ * `*` stops at a separator, a `**` segment crosses them, everything else is
+ * literal — no character classes, no braces, and no dependency for a matcher
+ * this size. Compiled per call and never cached: a config holds globs in single
+ * digits, and the cost next to the patches this module already reads is invisible.
  */
 function matchesAny(path: string, globs: string[]): boolean {
   return globs.some((glob) => globToRegExp(glob).test(path));

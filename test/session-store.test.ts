@@ -10,7 +10,6 @@ function stateDir(): string {
   return mkdtempSync(join(tmpdir(), "lsr-store-"));
 }
 
-/** One chapter of one file, for the orders and defaults the store answers for. */
 function chapter(name: string, path: string): SessionRecord["groups"][number] {
   return {
     name,
@@ -233,7 +232,6 @@ test("a session written before journeys were retired still reads as a review", (
   assert.equal(loaded?.groups[0]?.name, "API Handlers");
 });
 
-/** The thrown shape every corrupt-session test wants, with the file's own key. */
 function corruptWith(fragment: RegExp): (error: unknown) => boolean {
   return (error: unknown) =>
     error instanceof ReviewError &&
@@ -259,15 +257,10 @@ test("the delete-and-restart line spells the start that would actually run", () 
   );
 });
 
-/** Writes `body` over the session file the other tests in here use. */
 function writeRaw(dir: string, body: unknown): void {
   writeFileSync(join(dir, "sessions", "a3f8c21b9e4d5f60.json"), JSON.stringify(body));
 }
 
-/**
- * `rounds` was the only field checked, so a half-written grouping came back as
- * a `SessionRecord` and blew up as a raw `TypeError` in the first reader.
- */
 test("a session file with no grouping reports session_corrupt, not a TypeError", () => {
   const dir = stateDir();
   const store = new SessionStore(dir);

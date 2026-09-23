@@ -56,7 +56,6 @@ interface Harness {
   store: SessionStore;
   ledger: LedgerStore | undefined;
   opened: string[];
-  /** Every grouping request the fake model saw, in order. */
   grouped: GroupDiffInput[];
 }
 
@@ -267,8 +266,8 @@ test("re-running keeps the conversation and the approvals the diff has not undon
 });
 
 /**
- * `start` once fed ticked files to the model and it sank them; nothing orders on approval any
- * more, so what the reviewer ticked stays between the browser and the server.
+ * `start` once fed ticked files to the model and it sank them: what the reviewer ticked stays
+ * between the browser and the server.
  */
 test("the grouping call carries last round's reading order and no word of approval", async () => {
   await withHarness(async ({ config, deps, store, grouped }) => {
@@ -290,7 +289,6 @@ test("the grouping call carries last round's reading order and no word of approv
       "intents",
       "previous",
     ]);
-    // Round two: the grouping the reviewer read, in the order they read it.
     assert.deepEqual(grouped[1]?.previous, [
       { name: "API Handlers", files: ["src/api/users.ts"] },
       { name: "Auth", files: ["src/auth/token.ts"] },
@@ -298,10 +296,6 @@ test("the grouping call carries last round's reading order and no word of approv
   });
 });
 
-/**
- * The two-group grouping the harness returns, or the one-group catch-all every
- * degraded path returns, depending on the mode the round is scripted with.
- */
 function groupingFor(mode: GroupingMode, files: DiffFile[]): GroupingResult {
   if (mode === "llm") {
     return {
@@ -319,7 +313,6 @@ function groupingFor(mode: GroupingMode, files: DiffFile[]): GroupingResult {
   };
 }
 
-/** Runs `start` once per mode, recording what each grouping call was given. */
 async function rounds(
   harness: Harness,
   modes: GroupingMode[],
@@ -355,7 +348,6 @@ test("a round no model grouped is not handed back as the order the reviewer read
     assert.equal(calls.length, 3);
     assert.deepEqual(calls[1]?.previous, MODEL_GROUPING);
     assert.equal("previous" in calls[2]!, false);
-    // And the mode is on the round, which is what says so.
     const stored = harness.store.get(sessionKey(REPO, BRANCH, BASE))!;
     assert.deepEqual(
       stored.rounds.map((round) => round.grouping),
@@ -474,14 +466,11 @@ test("reads the branch pair and flags off the command line", () => {
   });
 });
 
-/** `--wait` is `start` and the block that follows it in one line, for the agent
- * with nothing to do until the reviewer sends. */
 test("--wait is off unless the command line says so", () => {
   assert.equal(parseStartArgs(["feature-auth"]).wait, false);
   assert.equal(parseStartArgs(["feature-auth", "--wait"]).wait, true);
 });
 
-/** Waits for something a blocked command does on another tick. */
 async function until(ready: () => boolean): Promise<void> {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     if (ready()) return;
@@ -499,9 +488,8 @@ function postFeedback(port: number, key: string, body: unknown): Promise<Respons
 }
 
 /**
- * B5: `--wait` printed nothing at all until the reviewer sent — no key, no url,
- * nothing to hand the person whose turn it is. The publish block goes out the
- * moment the round exists, and the answer follows it on the same stdout.
+ * Regression: `--wait` printed nothing at all until the reviewer sent — no key,
+ * no url, nothing to hand the person whose turn it is.
  */
 test("--wait prints the round it published before it blocks on the reviewer", async () => {
   await withHarness(async ({ config, deps, store }) => {
@@ -646,8 +634,6 @@ test("an unknown flag is refused, with the flags that do exist", () => {
   );
 });
 
-/** The mistyped flag used to land in `positional[1]`, so the run failed on a
- * base branch called `--intnet` instead of on the typo. */
 test("a mistyped flag is not read as the base branch", () => {
   assert.throws(() => parseStartArgs(["feature-auth", "--intnet", "why"]), /unknown flag --intnet/);
 });

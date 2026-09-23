@@ -1,14 +1,10 @@
 import { FakeNode } from "./fake-panel-dom.ts";
 import type { FakeElement } from "./fake-dom.ts";
 
-/**
- * The globals `mountAnnotationPopup` reaches for, installed for one test. The
- * popup is a `fake-panel-dom` node plus the fields a floating element needs.
- */
+/** A `fake-panel-dom` node plus the fields a floating element needs. */
 export class FakePopup extends FakeNode {
   className = "";
   readonly style: Record<string, string> = {};
-  /** What the popup would measure once the stylesheet has laid it out. */
   size = { width: 352, height: 300 };
 
   /**
@@ -29,7 +25,6 @@ export class FakePopup extends FakeNode {
   }
 }
 
-/** The screen the popup is placed on, and how far the page under it is scrolled. */
 export interface FakeScreen {
   innerWidth: number;
   innerHeight: number;
@@ -44,21 +39,14 @@ const DEFAULT_SCREEN: FakeScreen = {
   scrollY: 0,
 };
 
-/** What a test drives the popup with once the globals are in place. */
 export interface FakePopupDom {
   popup: FakePopup;
-  /** The comment box of the currently rendered popup, once a selection made one. */
   commentBox(): FakeNode | null;
-  /** Plays a reviewer's drag: sets the selection, then fires `mouseup`. */
   select(selection: Selection | undefined): Promise<void>;
-  /** Ranges the popup cleared after queueing, which is how it drops a selection. */
   cleared: number;
 }
 
-/**
- * Installs the globals and hands back the handles, restoring on teardown.
- * Callers pass `t.after` so the harness cannot outlive its test.
- */
+/** Callers pass `t.after` so the harness cannot outlive its test. */
 export function installPopupDom(
   after: (restore: () => void) => void,
   screen: Partial<FakeScreen> = {},
@@ -111,7 +99,7 @@ export function installPopupDom(
   return handle;
 }
 
-/** Where on the screen a fake selection was dragged, in client coordinates. */
+/** In client coordinates. */
 export interface FakeSelectionRect {
   top: number;
   bottom: number;
@@ -120,7 +108,6 @@ export interface FakeSelectionRect {
 
 const DEFAULT_RECT: FakeSelectionRect = { top: 24, bottom: 40, left: 12 };
 
-/** A selection that also answers the rectangle the popup is positioned by. */
 export function placedSelection(
   selection: Selection,
   rect: Partial<FakeSelectionRect> = {},
@@ -132,7 +119,6 @@ export function placedSelection(
   return selection;
 }
 
-/** Hands a fake diff to code typed against the real DOM. */
 export function asDiffRoot(fake: FakeElement): HTMLElement {
   return fake as unknown as HTMLElement;
 }

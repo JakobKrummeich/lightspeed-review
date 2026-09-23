@@ -1,7 +1,6 @@
 /**
- * Session lifecycle: the agent opening a round by posting a session, and the
- * review being closed. `announceRoundEnd` is shared with the feedback handler,
- * whose "Send & End" closes a round the same way.
+ * `announceRoundEnd` is shared with the feedback handler, whose "Send & End"
+ * closes a round the same way.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { closedBy } from "../feedback.ts";
@@ -45,8 +44,6 @@ export async function handleCreateSession(
   context.store.save(record);
   const ledger = logRound(context.log, record, round, now);
   logOutcomes(context.log, record, round, now);
-  // A round opens on finished work: whatever the last `wait` took away has
-  // landed, so the turn is the reviewer's (`nextSessionRecord` writes it).
   context.transport.publishPresence(key);
   context.transport.publish(key, "session", { reason: "updated" });
   sendJson(response, 200, {
@@ -72,7 +69,6 @@ function refreshAssets(context: ServerContext): void {
   }
 }
 
-/** Agent-initiated close: the reviewer's browser and any poller both learn. */
 export function handleEnd(
   context: ServerContext,
   _request: IncomingMessage,
@@ -95,7 +91,6 @@ export function handleEnd(
   sendJson(response, 200, { status: "ended", ...turnFacts(ended) });
 }
 
-/** A closed round is logged once and the status changes under every open tab. */
 export function announceRoundEnd(
   context: ServerContext,
   session: SessionRecord,

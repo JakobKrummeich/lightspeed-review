@@ -61,6 +61,34 @@ test("parseDiff remembers the name a renamed file used to have", () => {
   assert.equal(fileByPath(files, "src/api/users.ts").previousPath, undefined);
 });
 
+test("a copy header, which extractDiff never asks git for, parses as modified with its source", () => {
+  // `-C` reports a copy as `copy from`/`copy to`; `DIFF_ARGS` has no `-C`, so
+  // none reaches the parser from `extractDiff`. Handed one from elsewhere, the
+  // parser keeps the shape session records held while `-C` was asked for,
+  // rather than a status nothing downstream reads.
+  const diff = [
+    "diff --git a/src/auth/session.ts b/src/auth/admin-session.ts",
+    "similarity index 80%",
+    "copy from src/auth/session.ts",
+    "copy to src/auth/admin-session.ts",
+    "index 1111111..2222222 100644",
+    "--- a/src/auth/session.ts",
+    "+++ b/src/auth/admin-session.ts",
+    "@@ -1,2 +1,2 @@",
+    " export const ttl = 60;",
+    "-export const role = 'user';",
+    "+export const role = 'admin';",
+    "",
+  ].join("\n");
+
+  const [parsed] = parseDiff(diff);
+
+  assert.equal(parsed?.path, "src/auth/admin-session.ts");
+  assert.equal(parsed?.status, "modified");
+  assert.equal(parsed?.previousPath, "src/auth/session.ts");
+  assert.equal(parsed?.similarity, 80);
+});
+
 test("parseDiff marks binary files and keeps no content for them", () => {
   const logo = fileByPath(parseDiff(sampleDiff), "assets/logo.png");
 
@@ -173,10 +201,9 @@ test("diffStats counts binary files in binary_skipped", () => {
 });
 
 /**
- * S6: git's own stderr went straight past the output layer, so an agent reading
- * `2>&1` — the common case — got three lines of `fatal:` prose in front of the
- * TOON and failed to parse a failure that was already reported. The same three
- * lines were inside `detail` all along, where one of them is enough.
+ * Regression: git's own stderr went straight past the output layer, so an agent
+ * reading `2>&1` got three lines of `fatal:` prose in front of the TOON. One of
+ * them, inside `detail`, is enough.
  */
 test("extractDiff reports git_ref_not_found naming both refs and the way back", () => {
   const repoRoot = gitRepoWithBranch();
@@ -227,6 +254,90 @@ test("extractDiff asks git for histogram diffs and rename detection", () => {
   assert.ok((moved.similarity ?? 0) > 0, "git's own similarity index is carried");
 });
 
+/**
+ * A file moved to another directory and edited on the way (imports re-pointed,
+ * a hook generalised) scores 40–49% on git's similarity, under the default 50%,
+ * and came out as one deleted file and one added file — the same code shown
+ * twice. Measured on the user's own history: every pair git added between 50%
+ * and 40% was a real move.
+ */
+test("a file moved and half rewritten is one rename, not a deletion and an addition", () => {
+  const repoRoot = newRepo("lsr-move-");
+  const line = (name: string, index: number) => `export const ${name}${index} = ${index};`;
+  const kept = Array.from({ length: 9 }, (_, index) => line("keep", index));
+  const before = Array.from({ length: 11 }, (_, index) => line("old", index + 9));
+  const after = Array.from({ length: 11 }, (_, index) => line("new", index + 9));
+  mkdirSync(join(repoRoot, "src", "old"), { recursive: true });
+  writeFileSync(join(repoRoot, "src", "old", "thing.ts"), [...kept, ...before].join("\n") + "\n");
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "base");
+  fixtureGit(repoRoot, "checkout", "-b", "feature");
+  mkdirSync(join(repoRoot, "src", "new"));
+  writeFileSync(join(repoRoot, "src", "new", "thing.ts"), [...kept, ...after].join("\n") + "\n");
+  fixtureGit(repoRoot, "rm", "-q", "src/old/thing.ts");
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "move and edit");
+  // The fixture is only a fixture while git's own default threshold splits it:
+  // 9 of 20 lines kept lands the score in the forties, under 50% and over 40%.
+  assert.equal(
+    fixtureGit(repoRoot, "diff", "-M", "--name-status", "main...feature"),
+    "A\tsrc/new/thing.ts\nD\tsrc/old/thing.ts",
+  );
+
+  const { files } = extractDiff(repoRoot, "feature", "main");
+
+  assert.equal(files.length, 1);
+  const moved = fileByPath(files, "src/new/thing.ts");
+  assert.equal(moved.status, "renamed");
+  assert.equal(moved.previousPath, "src/old/thing.ts");
+  // The band, not git's exact score: the fixture exists to land between the
+  // two thresholds, and which forties git names is its arithmetic, not ours.
+  assert.ok(
+    moved.similarity !== undefined && moved.similarity >= 40 && moved.similarity < 50,
+    `a move scored in the forties is what pairs under -M40% and not under git's 50%; got ${moved.similarity}`,
+  );
+  assert.equal(moved.insertions, 11);
+  assert.equal(moved.deletions, 11);
+});
+
+/**
+ * Git's copy detection (`-C`) paired a new file with any modified file it
+ * resembled and showed only the delta — here 2 lines of a 10-line file. A new
+ * file, copied from a template or not, is new code the reviewer reads whole.
+ */
+test("a new file that resembles a modified one is added, whole: not a copy of it", () => {
+  const repoRoot = newRepo("lsr-copy-");
+  const line = (name: string, index: number) => `export const ${name}${index} = ${index};`;
+  const shared = Array.from({ length: 8 }, (_, index) => line("keep", index));
+  const write = (name: string, lines: string[]) =>
+    writeFileSync(join(repoRoot, name), lines.join("\n") + "\n");
+  write("a.ts", [...shared, line("keep", 8), line("keep", 9)]);
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "base");
+  fixtureGit(repoRoot, "checkout", "-b", "feature");
+  write("a.ts", [...shared, line("keep", 8), line("edited", 9)]);
+  write("b.ts", [...shared, line("own", 8), line("own", 9)]);
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "edit a, add b");
+  // The fixture is only a fixture while git's copy detection would pair the two:
+  // a modified file is a copy source, and 8 of 10 lines shared is over any threshold.
+  assert.match(
+    fixtureGit(repoRoot, "diff", "-C40%", "--name-status", "main...feature"),
+    /^C\d+\ta\.ts\tb\.ts$/m,
+  );
+
+  const { files } = extractDiff(repoRoot, "feature", "main");
+
+  assert.equal(files.length, 2);
+  assert.equal(fileByPath(files, "a.ts").status, "modified");
+  const added = fileByPath(files, "b.ts");
+  assert.equal(added.status, "added");
+  assert.equal(added.previousPath, undefined);
+  assert.equal(added.similarity, undefined);
+  assert.equal(added.insertions, 10, "every line of the new file, not the 2 it does not share");
+  assert.equal(added.deletions, 0);
+});
+
 test("a repeated closing line anchors on the inserted block, not on a blend of two", () => {
   const repoRoot = mkdtempSync(join(tmpdir(), "lsr-hist-"));
   const git = (...args: string[]) =>
@@ -255,14 +366,13 @@ test("a repeated closing line anchors on the inserted block, not on a blend of t
     .split("\n")
     .filter((line) => line.startsWith("+") && line[1] !== "+");
 
-  // The whole function arrives as added lines; nothing is rewritten around it.
   assert.deepEqual(added, ["+function two() {", "+  return two;", "+}"]);
   assert.equal(files[0]?.deletions, 0);
 });
 
 /**
- * The invariant the cut exists to keep: `header`, then every hunk's `header`/`body`
- * in order, is the patch that went in — `git apply` needs git's bytes, not a reconstruction.
+ * `header`, then every hunk's `header`/`body` in order, is the patch that went
+ * in — `git apply` needs git's bytes, not a reconstruction.
  */
 function assertHunksJoinBackIntoTheDiff(files: DiffFile[], source: string): void {
   assert.ok(files.length > 0, `${source}: no files, so the round trip proves nothing`);
@@ -425,7 +535,7 @@ test("a header that lost its closing @@ is not read as a hunk header", () => {
 
 /**
  * One file of every diff shape git emits (two-hunk modification, add, delete, pure rename,
- * binary, no-newline, decoy `@@` patch file). Git's own output, built once for three tests.
+ * binary, no-newline, decoy `@@` patch file). Git's own output, built once and shared.
  */
 function repoWithEveryDiffShape(): string {
   everyDiffShape ??= buildRepoWithEveryDiffShape();

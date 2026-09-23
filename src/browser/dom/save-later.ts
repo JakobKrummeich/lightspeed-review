@@ -5,18 +5,12 @@
  */
 export const SAVE_DELAY_MS = 250;
 
-/** A write that has been put off, and the two things that can happen to it. */
 export interface LaterSave {
-  /** Asks for the write, replacing whatever earlier ask is still waiting. */
   soon(): void;
-  /** Runs a waiting write at once; does nothing when none is waiting. */
   now(): void;
 }
 
-/**
- * Defers a write until the reviewer stops. Content read at run time, not ask
- * time: the last ask of a burst decides.
- */
+/** Content read at run time, not ask time: the last ask of a burst decides. */
 export function saveLater(write: () => void, delay = SAVE_DELAY_MS): LaterSave {
   let waiting: ReturnType<typeof setTimeout> | undefined;
   const run = (): void => {

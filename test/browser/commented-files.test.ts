@@ -136,9 +136,17 @@ test("a file matches the comment left on the name it had then", () => {
 });
 
 test("a file renamed since the comment was left is still the file it was left on", () => {
-  // The annotation carries the path as last round's diff named it, and this
-  // round's diff names the same file something else.
   const paths = new Set(["src/api.ts"]);
 
   assert.equal(commentedOn(file("src/http/api.ts", "src/api.ts"), paths), true);
+});
+
+test("an earlier name on a file git did not call renamed is not the file the comment was left on", () => {
+  // How a round recorded a copy while `src/diff-extract.ts` still asked git
+  // for copies: `modified` with the source as `previousPath`. The source is
+  // still in the review under its own name, wearing the badge itself.
+  const paths = new Set(["src/api.ts"]);
+  const earlierName = { ...file("src/admin-api.ts", "src/api.ts"), status: "modified" as const };
+
+  assert.equal(commentedOn(earlierName, paths), false);
 });

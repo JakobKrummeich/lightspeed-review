@@ -10,9 +10,8 @@ export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const COMMIT_PATTERN = /^[0-9a-f]{7,64}$/;
 
 /**
- * File contents at a commit, or undefined when git cannot produce them (added,
- * deleted, renamed, binary, too big). All normal outcomes — none throws; the
- * caller falls back to the diff alone.
+ * Undefined for whatever git cannot produce (added, deleted, renamed, binary,
+ * too big): all normal outcomes, none throws; the caller falls back to the diff alone.
  */
 export function readFileAtCommit(
   repoRoot: string,
@@ -46,9 +45,8 @@ export type DiffBetween =
   { state: "patch"; patch: string } | { state: "oversize" } | { state: "unreachable" };
 
 /**
- * Paths two commits differ in, under the newer commit's names; `unknowable` when
- * git cannot say. The list is complete when given at all: a path not in it was
- * verifiably untouched, which is what lets a caller reject it.
+ * Under the newer commit's names. The list is complete when given at all: a
+ * path not in it was verifiably untouched, which is what lets a caller reject it.
  */
 export type DiffNames = { state: "files"; files: string[] } | { state: "unknowable" };
 
@@ -68,8 +66,8 @@ export function listDiffNames(repoRoot: string, from: string, to: string): DiffN
 }
 
 /**
- * The patch between two commits. Renames are followed, which is why a caller
- * passes every name the file has had rather than only today's.
+ * Renames are followed, which is why a caller passes every name the file has
+ * had rather than only today's.
  */
 export function readDiffBetween(
   repoRoot: string,

@@ -1,4 +1,3 @@
-/** How often an idle long poll's connection is proved alive at the TCP level. */
 export const KEEPALIVE_PROBE_MS = 15_000;
 
 /** The two calls this needs, so a test can watch them being made. */
@@ -8,9 +7,8 @@ export interface HoldableSocket {
 }
 
 /**
- * A wait of unknown length: no idle timeout, TCP keepalive so a silent
- * connection stays known-alive to both ends. Both halves of the long poll use
- * it — either end letting go ends the wait.
+ * No idle timeout: the wait is of unknown length. TCP keepalive so a silent
+ * connection stays known-alive to both ends.
  */
 export function holdSocketOpen(socket: HoldableSocket): void {
   socket.setTimeout(0);

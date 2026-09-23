@@ -12,7 +12,6 @@ export interface SelectedColumns {
   end: number;
 }
 
-/** The numbers the diff printed for one selected line, either side missing. */
 export interface SelectedLine {
   old?: number;
   new?: number;
@@ -20,7 +19,6 @@ export interface SelectedLine {
   columns?: SelectedColumns;
 }
 
-/** One contiguous piece of a text selection, already attributed to a file block. */
 export interface SelectionFragment {
   file: string;
   group: string;
@@ -29,10 +27,10 @@ export interface SelectionFragment {
 }
 
 /**
- * The range selected lines span. New side preferred (the code under review);
- * removed-only selections anchor on the old side. Unnumbered lines skipped; no
- * numbers at all means no anchor — a guessed line would misdirect the agent.
- * Only the first and last line can be clipped, so columns come from those two.
+ * New side preferred (the code under review); removed-only selections anchor on
+ * the old side. No numbered line means no anchor — a guessed line would
+ * misdirect the agent. Only the first and last line can be clipped, so columns
+ * come from those two.
  */
 export function anchorFor(lines: SelectedLine[]): LineAnchor | undefined {
   const side: AnnotationSide = lines.some((line) => line.new !== undefined) ? "new" : "old";
@@ -64,10 +62,9 @@ function columnFields(
 }
 
 /**
- * Builds annotations from a queued selection: one per file block (agent needs
- * an unambiguous `file`), `+`/`-` prefixes kept so old/new stay distinguishable.
- * Only empty fragments drop; whitespace-only is a real selection (trailing
- * spaces, indentation) and must not queue as nothing.
+ * One per file block (agent needs an unambiguous `file`), `+`/`-` prefixes kept
+ * so old/new stay distinguishable. Only empty fragments drop; whitespace-only
+ * is a real selection (trailing spaces, indentation) and must not queue as nothing.
  */
 export function annotationsFrom(
   fragments: SelectionFragment[],
@@ -101,8 +98,7 @@ function promptFor(fragments: SelectionFragment[], comment: string): AnnotationP
 }
 
 /**
- * Anchor of a whole file's fragments. Same-side ranges widen to their span;
- * opposite sides cannot be one anchor, so the annotation goes out unanchored
+ * Opposite sides cannot be one anchor, so the annotation goes out unanchored
  * rather than pointing at code the reviewer never selected.
  */
 function mergedAnchor(fragments: SelectionFragment[]): LineAnchor | undefined {
@@ -122,10 +118,6 @@ function mergedAnchor(fragments: SelectionFragment[]): LineAnchor | undefined {
   };
 }
 
-/**
- * Leftmost column any fragment marked on the first line; one fragment taking
- * the line whole drops the column altogether.
- */
 function startColumn(anchors: LineAnchor[], line: number): number | undefined {
   const columns = anchors
     .filter((anchor) => anchor.line_start === line)
@@ -134,7 +126,6 @@ function startColumn(anchors: LineAnchor[], line: number): number | undefined {
   return Math.min(...columns.filter((column) => column !== undefined));
 }
 
-/** Where it ends, by the same rule read from the other end. */
 function endColumn(anchors: LineAnchor[], line: number): number | undefined {
   const columns = anchors
     .filter((anchor) => anchor.line_end === line)
@@ -143,12 +134,10 @@ function endColumn(anchors: LineAnchor[], line: number): number | undefined {
   return Math.max(...columns.filter((column) => column !== undefined));
 }
 
-/** Shortens selected text for the popup preview. */
 export function selectionPreview(text: string, maxChars = 200): string {
   return text.length <= maxChars ? text : `${text.slice(0, maxChars)}…`;
 }
 
-/** The selection popup: what was selected, where from, and the comment box. */
 export function renderAnnotationPopup(fragments: SelectionFragment[]): string {
   const files = [...new Set(fragments.map((fragment) => fragment.file))];
   const preview = selectionPreview(fragments.map((fragment) => fragment.text).join("\n"));

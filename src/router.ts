@@ -52,7 +52,6 @@ function matchSegments(pattern: string[], actual: string[]): RouteParams | undef
   return params;
 }
 
-/** Reads a JSON request body. Rejects oversized or malformed payloads. */
 export async function readJsonBody<T>(
   request: IncomingMessage,
   limitBytes = 64 * 1024 * 1024,

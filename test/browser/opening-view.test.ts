@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { opensFor, renderOpening } from "../../src/browser/opening-view.ts";
 
-/** The sheets of the stack, whole, in the order the markup lays them down. */
 function sheets(html: string): string[] {
   return [...html.matchAll(/<section class="lsr-opening-sheet"[\s\S]*?<\/section>/g)].map(
     ([sheet]) => sheet,
@@ -32,20 +31,31 @@ test("the stack is the cover and then one sheet per reason, in the order given",
   ]);
 
   assert.equal(sheets(html).length, 4, "three reasons are three sheets, behind one cover");
-  assert.deepEqual(texts(html, "lsr-opening-body").slice(1), [
+  assert.deepEqual(texts(html, "lsr-opening-body"), [
     "replace session cookies with signed tokens",
     "drop the legacy /login handler",
     "prove the whole thing with tests",
   ]);
 });
 
-test("the cover says who it is from and how much there is", () => {
+test("the cover says who it is from and that there is something, and no more", () => {
   const html = renderOpening(["one", "two", "three", "four"]);
   const cover = sheets(html)[0] ?? "";
 
   assert.match(cover, /from your agent/);
   assert.match(cover, /Something was built for you/);
-  assert.match(cover, /Four reasons, one at a time\./);
+  assert.deepEqual(buttons(cover), ["Unwrap"]);
+});
+
+test("the cover does not count the reasons: the dots say how many, the sheets say what", () => {
+  // "Four reasons, one at a time." was a line to read before the reasons could
+  // be; a cover with nothing to say has no body element, rather than an empty
+  // paragraph the stylesheet would still lay out.
+  const cover = sheets(renderOpening(["one", "two", "three", "four"]))[0] ?? "";
+
+  assert.doesNotMatch(cover, /reason/);
+  assert.doesNotMatch(cover, /at a time/);
+  assert.doesNotMatch(cover, /lsr-opening-body/);
 });
 
 test("a reason sheet carries the reason and the way on, and nothing else", () => {
@@ -59,30 +69,9 @@ test("a reason sheet carries the reason and the way on, and nothing else", () =>
   assert.deepEqual(texts(reason, "lsr-opening-body"), ["one"]);
 });
 
-test("each sheet says which kind it is, so the cover can speak at a size the reasons do not", () => {
-  const kinds = sheets(renderOpening(["one", "two"])).map((sheet) =>
-    attribute(sheet, "data-sheet"),
-  );
-
-  assert.deepEqual(kinds, ["cover", "reason", "reason"]);
-});
-
-test("a single reason is spoken of as one reason, not as one reasons", () => {
-  const html = renderOpening(["sign the tokens"]);
-
-  assert.match(html, /One reason, one at a time\./);
-  assert.doesNotMatch(html, /reasons/);
-});
-
-test("a count past the spelled numbers is still said, in digits", () => {
-  const html = renderOpening(Array.from({ length: 9 }, (_unused, index) => `reason ${index}`));
-
-  assert.match(html, /9 reasons, one at a time\./);
-});
-
 test("each reason says which of how many it is, to whoever cannot see the dots", () => {
-  // The counter costs no pixels now: it is the reason section's own label, so
-  // a screen reader still hears how far through the stack it is.
+  // The counter is the reason section's own label, so a screen reader still
+  // hears how far through the stack it is.
   const labels = sheets(renderOpening(["one", "two", "three"])).map((sheet) =>
     attribute(sheet, "aria-label"),
   );
@@ -176,7 +165,6 @@ test("a round that stated no reason has nothing to unwrap", () => {
   assert.equal(renderOpening([]), "");
 });
 
-/** The one review that opens: everything else below is one field off it. */
 const FIRST_ROUND = {
   round: 0,
   intents: ["sign the tokens"],

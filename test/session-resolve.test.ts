@@ -24,9 +24,8 @@ function session(overrides: Partial<SessionRecord>): SessionRecord {
 }
 
 /**
- * S7: the 404 named the session key — a hash the agent has never seen printed
- * anywhere it could have learned it — and offered a `<branch> [base]` template
- * back. The two facts it must carry are what was asked for and what is there.
+ * Regression: the 404 named the session key — a hash the agent has never seen
+ * printed anywhere — and offered a `<branch> [base]` template back.
  */
 test("a review nothing holds is named by its branch pair and its repository", () => {
   const error = missingSession({

@@ -1,6 +1,5 @@
 import type { ReviewMemoryStorage } from "../../src/browser/review-memory.ts";
 
-/** A `localStorage` that keeps what it is given, and can be looked into. */
 export class FakeStorage implements ReviewMemoryStorage {
   readonly entries: Map<string, string>;
   /**
@@ -32,7 +31,6 @@ export class FakeStorage implements ReviewMemoryStorage {
     this.entries.set(key, value);
   }
 
-  /** What everything but the key being written is taking up. */
   private used(writing: string): number {
     let total = 0;
     for (const [key, value] of this.entries) {

@@ -1,18 +1,15 @@
 import { railBadge, railLabel, type RailState } from "../panel-collapse.ts";
 
 export interface PanelRailOptions {
-  /** The rail itself: a button that stays on screen while the panel is shut. */
   rail: HTMLElement;
   /** Carries `data-panel`, which is what the stylesheet lays out against. */
   page: HTMLElement;
-  /** The panel opened or closed: the view breakpoint has to be asked again. */
+  /** The view breakpoint has to be asked again. */
   onToggle(): void;
 }
 
 export interface MountedRail {
-  /** The reviewer's unsent queue changed, which the rail shows while shut. */
   setQueued(count: number): void;
-  /** Opens a shut panel, for the one thing that must not be missed. */
   expand(): void;
 }
 

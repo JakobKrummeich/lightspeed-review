@@ -28,16 +28,12 @@ import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
 
 export interface MountedPanel {
-  /** Adds annotations queued from the diff and redraws the panel. */
   queue(prompts: FeedbackPrompt[]): void;
   update(session: SessionData): void;
-  /** Every file of the review is ticked, or one of them no longer is. */
   setAllApproved(allApproved: boolean): void;
-  /** The turn moved: the agent took the feedback away, or handed it back. */
   setTurn(turn: Turn): void;
   /**
-   * The reviewer said done from somewhere other than the panel's own button:
-   * the same send as Send & End, queue and comment included, so there is one
+   * The same send as Send & End, queue and comment included, so there is one
    * way a review ends however the word was given.
    */
   end(): void;
@@ -47,29 +43,24 @@ export interface PanelOptions {
   root: HTMLElement;
   key: string;
   session: SessionData;
-  /** Where the queue and the half-typed comment are kept across a reload. */
   storage: ReviewMemoryStorage;
   /**
-   * Server accepted a Send & End; the page locks. Carries the prompts so the
-   * page can name the reviewer's last act without asking the server again.
+   * Carries the prompts so the page can name the reviewer's last act without
+   * asking the server again.
    */
   onEnd(sent: FeedbackPrompt[]): void;
-  /** The unsent queue changed — the rail shows this while the panel is shut. */
+  /** The rail shows this while the panel is shut. */
   onPending(count: number): void;
-  /**
-   * A comment's file name pressed. The panel only says which file and where;
-   * opening and scrolling is the diff's craft.
-   */
+  /** The panel only says which file and where; opening and scrolling is the diff's craft. */
   onJump(file: string, place: LinePlace | undefined): void;
 }
 
-/** One mounted panel: its options, its held state and the hosts it redraws into. */
 interface PanelView {
   readonly options: PanelOptions;
   readonly state: PanelState;
   /**
-   * Send in flight. Controls locked exactly that long: the one thing worth
-   * refusing is the same feedback going twice, not an agent still working.
+   * Controls locked exactly this long: the one thing worth refusing is the
+   * same feedback going twice, not an agent still working.
    */
   sending: boolean;
   /**
@@ -86,8 +77,7 @@ interface PanelView {
  */
 export function mountPanel(options: PanelOptions): MountedPanel {
   const { root, key, session, storage } = options;
-  // Last visit's unsent queue, restored before the first draw so pills are
-  // simply there.
+  // Restored before the first draw, so pills are simply there.
   const remembered = readMemory(storage, key);
   const state = openingState(session, remembered.pending);
   root.innerHTML = renderPanel(state);
@@ -134,8 +124,6 @@ export function mountPanel(options: PanelOptions): MountedPanel {
       draw(view);
     },
     update(fresh: SessionData) {
-      // Rounds come with the conversation: a `start` appends one, and entries
-      // above its line become the round before.
       state.conversation = fresh.conversation;
       state.rounds = fresh.rounds;
       state.declarations = fresh.declarations;
@@ -164,9 +152,9 @@ export function mountPanel(options: PanelOptions): MountedPanel {
 }
 
 /**
- * What the panel opens on. The turn is read off the page's own session rather
- * than waited for over SSE: a reload must show the lock the server already has
- * written down, not a live Send that goes away one round trip later.
+ * The turn is read off the page's own session rather than waited for over
+ * SSE: a reload must show the lock the server already has written down, not a
+ * live Send that goes away one round trip later.
  */
 function openingState(session: SessionData, pending: PanelState["pending"]): PanelState {
   return {
@@ -202,9 +190,8 @@ function draw(view: PanelView): void {
 }
 
 /**
- * Reading the live end? Scrolled up, a reply must not yank the panel away.
- * Within a line counts as at bottom: rounded scroll positions are off by
- * fractions of a pixel.
+ * Scrolled up, a reply must not yank the panel away. Within a line counts as
+ * at bottom: rounded scroll positions are off by fractions of a pixel.
  */
 function atBottom(scrollHost: HTMLElement | null): boolean {
   if (scrollHost === null) return true;
@@ -264,9 +251,9 @@ function handleClick(view: PanelView, event: Event): void {
 }
 
 /**
- * File-name press, read off the button's own data so a redraw can never leave
- * a handler pointing at a gone comment. Half an anchor is treated as none:
- * better the file than a lie.
+ * Read off the button's own data, so a redraw can never leave a handler
+ * pointing at a gone comment. Half an anchor is treated as none: better the
+ * file than a lie.
  */
 function jumpPress(view: PanelView, target: HTMLElement): void {
   const file = target.dataset.file;
@@ -274,7 +261,6 @@ function jumpPress(view: PanelView, target: HTMLElement): void {
   view.options.onJump(file, placeOn(target));
 }
 
-/** The anchor a file press carries, or none when it never had a whole one. */
 function placeOn(target: HTMLElement): LinePlace | undefined {
   const side = target.dataset.side;
   if (side !== "old" && side !== "new") return undefined;
@@ -283,7 +269,6 @@ function placeOn(target: HTMLElement): LinePlace | undefined {
 }
 
 function handleComposeKey(view: PanelView, event: KeyboardEvent): void {
-  // Compared against the box: only the compose box sends on Enter.
   const field = generalCommentBox(view.options.root);
   if (field === null || event.target !== field) return;
   // The box stays live on the agent's turn — typing is not sending — so Enter
@@ -304,7 +289,6 @@ function handleComposeKey(view: PanelView, event: KeyboardEvent): void {
   void send(view, false);
 }
 
-/** Enter answers the question, exactly as it sends from the compose box. */
 function handleAnswerKey(view: PanelView, event: KeyboardEvent): void {
   const field = answerBox(view.options.root);
   if (field === null || event.target !== field) return;
@@ -321,11 +305,10 @@ function handleAnswerKey(view: PanelView, event: KeyboardEvent): void {
 }
 
 /**
- * The reviewer answering the agent's question. One press, and only the words in
- * that box go out: the queue stays queued and the general comment stays typed,
- * which is the whole reason `ask` is a verb of its own. Nothing here ends the
- * review and nothing here moves the turn — the agent's blocked `wait` takes it
- * on delivery, the same way it takes every other send.
+ * Only the words in the answer box go out: the queue stays queued and the
+ * general comment stays typed, which is the whole reason `ask` is a verb of
+ * its own. Nothing here moves the turn — the agent's blocked `wait` takes it
+ * on delivery, as it takes every other send.
  */
 async function answer(view: PanelView): Promise<void> {
   if (sendRefused(view)) return;
@@ -356,7 +339,6 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   const before = state.conversation;
   setSending(view, true);
   if (!(await deliver(options.key, prompts, ended))) {
-    // Nothing was cleared: controls come back full and the press can be repeated.
     setSending(view, false);
     return;
   }
@@ -390,7 +372,6 @@ function setSending(view: PanelView, sending: boolean): void {
 }
 
 /**
- * What this press puts on the wire, or nothing when there is no press to make.
  * Ending is never gated and sending always is, so a locked end is exactly what
  * the button says: it ends, and the queue stays queued rather than going out on
  * somebody else's turn. An unlocked send is only ever about prompts — with none
@@ -405,18 +386,16 @@ function onTheWire(view: PanelView, ended: boolean): FeedbackPrompt[] | undefine
 }
 
 /**
- * Whether a Send would be refused: one is already in flight, or it is not the
- * reviewer's turn. The button's `disabled` and Enter's own guard read this one
- * answer, so the two cannot come apart.
+ * The button's `disabled` and Enter's own guard read this one answer, so the
+ * two cannot come apart.
  */
 function sendRefused(view: PanelView): boolean {
   return view.sending || sendIsLocked(view.state);
 }
 
 /**
- * The compose row's controls as the panel's own state has them. Patched into
- * existing elements: re-rendering would replace the textarea and lose a comment
- * typed mid-flight — the very thing the lock prevents.
+ * Patched into existing elements: re-rendering would replace the textarea and
+ * lose a comment typed mid-flight — the very thing the lock prevents.
  *
  * Send is the only control a turn can take away: ending stays pressable in
  * every state (it says so on itself), and typing and queueing are never gated.
@@ -432,7 +411,6 @@ function lockControls(view: PanelView): void {
   if (answering) answering.disabled = sendRefused(view);
 }
 
-/** One control as the panel's state has it; a missing control is not an error. */
 function patch(view: PanelView, id: string, disabled: boolean, label?: string): void {
   const control = composeControl(view, id);
   if (!control) return;
@@ -440,15 +418,12 @@ function patch(view: PanelView, id: string, disabled: boolean, label?: string): 
   if (label !== undefined) control.textContent = label;
 }
 
-/** Two turns worth redrawing for: holder, mode and the plan the banner names. */
 function sameTurn(one: Turn, other: Turn): boolean {
   if (one.holder !== other.holder) return false;
-  // The reviewer's turn says nothing else; only the agent's carries a mode.
   if (one.holder !== "agent" || other.holder !== "agent") return true;
   return one.mode === other.mode && one.note === other.note;
 }
 
-/** One of the compose row's controls as the last draw of the row left it. */
 function composeControl(
   view: PanelView,
   id: string,

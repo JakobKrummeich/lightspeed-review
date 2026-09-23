@@ -27,18 +27,17 @@ export interface LoginInput {
   deps?: LoginDeps;
 }
 
-/** Where login/logout keep credentials. Login runs before a repo has config (it
- * makes the very first credential), so this resolves like the ledger reader: the
- * config file where one exists, defaults where none does. A config present but
- * broken still fails loudly. */
+/** Login runs before a repo has config (it makes the very first credential), so
+ * this resolves like the ledger reader: the config file where one exists,
+ * defaults where none does. A config present but broken still fails loudly. */
 export function authStateDir(cwd: string): string {
   return loadLedgerConfig(repoRootOrNone(cwd) ?? cwd).stateDir;
 }
 
-/** Human-run OAuth sign-in, the one interactive surface. Exists for subscriptions
- * (Claude Pro/Max, ChatGPT plans, Copilot) no environment variable can express.
- * The credential lands in lightspeed's own `<stateDir>/auth.json` and nowhere else;
- * grouping reads and refreshes it there on every later run. */
+/** Exists for subscriptions (Claude Pro/Max, ChatGPT plans, Copilot) no
+ * environment variable can express. The credential lands in lightspeed's own
+ * `<stateDir>/auth.json` and nowhere else; grouping reads and refreshes it there
+ * on every later run. */
 export async function runLogin(input: LoginInput): Promise<StructuredOutput> {
   const { provider, stateDir, deps = {} } = input;
   const supported: readonly string[] = LOGIN_PROVIDERS;
@@ -62,9 +61,9 @@ async function oauthLoginModels(credentials: CredentialStore): Promise<LoginMode
   return models;
 }
 
-/** The flow, framed by a terminal and a SIGINT wire: Ctrl+C aborts (readline
- * swallows the signal during a question, so the interface re-raises it); listener
- * and interface are both gone before the command answers, whatever the flow did. */
+/** Ctrl+C aborts (readline swallows the signal during a question, so the
+ * interface re-raises it); listener and interface are both gone before the
+ * command answers, whatever the flow did. */
 async function interactiveLogin(
   models: LoginModels,
   provider: string,

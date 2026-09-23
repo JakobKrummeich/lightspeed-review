@@ -98,8 +98,6 @@ test("the trailing test group is allowed to sit behind the mechanical one", () =
 });
 
 test("a group named for a removal is not mechanical: `moved` matches the word, not `removed`", () => {
-  // "Grouping threshold removed" was flagged only because "removed" contains "moved";
-  // a group that really moved files stays caught.
   const removal = [
     { name: "Grouping threshold removed", files: ["src/llm/grouping.ts"] },
     { name: "Documentation updates", files: ["README.md"] },

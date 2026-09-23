@@ -26,10 +26,6 @@ function idOf(opening: ReplayOpening | undefined): string | undefined {
   return opening?.data.comments[0]?.id ?? undefined;
 }
 
-/**
- * A refresher whose fetches answer only when the test says so, recording every
- * call to the page: openings offered, shown, and rounds marked replayed.
- */
 function harness(replayed: number[] = []) {
   const pending: Array<{ resolve(data: ReplayData): void; reject(error: Error): void }> = [];
   const offers: Array<string | undefined> = [];

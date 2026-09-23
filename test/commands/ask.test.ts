@@ -82,10 +82,8 @@ test("ask takes no flags, and a blank question is refused", () => {
 });
 
 /**
- * The question goes into the conversation as a card with its own answer box, and
- * the turn goes back so the reviewer can use it — then the same block every
- * delivery comes through. Feedback queued up front stands in for the reviewer
- * answering, so the wait ends without a second connection to race.
+ * Feedback queued up front stands in for the reviewer answering, so the wait
+ * ends without a second connection to race.
  */
 test("the question is delivered as a question, and the answer comes back on the same call", async () => {
   await withServer(session({ pending: [answer] }), async ({ port, store }) => {
@@ -97,9 +95,8 @@ test("the question is delivered as a question, and the answer comes back on the 
       question: "should I drop the retry?",
     });
 
-    // The one thing only this test can prove: `ask` puts `kind: "question"` on
-    // the wire, which is what draws the card with its own answer box. The rest of
-    // what the record holds is the server's contract, and tested there.
+    // `ask` puts `kind: "question"` on the wire, which is what draws the card with
+    // its own answer box; the rest of the record is the server's contract, tested there.
     assert.partialDeepStrictEqual(store.get(KEY)?.conversation.at(0)?.prompts, [
       { type: "message", comment: "should I drop the retry?", kind: "question" },
     ]);
@@ -107,7 +104,6 @@ test("the question is delivered as a question, and the answer comes back on the 
   });
 });
 
-/** The answer reads exactly as a `wait` does: same output, same help. */
 test("the answer is reported in the shape wait reports one", async () => {
   await withServer(session({ pending: [answer] }), async ({ port }) => {
     const output = await runAsk({
@@ -129,9 +125,9 @@ test("the answer is reported in the shape wait reports one", async () => {
 });
 
 /**
- * N2: the answer arrives minutes or hours later, and an agent that was compacted
- * in between reads "Env var, same as every other secret here" with no idea what
- * it asked. The question rides back out with its answer.
+ * The answer arrives minutes or hours later, and an agent that was compacted in
+ * between reads "Env var, same as every other secret here" with no idea what it
+ * asked.
  */
 test("the answer carries the question it answers", async () => {
   await withServer(session({ pending: [answer] }), async ({ port }) => {
@@ -150,7 +146,6 @@ test("the answer carries the question it answers", async () => {
   });
 });
 
-/** Only `ask` has a question to echo; a plain `wait` must not grow an empty one. */
 test("a plain wait carries no question", async () => {
   await withServer(session({ pending: [answer] }), async ({ port }) => {
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
@@ -181,8 +176,6 @@ test("asking from a turn the agent holds hands it back before the wait blocks", 
   });
 });
 
-/** Nobody is there to answer, so the question is refused rather than asked into
- * the closing summary and waited on. */
 test("a question put to an ended review is refused instead of blocking on an answer", async () => {
   await withServer(session({ status: "ended", endedBy: "reviewer" }), async ({ port, store }) => {
     await assert.rejects(
@@ -212,8 +205,6 @@ test("asking in an unknown session fails with session_not_found instead of block
   });
 });
 
-/** N3: the two places an agent reads what `ask` takes must not disagree — the
- * missing-argument error said `<text>` while `ask --help` said `<question>`. */
 test("the missing-question error names a question, the same as `ask --help`", () => {
   assert.throws(
     () => parseAskArgs([]),
@@ -226,9 +217,8 @@ test("the missing-question error names a question, the same as `ask --help`", ()
 });
 
 /**
- * S4: 146 of this answer's 187 tokens were the same four help lines the `wait`
- * that opened the round already printed. The answer to a question asked
- * mid-round closes with the one-line reminder instead.
+ * 146 of this answer's 187 tokens were the same four help lines the `wait` that
+ * opened the round already printed.
  */
 test("an answer to a question asked mid-round reminds rather than re-teaches", async () => {
   const record = session({ pending: [answer], helpShownRound: 1 });

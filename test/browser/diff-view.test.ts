@@ -17,13 +17,10 @@ import {
 
 const stubRenderer: DiffRenderer = { renderFile: (diff) => `<pre class="stub">${diff}</pre>` };
 
-/** A round nobody left a comment in before, which is what most of these are about. */
 const noComments = new Set<string>();
 
-/** A round whose files all stood still since the last one, ditto. */
 const noChanges = new Set<string>();
 
-/** A draw with everything not under test at its quietest; each test names only what it asserts on. */
 function render(review: Partial<ReviewRender> & Pick<ReviewRender, "groups">): string {
   return renderGroups({
     approved: [],
@@ -35,7 +32,7 @@ function render(review: Partial<ReviewRender> & Pick<ReviewRender, "groups">): s
   });
 }
 
-/** A draw of one chapter — the only view a diff is drawn in; the overview has no headers or rows. */
+/** The only view a diff is drawn in: the overview has no headers or rows. */
 function chapter(review: Partial<ReviewRender> & Pick<ReviewRender, "groups">, focus = 0): string {
   return render({ ...review, focus });
 }
@@ -256,8 +253,7 @@ test("the file tick sits after its diff, where reading the file ends", () => {
 });
 
 test("the chapter's rationale heads it once, on the gate, and never over the diff", () => {
-  // It used to head the first file's diff, where the eye went to the code and the sentence
-  // was never read. Now the gate says it, and the diff below carries no copy of it.
+  // Over the first file's diff the eye went to the code and the sentence was never read.
   const html = chapter({ groups: [group("API", ["a.ts"])] });
   const content = html.slice(html.indexOf(`class="lsr-group-content"`));
 
@@ -308,8 +304,6 @@ test("a binary or oversized file is a file the review is not done without", () =
 
 test("each tick box sits outside the section it marks, so collapsing keeps it", () => {
   const html = chapter({ groups: [group("API", ["a.ts"])] });
-  // A tick nested in the section it marks would vanish exactly when needed; collapsing hides the
-  // content element only, so both ticks stay on screen.
   assert.ok(
     html.indexOf(`class="lsr-group-content"`) < html.indexOf(`class="lsr-tick-all"`),
     "the chapter tick sits below the collapsible content, outside it",
@@ -336,7 +330,7 @@ test("a file approved in an earlier round is dimmed and closed, and says nothing
   assert.match(html, /<div class="lsr-file" data-file="b.ts" data-approval="unapproved"/);
   // The tick and the dimming already say "approved"; a badge would repeat them.
   assert.ok(!html.includes("lsr-file-approval"));
-  // Closed, diff hidden, and left where the group put it: being read is not a reason to move.
+  // Left where the group put it: being read is not a reason to move.
   const blocks = html.split('<div class="lsr-file"');
   assert.match(blocks[1]!, /data-file="a.ts"/);
   assert.match(blocks[1]!, /aria-expanded="false"/);
@@ -379,7 +373,6 @@ test("a file edited after approval offers the second diff, with the branch one p
     /class="lsr-switch-option lsr-form-option" data-form="approved" aria-pressed="false">Since approval</,
   );
   assert.match(html, /aria-label="Which diff to show for a.ts"/);
-  // The whole-file view joins the pair rather than displacing it, and comes last.
   assert.match(
     html,
     /Since approval<\/button>[^]*data-form="full" aria-pressed="false">Whole file</,
@@ -447,7 +440,10 @@ test("added and renamed files offer the whole-file view too", () => {
       {
         name: "API",
         rationale: "why API",
-        files: [file("a.ts", { status: "added" }), file("b.ts", { status: "renamed" })],
+        files: [
+          file("a.ts", { status: "added" }),
+          file("b.ts", { status: "renamed", previousPath: "old-b.ts" }),
+        ],
       },
     ],
   });
@@ -509,7 +505,6 @@ test("a group's files keep the model's order whatever the reviewer approved", ()
   );
 });
 
-/** The same reading from the other side: approving a file moves nothing. */
 test("the order a group renders in is the same before and after a file is approved", () => {
   const groups = [group("API", ["z.ts", "a.ts", "m.ts"])];
   const paths = (html: string): (string | undefined)[] =>
@@ -548,17 +543,64 @@ test("the heaviest file in a group wears the logic badge on its row", () => {
   assert.deepEqual(badged, ["src/pay.ts"]);
 });
 
-test("a renamed file's row says so, with git's own similarity", () => {
-  const renamed = {
+test("a moved file's header shows both paths, and says moved with git's own similarity", () => {
+  const moved = {
     ...file("src/auth/token.ts"),
     status: "renamed" as const,
     previousPath: "src/token.ts",
     similarity: 96,
   };
 
+  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [moved] }] });
+
+  assert.match(html, /<span class="lsr-file-path">src\/token\.ts → src\/auth\/token\.ts<\/span>/);
+  assert.match(html, /<span class="lsr-file-rename">moved, 96% identical<\/span>/);
+  // Every identity stays on the new path: the tick, the block and the label.
+  assert.match(html, /class="lsr-file" data-file="src\/auth\/token\.ts"/);
+  assert.match(html, /class="lsr-approved" data-file="src\/auth\/token\.ts"/);
+  assert.match(html, /aria-label="Mark src\/auth\/token\.ts approved"/);
+});
+
+test("a rename within its directory says renamed", () => {
+  const renamed = {
+    ...file("src/auth/session.ts"),
+    status: "renamed" as const,
+    previousPath: "src/auth/token.ts",
+    similarity: 96,
+  };
+
   const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [renamed] }] });
 
-  assert.match(html, /renamed from src\/token\.ts, 96% identical/);
+  assert.match(html, /<span class="lsr-file-rename">renamed, 96% identical<\/span>/);
+});
+
+test("a move git found identical says so once, in place of a diff with nothing in it", () => {
+  // diff2html draws "File without changes" for a header-only patch: true, and
+  // the one thing the reviewer needs to know — where it came from — unsaid.
+  const moved = {
+    ...file("src/auth/token.ts", { insertions: 0, deletions: 0 }),
+    status: "renamed" as const,
+    previousPath: "src/token.ts",
+    similarity: 100,
+    diff: "diff --git a/src/token.ts b/src/auth/token.ts\nsimilarity index 100%\nrename from src/token.ts\nrename to src/auth/token.ts",
+  };
+
+  const html = chapter({ groups: [{ name: "Moves", rationale: "mechanical", files: [moved] }] });
+
+  assert.match(html, /<span class="lsr-file-rename">moved, identical<\/span>/);
+  assert.match(
+    html,
+    /<p class="lsr-unchanged">Moved unchanged from <code>src\/token\.ts<\/code>\.<\/p>/,
+  );
+  assert.doesNotMatch(html, /<pre class="stub">/, "nothing is handed to the diff renderer");
+});
+
+test("a binary file keeps its own line: it is not a relocation", () => {
+  const html = chapter({
+    groups: [{ name: "Assets", rationale: "why", files: [file("logo.png", { status: "binary" })] }],
+  });
+
+  assert.match(html, /<p class="lsr-binary">Binary file — no diff to show\.<\/p>/);
 });
 
 test("a file the reviewer commented on last round is marked, and its neighbours are not", () => {

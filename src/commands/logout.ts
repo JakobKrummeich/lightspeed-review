@@ -6,9 +6,9 @@ export interface LogoutInput {
   stateDir: string;
 }
 
-/** Removes lightspeed's own stored credential and nothing else. Any provider id is
- * accepted (a missing entry answers `removed: false` rather than arguing about
- * names); pi's file is never touched — the store this builds cannot even name it. */
+/** Any provider id is accepted (a missing entry answers `removed: false` rather
+ * than arguing about names); pi's file is never touched — the store this builds
+ * cannot even name it. */
 export async function runLogout(input: LogoutInput): Promise<StructuredOutput> {
   const store = lightspeedAuthStore(input.stateDir);
   const removed = (await store.read(input.provider)) !== undefined;

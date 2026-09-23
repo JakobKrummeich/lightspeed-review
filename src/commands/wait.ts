@@ -19,7 +19,6 @@ export interface WaitArgs {
   /** Unset when the agent left it to `resolveSession` to work out. */
   branch: string | undefined;
   base: string | undefined;
-  /** `--full`: print selections at their real length instead of truncating. */
   full: boolean;
 }
 
@@ -30,10 +29,9 @@ export interface WaitInput {
   port: number;
   full?: boolean;
   /**
-   * The question this block is the answer to, when `ask` opened it. Echoed
-   * because the answer may arrive hours later, into an agent that no longer
-   * holds the sentence it sent — "env var, same as every other secret here"
-   * answers nothing on its own.
+   * Echoed because the answer may arrive hours later, into an agent that no
+   * longer holds the sentence it sent — "env var, same as every other secret
+   * here" answers nothing on its own.
    */
   asked?: string;
 }
@@ -59,10 +57,8 @@ export function parseWaitArgs(args: string[]): WaitArgs {
 }
 
 /**
- * The one blocking call in the CLI, and the only way the turn ever comes to the
- * agent. No timeout by design; broken connections don't end it either —
- * `longPoll` re-makes them while the server is there. Agents are told everywhere
- * to run this in the foreground and wait.
+ * No timeout by design; broken connections don't end it either — `longPoll`
+ * re-makes them while the server is there.
  */
 export async function runWait(input: WaitInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
@@ -78,7 +74,6 @@ export async function runWait(input: WaitInput): Promise<StructuredOutput> {
   return waitOutput(result, input);
 }
 
-/** Selections can be page-long; `--full` is the way to see one in full. */
 function shorten(prompt: FeedbackPrompt): FeedbackPrompt {
   if (prompt.type !== "annotation") return prompt;
   return {
@@ -88,9 +83,8 @@ function shorten(prompt: FeedbackPrompt): FeedbackPrompt {
 }
 
 /**
- * Where the agent reads the part that was cut, in its own checkout. A selection
- * is a pointer into a file it already has, so the cut costs nothing as long as
- * the pointer survives it.
+ * A selection is a pointer into a file the agent already has, so the cut costs
+ * nothing as long as the pointer survives it.
  */
 function whereTheRestIs(prompt: AnnotationPrompt): string {
   if (prompt.line_start === undefined) return `${prompt.file} has the rest`;
@@ -98,9 +92,8 @@ function whereTheRestIs(prompt: AnnotationPrompt): string {
 }
 
 /**
- * What a delivered turn looks like. `turn` and `round` lead because they are
- * what the next command has to be chosen against, and `help[]` closes with the
- * moves that are legal from here — the protocol, learned from one answer.
+ * `turn` and `round` lead because they are what the next command has to be
+ * chosen against; `help[]` closes with the moves that are legal from here.
  */
 export function waitOutput(result: PollPayload, input: WaitInput): StructuredOutput {
   const target = `${input.branch} ${input.base}`.trimEnd();
@@ -108,10 +101,8 @@ export function waitOutput(result: PollPayload, input: WaitInput): StructuredOut
   return {
     ...turnBlock(result),
     ...(input.asked === undefined ? {} : { asked: input.asked }),
-    // `status` is not printed: `turn` names the holder and `ended` says whether
-    // there is one, while the record's own word went stale between rounds —
-    // `feedback` long after the feedback was read. Two fields for one fact is a
-    // reconciliation an agent should never be asked to make.
+    // No `status`: `turn` names the holder and `ended` says whether there is
+    // one, while the record's own word went stale between rounds.
     ended: result.ended,
     ...listed.block,
     ...endedFacts(result),
@@ -127,17 +118,16 @@ function moves(result: PollPayload, target: string): string[] {
     ? // An ended review is read once and acted on once: the account of what it
       // left is never boilerplate, so it is never shortened.
       [endedHelp(result), ...helpApprovals(result, target), ...legalMoves("ended", target)]
-    : // Delivery is what ended this wait, so the turn is the agent's — and the
-      // answer states it: the handshake refused every server that would not.
+    : // Delivery is what ended this wait, so the turn is the agent's.
       turnHelp(turnOf(result), target, result.helpForm);
 }
 
 /**
- * The turn this answer landed on. It used to default to `agent reading`, which
- * is how a server from before the turn existed had its silence read as a fact:
- * the agent was told it held a turn nobody had handed over. A server of this
- * version always states it — `runWait` refuses the ones that would not — so
- * absence here is our own payload gone wrong, and is reported, never guessed.
+ * Defaulting to `agent reading` is how a server from before the turn existed
+ * had its silence read as a fact: the agent was told it held a turn nobody had
+ * handed over. A server of this version always states it — `runWait` refuses
+ * the ones that would not — so absence here is our own payload gone wrong, and
+ * is reported, never guessed.
  */
 function turnOf(result: PollPayload): TurnLabel {
   if (result.turn !== undefined) return result.turn;
@@ -152,11 +142,10 @@ function turnOf(result: PollPayload): TurnLabel {
 }
 
 /**
- * The prompts, or the definitive statement that there were none. A `wait` on an
- * open review only returns once something is queued (`drainPending`), so an
- * empty list is the review that ended with nothing waiting — and `prompts: []`
- * would leave an agent unable to tell that from a field that came back empty by
- * accident.
+ * A `wait` on an open review only returns once something is queued
+ * (`drainPending`), so an empty list is the review that ended with nothing
+ * waiting — and `prompts: []` would leave an agent unable to tell that from a
+ * field that came back empty by accident.
  */
 function promptBlock(
   result: PollPayload,
@@ -215,8 +204,7 @@ function counted(approval: EndApproval | undefined): EndApproval | undefined {
   return KNOWN_VERDICTS.has(approval.verdict) ? approval : undefined;
 }
 
-/** The one command that names files, offered only where a name could matter: a
- * review that ended holding some. Nothing runs it by default. */
+/** Offered only where a name could matter: a review that ended holding some. */
 function helpApprovals(result: PollPayload, target: string): string[] {
   const approval = counted(result.approval);
   if (approval === undefined || approval.total === 0) return [];
@@ -226,27 +214,25 @@ function helpApprovals(result: PollPayload, target: string): string[] {
   ];
 }
 
-/** The one answer an agent may act on with nobody left in the loop. The counts
- * state themselves and the words are spent only on the readings no number
- * carries — except the verdict, which is echoed here in the one line every reader
- * reads. An agent that skims the help and never opens the payload is the one this
- * whole sentence exists for, and "ended" alone would let it read a sign-off. */
+/** The words are spent only on the readings no number carries — except the
+ * verdict, echoed in the one line every reader reads: an agent that skims the
+ * help and never opens the payload is the one this sentence exists for, and
+ * "ended" alone would let it read a sign-off. */
 function endedHelp(result: PollPayload): string {
   return [closerClause(result.endedBy), ...approvalClauses(counted(result.approval))].join("; ");
 }
 
-/** Who closed it. A record that does not say must not be read as either party. */
+/** A record that does not say must not be read as either party. */
 function closerClause(endedBy: ReviewCloser | undefined): string {
   if (endedBy === "reviewer") return "The reviewer ended this review";
   if (endedBy === "agent") return "`lightspeed end` closed this review, not the reviewer";
   return "This review is ended";
 }
 
-/** The two readings a number cannot carry. An older server's account is
- * unreadable rather than empty — it recorded approvals, it just did not report
- * them in a shape this reads — and a sweep lane's tick says accepted where the
- * review asked nobody to read, which is what would otherwise turn a `signed-off`
- * verdict into a claim nobody made. */
+/** An older server's account is unreadable rather than empty — it recorded
+ * approvals, it just did not report them in a shape this reads — and a sweep
+ * lane's tick says accepted where the review asked nobody to read, which would
+ * otherwise turn a `signed-off` verdict into a claim nobody made. */
 function approvalClauses(approval: EndApproval | undefined): string[] {
   if (approval === undefined) return ["what was approved was not reported"];
   const verdict = [`verdict: ${approval.verdict}`];

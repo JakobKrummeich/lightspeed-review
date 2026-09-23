@@ -18,7 +18,6 @@ export function git(repoRoot: string, ...args: string[]): string {
   }).trim();
 }
 
-/** An empty repository on `main`, in a temporary directory. */
 export function newRepo(prefix = "lsr-git-"): string {
   const repoRoot = mkdtempSync(join(tmpdir(), prefix));
   git(repoRoot, "init", "-b", "main");

@@ -2,13 +2,12 @@
 const COLUMN_SELECTOR = ".d2h-file-side-diff";
 
 /**
- * Keeps a selection inside the side-by-side column it started in. Two guards,
- * because a selection can grow by mouse or by keyboard:
- * a drag out of a column is stopped by making the other column unselectable
- * (CSS, keyed off `data-lock-column`), and any selection that still ends up in
- * the other column — shift+arrow, double-click, programmatic — is pulled back
- * to the edge of the column it was anchored in. Cross-column text would
- * interleave old and new code into one unusable annotation.
+ * Two guards, because a selection can grow by mouse or by keyboard: a drag out
+ * of a column is stopped by making the other column unselectable (CSS, keyed
+ * off `data-lock-column`), and any selection that still ends up in the other
+ * column — shift+arrow, double-click, programmatic — is pulled back to the
+ * edge of the column it was anchored in. Cross-column text would interleave
+ * old and new code into one unusable annotation.
  */
 export function lockSelectionToColumn(diffRoot: HTMLElement): void {
   document.addEventListener("mousedown", (event) => {

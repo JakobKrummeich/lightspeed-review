@@ -86,7 +86,6 @@ function patchFor(path: string, oldPath = path): string {
   ].join("\n");
 }
 
-/** The same one-file patch with the two hunk headers the test chooses. */
 function patchWithHunks(first: string, second: string): string {
   return [
     "diff --git a/src/a.ts b/src/a.ts",

@@ -24,29 +24,25 @@ export interface DiffFile {
   path: string;
   status: DiffFileStatus;
   /**
-   * Unified diff for this file alone, header included; empty for binary files.
-   * The one copy of the patch: per-hunk consumers ask `splitHunks`, not a second copy.
+   * Header included; empty for binary files. The one copy of the patch: per-hunk
+   * consumers ask `splitHunks`, not a second copy.
    */
   diff: string;
   insertions: number;
   deletions: number;
-  /** True when the diff is big enough that the browser should lazy-render it. */
   oversized: boolean;
-  /** Rename source; the old version of the file lives under this name. */
   previousPath?: string;
-  /** git's rename/copy similarity (0-100): `98% identical` is skim vs re-read. */
+  /** git's rename similarity, 0-100. */
   similarity?: number;
 }
 
 /** Group order is the ARRAY position — the LLM returns an ordered array, no `order` field. */
 export interface DiffGroup {
   name: string;
-  /** One sentence of what happened in this group: the primer under its name. */
   rationale: string;
   /**
-   * How this chapter is meant to be read (`src/group-tier.ts`). Optional because
-   * sessions written before tiers existed have none, and every reader takes an
-   * absent tier as `study` — see `isSweep`.
+   * Optional because sessions written before tiers existed have none; every
+   * reader takes an absent tier as `study` — see `isSweep`.
    */
   tier?: GroupTier;
   files: DiffFile[];
@@ -78,7 +74,6 @@ export interface ExtractedDiff {
 
 export const OVERSIZED_LINE_COUNT = 10_000;
 
-/** Reads the merge-base diff (`git diff base...branch`) for a repository. */
 export function extractDiff(repoRoot: string, branch: string, base: string): ExtractedDiff {
   const files = parseDiff(runGitDiff(repoRoot, branch, base));
   return {
@@ -131,12 +126,25 @@ export function diffStats(files: DiffFile[]): DiffStats {
 
 /**
  * `--histogram`: anchors hunks on rare lines so an inserted block reads as one.
- * `-M -C`: renames reported as renames whatever the user's `diff.renames` says.
+ * `-M40%`: renames reported whatever the user's `diff.renames` says, paired
+ * down to 40% similar rather than git's default 50%. A file moved to another
+ * directory has its imports re-pointed on the way, and with a test id renamed
+ * or a hook generalised on top it scored 43–49% — under the default, so the
+ * review showed it twice, as a deleted file and an added one. 40% is the lowest
+ * threshold at which every extra pair in the user's real history was a true
+ * move; from 30% down, CSS modules and boilerplate start pairing with
+ * strangers.
+ * No `-C`: copy detection paired a genuinely new file with any modified file it
+ * resembled and showed only the delta. Measured at 40% over the same history:
+ * 8 extra pairs, 2 of them strangers (CSS modules sharing boilerplate). A new
+ * file — copied from a template or not — is new code the reviewer reads whole,
+ * so it is shown whole. `-M` alone also overrides a `diff.renames=copies`
+ * config (measured, git 2.43), so no `copy from` header reaches `parseDiff`.
  * `--full-index`: rounds compare `index` shas to tell edited from untouched;
  * abbreviated width is git's choice (repo size, `core.abbrev`), so two rounds
  * could name one object differently — the full sha never varies.
  */
-const DIFF_ARGS = ["diff", "--histogram", "-M", "-C", "--full-index"];
+const DIFF_ARGS = ["diff", "--histogram", "-M40%", "--full-index"];
 
 /** `base...branch`: everything the branch added since the two last agreed. */
 function ref(base: string, branch: string): string {
@@ -181,7 +189,6 @@ function firstLine(error: unknown): string {
   return said.split("\n")[0]?.trim() ?? said;
 }
 
-/** Splits a unified diff into one entry per file. */
 export function parseDiff(diff: string): DiffFile[] {
   return splitFileSections(diff).map(parseFileSection);
 }
@@ -248,8 +255,8 @@ export function splitHunks(diff: string): { header: string; hunks: DiffHunk[] } 
 }
 
 /**
- * Lines `from`..`to` with joining newlines. A region reaching the patch's end
- * ends bare: `parseFileSection` strips git's trailing newlines between sections.
+ * A region reaching the patch's end ends bare: `parseFileSection` strips git's
+ * trailing newlines between sections.
  */
 function region(lines: string[], from: number, to: number): string {
   const text = lines.slice(from, to).join("\n");
@@ -281,7 +288,10 @@ function readStatus(lines: string[], isBinary: boolean): DiffFileStatus {
   return "modified";
 }
 
-/** The pre-image name of a renamed or copied file; undefined for every other file. */
+/**
+ * `copy from` is read too, though `DIFF_ARGS` never asks git for one: a patch
+ * from elsewhere parses as modified with its source, not as nothing.
+ */
 function readPreviousPath(lines: string[]): string | undefined {
   const from = lines.find(
     (line) => line.startsWith("rename from ") || line.startsWith("copy from "),
@@ -289,7 +299,7 @@ function readPreviousPath(lines: string[]): string | undefined {
   return from === undefined ? undefined : unquote(from.slice(from.indexOf("from ") + 5));
 }
 
-/** git's own `similarity index 96%`, for a rename or a copy; never a guess of ours. */
+/** git's own `similarity index 96%` on a rename; never a guess of ours. */
 function readSimilarity(lines: string[]): number | undefined {
   const line = lines.find((candidate) => candidate.startsWith("similarity index "));
   const percent = line === undefined ? Number.NaN : Number.parseInt(line.slice(17), 10);
@@ -314,9 +324,8 @@ function readPath(lines: string[]): string {
 }
 
 /**
- * `diff --git a/x b/y` → `y`. Binary files have no `+++` line, so this header is
- * the only source for their path. Paths may contain spaces, so the split is on
- * the last ` b/` (or the second quoted token when git quoted the names).
+ * `diff --git a/x b/y` → `y`. Paths may contain spaces, so the split is on the
+ * last ` b/` (or the second quoted token when git quoted the names).
  */
 function headerPostImagePath(header: string): string {
   const rest = header.slice("diff --git ".length);

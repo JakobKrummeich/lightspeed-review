@@ -17,8 +17,6 @@ test("content shorter than the limit is passed through untouched", () => {
   assert.equal(truncateContent("+const user = 1;", 100, "a.txt has the rest"), "+const user = 1;");
 });
 
-/** A cut that does not say where the rest is is a loss; this one names the
- * place the agent can read it in full without another round trip. */
 test("long content is cut and says how much there was and where the rest is", () => {
   const truncated = truncateContent("x".repeat(50), 10, "lines 1-1 of a.txt have the rest");
 

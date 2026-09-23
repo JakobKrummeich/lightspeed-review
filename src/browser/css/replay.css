@@ -1,9 +1,5 @@
-/*
- * The between-rounds replay: one card per comment the reviewer made last
- * round, over the same scrim as the closing summary. Below the ended overlay
- * on purpose — a review that ends while the replay is up is over, and the
- * summary is the page's last word.
- */
+/* Below the ended overlay on purpose: a review that ends while the replay is
+ * up is over, and the summary is the page's last word. */
 .lsr-replay-overlay {
   position: fixed;
   inset: 0;
@@ -15,12 +11,9 @@
   z-index: 18;
 }
 
-/*
- * Same card language as the closing summary — surface, border, lift — but
- * wider: this one holds code, and a hunk folded to 40rem wraps more than it
- * says. The nav has to stay reachable however long a card runs, so the card is
- * a column whose middle scrolls.
- */
+/* Wider than the closing summary's card: a hunk folded to 40rem wraps more
+ * than it says. The nav has to stay reachable however long a card runs, so the
+ * card is a column whose middle scrolls. */
 .lsr-replay {
   display: flex;
   flex-direction: column;
@@ -42,8 +35,6 @@
   gap: var(--lsr-space-4);
 }
 
-/* The same quiet uppercase as the closing summary's eyebrow: one voice for
- * "where you are" across the page's two overlays. */
 .lsr-replay-eyebrow,
 .lsr-replay-label,
 .lsr-replay-quote-label {
@@ -84,12 +75,9 @@
   font-size: var(--lsr-size-meta);
 }
 
-/*
- * The status chip: the same pill shape as the file badges, in the verdict's
- * own colour. Grey for both `unchanged` and `unknown` on purpose — neither is
- * failure, and only `addressed` (green) and `repeated` (magenta) carry news
- * worth a hue. No animation anywhere here: the spec says serious.
- */
+/* Grey for both `unchanged` and `unknown` on purpose: neither is failure, and
+ * only `addressed` and `repeated` carry news worth a hue. No animation
+ * anywhere here: the spec says serious. */
 .lsr-replay-chip {
   font-size: var(--lsr-size-label);
   line-height: var(--lsr-leading-tight);
@@ -113,10 +101,6 @@
   background: color-mix(in oklab, var(--lsr-pink) 12%, transparent);
 }
 
-/*
- * The reviewer's own words, in the violet the "commented last round" badge
- * wears: one colour for "this is where you spoke", wherever it appears.
- */
 .lsr-replay-quote {
   margin: 0;
   padding: var(--lsr-space-3) var(--lsr-space-4);
@@ -188,8 +172,6 @@
   color: var(--lsr-strong);
 }
 
-/* The hunks, on the page's own code background, framed the way a file's diff
- * is framed in the review below. */
 .lsr-replay-diff {
   background: var(--lsr-bg);
   border-radius: 0.5rem;
@@ -197,7 +179,6 @@
   overflow: hidden;
 }
 
-/* Why there is nothing to draw: a fact about the answer, never failure. */
 .lsr-replay-nochange,
 .lsr-replay-state {
   margin: 0;
@@ -214,9 +195,8 @@
   border-top: 1px solid var(--lsr-border);
 }
 
-/* Next is the way on and keeps the page's action colour; a floor under its
- * width so the label turning into Done does not shift the nav under a pressed
- * pointer. */
+/* A floor under its width so the label turning into Done does not shift the
+ * nav under a pressed pointer. */
 .lsr-replay-next {
   min-width: 6rem;
 }
@@ -228,8 +208,6 @@
   font-weight: 500;
 }
 
-/* One dot per card: where the reviewer is in the replay, and a press that goes
- * there. Sized as a target, drawn as a dot. */
 .lsr-replay-dots {
   display: flex;
   align-items: center;
@@ -248,7 +226,6 @@
   background: var(--lsr-accent);
 }
 
-/* The way out, under the nav and quieter than it: always there, never urgent. */
 .lsr-replay-skip {
   align-self: center;
   background: none;
@@ -258,8 +235,7 @@
   padding: 0;
 }
 
-/* The header control that brings the replay back while the round is open,
- * dressed like the switches beside it rather than like an action button. */
+/* Dressed like the header switches beside it, not like an action button. */
 .lsr-replay-reopen {
   background: none;
   white-space: nowrap;

@@ -14,7 +14,6 @@ import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore, type SessionRecord } from "../../src/session-store.ts";
 import type { DiffGroup } from "../../src/diff-extract.ts";
 
-/** A grouping of `paths`, which is all the ended output counts files off. */
 function groups(...paths: string[]): DiffGroup[] {
   return [
     {
@@ -67,8 +66,7 @@ function session(overrides: Partial<SessionRecord> = {}): SessionRecord {
   };
 }
 
-/** A review server of another version: ours by `/health`, and speaking a
- * protocol this CLI no longer reads. */
+/** Ours by `/health`, speaking a protocol this CLI no longer reads. */
 function createStaleServer(version: string): Server {
   return createServer((_request, response) => {
     response.writeHead(200, { "content-type": "application/json" });
@@ -131,10 +129,8 @@ test("returns the queued prompts once the reviewer sends", async () => {
 });
 
 /**
- * N4: `status` restated what `turn` and `ended` already say, and said it out of
+ * `status` restated what `turn` and `ended` already say, and said it out of
  * date — a session reads `feedback` for rounds after the feedback was consumed.
- * Two fields to reconcile where one is authoritative is how an agent reads a
- * round as unfinished.
  */
 test("the answer states the turn, not a second stale word for it", async () => {
   await withServer(session({ pending: [annotation], status: "feedback" }), async ({ port }) => {
@@ -190,10 +186,9 @@ test("a delivered wait closes with the moves that are legal from there", async (
 });
 
 /**
- * S5: the guard sat at 2000 characters, so a 1226-character selection came back
- * whole — 372 tokens for one prompt, of text the agent can read in the file it
- * is standing in. The cut says where the rest is, which is what makes it a cut
- * and not a loss.
+ * Regression: the guard sat at 2000 characters, so a 1226-character selection
+ * came back whole — 372 tokens for one prompt, of text the agent can read in the
+ * file it is standing in.
  */
 test("a huge selection is cut where the reviewer's point is still visible", async () => {
   const huge = {
@@ -208,8 +203,7 @@ test("a huge selection is cut where the reviewer's point is still visible", asyn
     const output = await runWait({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
 
     const [prompt] = output.prompts as [{ selected_text: string }];
-    // The cut itself, not merely "shorter": one character off would satisfy that,
-    // and the point of the cut is that a page-long selection stays readable.
+    // The cut itself, not merely "shorter": one character off would satisfy that.
     assert.equal(
       prompt.selected_text,
       `${huge.selected_text.slice(0, SELECTION_LIMIT)}\n(truncated, 1226 chars — use --full;` +
@@ -219,7 +213,7 @@ test("a huge selection is cut where the reviewer's point is still visible", asyn
 });
 
 /** The comment is the reviewer's own words, and the only part of a prompt the
- * agent cannot read anywhere else. It is never cut. */
+ * agent cannot read anywhere else. */
 test("the reviewer's comment comes back whole however long it is", async () => {
   const wordy = { ...annotation, comment: "because ".repeat(400) };
   await withServer(session({ pending: [wordy], status: "feedback" }), async ({ port }) => {
@@ -271,10 +265,9 @@ test("--full hands back the selection exactly as the reviewer made it", async ()
 });
 
 /**
- * N6: a `serve` process left over from an older install answered this CLI with
- * a payload that had no `turn` and no `round`, and the client defaulted its way
- * past it — so the agent read "agent reading" off a server that had never heard
- * of turns. A wait that cannot trust the answer must not block for one.
+ * Regression: a `serve` left over from an older install answered with no `turn`
+ * and no `round`, and the client defaulted its way past it. A wait that cannot
+ * trust the answer must not block for one.
  */
 test("a wait against a server of another version is refused, with the way to clear it", async () => {
   const stale = createStaleServer("0.0.1");
@@ -432,8 +425,7 @@ test("a session ended before the closer was recorded names neither party", async
 });
 
 /**
- * A server answering one fixed payload, for the shapes a payload can arrive in.
- * It states this CLI's own version: version skew is refused by the handshake, so
+ * States this CLI's own version: version skew is refused by the handshake, so
  * what is left to read defensively is a payload of the right version that does
  * not hold together.
  */
@@ -453,9 +445,8 @@ async function fixedPayloadServer(payload: unknown): Promise<{
 }
 
 test("an approval written as paths, before the counts, is reported as unreadable", async () => {
-  // A server older than the counts sends the file lists that used to be there.
-  // Read as counts they would say "approved" off an array's truthiness, so the
-  // account is dropped and stated as not reported, which is what it is.
+  // A server older than the counts sends file lists. Read as counts they would
+  // say "approved" off an array's truthiness, so the account is dropped.
   const legacy = await fixedPayloadServer({
     status: "ended",
     ended: true,
@@ -479,8 +470,8 @@ test("an approval written as paths, before the counts, is reported as unreadable
 
 test("counts without the verdict they summarise are reported as unreadable too", async () => {
   // A server from between the two changes: the numbers are right, but the field
-  // an agent is told to branch on is missing, and half an account read as a
-  // whole one is how an absent verdict becomes "not signed off" by accident.
+  // an agent is told to branch on is missing, and an absent verdict read as a
+  // whole account becomes "not signed off" by accident.
   const legacy = await fixedPayloadServer({
     status: "ended",
     ended: true,
@@ -564,7 +555,6 @@ test("an ended wait with nothing queued states the silence instead of an empty l
 
     assert.equal(output.prompts, 0);
     assert.equal(output.message, "no feedback was queued when this review ended");
-    // The account and the words it ends on are untouched by the empty list.
     assert.equal(endedHelp(output), "The reviewer ended this review; verdict: signed-off");
     assert.equal((output.approval as { verdict: string }).verdict, "signed-off");
     assert.equal(output.endedBy, "reviewer");
@@ -603,17 +593,14 @@ test("an unknown session fails with session_not_found instead of blocking", asyn
 });
 
 /**
- * Waits until the server says an agent is parked on this session. The wait is sent from here and
- * registered over there, so a test that paused a fixed moment instead was — on a machine busy
- * enough — stopping the server before the poll had arrived, and testing a poll that met a closed
- * port rather than one the shutdown had to release. Presence is the server's own answer to "is
- * anybody waiting", and every watcher is handed it on connecting, so a poll that parked before
- * this call is seen as readily as one that parks after.
+ * A test that paused a fixed moment instead was — on a machine busy enough — stopping the server
+ * before the poll had arrived, and testing a poll that met a closed port rather than one the
+ * shutdown had to release. Every watcher is handed presence on connecting, so a poll that parked
+ * before this call is seen as readily as one that parks after.
  */
 async function untilParked(port: number, key: string): Promise<void> {
   const abort = new AbortController();
-  // Wide enough that a machine slow enough to be swapping still gets its poll registered inside
-  // it, and finite so a poll that never parks fails the test instead of hanging the run.
+  // Wide enough for a swapping machine, finite so a poll that never parks fails the test.
   const deadline = setTimeout(() => abort.abort(), 30_000);
   try {
     const events = await fetch(`http://127.0.0.1:${port}/api/session/${key}/events`, {
@@ -665,7 +652,6 @@ test("a server that is not running is reported as server_not_running", async () 
   );
 });
 
-/** The mirror of `work` without the turn: a wait made from mid-edit is refused. */
 test("waiting while still working is refused with the moves that give the turn up", async () => {
   const record = session({
     status: "feedback",

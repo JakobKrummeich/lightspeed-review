@@ -6,17 +6,16 @@ import { startCall } from "./home.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
-  /** `http://127.0.0.1:<port>`; both the poll and its acknowledgement hang off it. */
+  /** `http://127.0.0.1:<port>`. */
   origin: string;
-  /** The session waited on, named in the 404 message and in both URLs. */
   key: string;
   /** `<branch> <base>`, for the commands an error about this review suggests. */
   target?: string;
   /** Probed when a connection fails, to tell "gone" from "hiccup". */
   port: number;
-  /** Waits between port probes after a failure. Injected by tests. */
+  /** Injected by tests. */
   probeBackoffMs?: number[];
-  /** First wait before reconnecting to a port that is still open. Injected by tests. */
+  /** Injected by tests. */
   reconnectDelayMs?: number;
 }
 
@@ -28,14 +27,11 @@ const MAX_RECONNECT_DELAY_MS = 5_000;
 const FAILURES_BEFORE_HEALTH_CHECK = 3;
 
 /**
- * Waits for the reviewer. No client-side timer ends the wait: `fetch` is unusable —
- * undici caps a response at `headersTimeout` (5 min default) and rejects a poll the
- * reviewer just has not answered (measured: 300687ms, `UND_ERR_HEADERS_TIMEOUT`);
- * `node:http` with `agent: false` gives the request its own connection, timers off.
- * Broken connections are re-made as long as two checks keep saying the server is
- * there: the port accepts, and — from the third failure — `/health` answers. Ends
- * on the reviewer's answer, an unknown/ended session, or a port diagnosis: refused
- * is `server_not_running`, everything else `server_unreachable`.
+ * No client-side timer ends the wait: `fetch` is unusable — undici caps a
+ * response at `headersTimeout` (5 min default) and rejects a poll the reviewer
+ * just has not answered (measured: 300687ms, `UND_ERR_HEADERS_TIMEOUT`);
+ * `node:http` with `agent: false` gives the request its own connection, timers
+ * off.
  */
 export async function longPoll(input: LongPollInput): Promise<unknown> {
   const retry = retries(input);
@@ -53,14 +49,11 @@ export async function longPoll(input: LongPollInput): Promise<unknown> {
 }
 
 /**
- * Tells the server the handover arrived. The server cannot see this for itself:
- * the bytes reach the kernel whether or not anything reads them, so without the
- * acknowledgement it must assume every delivery may have been lost. One place
- * for both blocking commands — `wait` and `ask` come through here.
- *
- * Best effort, because the prompts are already in this process's hands: a
- * failed acknowledgement costs one re-delivery on the next poll, while a failed
- * `wait` would cost the agent the feedback it is holding.
+ * The server cannot see for itself that the handover arrived: the bytes reach
+ * the kernel whether or not anything reads them. Best effort, because the
+ * prompts are already in this process's hands: a failed acknowledgement costs
+ * one re-delivery on the next poll, while a failed `wait` would cost the agent
+ * the feedback it is holding.
  */
 async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<void> {
   if (typeof answer !== "object" || answer === null) return;
@@ -77,8 +70,6 @@ async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<v
   }
 }
 
-/** After a broken connection: is there still a server to wait for — wait longer or
- * report the port. Failure count lives here so `longPoll` stays a plain loop. */
 function retries(input: LongPollInput): (failure: unknown) => Promise<void> {
   let failures = 0;
   return async (failure: unknown) => {
@@ -139,8 +130,6 @@ function notAReviewServer(port: number, failure: unknown, target: string): Revie
   });
 }
 
-/** One attempt on a connection of its own, every timeout off: the server answers
- * when the reviewer sends, which may be hours. */
 function about(input: LongPollInput): SessionRef {
   return { key: input.key, ...(input.target === undefined ? {} : { target: input.target }) };
 }

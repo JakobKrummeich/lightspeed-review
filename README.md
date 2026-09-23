@@ -666,7 +666,12 @@ A ledger failure never fails a review: it is reported as
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
-- Renames say what they came from and how much of the file survived.
+- A file that moved or was renamed shows both of its paths (`old → new`), the
+  word for which it was, and how much of the file survived. One git found
+  identical says so in place of an empty diff, and pairs are found down to 40%
+  similar: a file whose imports moved with it is one move, not a deletion and
+  an addition. A new file is shown whole, however much of it resembles another:
+  git's copy detection is not asked for.
 - The heaviest added branching in the review is marked **densest logic**, on the
   file row and on the group in the index. Branching a change only re-adds counts
   for nothing — a reindented or renamed block scores zero, however many `if`s it

@@ -11,7 +11,6 @@ const page = ["main.ts", "session-events.ts"]
   .map((file) => readFileSync(new URL(`../../../src/browser/dom/${file}`, import.meta.url), "utf8"))
   .join("\n");
 
-/** Every event name the server pushes down a session's stream. */
 function published(): Set<string> {
   const names = new Set<string>();
   for (const file of readdirSync(serverDir)) {

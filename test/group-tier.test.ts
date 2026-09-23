@@ -2,10 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isSweep, trailSweeps, type GroupTier } from "../src/group-tier.ts";
 
-/**
- * A chapter as the ordering reads it: a name to check the result by, and a
- * tier. Nothing else, because nothing else decides where a chapter goes.
- */
+/** A name to check the result by, and a tier: nothing else decides where a chapter goes. */
 interface Chapter {
   name: string;
   tier?: GroupTier;
@@ -37,7 +34,6 @@ test("a review with nothing swept comes back in the order it arrived", () => {
 });
 
 test("a review that is nothing but bulk comes back in the order it arrived", () => {
-  // Nothing to sink it below, and the lane's own order is the grouping's.
   const groups = [chapter("Renames", "sweep"), chapter("Docs", "sweep")];
 
   assert.deepEqual(namesOf(trailSweeps(groups)), ["Renames", "Docs"]);

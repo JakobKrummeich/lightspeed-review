@@ -1,8 +1,4 @@
-/**
- * File and diff content read out of git for one session, gated by the paths
- * the session's grouping actually lists — the gate that keeps `?path=` from
- * being a read-any-file hole in the reviewer's machine.
- */
+/** Every read here is gated by the paths the session's grouping lists (`gitPathOf`). */
 import {
   MAX_APPROVED_FORM_BYTES,
   type ApprovedForm,
@@ -12,10 +8,6 @@ import { readDiffBetween, readFileAtCommit } from "../git-file.ts";
 import type { AnnotationSide } from "../ledger/records.ts";
 import type { SessionRecord } from "../session-store.ts";
 
-/**
- * One whole file in one version, or undefined when git has no such text
- * (unknown path, no commit, binary, oversized). Path-gated by `gitPathOf`.
- */
 export function readSessionFile(
   session: SessionRecord,
   path: string,
@@ -30,7 +22,8 @@ export function readSessionFile(
 /**
  * The name git knows a file by, or undefined when this session's grouping does
  * not list it at all — which is what keeps `?path=` from being a read-any-file
- * hole. A rename's old version is stored under the name it had then.
+ * hole. A rename's old version is stored under the name it had then: the old
+ * side of its diff is that file.
  */
 export function gitPathOf(
   session: SessionRecord,

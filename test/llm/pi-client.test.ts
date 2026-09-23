@@ -109,10 +109,8 @@ test("an unknown provider reports pi_model_unknown", async () => {
 });
 
 /**
- * S3: the detail blamed the reference's format — `model` must be
- * `<provider>/<model-id>` — over a reference whose format was right, so the
- * agent read a false diagnosis of the one thing it had got correct. A
- * well-formed name no provider has is a name to change, not a form to fix.
+ * A well-formed name no provider has is a name to change, not a form to fix: the format rule as
+ * detail was a false diagnosis of the one thing the agent had got right.
  */
 test("an unknown model id on a known provider reports pi_model_unknown", async () => {
   const { models } = fauxModels([fauxAssistantMessage("ok")]);
@@ -133,8 +131,7 @@ test("an unknown model id on a known provider reports pi_model_unknown", async (
   );
 });
 
-/** A reference with no provider in it is the one case where the format really
- * is what is wrong, so that is the case that says so. */
+/** No provider in the reference is the one case where the format really is wrong. */
 test("a model without a provider prefix reports pi_model_unknown", async () => {
   const { models } = fauxModels([fauxAssistantMessage("ok")]);
 
@@ -201,10 +198,8 @@ test("a configured provider decides where the grouping request is sent", async (
   assert.equal(seen.model?.baseUrl, "http://localhost:3001");
 });
 
-/**
- * A down proxy fails like any network failure, so the message must name the
- * URL tried — the config points at one nothing else mentions.
- */
+/** A down proxy fails like any network failure, so the message must name the URL tried: the
+ * config points at one nothing else mentions. */
 test("a failure against a configured provider names the URL the config chose", async () => {
   const { models } = fauxModels([
     fauxAssistantMessage("", { stopReason: "error", errorMessage: "Connection error." }),

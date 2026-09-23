@@ -76,6 +76,27 @@ test("a rename that also changed lines is not mechanical — the change is the p
   assert.equal(classifyFile(renamed).mechanical, false);
 });
 
+test("a rename that flipped the file's mode is not mechanical: the header is the change", () => {
+  // `git mv` + `chmod +x` scores 100% with no hunks; a file made executable
+  // is a decision, and the line counts never see it. A `.rb`, not a `.sh`:
+  // shell scripts are guardrail paths and would fail this for another reason.
+  const madeExecutable = file("bin/console.rb", {
+    status: "renamed",
+    previousPath: "scripts/console.rb",
+    similarity: 100,
+    diff: [
+      "diff --git a/scripts/console.rb b/bin/console.rb",
+      "old mode 100644",
+      "new mode 100755",
+      "similarity index 100%",
+      "rename from scripts/console.rb",
+      "rename to bin/console.rb",
+    ].join("\n"),
+  });
+
+  assert.deepEqual(classifyFile(madeExecutable), { mechanical: false, guardrail: false });
+});
+
 test("a generated Go file is mechanical: its own banner says so", () => {
   const generated = file("internal/api/types.pb.go", {
     insertions: 1,
@@ -243,8 +264,8 @@ test("a lockfile is guardrail and never mechanical, however it was generated", (
 });
 
 /**
- * The rule the whole module turns on. Both files would be mechanical on their
- * diff alone — one is a rename git scored 100%, the other pure re-indentation.
+ * Both files would be mechanical on their diff alone — one is a rename git
+ * scored 100%, the other pure re-indentation.
  */
 test("guardrail wins over every mechanical rule", () => {
   const movedWorkflow = file(".github/workflows/release.yml", {
@@ -353,7 +374,6 @@ test("a glob's regex characters are literal, so a `.` is a dot and nothing else"
   assert.equal(classifyFile(file("CHANGELOGxmd"), configured).mechanical, false);
 });
 
-/** Mirrors `TEST_PATH_CONVENTIONS`: a rule that stopped claiming its own examples fails here. */
 function claims(rules: readonly PathRule[], path: string): PathRule[] {
   return rules.filter((rule) => rule.pattern.test(path));
 }
@@ -387,7 +407,6 @@ for (const [table, rules] of [
   });
 }
 
-/** The contract in the module comment, checked rather than promised. */
 test("no default rule names a path out of this repository", () => {
   for (const rule of [...GUARDRAIL_PATH_RULES, ...MECHANICAL_PATH_RULES]) {
     assert.doesNotMatch(rule.pattern.source, /src\\\/(browser|llm|ledger|rounds|commands|server)/);

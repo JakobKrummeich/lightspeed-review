@@ -105,12 +105,11 @@ test("Pi command expressions execute for each auth resolution", async () => {
 });
 
 /**
- * Pi's value syntax is read by two resolvers: the async one for provider
- * credentials (a stored credential's env answers before this process's does)
- * and the sync one for model headers. Where a name is looked up is theirs to
- * differ on; what the syntax means is not, so the table is asserted against
- * both. A case only one of them satisfies is a config that works for a provider
- * header and fails for a model header, reported as the wrong field's fault.
+ * Two resolvers read Pi's value syntax: the async one for provider credentials (a stored
+ * credential's env answers before this process's) and the sync one for model headers. Where a
+ * name is looked up may differ; what the syntax means may not, so the table is asserted against
+ * both — a case only one satisfies is a config that works for a provider header and fails for a
+ * model header, reported as the wrong field's fault.
  */
 const PI_VALUE_CASES: { value: string; resolved: string | undefined; reading: string }[] = [
   { value: "test-api-key", resolved: "test-api-key", reading: "a value with no token is itself" },

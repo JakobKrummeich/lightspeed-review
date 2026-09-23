@@ -29,16 +29,14 @@ const asGrouped = [
   group("Docs", "sweep", "README.md"),
 ];
 
-/** The chapter numbers a rendering names, in the order it names them. */
 function chapterOrder(html: string): string[] {
   return [...html.matchAll(/data-group-index="(\d+)"/g)].map((match) => match[1]!);
 }
 
 /**
- * The invariant the ordering exists for: one order for the whole review. Both
- * surfaces read the same array, so both walk it from front to back — a chapter
- * the bar draws second is the second row of the survey, and "Chapter 2 of 4"
- * on the way into it is the same chapter again.
+ * The invariant the ordering exists for: one order for the whole review, so a
+ * chapter the bar draws second is the second row of the survey, and "Chapter 2
+ * of 4" on the way into it is the same chapter again.
  */
 test("the bar and the survey name the chapters in one order, and it is the array's", () => {
   const groups = trailSweeps(asGrouped);
@@ -71,8 +69,7 @@ test("the bulk is last on both surfaces, because it is last in the array", () =>
 test("the chapter counter counts the place the reviewer sees it drawn in", () => {
   const groups = trailSweeps(asGrouped);
 
-  // Entering the first swept chapter is entering the third of four, which is
-  // where both the bar and the survey drew it.
+  // The first swept chapter is the third of four, where both the bar and the survey drew it.
   assert.match(renderFocusBar(groups, 2), /Chapter 3 of 4/);
   assert.match(renderFocusBar(groups, 2), /Renames/);
 });

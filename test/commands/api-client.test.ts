@@ -101,8 +101,7 @@ test("a 422 relays the server's own structured error, help and all", () => {
   ]);
 });
 
-/** Every rule the server can state arrives this way, not just the first one that
- * needed it: a code this client did not know about used to reach the agent as
+/** Regression: a code this client did not know about reached the agent as
  * `internal_error`, which reads as a lightspeed bug rather than an illegal move. */
 test("a 422 carrying a code this client has never seen is relayed, not swallowed", () => {
   const body = JSON.stringify({

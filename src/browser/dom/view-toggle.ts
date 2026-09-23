@@ -13,19 +13,17 @@ export interface MountedViewToggle {
 }
 
 export interface ViewToggleOptions {
-  /** The segmented control; its `button[data-format]` children are the options. */
   root: HTMLElement;
   sessionKey: string;
   storage: ViewFormatStorage;
-  /** Whether two code columns fit right now, panel included if it is open. */
   hasRoom(): boolean;
   /** Called only when the rendered view changes, never for the initial one. */
   onFormat(format: DiffOutputFormat): void;
 }
 
 /**
- * Wires the header view switch. The caller renders the first view itself (same
- * stored preference, same breakpoint) so the diff is drawn once at mount.
+ * The caller renders the first view itself (same stored preference, same
+ * breakpoint) so the diff is drawn once at mount.
  */
 export function mountViewToggle(options: ViewToggleOptions): MountedViewToggle {
   const buttons = [...options.root.querySelectorAll<HTMLButtonElement>("button[data-format]")];

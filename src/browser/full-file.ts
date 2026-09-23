@@ -2,11 +2,7 @@ import { escapeHtml } from "../escape-html.ts";
 import { BRANCH_OPTION } from "./approved-form.ts";
 import type { FileHighlight } from "./syntax-file.ts";
 
-/**
- * The `Whole file` view: the file's entire new version, numbered and
- * highlighted like a diff. Pure, like `diff-view.ts`: markup asserted without
- * a DOM. Read-only in v1 — annotations stay anchored to the branch diff.
- */
+/** Pure, like `diff-view.ts`: markup asserted without a DOM. Read-only: annotations stay anchored to the branch diff. */
 
 /**
  * Names the press, not a literal: renaming the option must not leave this
@@ -14,7 +10,6 @@ import type { FileHighlight } from "./syntax-file.ts";
  */
 const READ_ONLY = `Read-only view: annotations are filed on the branch diff — press ${BRANCH_OPTION.label} to leave one.`;
 
-/** The whole file under the fetched forms' chrome: same note band, same diff surface. */
 export function renderFullFile(contents: string, highlight: FileHighlight | undefined): string {
   const raw = contents.split("\n");
   // Aligned or dropped whole: a shifted highlight would paint one line's

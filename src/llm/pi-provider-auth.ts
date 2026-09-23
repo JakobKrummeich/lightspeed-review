@@ -52,7 +52,6 @@ export function overridePiBuiltin(
   };
 }
 
-/** Authentication for a Pi-defined provider that pi-ai did not ship. */
 export function piProviderAuth(id: string, config: PiProviderConfig): ProviderAuth {
   return {
     apiKey: {

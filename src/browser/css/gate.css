@@ -1,24 +1,16 @@
 /*
- * The chapter's gate: the card a chapter stands behind until the reviewer
- * presses through to its diff. Its own area, and not part of the chapter
- * screen it interrupts, because it is the one surface of the review with no
- * code on it — everything here is sized and coloured to be read rather than
- * scanned, which is the opposite of every rule in `index.css`. The cascade
- * puts it straight after that screen: these rules answer its `.lsr-group`
- * selectors and must be able to overrule them.
+ * The card a chapter stands behind until the reviewer presses through to its
+ * diff: the one surface of the review with no code on it, sized to be read
+ * rather than scanned. The cascade puts it straight after `index.css`: these
+ * rules answer its `.lsr-group` selectors and must be able to overrule them.
  */
 
 /*
- * The gate a chapter opens behind: the card saying what the chapter is for,
- * alone on the screen with the diff shut behind one press. One column at a
- * reading measure, because these are sentences to read and not a row to scan,
- * and nothing on it is muted — on a screen holding this and nothing else,
- * quiet type says "skip me", which is what the same sentences got when they
- * headed the first file's diff. The column stands in the middle of the
- * screen — hugging the left edge it read as one more paragraph of the page
- * and not as the page a chapter starts on — but its lines are flush left:
- * sentences read from one edge, and centred ones make the eye find it anew
- * on every line.
+ * Nothing on the card is muted: on a screen holding this and nothing else,
+ * quiet type says "skip me". The column stands in the middle of the screen —
+ * hugging the left edge it read as one more paragraph of the page — but its
+ * lines are flush left: centred ones make the eye find the edge anew on every
+ * line.
  */
 .lsr-gate {
   display: flex;
@@ -31,19 +23,16 @@
   padding: var(--lsr-space-2) 0 var(--lsr-space-4);
 }
 
-/* Gone the moment the diff is up: the room the intent held is the diff's now. */
 .lsr-group:has(.lsr-gate-press[aria-expanded="true"]) .lsr-gate {
   display: none;
 }
 
 /*
- * And the chapter's name moves up to the bar the moment the card goes. On the
- * card it is the title, right under the bar, and said on both it was the one
- * thing on the screen written twice; once the card is gone behind the diff,
- * the bar is the only place left to say which chapter this is. Read off the
- * gate's own fold, as the card's showing is, so the name comes back down when
- * the chapter shuts. The bar is set in `index.css`; this one word on it is
- * the gate's doing, so it is set here with the gate.
+ * The chapter's name moves up to the bar the moment the card goes behind the
+ * diff, since the bar is then the only place left to say which chapter this
+ * is; read off the gate's own fold so it comes back down when the chapter
+ * shuts. The bar is set in `index.css`; this one word on it is the gate's
+ * doing, so it lives here.
  */
 .lsr-focus-name {
   display: none;
@@ -66,22 +55,8 @@
   }
 }
 
-/*
- * The chapter's own tick stays on the card, at its foot as it is at the
- * diff's: a chapter is settled from its card as well as from under its lines,
- * and once it is settled the same box is its mark — a finished chapter shuts
- * back onto its card, and the card is where its state has to show. The tick
- * is a press of its own: the card around it opens the diff, the tick and its
- * label never do (`diff-mount` answers the tick and lets the card be).
- */
-
-/*
- * The words the survey's lane wore, on the one card reachable without the
- * lane: they say this chapter's tick is the press to make, with nothing in it
- * to read first. Set as the lane's heading is, in the meta size and muted,
- * because it is a label on the chapter and not one of the sentences the card
- * exists to have read.
- */
+/* Set as the survey lane's heading is, meta and muted: a label on the chapter,
+ * not one of the sentences the card exists to have read. */
 .lsr-gate-tier {
   margin: 0;
   color: var(--lsr-muted);
@@ -91,16 +66,11 @@
 }
 
 /*
- * Shut, the chapter is a card and the only thing on the screen, so the section
- * is drawn as one: narrower than the page it lies on, centred, lifted off it
- * the way the finish card and the closing summary are. Full width it was a
- * band the size of the review with a column of words marooned in the middle of
- * it — the same lines read as a card the moment its edges are near them. The
- * measure lives here and not on the gate: card and text are one width apart,
- * and one place to change it.
- *
- * A shut card also opens on a press anywhere on it, not only on the button
- * that names the press. The cursor is the whole of the announcement — no hover
+ * Shut, the chapter is a card and the only thing on the screen, so it is drawn
+ * as one — narrower than the page, centred, lifted like the finish card and
+ * the closing summary. The measure lives here and not on the gate: card and
+ * text are one width apart, and one place to change it. A shut card opens on
+ * a press anywhere on it, and the cursor is the whole announcement: no hover
  * dressing, the card is text to read and not a control to find.
  */
 .lsr-group:has(.lsr-gate-press[aria-expanded="false"]) {
@@ -114,32 +84,79 @@
 
 .lsr-gate-name {
   margin: 0;
-  /* The same headline it wears on the survey: one chapter, one voice,
-   * whichever screen it is named on. */
   font-size: var(--lsr-size-title);
   line-height: var(--lsr-leading-tight);
   font-weight: 600;
   color: var(--lsr-strong);
 }
 
-/*
- * What happened, set to be read: the lead step, a half-step above the reading
- * size, because on this screen it is the content — and with a paragraph's
- * leading rather than the tight one a lone heading line takes.
- */
 .lsr-gate-rationale {
   margin: 0;
   font-size: var(--lsr-size-lead);
   line-height: var(--lsr-leading);
 }
 
-/* What the press opens, path by path, with the size of each change beside it. */
-.lsr-gate-files {
+/*
+ * The paths, folded behind one line saying how much there is. A `<details>`,
+ * so the browser owns the fold; the mount only keeps its press off the card
+ * (`diff-mount`) and carries it across a redraw (`diff-folds`). The hover is a
+ * step up in colour and nothing else: the card under it wears no hover
+ * dressing, and a pill here would say this line is a different kind of thing
+ * from the ones around it.
+ */
+.lsr-gate-files-summary {
+  position: relative;
+  padding: 0 0 0 var(--lsr-space-4);
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+  line-height: var(--lsr-leading-tight);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  list-style: none;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.lsr-gate-files-summary::-webkit-details-marker {
+  display: none;
+}
+
+.lsr-gate-files-summary:hover {
+  color: var(--lsr-text);
+}
+
+.lsr-gate-files-summary:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 2px;
+}
+
+/* The arrow in the line's own colour, so the hover lifts both together. */
+.lsr-gate-files-summary::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  inset-block: 0;
+  margin: auto 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.lsr-gate-files[open] > .lsr-gate-files-summary::before {
+  transform: rotate(45deg);
+}
+
+/* Under the line's words rather than its arrow: the arrow marks the block, the
+ * words and the rows share an edge. */
+.lsr-gate-files-list {
   display: flex;
   flex-direction: column;
   gap: var(--lsr-space-1);
   margin: 0;
-  padding: 0;
+  padding: var(--lsr-space-2) 0 0 var(--lsr-space-4);
   list-style: none;
 }
 
@@ -149,11 +166,8 @@
   gap: var(--lsr-space-3);
 }
 
-/*
- * A path longer than the card wraps. A flex item will not shrink below its
- * content on its own, and a row that overflows runs out of the card with the
- * change's size after it.
- */
+/* A flex item will not shrink below its content on its own: without this a
+ * long path runs out of the card with the change's size after it. */
 .lsr-gate-path {
   min-width: 0;
   overflow-wrap: anywhere;

@@ -174,9 +174,7 @@ test("speaking leaves the turn where it was, and offers the moves that fit it", 
   });
 });
 
-/** The same, from mid-edit: `work` is already declared, so the moves left are
- * the ones that give the turn up deliberately — never a `wait`, which the poll
- * refuses with `turn_still_yours` while the agent is working. */
+/** Never a `wait`: the poll refuses it with `turn_still_yours` while the agent is working. */
 test("speaking mid-edit offers the moves that give the turn up, not a wait", async () => {
   const record = session({
     turn: { holder: "agent", mode: "working", at: AT, note: "splitting the helper out" },
@@ -236,9 +234,9 @@ test("a pinned answer lands as a declaration and adds no line to the conversatio
       files: ["src/api/users.ts"],
     });
 
-    // Both halves of the title, and neither is readable off the output: only
-    // `say --for` could have written this declaration, and only a second, wrong
-    // filing would add the same sentence to the conversation.
+    // Neither half is readable off the output: only `say --for` could have written
+    // this declaration, and only a wrong second filing would add the same sentence
+    // to the conversation.
     assert.partialDeepStrictEqual(store.get(KEY)?.declarations, {
       evt_a: { note: "one transaction now", files: ["src/api/users.ts"] },
     });
@@ -267,8 +265,8 @@ test("a pin naming no comment of this review is refused whole", async () => {
         return true;
       },
     );
-    // Rejected whole: nothing of it was stored. That the server rejects it whole
-    // is its own test; what this one owes is that the CLI stored nothing either.
+    // That the server rejects it whole is its own test; this one owes that the
+    // CLI stored nothing either.
     assert.equal(store.get(KEY)?.declarations, undefined);
   });
 });
@@ -316,10 +314,8 @@ test("an answer saying the review ended points at the only command that reopens 
 });
 
 /**
- * S10: the branch and the base were on the command line that reached this
- * error, and every other path inlines them — only the reopen line asked the
- * agent to fill in `<branch> [base]` from a command it had just run. The
- * `--intent` is there for the same reason it is everywhere else: `start`
+ * Regression: only the reopen line asked the agent to fill in `<branch> [base]`
+ * from a command it had just run. The `--intent` is there because `start`
  * refuses a round without one.
  */
 test("a review that ended names this session in the command that reopens it", async () => {
@@ -353,9 +349,9 @@ test("speaking into an unknown session fails with session_not_found", async () =
 });
 
 /**
- * S4: an agent that answers a comment mid-edit has already read this round's
- * moves off the `wait` that delivered the comment — 73% of this answer was that
- * same block again.
+ * An agent that answers a comment mid-edit has already read this round's moves
+ * off the `wait` that delivered the comment — 73% of this answer was that same
+ * block again.
  */
 test("an answer later in the round closes with one line, not the block again", async () => {
   const record = session({

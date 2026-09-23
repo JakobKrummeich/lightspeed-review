@@ -118,8 +118,6 @@ test("every convention carries examples and counterexamples to be judged by", ()
 });
 
 test("a C# test pinned to its production class is pulled out of that group", () => {
-  // The complaint this widening came from: the model pairs OrderServiceTests.cs
-  // with OrderService.cs, and nothing recognised the test, so the pairing stood.
   const grouped = trailTests([
     group("Order pricing", "src/Orders/OrderService.cs", "tests/Orders/OrderServiceTests.cs"),
     group("Checkout", "src/Checkout/Cart.cs"),
@@ -148,8 +146,8 @@ test("a test group the model put near the top is moved to the end", () => {
 });
 
 /**
- * The one rationale this repository writes itself. It was "Do these check what the
- * change above promises?" — a claim a tests-only fallback has no group above it to make.
+ * The one rationale the code writes itself: "the change above" is a claim a tests-only fallback
+ * has no group above it to make.
  */
 test("the Tests group's own rationale states what the files are, from any position", () => {
   const appended = trailTests([group("The change", "src/a.ts"), group("Checks", "test/a.test.ts")]);

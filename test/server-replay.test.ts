@@ -74,7 +74,6 @@ interface Harness {
   stop(): Promise<void>;
 }
 
-/** A running server holding one session on its first round over a real repo. */
 async function startReview(commits: Record<string, string>): Promise<Harness> {
   const repoRoot = repoWith(commits);
   const line = commitLine(repoRoot, Object.keys(commits).length + 1);
@@ -90,7 +89,6 @@ async function startReview(commits: Record<string, string>): Promise<Harness> {
   return { url, store, repoRoot, key, commits: line, stop: () => server.stop() };
 }
 
-/** The reviewer comments on line 1 of the file, and the server mints the id. */
 async function annotate(harness: Harness): Promise<string> {
   const response = await fetch(`${harness.url}/api/session/${harness.key}/feedback`, {
     method: "POST",

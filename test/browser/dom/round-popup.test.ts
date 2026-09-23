@@ -5,7 +5,6 @@ import type { SessionData } from "../../../src/browser/dom/session-api.ts";
 import type { DiffFile } from "../../../src/diff-extract.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
-/** The page as far as the popup touches it: the Esc listener. */
 class FakeDocument {
   private listeners = new Map<string, ((event: unknown) => void)[]>();
 
@@ -40,7 +39,6 @@ function file(path: string): DiffFile {
   };
 }
 
-/** A session standing on `round`, with one group of the paths given. */
 function session(round: number, paths: string[]): SessionData {
   return {
     intents: [],

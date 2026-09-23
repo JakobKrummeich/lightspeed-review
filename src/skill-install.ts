@@ -3,9 +3,8 @@ import { dirname, join } from "node:path";
 import { expandHome } from "./paths.ts";
 import type { SkillAgent } from "./skill.ts";
 
-/** Whose skill directory is written: the machine's, or the repository the
- * command was run in. Global is the default because an agent is installed once
- * per machine and then used on every checkout. */
+/** Global is the default because an agent is installed once per machine and
+ * then used on every checkout. */
 export const INIT_SCOPES = ["global", "project"] as const;
 
 export type InitScope = (typeof INIT_SCOPES)[number];
@@ -30,25 +29,23 @@ export interface InstallReport {
   mode: WriteMode;
 }
 
-/** Where the command is standing. Both are parameters, never read from the
- * process, so a test drives temporary directories instead of a real machine. */
+/** Parameters, never read from the process, so a test drives temporary
+ * directories instead of a real machine. */
 export interface InitRoots {
   home: string;
   cwd: string;
 }
 
 interface Destination {
-  /** Absent when the agent has no machine-wide instructions file at all. */
   global?: string;
   project: string;
   mode: WriteMode;
 }
 
 /**
- * Where each harness actually reads its skill, which is not where the setup
- * instructions used to say: pi scans `~/.pi/agent/skills`, and `~/.pi/skills`
- * — the path the README named for years — is a directory pi never looks in.
- * Checked against pi's own `docs/skills.md` before it was written down again.
+ * pi scans `~/.pi/agent/skills`; `~/.pi/skills` — the path the README named
+ * for years — is a directory pi never looks in (checked against pi's own
+ * `docs/skills.md`).
  */
 const DESTINATIONS: Record<SkillAgent, Destination> = {
   pi: {
@@ -104,9 +101,9 @@ const BLOCK_START = "<!-- lightspeed:start -->";
 const BLOCK_END = "<!-- lightspeed:end -->";
 
 /**
- * Installs the rendered skill and says what that changed. Content is compared
- * before anything is written: agents re-run `init` after every upgrade, and a
- * rewrite that changes nothing still shows up as a dirty file in a repository.
+ * Content is compared before anything is written: agents re-run `init` after
+ * every upgrade, and a rewrite that changes nothing still shows up as a dirty
+ * file in a repository.
  */
 export function installSkill(
   target: SkillTarget,
@@ -127,9 +124,8 @@ function block(rendered: string): string {
 }
 
 /**
- * A re-run refreshes the region between the markers and leaves every other line
- * where the user put it. A file with no markers keeps everything it said and
- * gains the block at the end — appending twice is the failure this replaces.
+ * A file with no markers keeps everything it said and gains the block at the
+ * end — appending twice is the failure this replaces.
  */
 function merged(existing: string | undefined, marked: string): string {
   if (existing === undefined) return `${marked}\n`;
@@ -138,7 +134,6 @@ function merged(existing: string | undefined, marked: string): string {
   return `${existing.slice(0, bounds.start)}${marked}${existing.slice(bounds.end)}`;
 }
 
-/** Where a previous run's block sits, when this file carries one. */
 function blockBounds(existing: string): { start: number; end: number } | undefined {
   const start = existing.indexOf(BLOCK_START);
   const end = existing.indexOf(BLOCK_END, start);
@@ -159,8 +154,6 @@ function writeChange(
   return existing === undefined ? "written" : "updated";
 }
 
-/** Every destination sits under a directory the user may never have created —
- * a fresh machine has no `~/.pi/agent/skills` until something makes one. */
 function writeThrough(path: string, contents: string): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, contents);

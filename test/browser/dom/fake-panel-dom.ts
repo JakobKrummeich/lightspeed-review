@@ -5,15 +5,13 @@
 export class FakeNode {
   readonly tag: string;
   private readonly attributes: string;
-  /** Set by the fake typist, like a reviewer's keystrokes. */
   value = "";
   /** Flat: the text up to the next tag, not everything underneath. */
   textContent = "";
-  /** Scroll geometry a fake cannot lay out: tests state heights and watch what the panel does to scrollTop. */
+  /** A fake cannot lay out: tests state heights and watch what the panel does to scrollTop. */
   scrollTop = 0;
   scrollHeight = 0;
   clientHeight = 0;
-  /** Where that typist's caret sits, as a textarea reports it. */
   selectionStart: number | null = 0;
   selectionEnd: number | null = 0;
   private locked: boolean | undefined;
@@ -37,13 +35,11 @@ export class FakeNode {
     this.children = parseNodes(html);
   }
 
-  /** The classes the markup gave this node, asked the way an element is asked. */
   get classList(): { contains(name: string): boolean } {
     const classes = this.attribute("class").split(" ");
     return { contains: (name: string) => classes.includes(name) };
   }
 
-  /** The `id` the markup gave this node, as an element reports it. */
   get id(): string {
     return this.attribute("id");
   }
@@ -79,7 +75,6 @@ export class FakeNode {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
   }
 
-  /** True once the page put the caret here. */
   focused = false;
 
   focus(): void {
@@ -106,7 +101,6 @@ export class FakeNode {
     ]);
   }
 
-  /** The parser's only way in: markup nests, and this is what nests it. */
   adopt(child: FakeNode): void {
     this.children.push(child);
   }
@@ -123,11 +117,6 @@ export class FakeNode {
   }
 }
 
-/**
- * No self-closing case on purpose: `<p/>` opens a paragraph in real HTML and `href="docs/"` ends
- * in a slash — reading either as empty would flatten what follows. Void elements are a list.
- */
-/** Every `data-` attribute of one tag, under the name an element reports it by. */
 function readDataset(attributes: string): Record<string, string | undefined> {
   return Object.fromEntries(
     [...attributes.matchAll(/data-([\w-]+)="([^"]*)"/g)].map(([, name, value]) => [
@@ -137,6 +126,10 @@ function readDataset(attributes: string): Record<string, string | undefined> {
   );
 }
 
+/**
+ * No self-closing case on purpose: `<p/>` opens a paragraph in real HTML and `href="docs/"` ends
+ * in a slash — reading either as empty would flatten what follows. Void elements are a list.
+ */
 const TAG = /<(\/?)(\w+)([^>]*)>([^<]*)/g;
 const VOID_TAGS = new Set(["br", "hr", "img", "input", "link", "meta"]);
 
@@ -180,7 +173,6 @@ export function installFakeElements(after: (undo: () => void) => void): FakeWind
   return page;
 }
 
-/** The page itself, as far as the panel uses it: something that can be left. */
 export class FakeWindow {
   private readonly listeners = new Map<string, (() => void)[]>();
 
@@ -188,13 +180,11 @@ export class FakeWindow {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
   }
 
-  /** The reviewer closing the tab, or reloading it. */
   leave(): void {
     for (const handler of this.listeners.get("pagehide") ?? []) handler();
   }
 }
 
-/** Hands a fake to code typed against the real DOM. */
 export function asPanelRoot(fake: FakeNode): HTMLElement {
   return fake as unknown as HTMLElement;
 }

@@ -10,7 +10,6 @@ export interface ApprovalsArgs {
   /** Unset when the reviewer left it to `resolveSession` to work out. */
   branch: string | undefined;
   base: string | undefined;
-  /** `--full`: print every path instead of stopping at the per-list cap. */
   full: boolean;
 }
 
@@ -25,12 +24,10 @@ export interface ApprovalsInput {
 const APPROVALS_FLAGS = ["--full"];
 
 /**
- * How many paths of one list a bare listing prints. A branch-sized review fits
- * under it whole, and the reviews that do not are exactly the ones whose full
- * account costs the reading agent most; a path is also read to find something,
- * and nobody finds anything in the four hundredth line. `--full` lifts it in one
- * word. No byte budget beside it, unlike `feedback list`: a path has a length a
- * copied hunk does not, so counting paths bounds the answer on its own.
+ * A branch-sized review fits under it whole, and the reviews that do not are
+ * exactly the ones whose full account costs the reading agent most. No byte
+ * budget beside it, unlike `feedback list`: a path has a length a copied hunk
+ * does not, so counting paths bounds the answer on its own.
  */
 export const DEFAULT_PATH_LIMIT = 50;
 
@@ -60,12 +57,10 @@ function unknownApprovalsFlag(flag: string): Error {
 }
 
 /**
- * The paths behind `wait`'s counts, and the only place that prints them. `wait`
- * runs on every round and its payload is read whether or not anyone needs a file
- * list, so the lists live here, behind a command an agent runs when something
- * turns on which file — naming a swept change it wants read, or chasing what was
- * left unapproved. Read off the store rather than the server: a review is worth
- * asking about after it ended, and the server may already be stopped.
+ * The only place that prints the paths behind `wait`'s counts: `wait` runs on
+ * every round and its payload is read whether or not anyone needs a file list.
+ * Read off the store rather than the server: a review is worth asking about
+ * after it ended, and the server may already be stopped.
  */
 export function runApprovals(input: ApprovalsInput): StructuredOutput {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
@@ -81,21 +76,18 @@ export function runApprovals(input: ApprovalsInput): StructuredOutput {
   const paths = approvalPaths(session.groups, session.approved);
   const listed = listing(paths, input.full ?? false);
   return {
-    // No `status`: `turn` is where the state of a review is stated, and a second
-    // word for it went stale between rounds. Here it was stale and redundant at
-    // once — the help below already says whether this review is over.
+    // No `status`: a second word for the review's state went stale between
+    // rounds, and the help below already says whether this review is over.
     session: { key, branch: input.branch, base: input.base },
     counts: countBlock(paths, listed.omitted),
-    // Only the lists that name something. An empty list beside a count of 0 is
-    // the same fact twice, and three of them cost more than the answer.
     ...namedPaths(listed.paths),
     help: [
       ...(listed.omitted > 0 ? [HELP_FULL] : []),
       session.status === "ended"
         ? "This review is over: these are the ticks it ended on"
         : "This review is still open: these are the ticks so far, not a verdict",
-      // Only where a lane actually swept something: on every other review this
-      // was two lines explaining a count that read 0.
+      // On every review with no swept lane this was two lines explaining a
+      // count that read 0.
       ...(paths.swept.length > 0 ? [SWEPT_HELP] : []),
     ],
   };
@@ -105,8 +97,8 @@ const SWEPT_HELP =
   "`swept` files were approved in a lane the review filed as bulk, so the tick says" +
   " accepted and not read — ask the reviewer to read one when a change of yours needs it";
 
-/** The three lists, flattened to the ones with something in them: `unapproved[3]`
- * reads as the answer, `approval: {approved: [], ...}` reads as a form. */
+/** Only the lists with something in them: `unapproved[3]` reads as the answer,
+ * `approval: {approved: [], ...}` reads as a form. */
 function namedPaths(paths: Record<PathList, string[]>): StructuredOutput {
   return Object.fromEntries(
     PATH_LISTS.filter((name) => paths[name].length > 0).map((name) => [name, paths[name]]),
@@ -123,8 +115,8 @@ interface Listing {
   omitted: number;
 }
 
-/** The three lists as printed: each cut at the cap, none of them reordered, so
- * what is shown is the head of the review's own order and not a sample. */
+/** None of the lists is reordered: what is shown is the head of the review's own
+ * order, not a sample. */
 function listing(paths: ApprovalPaths, full: boolean): Listing {
   const cut = (list: string[]) => (full ? list : list.slice(0, DEFAULT_PATH_LIMIT));
   const listed = {
@@ -140,10 +132,9 @@ function listing(paths: ApprovalPaths, full: boolean): Listing {
 }
 
 /**
- * The account itself, never cut. A capped list renders under a length that is
- * the page's and not the tick's, so the numbers an agent decides on live beside
- * it and are read off the whole review — the same four counts `wait` reports
- * under its verdict, which is why the two can be compared at all.
+ * Never cut: the numbers an agent decides on are read off the whole review, and
+ * they are the same four counts `wait` reports under its verdict, which is why
+ * the two can be compared at all.
  */
 function countBlock(paths: ApprovalPaths, omitted: number): StructuredOutput {
   return {
@@ -151,9 +142,8 @@ function countBlock(paths: ApprovalPaths, omitted: number): StructuredOutput {
     unapproved: paths.unapproved.length,
     swept: paths.swept.length,
     total: paths.total,
-    // Only when the cap held something back: `omitted: 0` beside `has_more:
-    // false` was one fact said twice, on every review small enough to print
-    // whole — which is nearly all of them. The `--full` help line says the rest.
+    // `omitted: 0` said nothing on every review small enough to print whole,
+    // which is nearly all of them; the `--full` help line says the rest.
     ...(omitted > 0 ? { omitted } : {}),
   };
 }

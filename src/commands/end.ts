@@ -13,8 +13,7 @@ export interface EndInput {
 }
 
 /**
- * Agent-initiated close: the review is over without waiting for a reviewer.
- * Never gated on the turn — ending is the one move both sides can always make,
+ * Never gated on the turn: ending is the one move both sides can always make,
  * and an agent that cannot end a review it opened is an agent that leaks them.
  */
 export async function runEnd(input: EndInput): Promise<StructuredOutput> {

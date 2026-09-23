@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { renderFullFile } from "../../src/browser/full-file.ts";
 import type { FileHighlight } from "../../src/browser/syntax-file.ts";
 
-/** A highlight as `highlightFile` hands it over: one HTML and one text entry per line. */
 function highlight(contents: string, html: string[]): FileHighlight {
   return { html, text: contents.split("\n") };
 }

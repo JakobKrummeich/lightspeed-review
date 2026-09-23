@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { wireFinish, type FinishSide } from "../../../src/browser/dom/finish.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
-/** The page as far as the card touches it. */
 class FakeDocument {
   activeElement: FakeNode | null = null;
   addEventListener(): void {}
@@ -13,7 +12,6 @@ class FakeDocument {
 function wired(t: TestContext): {
   root: FakeNode;
   finish: ReturnType<typeof wireFinish>;
-  /** What the panel and the rail were told, in order. */
   log: string[];
   side: FinishSide;
 } {

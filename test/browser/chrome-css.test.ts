@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { stylesheet } from "../helpers/stylesheet.ts";
 
-// The whole stylesheet, however many files it is split into: these assertions
-// are about what the browser is served, not about where a rule is written.
+// The whole stylesheet: these assertions are about what the browser is served,
+// not about where a rule is written.
 const css = stylesheet();
 const lines = css.split("\n");
 const shell = readFileSync(new URL("../../src/html-template.ts", import.meta.url), "utf8");
@@ -17,7 +17,6 @@ test("both schemes exist and an explicit pick can reach either", () => {
 });
 
 test("every colour is a token or built from one", () => {
-  // Colour literals may appear only in token definitions; everything else must use var()/color-mix().
   const declarations = /--lsr-[\w-]*:[^;]*;/g;
   const stray = css
     .replace(declarations, "")
@@ -52,7 +51,7 @@ test("token colours come from the code tokens, not straight from a hue", () => {
 });
 
 test("every type size and leading is read from a token", () => {
-  // Sizes were inherited piecemeal and never formed a scale: a literal here is a size nobody chose.
+  // A literal here is a size nobody chose.
   const literals = lines.filter((line) =>
     /^\s*(font-size|line-height): (?!var\(--lsr-)/.test(line),
   );
@@ -61,12 +60,14 @@ test("every type size and leading is read from a token", () => {
 });
 
 test("every gap between things is a step of one scale", () => {
-  // 23 unrelated spacing values used to live here; every gap must come off one scale.
   const spacing =
     /^\s*(padding|margin|gap|row-gap|column-gap)(-top|-right|-bottom|-left)?: ([^;]+);/;
+  // A step with a border's width taken back off it is still that step: the words land where
+  // they do on a card without the border.
+  const stepLessBorder = /^calc\(var\(--lsr-space-\d+\) - \d+px\)$/;
   const offScale = lines.filter((line) => {
     const value = spacing.exec(line)?.[3];
-    if (value === undefined) return false;
+    if (value === undefined || stepLessBorder.test(value)) return false;
     // The code line's left padding is the gutter it clears, not a gap.
     return value
       .split(/\s+/)
@@ -89,7 +90,6 @@ test("the code is sized, led and spaced for reading, not left at diff2html's def
 
 test("unified spends its width on code, not on padding nothing is drawn in", () => {
   // diff2html defaults: 8em side padding, two number columns with one blank per add/remove row.
-  // Kept: one column, left padding exactly the gutter it clears.
   const codeLine = /\.d2h-code-line\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
 
   assert.match(codeLine, /padding: 0 0 0 var\(--lsr-gutter\);/);
@@ -102,7 +102,7 @@ test("unified spends its width on code, not on padding nothing is drawn in", () 
 // Strip comments so a selector match does not drag the preceding comment along.
 const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** Bodies of every rule naming exactly this selector; whitespace collapsed so formatter wraps don't matter. */
+/** Whitespace collapsed so formatter wraps don't matter. */
 function rulesFor(selector: string): string[] {
   const wanted = tidy(selector);
   return [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
@@ -110,7 +110,6 @@ function rulesFor(selector: string): string[] {
     .map(([, , body]) => body ?? "");
 }
 
-/** One selector the way a hand would write it: runs of space collapsed, none inside a paren. */
 function tidy(selector: string): string {
   return selector.trim().replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
 }
@@ -197,9 +196,11 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
     .sort();
 
   // `.lsr-gate-path`: one path on the chapter's card, a leaf with no diff under it.
+  // `.lsr-file-path`: the path on a file's header row — two paths and an arrow
+  // for a moved file — a span in the header button, a sibling of the diff, never over it.
   assert.deepEqual(
     wrapping,
-    [".lsr-gate-path", ".lsr-panel-scroll", ".lsr-popup", "textarea"],
+    [".lsr-file-path", ".lsr-gate-path", ".lsr-panel-scroll", ".lsr-popup", "textarea"],
     "a new mid-token wrap is a deliberate choice: say so here, and check it cannot reach the diff",
   );
 });
@@ -258,10 +259,8 @@ test("the chapter's rationale is set to be read, not to be skipped past", () => 
 });
 
 test("every chapter's card offers the chapter's tick", () => {
-  // A chapter is settled from its card as well as from under its lines: the
-  // last chapter of a review used to be the one place with no tick to press,
-  // its card hiding the foot until the diff was up. No rule hides the foot on
-  // a shut card any more, whatever the chapter's tier or state.
+  // Regression: the last chapter of a review was the one place with no tick to
+  // press, its card hiding the foot until the diff was up.
   assert.doesNotMatch(
     bare,
     /aria-expanded="false"[^{]*\.lsr-group-foot\s*\{/,
@@ -281,6 +280,25 @@ test("the sweep card's label is set as the survey's lane heading is", () => {
   assert.match(lane, /color: var\(--lsr-muted\);/);
 });
 
+test("the card's folded file list is a quiet line with the page's arrow on it", () => {
+  // One line saying how much the chapter is, set as the tier label is: a label
+  // on the chapter, not one of the sentences the card exists to have read.
+  const line = rulesFor(".lsr-gate-files-summary").join("");
+  assert.match(line, /font-size: var\(--lsr-size-meta\);/);
+  assert.match(line, /color: var\(--lsr-muted\);/);
+  assert.match(line, /cursor: pointer;/);
+  assert.match(line, /list-style: none;/);
+  assert.match(
+    rulesFor(".lsr-gate-files-summary::before").join(""),
+    /transform: rotate\(-45deg\);/,
+  );
+  assert.match(
+    rulesFor(".lsr-gate-files[open] > .lsr-gate-files-summary::before").join(""),
+    /transform: rotate\(45deg\);/,
+  );
+  assert.match(rulesFor(".lsr-gate-files-summary:focus-visible").join(""), /outline: 2px solid/);
+});
+
 test("the chapter's card stands in the middle of the screen, its lines flush left", () => {
   // The block is centred, not the words on it: a column of sentences reads
   // from one left edge, and a card hugging the screen's edge read as one more
@@ -289,9 +307,8 @@ test("the chapter's card stands in the middle of the screen, its lines flush lef
   assert.match(card, /margin: 0 auto;/);
   assert.match(card, /align-items: start;/);
   assert.doesNotMatch(card, /text-align: center;/);
-  // And the section it stands in draws in around it: a card is a card by
-  // being narrower than the page it lies on, lifted off it, with its words
-  // near its edges rather than marooned in the middle of a full-width band.
+  // A card is a card by being narrower than the page it lies on, lifted off it,
+  // its words near its edges rather than marooned in a full-width band.
   const shut = rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="false"])').join("");
   assert.match(shut, /max-width: \d+ch;/);
   assert.match(shut, /margin-inline: auto;/);
@@ -299,15 +316,13 @@ test("the chapter's card stands in the middle of the screen, its lines flush lef
   // The measure belongs to the card, so the gate does not cap it a second time.
   assert.doesNotMatch(card, /max-width:/);
   assert.doesNotMatch(rulesFor(".lsr-gate-file").join(""), /justify-content: center;/);
-  // A path longer than the card wraps rather than running out of it.
   assert.match(rulesFor(".lsr-gate-path").join(""), /overflow-wrap: anywhere;/);
 });
 
 test("the bar carries the chapter's name only while the diff is up", () => {
-  // On the card the name is in the title size right below the bar, and said
-  // twice it was the one thing on the screen written twice. Once the card is
-  // gone behind the diff, the bar is the only place left to say which chapter
-  // this is — so the name moves up there, and nowhere is it on screen twice.
+  // On the card the name is in the title size right below the bar; once the
+  // card is gone behind the diff, the bar is the only place left to say which
+  // chapter this is. Nowhere is it on screen twice.
   assert.match(rulesFor(".lsr-focus-name").join(""), /display: none;/);
   const up = rulesFor(
     '.lsr-focus-bar:has(+ .lsr-group .lsr-gate-press[aria-expanded="true"]) .lsr-focus-name',
@@ -332,7 +347,6 @@ test("a shut card is one press, and says so with the cursor alone", () => {
 
 test("a fully ticked group recedes the way an approved file does, and comes back on hover", () => {
   // No per-group state: the tick drives the mark, so card and boxes cannot disagree.
-  // Hover and keyboard focus both restore contrast.
   const dimmed = rulesFor(".lsr-group:has(.lsr-tick-all:checked)");
   assert.equal(dimmed.length, 1);
   assert.match(dimmed[0] ?? "", /opacity: 0\.55;/);
@@ -362,13 +376,115 @@ test("regression guard: the round's line keeps the three properties that pin it"
   assert.match(mark, /background: var\(--lsr-surface\);/);
 });
 
-test("an earlier round's messages read as history without being faded out", () => {
+test("an earlier round keeps its bubbles: history is neither flattened nor faded", () => {
   // Old entries keep contrast (reviewer scrolled up to read them); opacity is barred because it
-  // multiplies down the tree.
-  const earlier = rulesFor('.lsr-entry[data-round-state="earlier"]');
-  assert.equal(earlier.length, 1);
-  assert.match(earlier[0] ?? "", /background: none;/);
-  assert.doesNotMatch(earlier[0] ?? "", /opacity/);
+  // multiplies down the tree, and a flat card would take the agent's grey bubble off the page.
+  const faded = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(
+      ([, list, body]) =>
+        /\.lsr-entry[^,{]*data-round-state="earlier"/.test(list ?? "") &&
+        /background|opacity/.test(body ?? ""),
+    )
+    .map(([, list]) => list?.trim());
+  assert.deepEqual(faded, [], "a rule takes an earlier round's bubble away");
+});
+
+test("each voice of the sidechat is one hue, worn as a bar down the card and on its label", () => {
+  // The agent keeps the accent it has everywhere else on the page; the reviewer the violet of
+  // the replay. The bar is the glance, the label the word for whoever cannot tell the hues apart.
+  assert.match(
+    rulesFor('.lsr-entry[data-role="agent"]').join(""),
+    /--lsr-speaker: var\(--lsr-accent\);/,
+  );
+  assert.match(
+    rulesFor('.lsr-entry[data-role="reviewer"]').join(""),
+    /--lsr-speaker: var\(--lsr-violet\);/,
+  );
+
+  const card = rulesFor(".lsr-entry[data-role]").join("");
+  assert.match(card, /border-left: 3px solid var\(--lsr-speaker\);/);
+  // The bar is inside the box: without giving its width back, a card's words sat 3px right of
+  // the pills sharing the base padding.
+  assert.match(card, /padding-left: calc\(var\(--lsr-space-3\) - 3px\);/);
+
+  // Two fifths hue: the night reviewer's card is the ceiling, where the violet is 4.67:1 at
+  // two fifths and 4.52:1 at half (paper 6.10:1); the accent on the agent's card is 6.14:1.
+  assert.match(
+    rulesFor(".lsr-entry[data-role] .lsr-entry-role").join(""),
+    /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
+  );
+});
+
+test("the reviewer's bubble is violet and the agent's is grey, on every round", () => {
+  // Neutral against violet, not cobalt against violet: at 14% each, a cobalt card and a violet
+  // card differ by 0.021 of oklab lightness on paper and 0.018 at night, one hue step apart for
+  // whoever cannot tell the two blues apart; the grey card sits 0.080 and 0.083 away. 30% is
+  // 0.154 of lightness off the card's base on paper and 0.146 at night, and where the night
+  // labels stop it: at 32% the widest violet label that clears AA is 4.51:1, at 30% 4.67:1.
+  // 11% of ink is 0.074 and 0.064 off the base, and 0.063 and 0.104 off the panel.
+  const reviewer = rulesFor('.lsr-entry[data-role="reviewer"]').join("");
+  assert.match(
+    reviewer,
+    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-violet\) 30%, var\(--lsr-raised\)\);/,
+  );
+
+  const agent = rulesFor('.lsr-entry[data-role="agent"]').join("");
+  assert.match(
+    agent,
+    /--lsr-bubble: color-mix\(in oklab, var\(--lsr-text\) 11%, var\(--lsr-raised\)\);/,
+  );
+  assert.doesNotMatch(
+    agent,
+    /--lsr-bubble:[^;]*var\(--lsr-(accent|violet|green|red|amber|pink|cyan)\)/,
+    "the agent's bubble carries no hue",
+  );
+
+  // The bubble is the card's background whatever the round's state: a chat keeps its bubbles.
+  assert.match(rulesFor(".lsr-entry[data-role]").join(""), /background: var\(--lsr-bubble\);/);
+  assert.equal(
+    rulesFor('.lsr-entry[data-role][data-round-state="current"]').length,
+    0,
+    "the bubble is not a live-round effect",
+  );
+});
+
+test("the small print on a bubble steps toward the text: the caption, and the accent labels", () => {
+  // Every share is set by the night reviewer's card. Muted at 15% is 4.76:1 there (4.58:1 at
+  // 20%; paper 6.81:1). The question label is the card's own voice and takes the role label's
+  // two fifths (6.14:1 on the night agent's card). The answer label is the accent on the
+  // violet, where a quarter is 4.69:1 and two fifths 4.35:1 (paper 6.23:1). Not on hover,
+  // which keeps the accent it answers with.
+  const caption = rulesFor(".lsr-entry[data-role] .lsr-prompt-file:not(:hover)").join("");
+  assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 15%, var\(--lsr-text\)\);/);
+
+  assert.match(
+    rulesFor(".lsr-entry[data-role] .lsr-question-label").join(""),
+    /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
+    "the question label is left raw on the bubble",
+  );
+  assert.match(
+    rulesFor(".lsr-entry[data-role] .lsr-prompt-answer-label").join(""),
+    /color: color-mix\(in oklab, var\(--lsr-accent\) 25%, var\(--lsr-text\)\);/,
+    "the answer label is left raw on the bubble",
+  );
+});
+
+test("the seam between two comments is drawn off the bubble, not off the border token", () => {
+  // The border token sits at the bubble's own lightness on the night agent's card (1.01:1).
+  // A fifth of ink into the bubble is 1.43:1 to 1.55:1 on every card in both schemes; 15% is
+  // 1.30:1 on the light reviewer's, at the floor.
+  const seam = rulesFor(".lsr-prompt + .lsr-prompt").join("");
+  assert.match(
+    seam,
+    /border-top: 1px solid\s+color-mix\(in oklab, var\(--lsr-text\) 20%, var\(--lsr-bubble, var\(--lsr-raised\)\)\);/,
+  );
+});
+
+test("a question inside the agent's card keeps its inset but not its own bar", () => {
+  // The card's 3px accent bar and the question's 2px one stood a few px apart: two bars, one voice.
+  const question = rulesFor('.lsr-entry[data-role="agent"] .lsr-prompt[data-kind="question"]');
+  assert.equal(question.length, 1);
+  assert.match(question[0] ?? "", /border-left: 0;/);
 });
 
 // Regression: regions naming only one axis let auto-flow deal them the wrong cells.
@@ -404,8 +520,8 @@ test("every region of the page names both its column and its row, in one rule", 
 });
 
 test("guard: the shell renders no region the grid has not been told where to put", () => {
-  // Guard: a new shell region without a placement would be dealt the wrong cells again. Matched by
-  // template shape (no HTML parser). .lsr-popup absent on purpose: annotation-popup.ts appends it at runtime.
+  // Matched by template shape (no HTML parser). .lsr-popup absent on purpose:
+  // annotation-popup.ts appends it at runtime.
   const body = /<body[^>]*>([\s\S]*?)<\/body>/.exec(shell)?.[1] ?? "";
   const rendered = [...body.matchAll(/^ {4}<\w+[^>]*class="([^"]+)"/gm)]
     .map(([, name]) => `.${name}`)
@@ -478,7 +594,6 @@ test("a swept chapter's segment says so in the weave, and only in the weave", ()
 
   assert.match(swept, /background: repeating-linear-gradient\(/);
   assert.match(swept, /var\(--lsr-border\) 0 var\(--lsr-space-1\)/);
-  // Approval fill is untouched: a hatched segment fills like every other one.
   assert.doesNotMatch(swept, /\.lsr-progress-fill/);
 });
 
@@ -545,9 +660,8 @@ test("the intent scrolls away with the diff instead of holding a row open", () =
 });
 
 test("what the change is for is set to be read, not filed as a chrome label", () => {
-  // It was at label size, uppercase and muted — the smallest step in the scale,
-  // wearing the treatment this page gives metadata. It is a heading over the
-  // sentences the review exists for, and it is set like one.
+  // A heading over the sentences the review exists for, set like one — not in
+  // the label-size, uppercase, muted treatment this page gives metadata.
   const heading = [".lsr-intent-title", ".lsr-intent-press"].map((one) => rulesFor(one).join(""));
 
   for (const rules of heading) {
@@ -597,7 +711,6 @@ test("the intent's press is a heading with an arrow, not a button on the page", 
     rulesFor('.lsr-intent-press[aria-expanded="true"] .lsr-intent-hint').join(""),
     /display: none;/,
   );
-  // Reachable by keyboard, and visibly so: it is the way into the block.
   assert.match(
     rulesFor(".lsr-intent-press:focus-visible").join(""),
     /outline: 2px solid var\(--lsr-accent\);/,
@@ -638,22 +751,19 @@ test("a row wearing every badge at once wraps rather than covering the diff swit
 });
 
 test("the scrim the closing summary is centred on is painted too", () => {
-  // The summary's own classes are guarded per area in stylesheet-boundary.test.ts, which reads
-  // them off its render; this scrim is rendered by the banner around it, so that guard never
-  // sees it and it would go unpainted unnoticed.
+  // stylesheet-boundary.test.ts guards the summary's classes off its render; this
+  // scrim is rendered by the banner around it, so that guard never sees it.
   assert.ok(rulesFor(".lsr-ended-overlay").length > 0);
 });
 
 test("the control that reopens the replay is painted too", () => {
-  // The overlay's own classes are guarded per area in stylesheet-boundary.test.ts, which reads
-  // them off renderReplayOverlay; this button sits in the shell's header, so that guard never
-  // sees it and it would go unpainted unnoticed.
+  // stylesheet-boundary.test.ts guards the overlay's classes off renderReplayOverlay;
+  // this button sits in the shell's header, so that guard never sees it.
   assert.ok(rulesFor(".lsr-replay-reopen").length > 0);
 });
 
 test("only the sheet being spoken is on screen: the rest are below it or gone above it", () => {
-  // Coming sheets rise from below, done ones lift away above, both invisible in transit:
-  // a second readable sheet is a second thing to read.
+  // Both invisible in transit: a second readable sheet is a second thing to read.
   const under = rulesFor('.lsr-opening-sheet[data-at="under"]').join("");
   const gone = rulesFor('.lsr-opening-sheet[data-at="gone"]').join("");
 
@@ -667,8 +777,6 @@ test("only the sheet being spoken is on screen: the rest are below it or gone ab
 });
 
 test("the room grows with the longest reason instead of scrolling it", () => {
-  // Sheets share one grid cell so the tallest sizes the room; a fixed height is the old scroll
-  // trap, and `safe` centering keeps a scrolled sheet's top reachable.
   const stack = rulesFor(".lsr-opening-stack").join("");
   const sheet = rulesFor(".lsr-opening-sheet").join("");
 
@@ -709,7 +817,6 @@ test("the opening is painted for both schemes at once, never for one of them", (
 });
 
 test("a reviewer who asked for less motion gets the handover without the movement", () => {
-  // The one feature that moves something across a whole screen.
   assert.match(
     bare,
     /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.lsr-opening-sheet\s*\{\s*transition: none;/,

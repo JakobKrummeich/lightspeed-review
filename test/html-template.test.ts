@@ -158,7 +158,6 @@ test("branch names are escaped rather than injected", () => {
   assert.match(html, /&lt;img src=x/);
 });
 
-/** A round the page can name a reason for. */
 function withRound(intents: string[], commits: string[]): SessionRecord {
   return {
     ...session,

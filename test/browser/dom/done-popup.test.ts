@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { mountDonePopup } from "../../../src/browser/dom/done-popup.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
-/** The page as far as the popup touches it: the Esc listener, and who holds the caret. */
 class FakeDocument {
   private listeners = new Map<string, ((event: unknown) => void)[]>();
   activeElement: FakeNode | null = null;
@@ -31,7 +30,6 @@ class FakeDocument {
 function mounted(t: TestContext): {
   root: FakeNode;
   page: FakeDocument;
-  /** The box the reviewer's last tick left the caret in. */
   tick: FakeNode;
   ended: number[];
   open(queued?: number): void;

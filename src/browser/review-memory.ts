@@ -15,39 +15,28 @@ export interface ReviewMemoryStorage {
 }
 
 /**
- * What a reload would lose, kept per review. Two lifetimes: `pending`/`draft`
- * are unsent words that nothing the agent does makes stale; `groups`/`files`/
- * `scroll` point into one round's diff, so they are round-stamped and only
- * handed back to that round.
+ * Two lifetimes: `pending`/`draft` are unsent words that nothing the agent
+ * does makes stale; `groups`/`files`/`scroll` point into one round's diff, so
+ * they are round-stamped and only handed back to that round.
  */
 export interface ReviewMemory {
-  /** Feedback queued in the browser and not yet handed to the server. */
   pending: QueuedPill[];
-  /** The general comment box, as far as it has been typed. */
   draft: string;
-  /** Which round the three fields below were left in; undefined before any was. */
   round: number | undefined;
   /**
    * Last round whose replay auto-showed, so a reload never re-triggers it.
    * Not part of the place: a re-group leaves it; the reopen control ignores it.
    */
   replayed: number | undefined;
-  /**
-   * Whether this browser opened the review's wrapper. Once per review, not per
-   * round: a re-group leaves it standing, and nothing ever sets it back.
-   */
+  /** Once per review, not per round: a re-group leaves it standing, and nothing ever sets it back. */
   unwrapped: boolean;
-  /** Indices of the groups standing open. */
   groups: number[];
-  /** Paths of the files standing open. */
   files: string[];
-  /** How far down the review the reviewer had scrolled, in pixels. */
+  /** Pixels. */
   scroll: number;
-  /** The chapter focus mode was on, or undefined for the overview. */
   focus: number | undefined;
 }
 
-/** Where the reviewer was reading, which only means anything in its own round. */
 export type ReviewPlace = Pick<ReviewMemory, "groups" | "files" | "scroll" | "focus">;
 
 /**
@@ -68,22 +57,18 @@ const VERSION = 1;
 const KEY_PREFIX = "lsr:memory:";
 
 /**
- * Reviews remembered at once. Uncapped this grows for the browser profile's
- * life. Eight ≈ several days: yesterday's branch still finds its queue, and
- * the store stays a rounding error against the origin's quota.
+ * Uncapped this grows for the browser profile's life. Eight ≈ several days:
+ * yesterday's branch still finds its queue, and the store stays a rounding
+ * error against the origin's quota.
  */
 export const MEMORY_SESSION_LIMIT = 8;
 
-/** Everything remembered for one review, or empty defaults when nothing is. */
 export function readMemory(storage: ReviewMemoryStorage, sessionKey: string): ReviewMemory {
   const stored = attempt(() => storage.getItem(storageKey(sessionKey)));
   return parseMemory(stored ?? undefined) ?? emptyMemory();
 }
 
-/**
- * Where to put the reviewer back; nothing when the memory belongs to a
- * replaced round — its indices, paths and offset describe a different diff.
- */
+/** Nothing for a replaced round: its indices, paths and offset describe a different diff. */
 export function reviewPlace(memory: ReviewMemory, round: number): ReviewPlace | undefined {
   if (memory.round !== round) return undefined;
   return {
@@ -95,10 +80,9 @@ export function reviewPlace(memory: ReviewMemory, round: number): ReviewPlace | 
 }
 
 /**
- * Writes the named fields, leaves the rest: panel and diff each remember
- * their half without reading the other's. A patch naming a new round resets
- * the place half — the old paths and offsets must not survive into a
- * different diff.
+ * Panel and diff each remember their half without reading the other's. A
+ * patch naming a new round resets the place half — the old paths and offsets
+ * must not survive into a different diff.
  */
 export function updateMemory(
   storage: ReviewMemoryStorage,
@@ -113,34 +97,28 @@ export function updateMemory(
   write(storage, sessionKey, next);
 }
 
-/** The record a patch is applied on top of: emptied of the place it named a new round for. */
 function rebased(memory: ReviewMemory, round: number | undefined): ReviewMemory {
   if (round === undefined || round === memory.round) return memory;
   return { ...memory, ...emptyPlace(), round };
 }
 
-/**
- * Nothing worth a key. Asked in three parts: three different kinds of
- * nothing, unreadable as one run of `&&`.
- */
+/** Three parts: three different kinds of nothing, unreadable as one run of `&&`. */
 function isEmpty(memory: ReviewMemory): boolean {
   return nothingUnsent(memory) && nothingShownYet(memory) && noPlaceKept(memory);
 }
 
-/** The reviewer has typed nothing a reload would take from them. */
 function nothingUnsent(memory: ReviewMemory): boolean {
   return memory.pending.length === 0 && memory.draft === "";
 }
 
 /**
- * Neither overlay has had its turn. Dropping the record while one stands
- * would give it a second turn on next load — the one thing both must never do.
+ * Dropping the record while either overlay's flag stands would give it a
+ * second turn on next load — the one thing both must never do.
  */
 function nothingShownYet(memory: ReviewMemory): boolean {
   return memory.replayed === undefined && !memory.unwrapped;
 }
 
-/** Nowhere in the diff worth putting the reviewer back. */
 function noPlaceKept(memory: ReviewMemory): boolean {
   return (
     memory.groups.length === 0 &&
@@ -151,9 +129,8 @@ function noPlaceKept(memory: ReviewMemory): boolean {
 }
 
 /**
- * Stores the record, giving ground on quota: first other reviews, then this
- * review's place. Queue and draft go last — the only things not recoverable
- * by scrolling.
+ * Gives ground on quota: first other reviews, then this review's place. Queue
+ * and draft go last — the only things not recoverable by scrolling.
  */
 function write(storage: ReviewMemoryStorage, sessionKey: string, memory: ReviewMemory): void {
   const key = storageKey(sessionKey);
@@ -167,9 +144,9 @@ function write(storage: ReviewMemoryStorage, sessionKey: string, memory: ReviewM
 }
 
 /**
- * Last stamp written. Two reviews often write within one millisecond, and
- * equal stamps make eviction guess (wrongly for the later write) — so each
- * stamp is at least one past the last; the clock still orders across page loads.
+ * Two reviews often write within one millisecond, and equal stamps make
+ * eviction guess (wrongly for the later write) — so each stamp is at least one
+ * past the last; the clock still orders across page loads.
  */
 let lastStamp = 0;
 
@@ -178,7 +155,7 @@ function stamp(): number {
   return lastStamp;
 }
 
-/** True when the record landed; false is the store being full or shut. */
+/** False: the store is full or shut. */
 function put(storage: ReviewMemoryStorage, key: string, memory: ReviewMemory): boolean {
   const record = { v: VERSION, at: stamp(), ...memory };
   try {
@@ -189,26 +166,23 @@ function put(storage: ReviewMemoryStorage, key: string, memory: ReviewMemory): b
   }
 }
 
-/** Drops the reviews least recently written, leaving room for this one. */
 function evictOldest(storage: ReviewMemoryStorage, keep: string): void {
   for (const stale of otherReviews(storage, keep).slice(MEMORY_SESSION_LIMIT - 1)) {
     attempt(() => storage.removeItem(stale.key));
   }
 }
 
-/** Drops them all: the most room the store can be given for this one record. */
 function evictOthers(storage: ReviewMemoryStorage, keep: string): void {
   for (const other of otherReviews(storage, keep)) {
     attempt(() => storage.removeItem(other.key));
   }
 }
 
-/** The reviews this store remembers besides one, newest write first. */
 function otherReviews(storage: ReviewMemoryStorage, keep: string): { key: string; at: number }[] {
   return records(storage).filter((record) => record.key !== keep);
 }
 
-/** Every review this store remembers, newest write first. */
+/** Newest write first. */
 function records(storage: ReviewMemoryStorage): { key: string; at: number }[] {
   const found = attempt(() => {
     const keys: string[] = [];
@@ -223,15 +197,15 @@ function records(storage: ReviewMemoryStorage): { key: string; at: number }[] {
     .sort((one, other) => other.at - one.at);
 }
 
-/** When a record was last written, or the beginning of time if it will not say. */
+/** A record that will not say dates from the beginning of time. */
 function savedAt(storage: ReviewMemoryStorage, key: string): number {
   const value = parseJson(attempt(() => storage.getItem(key)) ?? undefined);
   return isRecord(value) ? (asNumber(value.at) ?? 0) : 0;
 }
 
 /**
- * A stored record read back. Every field checked, not trusted: the store is
- * origin-wide, and a page that throws on load beats losing to an empty queue.
+ * Every field checked, not trusted: the store is origin-wide, and a page that
+ * throws on load beats losing to an empty queue.
  */
 function parseMemory(text: string | undefined): ReviewMemory | undefined {
   const value = parseJson(text);
@@ -266,9 +240,8 @@ function restoredPrompt(value: unknown): FeedbackPrompt | undefined {
 }
 
 /**
- * One pill: the prompt as judged, plus its round stamp. The stamp rides
- * outside the server's parser (which strips unknown fields); a corrupt stamp
- * drops alone — no stamp honestly claims no round.
+ * The stamp rides outside the server's parser (which strips unknown fields);
+ * a corrupt stamp drops alone — no stamp honestly claims no round.
  */
 function restoredPill(value: unknown): QueuedPill | undefined {
   const prompt = restoredPrompt(value);
@@ -277,7 +250,6 @@ function restoredPill(value: unknown): QueuedPill | undefined {
   return round === undefined ? prompt : { ...prompt, round };
 }
 
-/** The same prompt with nothing left saying where in the file it pointed. */
 function withoutAnchor(value: unknown): unknown {
   if (!isRecord(value)) return value;
   return Object.fromEntries(

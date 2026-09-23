@@ -1,13 +1,10 @@
 /**
- * The one press on the intent block: the heading that opens what the change is
- * for, and shuts it again. Its own module because `#lsr-intent` stands outside
- * the diff root, so the diff's click handler — which answers every other fold
- * on the page — never sees a press on it.
- *
- * Delegated from the section rather than bound to the button: a round that
- * states a new reason rewrites everything inside the section, and a listener on
- * the button would go with the markup it was bound to. One listener, for the
- * life of the page.
+ * Its own module because `#lsr-intent` stands outside the diff root, so the
+ * diff's click handler — which answers every other fold on the page — never
+ * sees a press on it. Delegated from the section rather than bound to the
+ * button: a round that states a new reason rewrites everything inside the
+ * section, and a listener on the button would go with the markup it was bound
+ * to.
  */
 export function wireIntent(root: HTMLElement): void {
   root.addEventListener("click", (event) => {

@@ -24,11 +24,9 @@ export function parseAskArgs(args: string[]): VerbArgs {
 }
 
 /**
- * Ask and listen in one line. The question goes into the conversation as a card
- * with its own answer box, the turn goes back to the reviewer so they can use
- * it, and the command blocks on the same wait every delivery comes through —
- * which is the point: an agent should be able to ask something before it starts
- * editing, without inventing a protocol for the answer.
+ * Blocks on the same wait every delivery comes through: an agent should be able
+ * to ask something before it starts editing, without inventing a protocol for
+ * the answer.
  */
 export async function runAsk(input: AskInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);

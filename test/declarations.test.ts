@@ -188,10 +188,8 @@ test("unknowable history accepts the declaration instead of guessing it wrong", 
 });
 
 /**
- * B4: the way out this named was `--note`, a flag that does not exist, so the
- * agent's next line was refused for a second time — `unknown flag --note`, exit
- * 2 — by text the CLI wrote itself. The reason states the fact and leaves the
- * commands to the `help[]` that carries this problem out.
+ * Regression: the reason named `--note`, a flag that does not exist. It states
+ * the fact and leaves the commands to the `help[]` that carries this problem out.
  */
 test("declaring files before the next round says what is wrong, in facts", () => {
   const session = reviewed();
@@ -261,7 +259,6 @@ test("withDeclarations stores by comment id and redeclaring replaces wholesale",
   assert.deepEqual(first.declarations, {
     evt_a: { note: "one", files: ["a.ts"], at: "2025-01-02T01:00:00.000Z" },
   });
-  // The old note does not linger under the new files: absence must stay absence.
   assert.deepEqual(second.declarations, {
     evt_a: { files: ["b.ts"], at: "2025-01-02T02:00:00.000Z" },
   });

@@ -16,7 +16,6 @@ function file(path: string): DiffFile {
   };
 }
 
-/** A round of `paths`, cut into one group per name given. */
 function session(round: number, groups: Record<string, string[]>): SessionData {
   return {
     intents: [],
@@ -39,7 +38,6 @@ function session(round: number, groups: Record<string, string[]>): SessionData {
   };
 }
 
-/** The button as the shell renders it: in the header, empty and hidden. */
 function mount(): { root: FakeNode; taken: SessionData[] } {
   const root = new FakeNode("button", 'id="lsr-round-offer" hidden');
   const taken: SessionData[] = [];

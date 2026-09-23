@@ -150,9 +150,8 @@ test("the model's rationale rides its group all the way out", async () => {
 });
 
 test("a model still writing the retired `watch` sentence is neither sent back nor believed", async () => {
-  // The field is gone from the contract; a model answering off a cached prefix
-  // or a copied example may still write it. Not worth a repair round, and not
-  // carried into the review either: nothing there would show it.
+  // A model answering off a cached prefix or a copied example may still write the retired
+  // field: not worth a repair round, and nothing in the review would show it.
   const stale = replyGrouping(eightFiles).replace(
     '"rationale":"main change"',
     '"rationale":"main change","watch":"the risky part"',
@@ -166,11 +165,7 @@ test("a model still writing the retired `watch` sentence is neither sent back no
   assert.ok(!("watch" in result.groups[0]!));
 });
 
-/**
- * One chapter of bulk and one of code, tiered as the model saw them, with the
- * bulk in front: where the model puts a swept chapter is the model's business,
- * and where it ends up is the pipeline's.
- */
+/** Bulk first on purpose: where a swept chapter ends up is the pipeline's call, not the model's. */
 function replyTiered(sweep: string[], study: string[]): string {
   return JSON.stringify({
     groups: [
@@ -186,7 +181,6 @@ test("a swept chapter of nothing but bulk reaches the reviewer swept, and last",
 
   const result = await groupDiff({ files, config: config(), intents: [], models });
 
-  // The reply opened on the bulk; the review opens on the change to read.
   assert.deepEqual(
     result.groups.map((group) => [group.name, group.tier]),
     [
@@ -197,9 +191,8 @@ test("a swept chapter of nothing but bulk reaches the reviewer swept, and last",
 });
 
 test("a chapter the model swept over a file worth judging is raised by the code", async () => {
-  // The one direction the pipeline moves a tier in: a chapter carrying a file no
-  // rule calls bulk is read, whatever the reply said. Raised before anything is
-  // ordered, so the chapter keeps the place the model gave it — only bulk sinks.
+  // The one direction a tier moves: a file no rule calls bulk makes its chapter read. Raised
+  // before ordering, so the chapter keeps the place the model gave it — only bulk sinks.
   const files = [diffFile("src/a.ts"), diffFile("README.md"), diffFile("src/auth.ts")];
   const { models } = modelsReplying([replyTiered(["README.md", "src/auth.ts"], ["src/a.ts"])]);
 
@@ -220,9 +213,8 @@ test("the tests chapter the code adds is tiered like every other chapter", async
 
   const result = await groupDiff({ files, config: config(), intents: [], models });
 
-  // Tests trail the chapters a reviewer ranks and the bulk trails them all: the
-  // checks are still read, so they cannot sit under a heading that says nothing
-  // here needs reading.
+  // Tests trail the ranked chapters and bulk trails them all: the checks are still read, so
+  // they cannot sit under a heading that says nothing here needs reading.
   assert.deepEqual(
     result.groups.map((group) => [group.name, group.tier]),
     [
@@ -284,7 +276,6 @@ test("a missing file is reported back to the model and repaired", async () => {
   assert.match(prompts[1] ?? "", /src\/file-7\.ts/);
 });
 
-/** The same two groups, with one rationale written at the reviewer instead of about the code. */
 function replyOrdering(files: DiffFile[]): string {
   return replyGrouping(files).replace(
     '"rationale":"main change"',
@@ -386,10 +377,8 @@ test("the fallback group lets its tests trail too", async () => {
 });
 
 /**
- * S3: `start` exits 0 on a model nobody has, so the whole of the product's
- * ordering is lost quietly — and the reason printed was the format rule, over a
- * reference whose format was right. What the agent needs is the name it got
- * wrong, what that cost, and the one edit that buys it back.
+ * `start` exits 0 on a model nobody has, so the ordering is lost quietly: the agent needs the
+ * name it got wrong, what that cost, and the one edit that buys it back.
  */
 test("a model no provider has is named, with what it cost and what fixes it", async () => {
   const { models } = modelsReplying([]);
@@ -414,8 +403,6 @@ test("a model no provider has is named, with what it cost and what fixes it", as
   );
 });
 
-/** Every other degradation still says what happened — and now says it without
- * dropping the message the detail was only ever context for. */
 test("a provider failure names the request that failed as well as why", async () => {
   const faux = fauxProvider();
   const models = createModels();
@@ -456,8 +443,8 @@ test("a provider failure degrades to the fallback group instead of blocking revi
 });
 
 /**
- * The model once got the ticks and sank what they marked, moving the review between rounds;
- * nothing about approval is sent now, so there is nothing to order on by accident.
+ * Regression: given the ticks, the model sank what they marked and the review moved between
+ * rounds; nothing about approval is sent, so there is nothing to order on by accident.
  */
 test("nothing the reviewer approved is sent to the model", async () => {
   const { models, prompts } = modelsReplying([replyGrouping(eightFiles)]);
@@ -520,10 +507,7 @@ test("a provider that was never configured fails the review instead of degrading
   );
 });
 
-/**
- * The reviewer meets this rationale on the ordinary one-file review, so it obeys the prompt's
- * rule: a statement about the change, not a question.
- */
+/** Seen on every one-file review, so it obeys the prompt's rule: a statement, not a question. */
 test("the All Changes rationale says what happened to the diff, and asks nothing", async () => {
   const result = await groupDiff({
     files: [diffFile("src/a.ts")],

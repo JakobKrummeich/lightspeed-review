@@ -61,7 +61,6 @@ function repoWithOneFileDiff(port: number): string {
   return repoRoot;
 }
 
-/** What the browser sends when the reviewer acts; shapes match `src/browser`. */
 function postJson(url: string, body: unknown): Promise<Response> {
   return fetch(url, {
     method: "POST",
@@ -89,7 +88,6 @@ async function shutdownServer(port: number): Promise<void> {
   await fetch(`http://127.0.0.1:${port}/api/shutdown`, { method: "POST" }).catch(() => undefined);
 }
 
-/** The session key and reviewer URL, read off `start`'s stdout like an agent would. */
 function parseStartStdout(stdout: string): { key: string; url: string } {
   const key = /^ {2}key: ([0-9a-f]{16})$/m.exec(stdout)?.[1];
   const url = /^ {2}url: "(http:\/\/127\.0\.0\.1:\d+\/session\/[0-9a-f]{16})"$/m.exec(stdout)?.[1];
@@ -117,7 +115,6 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-type") ?? "", /text\/html/);
 
-    // The reviewer ticks the file approved and sends one targeted comment.
     const origin = `http://127.0.0.1:${port}`;
     const approved = await postJson(`${origin}/api/session/${key}/approved`, {
       approved: ["app.ts"],
@@ -141,12 +138,10 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     const commentId = /evt_[a-z0-9]+_\d+/.exec(waited.stdout)?.[0];
     assert.ok(commentId, waited.stdout);
 
-    // Holding the turn, the agent may declare the silence it is about to keep.
     const working = await runCli(["work", "rename it to MAX_RETRIES", "feature", "main"], repoRoot);
     assert.equal(working.code, 0, working.stdout);
     assert.match(working.stdout, /^turn: "?agent working"?$/m);
 
-    // `say --for` pins the answer under the comment it answers and keeps the turn.
     const said = await runCli(
       ["say", "renamed it", "feature", "main", "--for", commentId],
       repoRoot,
@@ -155,8 +150,7 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     assert.match(said.stdout, /^turn: "?agent working"?$/m);
 
     // A second wait on a turn the agent is still working under would hand Send
-    // back mid-edit, so it is refused before it can park — in the agent's own
-    // error shape, exit 2, naming the two moves that give the turn up on purpose.
+    // back mid-edit, so it is refused before it can park.
     const waitedAgain = await runCli(["wait", "feature", "main"], repoRoot);
     assert.equal(waitedAgain.code, 2, waitedAgain.stdout);
     assert.match(waitedAgain.stdout, /^ {2}code: turn_still_yours$/m);
@@ -166,7 +160,6 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     assert.equal(ended.code, 0, ended.stdout);
     assert.match(ended.stdout, /^turn: ended$/m);
 
-    // An ended session answers a wait at once: who closed it, what approval evidence remains.
     const afterEnd = await runCli(["wait", "feature", "main"], repoRoot);
     assert.equal(afterEnd.code, 0, afterEnd.stdout);
     assert.match(afterEnd.stdout, /^ended: true$/m);
@@ -175,8 +168,8 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     // The earlier wait took the only comment, so this one has nothing — said, not left blank.
     assert.match(afterEnd.stdout, /^prompts: 0$/m);
     assert.match(afterEnd.stdout, /^message: no feedback was queued when this review ended$/m);
-    // A verdict and counts. The paths cost the agent context it did not ask for, so they
-    // wait behind the command the same payload points at.
+    // The paths cost the agent context it did not ask for, so they wait behind the
+    // command the same payload points at.
     assert.match(afterEnd.stdout, /^ {2}verdict: signed-off$/m);
     assert.match(afterEnd.stdout, /^ {2}approved: 1$/m);
     assert.match(afterEnd.stdout, /^ {2}swept: 0$/m);
@@ -189,7 +182,6 @@ test("the full loop: start, reviewer feedback over HTTP, wait, work, say, end, w
     // The lists that name nothing are not printed: their counts already say so.
     assert.doesNotMatch(named.stdout, /^unapproved/m);
     assert.doesNotMatch(named.stdout, /^swept/m);
-    // A one-file review is printed whole, so the counts beside it report no cut.
     assert.match(named.stdout, /^ {2}total: 1$/m);
     assert.doesNotMatch(named.stdout, /omitted/);
     assert.doesNotMatch(named.stdout, /--full/);
@@ -239,12 +231,10 @@ test("a reviewer's Send & End closes the review; only --reopen starts a new roun
     assert.match(illegal.stdout, /^ {2}code: session_ended$/m);
     assert.match(illegal.stdout, /--reopen/);
 
-    // The agent may not quietly open round two on a review the reviewer ended.
     const refused = await runCli(["start", "feature", "--intent", "again", "--no-open"], repoRoot);
     assert.equal(refused.code, 1);
     assert.match(refused.stdout, /^ {2}code: session_ended$/m);
 
-    // The reviewer asked for another round, so --reopen is allowed to give one.
     const reopened = await runCli(
       ["start", "feature", "--intent", "again", "--no-open", "--reopen"],
       repoRoot,

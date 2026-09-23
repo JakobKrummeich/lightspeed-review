@@ -3,23 +3,20 @@ import { helpReopen, startCall } from "./home.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /**
- * Which review a request is about, for the errors that name it. Both halves
- * come off the command line the caller already parsed: an error that makes the
- * agent retype what it just typed is an error that costs a turn.
+ * Both halves come off the command line the caller already parsed: an error
+ * that makes the agent retype what it just typed costs a turn.
  */
 export interface SessionRef {
-  /** Session key, named in the 404 message. */
   key: string;
   /** `<branch> <base>`, for the commands an error suggests running. */
   target?: string;
 }
 
-/** Talks to the review server for a command, mapping transport failures to codes
- * an agent can act on — no command interprets an HTTP status itself. */
+/** Maps transport failures to codes an agent can act on: no command interprets
+ * an HTTP status itself. */
 export async function apiRequest(
   url: string,
   init?: RequestInit,
-  /** The review this request is about, when it is about one. */
   about?: SessionRef,
 ): Promise<unknown> {
   let response: Response;
@@ -33,14 +30,10 @@ export async function apiRequest(
   return answer;
 }
 
-/** The review a suggested command should name: the branch pair the caller
- * already typed, or the form to type when a caller had none. */
 function target(about: SessionRef | undefined): string {
   return about?.target ?? "<branch> [base]";
 }
 
-/** Statuses about the review rather than HTTP. Reached through `parseBody`, so
- * every client names them the same. */
 function errorForStatus(status: number, about?: SessionRef): ReviewError | undefined {
   if (status === 404) {
     return new ReviewError({
@@ -56,8 +49,6 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
     return new ReviewError({
       code: "session_ended",
       message: "the reviewer ended this review; only they ask for a new round",
-      // The session this command named, not a template of it: the branch and the
-      // base were on the command line that got here.
       suggestions: [helpReopen(target(about))],
     });
   }
@@ -71,9 +62,9 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
   return undefined;
 }
 
-/** The payload, or the error the status and body add up to. Shared with the long
- * poll, which reads the same statuses off its own connection — the two clients
- * must not drift on what a 500 or a non-JSON body means. */
+/** Shared with the long poll, which reads the same statuses off its own
+ * connection: the two clients must not drift on what a 500 or a non-JSON body
+ * means. */
 export function parseBody(status: number, body: string, about?: SessionRef): unknown {
   const failure = errorForStatus(status, about);
   if (failure) return failure;
@@ -98,10 +89,9 @@ export function parseBody(status: number, body: string, about?: SessionRef): unk
   }
 }
 
-/** The rules the server states as 422s, relayed to the agent under their own
- * codes. Listed rather than accepted wholesale so the closed `ReviewErrorCode`
- * set stays true — and listed as a set rather than one hardcoded code, which is
- * how `turn_not_yours` first reached agents as `internal_error`: a bug in
+/** Listed rather than accepted wholesale so the closed `ReviewErrorCode` set
+ * stays true — and as a set rather than one hardcoded code, which is how
+ * `turn_not_yours` first reached agents as `internal_error`: a bug in
  * lightspeed, they read, instead of an illegal move they could fix. */
 const DOMAIN_ERROR_CODES = new Set<ReviewErrorCode>([
   "declaration_invalid",
@@ -113,10 +103,9 @@ function isDomainCode(code: unknown): code is ReviewErrorCode {
   return typeof code === "string" && DOMAIN_ERROR_CODES.has(code as ReviewErrorCode);
 }
 
-/** 422 is the server rejecting the request's content — a declaration that names no
- * comment, a `work` on a turn the agent does not hold — with a structured error
- * relayed as it stands. The server is the one place those rules are spelt. A 422
- * whose body is not that shape is a bug. */
+/** 422 is the server rejecting the request's content with a structured error,
+ * relayed as it stands: the server is the one place those rules are spelt. A
+ * 422 whose body is not that shape is a bug. */
 function domainError(body: string): ReviewError {
   const parsed = readErrorBody(body);
   const { code, message, detail } = parsed.error ?? {};
@@ -182,7 +171,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
 }
 
 /** `fetch` reports every transport failure as "fetch failed"; the real cause is on
- * `cause`. A bare "fetch failed" once cost an hour, so the cause travels with it. */
+ * `cause`, and a bare "fetch failed" once cost an hour. */
 function failureDetail(error: unknown): string {
   const message = (error as Error).message;
   const cause = (error as { cause?: { code?: string; message?: string } }).cause;
@@ -197,10 +186,10 @@ function portOf(url: string): number {
 
 const RETRY_DELAY_MS = 50;
 
-/** One retry for a read whose connection failed. Undici already retries a pooled
- * socket closed under it; this is insurance beyond that, never shown to save a
- * specific failure. Only reads retry: a dropped POST may have landed, and a
- * duplicated reply is worse than an error the agent can act on. */
+/** Undici already retries a pooled socket closed under it; this is insurance
+ * beyond that, never shown to save a specific failure. Only reads retry: a
+ * dropped POST may have landed, and a duplicated reply is worse than an error
+ * the agent can act on. */
 async function sendOnce(url: string, init: RequestInit | undefined): Promise<Response> {
   try {
     return await fetch(url, init);

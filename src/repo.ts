@@ -3,11 +3,6 @@ import { basename } from "node:path";
 import { ReviewError } from "./errors.ts";
 import type { RepoRef } from "./ledger/records.ts";
 
-/**
- * How a repository is identified inside the global feedback ledger. The remote
- * is best effort: a repo without one, or a directory git refuses to answer for,
- * still has a usable name, and no ledger write may fail over it.
- */
 export function repoRef(repoRoot: string): RepoRef {
   return {
     root: repoRoot,
@@ -16,6 +11,10 @@ export function repoRef(repoRoot: string): RepoRef {
   };
 }
 
+/**
+ * Best effort: a repo without a remote, or a directory git refuses to answer
+ * for, still has a usable name, and no ledger write may fail over it.
+ */
 function readRemote(repoRoot: string): string | undefined {
   try {
     return execFileSync("git", ["remote", "get-url", "origin"], {
@@ -36,9 +35,8 @@ function normaliseRemote(url: string | undefined): string | null {
 }
 
 /**
- * The repository a command applies to, or undefined when there is none. Only
- * the ledger reader uses this: everything else needs a repository, and saying
- * so with `git_repo_not_found` is more useful than carrying an absent one.
+ * Only the ledger reader uses this: everything else needs a repository, and
+ * saying so with `git_repo_not_found` is more useful than carrying an absent one.
  */
 export function repoRootOrNone(cwd: string): string | undefined {
   try {
@@ -49,9 +47,8 @@ export function repoRootOrNone(cwd: string): string | undefined {
 }
 
 /**
- * The repository a command applies to. Sessions are keyed by repo root, so
- * this has to be the same string every command computes — `git` decides it,
- * not the caller's cwd.
+ * Sessions are keyed by repo root, so this has to be the same string every
+ * command computes — `git` decides it, not the caller's cwd.
  */
 export function findRepoRoot(cwd: string): string {
   try {

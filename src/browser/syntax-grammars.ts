@@ -39,9 +39,9 @@ export const GRAMMAR_LOADERS: Record<string, () => Promise<GrammarModule>> = {
 };
 
 /**
- * Grammars highlight.js hands parts of a file to. Its JavaScript and TypeScript
- * grammars mark JSX up with the `xml` grammar, so without this a `.tsx` file's
- * tags come out as plain text between the code around them.
+ * highlight.js's JavaScript and TypeScript grammars mark JSX up with the
+ * `xml` grammar, so without this a `.tsx` file's tags come out as plain text
+ * between the code around them.
  */
 const GRAMMAR_DEPENDENCIES: Record<string, string[]> = {
   javascript: ["xml"],
@@ -52,10 +52,8 @@ let core: Promise<HLJSApi> | undefined;
 const registered = new Map<string, Promise<void>>();
 
 /**
- * The shared highlighter with the requested grammars registered, or undefined
- * when none of them is known — a review of files highlight.js has no grammar
- * for should not download highlight.js at all.
- *
+ * Undefined when none of the languages is known — a review of files
+ * highlight.js has no grammar for should not download highlight.js at all.
  * Both the engine and each grammar are fetched once per page and cached as
  * promises, so concurrent callers share one request.
  */

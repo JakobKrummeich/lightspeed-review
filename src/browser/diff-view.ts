@@ -1,5 +1,6 @@
 import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { escapeHtml } from "../escape-html.ts";
+import { relocationOf, unchangedRelocationOf, type Relocation } from "../file-relocation.ts";
 import { reviewPaths } from "../review-files.ts";
 import type { Approval } from "../rounds/history.ts";
 import {
@@ -14,39 +15,33 @@ import type { DiffRenderer } from "./diff-renderer.ts";
 import { clampFocus, renderChapterGate, renderFocusBar } from "./focus-mode.ts";
 import { approvedLabel, renderGroupIndex } from "./group-index.ts";
 import { LOGIC_BADGE_LABEL, heaviestFiles } from "./hunk-complexity.ts";
+import { pathLabel } from "./path-label.ts";
 
-/** Where each path of this round stands; a path the server did not name is unapproved. */
 export type ApprovalMap = Record<string, Approval>;
 
-/** Everything a draw of the review is made of: the diff, and what is known about it. */
 export interface ReviewRender {
   groups: DiffGroup[];
   approved: string[];
   renderer: DiffRenderer;
   approval: ApprovalMap;
-  /** Paths the reviewer annotated in the round before this one. */
+  /** Annotated by the reviewer in the round before this one. */
   commented: ReadonlySet<string>;
-  /**
-   * Paths whose blobs prove an edit between the last two rounds — the files
-   * that offer the `Since last round` switch. Derived in the browser
-   * (`round-changes.ts`) from the rounds the payload already carries.
-   */
+  /** Edited between the last two rounds, per `round-changes.ts`: these offer the `Since last round` switch. */
   sinceLastRound: ReadonlySet<string>;
   /**
-   * The one chapter to render, or undefined for the overview. Focus mode
-   * leaves every other chapter out of the markup entirely — not hidden,
-   * absent — which is what makes a big review fast to draw and to scroll.
+   * Undefined for the overview. Every other chapter is left out of the markup
+   * entirely — not hidden, absent — which is what makes a big review fast to
+   * draw and to scroll.
    */
   focus?: number | undefined;
 }
 
 /**
- * Renders the review as one HTML string. Pure on purpose: markup asserted
- * without a DOM. Two views: the overview is the chapter index with no diff at
- * all (diffs below the index once made the opening screen a wall), and
- * `renderFocused` is the only thing that draws a chapter. Files keep their
- * group's order regardless of approval: reordering ticked files at redraw once
- * made reviewers lose their place.
+ * Pure on purpose: markup asserted without a DOM. The overview is the chapter
+ * index with no diff at all (diffs below the index once made the opening
+ * screen a wall); `renderFocused` is the only thing that draws a chapter.
+ * Files keep their group's order regardless of approval: reordering ticked
+ * files at redraw once made reviewers lose their place.
  */
 export function renderGroups(review: ReviewRender): string {
   const { groups, approved } = review;
@@ -58,10 +53,6 @@ export function renderGroups(review: ReviewRender): string {
   return renderGroupIndex(groups, approved);
 }
 
-/**
- * One chapter, behind its gate: the intent card first, the diff a press away.
- * The bar above both is the way back.
- */
 function renderFocused(review: ReviewRender, focus: number): string {
   const group = review.groups[focus]!;
   return `${renderFocusBar(review.groups, focus)}\n${renderGroup(group, focus, review)}`;
@@ -77,9 +68,9 @@ export function counterLabel(group: DiffGroup, approved: string[]): string {
 }
 
 /**
- * Whole-review progress for the header. Says "files" (group counters do not)
- * because it stands next to the progress bar, whose widths are lines — without
- * the word they read as two answers to one question.
+ * Says "files" (group counters do not) because it stands next to the progress
+ * bar, whose widths are lines — without the word they read as two answers to
+ * one question.
  */
 export function overallCounterLabel(groups: DiffGroup[], approved: string[]): string {
   const paths = reviewPaths(groups);
@@ -89,9 +80,8 @@ export function overallCounterLabel(groups: DiffGroup[], approved: string[]): st
 }
 
 /**
- * Every file approved? Counted off the same paths as the header counter, so
- * sentence and number cannot disagree. No files means not approved, per
- * `groupApproved`'s reason.
+ * Counted off the same paths as the header counter, so sentence and number
+ * cannot disagree. No files means not approved, per `groupApproved`'s reason.
  */
 export function reviewApproved(groups: DiffGroup[], approved: string[]): boolean {
   const paths = reviewPaths(groups);
@@ -103,32 +93,28 @@ export function approvedCount(group: DiffGroup, approved: string[]): number {
 }
 
 /**
- * A group is approved exactly when every file in it is. Derived, never stored:
- * the server keeps a list of approved paths and nothing else, so a group's mark
- * cannot drift out of step with the ticks it is made of. A group with no files
- * in it is not approved — vacuous truth would tick a box for work nobody did.
+ * Derived, never stored: the server keeps a list of approved paths and nothing
+ * else, so a group's mark cannot drift out of step with the ticks it is made
+ * of. A group with no files in it is not approved — vacuous truth would tick a
+ * box for work nobody did.
  */
 export function groupApproved(group: DiffGroup, approved: string[]): boolean {
   return group.files.length > 0 && approvedCount(group, approved) === group.files.length;
 }
 
-/** A group that changed hands, and where it landed. */
 export interface GroupApprovalFlip {
-  /** Which group, as an index into the array the two lists were read against. */
   index: number;
   approved: boolean;
 }
 
-/** A file whose tick changed, and where it landed. */
 export interface FileApprovalFlip {
   path: string;
   approved: boolean;
 }
 
 /**
- * Which groups changed hands between two approved lists. Only flips are
- * reported (here and for files): what the reviewer opened by hand is theirs to
- * close, so a tick must move nothing it did not change.
+ * Only flips are reported (here and for files): what the reviewer opened by
+ * hand is theirs to close, so a tick must move nothing it did not change.
  */
 export function groupApprovalFlips(
   groups: DiffGroup[],
@@ -141,7 +127,6 @@ export function groupApprovalFlips(
   });
 }
 
-/** The same reading one level down: which files of these groups were just ticked. */
 export function fileApprovalFlips(
   groups: DiffGroup[],
   before: string[],
@@ -171,10 +156,10 @@ function union(approved: string[], paths: string[]): string[] {
 }
 
 /**
- * The chapter itself. Always drawn shut, whichever way it was entered: the
- * gate is the chapter's face until the reviewer presses through it, and a draw
- * that opened the diff by itself would put the lines back above the reason for
- * them. The mount re-opens what this reviewer already opened in this round.
+ * Always drawn shut, whichever way it was entered: the gate is the chapter's
+ * face until the reviewer presses through it, and a draw that opened the diff
+ * by itself would put the lines back above the reason for them. The mount
+ * re-opens what this reviewer already opened in this round.
  */
 function renderGroup(group: DiffGroup, index: number, review: ReviewRender): string {
   const { approved, renderer, approval, commented, sinceLastRound } = review;
@@ -223,11 +208,8 @@ interface FileRow {
   renderer: DiffRenderer;
   id: string;
   approval: Approval;
-  /** Carries the most added branching in its group. */
   densestLogic: boolean;
-  /** The reviewer's own feedback last round was about this file. */
   commented: boolean;
-  /** The agent provably edited this file between the last two rounds. */
   sinceLastRound: boolean;
 }
 
@@ -236,15 +218,17 @@ function renderFile(row: FileRow): string {
   const path = escapeHtml(file.path);
   const isApproved = approved.includes(file.path);
   const contentId = `lsr-file-content-${id}`;
-  // `data-group`: which concern an annotation was made under (task 8).
+  // `data-group`: which concern an annotation was made under.
   // `data-status`: which versions exist, so the page only asks git for those.
+  // Every identity (`data-file`, the tick, the label) is the new path alone; a
+  // relocated file's old path is words on the row, never a key.
   // Tick follows the diff (reading ends at the last line; a top tick means
   // scrolling back), and is a sibling of it so collapsing keeps it on screen.
   return `<div class="lsr-file" data-file="${path}" data-approval="${approval}"${formAttribute(file, approval, row.sinceLastRound)} data-status="${file.status}" data-group="${escapeHtml(groupName)}">
       <div class="lsr-row">
         <button type="button" class="lsr-file-header" aria-expanded="${!isApproved}" aria-controls="${contentId}">
-          <span class="lsr-file-path">${path}</span>
-          <span class="lsr-file-stats">+${file.insertions} −${file.deletions}</span>${renameBadge(file)}${logicBadge(row.densestLogic)}${commentedBadge(row.commented)}${approvalBadge(approval)}
+          <span class="lsr-file-path">${pathLabel(file)}</span>
+          <span class="lsr-file-stats">+${file.insertions} −${file.deletions}</span>${relocationBadge(file)}${logicBadge(row.densestLogic)}${commentedBadge(row.commented)}${approvalBadge(approval)}
         </button>${formSwitch(file, approval, row.sinceLastRound)}
       </div>
       <div class="lsr-file-diff" id="${contentId}"${isApproved ? " hidden" : ""}>${renderFileBody(file, renderer)}</div>
@@ -258,26 +242,28 @@ function renderFile(row: FileRow): string {
 }
 
 /**
- * Rename plus similarity, which the diff alone never says: `98% identical` is
- * the difference between skimming and re-reading 400 lines.
+ * Git's similarity, which the diff alone never says: `98% identical` is the
+ * difference between skimming and re-reading 400 lines. The old path is not
+ * repeated here: the row's path already reads `old → new`.
  */
-function renameBadge(file: DiffFile): string {
-  if (file.previousPath === undefined) return "";
-  const identical = file.similarity === undefined ? "" : `, ${file.similarity}% identical`;
-  return `<span class="lsr-file-rename">renamed from ${escapeHtml(file.previousPath)}${identical}</span>`;
+function relocationBadge(file: DiffFile): string {
+  const relocation = relocationOf(file);
+  if (relocation === undefined) return "";
+  return `<span class="lsr-file-rename">${relocation}${similarityNote(file)}</span>`;
 }
 
-/** Where the thinking is inside this group; see `hunk-complexity.ts` for what it counts. */
+function similarityNote(file: DiffFile): string {
+  if (unchangedRelocationOf(file) !== undefined) return ", identical";
+  if (file.similarity === undefined) return "";
+  return `, ${file.similarity}% identical`;
+}
+
 function logicBadge(densestLogic: boolean): string {
   if (!densestLogic) return "";
   return `<span class="lsr-file-logic">${LOGIC_BADGE_LABEL}</span>`;
 }
 
-/**
- * Marks files last round's feedback was about — the ones the reviewer comes
- * back to; the panel is the only other place that knows, far from the diff.
- * Label only, never a count.
- */
+/** The panel is the only other place that knows, far from the diff. Label only, never a count. */
 function commentedBadge(commented: boolean): string {
   if (!commented) return "";
   return `<span class="lsr-file-commented">commented last round</span>`;
@@ -303,7 +289,6 @@ function formAttribute(file: DiffFile, approval: Approval, sinceLastRound: boole
 }
 
 /**
- * Which switch this file offers; undefined for branch-diff-only files.
  * Withdrawn approval outranks the round comparison: the approved form already
  * covers everything since the tick, so one file never carries two comparisons.
  * The whole-file view joins last, except where no new side exists to show.
@@ -324,7 +309,6 @@ function switchOptions(
 }
 
 /**
- * Per-file switch between the branch diff and a file's other views.
  * Sibling of the header, not child: a button inside a button is neither valid
  * markup nor clickable. Branch diff starts pressed on every draw.
  */
@@ -344,12 +328,24 @@ function formSwitch(file: DiffFile, approval: Approval, sinceLastRound: boolean)
 }
 
 /**
- * One file's branch diff. Exported: the mount re-renders it when a file
- * switches back from the approved form.
+ * Exported: the mount re-renders it when a file switches back from the
+ * approved form. A relocation git found identical is a header-only patch,
+ * which diff2html draws as "File without changes" — true, and silent on the
+ * one thing there is to know, where it came from.
  */
 export function renderFileBody(file: DiffFile, renderer: DiffRenderer): string {
   if (file.status === "binary") {
     return `<p class="lsr-binary">Binary file — no diff to show.</p>`;
   }
-  return renderer.renderFile(file.diff);
+  const unchanged = unchangedRelocationOf(file);
+  const from = file.previousPath;
+  // Every relocation has a `from` (`relocationOf`), which the type cannot say;
+  // a record without one gets the renderer's own words rather than an empty name.
+  if (unchanged === undefined || from === undefined) return renderer.renderFile(file.diff);
+  return `<p class="lsr-unchanged">${UNCHANGED_RELOCATION[unchanged]} unchanged from <code>${escapeHtml(from)}</code>.</p>`;
 }
+
+const UNCHANGED_RELOCATION: Record<Relocation, string> = {
+  moved: "Moved",
+  renamed: "Renamed",
+};

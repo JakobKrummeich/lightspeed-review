@@ -21,9 +21,10 @@ with one sheet standing in the middle of it. There is no scrim and nothing
 shows through — until the last press the review is not on screen at all, so
 there is nothing to look at instead of the reason being read.
 
-- **The cover.** Where it came from, one loud line, and how much there is:
-  "from your agent" / "Something was built for you" / "Four reasons,
-  one at a time." One button opens the stack.
+- **The cover.** Where it came from and one loud line: "from your agent" /
+  "Something was built for you". One button opens the stack. It does not
+  count the reasons: the dots say how many, and a count was one more line to
+  read before the first reason could be.
 - **One sheet per intent.** In the order the intents were given, each carrying
   one intent and the button, and nothing else at all. The button moves to the
   next; on the last sheet it opens the review.
@@ -119,9 +120,7 @@ round has none of.
   the whole room, no DOM: the motes, every sheet, the dots and the layer the
   flood is painted on. Every sheet is in the markup from the start; peeling
   moves a `data-at` attribute (`gone` / `top` / `under`), so a press is one
-  attribute write and the animation is the stylesheet's business. `data-sheet`
-  says whether a sheet is the cover or a reason, which is how one body rule
-  speaks at two sizes.
+  attribute write and the animation is the stylesheet's business.
 - `mountOpening` in `src/browser/dom/opening-overlay.ts` — the mount, modelled
   on `mountReplayOverlay`: `Escape` closes, focus moves to the top sheet's
   button on every peel and is restored to the page on close. It also writes the
