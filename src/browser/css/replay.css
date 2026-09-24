@@ -35,16 +35,23 @@
   gap: var(--lsr-space-4);
 }
 
+/* One voice for the replay's labels, but not one colour: the quote's label is
+ * the reviewer's violet (below, with the quote), so the grey is set only on the
+ * two that are the page's own, and neither rule has to win over the other. */
 .lsr-replay-eyebrow,
 .lsr-replay-label,
 .lsr-replay-quote-label {
   margin: 0;
-  color: var(--lsr-muted);
   font-size: var(--lsr-size-label);
   line-height: var(--lsr-leading-tight);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 600;
+}
+
+.lsr-replay-eyebrow,
+.lsr-replay-label {
+  color: var(--lsr-muted);
 }
 
 .lsr-replay-progress {
@@ -101,15 +108,33 @@
   background: color-mix(in oklab, var(--lsr-pink) 12%, transparent);
 }
 
+/*
+ * The reviewer's own words, quoted back: a bubble in the violet their words
+ * wear everywhere else (the sidechat's reviewer card, the "commented last
+ * round" badge), under a "You said" label in that violet. Tint and label are
+ * what set it apart from the agent's answer below it on the bare card, so it
+ * wears no stripe down its edge: that said the same thing a third time and
+ * read as stock quote furniture. Rounded on every side, as the sidechat's
+ * bubbles are — a square edge was only ever there for the stripe.
+ *
+ * 16% rather than the 10% it had beside a stripe: at 10% the night bubble was
+ * a grey box with nothing violet about it. The label clears AA on it at
+ * 5.15:1 on paper and 5.62:1 at night; the muted grey the other replay labels
+ * wear was 4.18:1 and 4.04:1 on the old bubble and 3.80:1 and 3.54:1 on this
+ * one.
+ */
 .lsr-replay-quote {
   margin: 0;
   padding: var(--lsr-space-3) var(--lsr-space-4);
-  border-left: 3px solid color-mix(in oklab, var(--lsr-violet) 75%, var(--lsr-surface));
-  border-radius: 0 0.5rem 0.5rem 0;
-  background: color-mix(in oklab, var(--lsr-violet) 10%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--lsr-violet) 16%, transparent);
   display: flex;
   flex-direction: column;
   gap: var(--lsr-space-2);
+}
+
+.lsr-replay-quote-label {
+  color: var(--lsr-violet);
 }
 
 /* The quoted selection keeps its own line breaks and marker column; a long

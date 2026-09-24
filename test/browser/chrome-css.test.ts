@@ -483,17 +483,48 @@ test("each voice of the sidechat is one hue, worn on its label, with no stripe d
   );
 });
 
-test("nothing in the sidechat wears a stripe down its left edge", () => {
-  // Cards, pills, the agent's question and the agent's answer alike: each is told apart by its
-  // bubble and its label, never by a bar — drawn as a border, an inset shadow or a painted layer.
+test("nothing in the sidechat or the replay wears a stripe down its left edge", () => {
+  // Cards, pills, the agent's question and answer, and the replay's quote of the reviewer alike:
+  // each is told apart by its bubble and its label, never by a bar — drawn as a border, an inset
+  // shadow, a painted layer or a thin absolutely placed pseudo-element.
+  const length = String.raw`[\d.]+(?:px|r?em)`;
+  const bar = new RegExp(
+    [
+      "border-left",
+      "border-inline-start",
+      `border-width: 0 0 0 ${length}`,
+      `inset ${length} 0`,
+      `left / ${length}`,
+    ].join("|"),
+  );
+  const thin = new RegExp(`(?:^|[\\s;])width: (?:[1-6]px|0?\\.[0-3]\\d*r?em);`);
   const striped = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
-    .filter(
-      ([, list, body]) =>
-        /\.lsr-(entry|prompt|question|answer|pill)/.test(list ?? "") &&
-        /border-left|border-inline-start|inset \d+px 0|left \/ \d+px/.test(body ?? ""),
-    )
+    .filter(([, list = ""]) => /\.lsr-(entry|prompt|question|answer|pill|replay)/.test(list))
+    .filter(([, list = "", body = ""]) => {
+      const pseudo = /::(before|after)/.test(list) && /position: absolute;/.test(body);
+      return bar.test(body) || (pseudo && thin.test(body));
+    })
     .map(([, list]) => list?.trim());
   assert.deepEqual(striped, []);
+});
+
+test("the replay quotes the reviewer in a violet bubble under a violet label", () => {
+  // With the stripe gone, tint and label are the quote's voice. 16% violet, not the 10% it had
+  // beside a stripe, at which the night bubble was a grey box. The label in the violet itself
+  // clears AA on it: 5.15:1 on paper, 5.62:1 at night — where the muted grey of the other
+  // replay labels is 3.80:1 and 3.54:1.
+  const quote = rulesFor(".lsr-replay-quote").join("");
+  assert.match(quote, /background: color-mix\(in oklab, var\(--lsr-violet\) 16%, transparent\);/);
+  assert.match(quote, /border-radius: 0\.5rem;/, "the bubble is rounded on every side");
+  // Exactly one rule colours the label, whatever else its selector says, so the violet applies
+  // by being the only colour on offer rather than by winning on source order or specificity.
+  const colours = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(([, list]) =>
+      (list ?? "").split(",").some((one) => /\.lsr-replay-quote-label(?![\w-])(?!.*::)/.test(one)),
+    )
+    .flatMap(([, , body]) => [...(body ?? "").matchAll(/(?:^|[\s;])color: ([^;]+);/g)])
+    .map(([, value]) => value);
+  assert.deepEqual(colours, ["var(--lsr-violet)"], "the label's colour is contested or muted");
 });
 
 test("the reviewer's bubble is violet and the agent's is grey, on every round", () => {

@@ -465,20 +465,27 @@ at a time, before the new diff is read. Never shown together with §7.
 │   ┌ article.lsr-replay-card ───────────────────────────┐   │
 │   │ src/path/file.ts                     [addressed]   │   │ .lsr-replay-path + -chip
 │   │                                                    │   │  (addressed│unchanged│
-│   │ You said                                           │   │   repeated│unknown)
-│   │ │ quoted selected text                             │   │ .lsr-replay-quote
-│   │ comment text                                       │   │
-│   │                                                    │   │
-│   │ The agent's answer                                 │   │ .lsr-replay-answer
+│   │ ╭────────────────────────────────────────────────╮ │   │   repeated│unknown)
+│   │ │ YOU SAID                                       │ │   │ .lsr-replay-quote (violet
+│   │ │ quoted selected text                           │ │   │  bubble) + -quote-label
+│   │ │ comment text                                   │ │   │  (violet)
+│   │ ╰────────────────────────────────────────────────╯ │   │
+│   │ THE AGENT'S ANSWER                                 │   │ .lsr-replay-answer
 │   │ note text                                          │   │
 │   │                                                    │   │
-│   │ What changed                                       │   │ .lsr-replay-changes
+│   │ WHAT CHANGED                                       │   │ .lsr-replay-changes
 │   │ (per-file diff │ "no change" │ unrecorded note)    │   │
 │   └────────────────────────────────────────────────────┘   │
 │   [Previous]          ● ● ○ ○              [Next / Done]   │ .lsr-replay-nav + -dots
 │                   Skip to the diff                         │ .lsr-replay-skip
 └────────────────────────────────────────────────────────────┘
 ```
+
+The reviewer's quote is a bubble, not a ruled block: `--lsr-violet` at 16%,
+rounded on every side, under a "You said" label in the violet itself — the
+hue the reviewer's words wear in the sidechat and on the "commented last
+round" badge. No stripe down its edge: tint and label already set it apart
+from the agent's answer on the bare card below it.
 
 ## 10. Ended overlay — closing summary (status-banner.ts)
 
