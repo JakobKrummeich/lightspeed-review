@@ -14,14 +14,16 @@ the lines they care about and sends comments back to you, one round at a time.
 
 A review has exactly one turn holder. It is the reviewer's until your
 `wait` is handed their feedback; it is yours from that moment until you
-`ask`, `start` or `end`. While you hold it the reviewer's Send is
-disabled, so a round cannot change under you mid-edit; their queue and their
-End are never disabled, so they are never stuck behind you.
+`ask`, `start` or `end`. While you hold it the reviewer's Send only
+queues, so a round cannot change under you mid-edit; what they queue meanwhile,
+general and line comments alike, goes out in order with their next Send once
+the turn is theirs again. Their End is never disabled, so they are never stuck
+behind you.
 
 Do not `wait` twice on one turn. A `wait` that parks gives the turn
 back — it says you are listening, not editing — so once you have declared
 `work`, a second `wait` is refused with `turn_still_yours` and exit 2
-rather than unlocking Send while you are still editing. Give the turn up
+rather than handing the reviewer's Send back while you are still editing. Give the turn up
 deliberately instead: `start <branch> [base] --wait` to publish what you
 changed and block on the next round, or `ask` to hand it back with a
 question.

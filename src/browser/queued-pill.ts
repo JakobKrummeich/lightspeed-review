@@ -20,8 +20,14 @@ export function unstampedPill(pill: QueuedPill): FeedbackPrompt {
   return prompt;
 }
 
-/** An unstamped pill is never called stale: absence of a stamp is absence of a claim. */
+/**
+ * An unstamped pill is never called stale: absence of a stamp is absence of a
+ * claim. Nor is a general comment: the badge warns that lines may not line up,
+ * and a message has none — one queued through the agent's turn outliving the
+ * round it was typed in is the ordinary case, not a hazard.
+ */
 export function stalePillRound(pill: QueuedPill, current: number): number | undefined {
+  if (pill.type === "message") return undefined;
   if (pill.round === undefined || pill.round === current) return undefined;
   return pill.round;
 }

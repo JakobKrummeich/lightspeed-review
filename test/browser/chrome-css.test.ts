@@ -251,6 +251,23 @@ test("the chapter's rationale is set to be read, not to be skipped past", () => 
     /\.lsr-gate-(rationale|name)[^{]*\{[^}]*color: var\(--lsr-muted\)/,
     "nothing else may mute it either",
   );
+  // Not muting it is not enough: set in body weight and body ink, the one
+  // sentence the reviewer must read before pressing through was the one skimmed.
+  assert.match(sentence, /color: var\(--lsr-strong\);/);
+  assert.match(sentence, /font-weight: 500;/);
+  assert.match(sentence, /border-left: 3px solid var\(--lsr-accent\);/);
+  // The bar's 3px come back off the padding, so the words share the files
+  // summary's edge below them rather than sitting a pixel short of it.
+  assert.match(sentence, /padding-left: calc\(var\(--lsr-space-4\) - 3px\);/);
+  assert.match(
+    rulesFor(".lsr-gate-files-summary").join(""),
+    /padding: 0 0 0 var\(--lsr-space-4\);/,
+  );
+  // Set in the name's weight, name and sentence read as one heading.
+  const name = rulesFor(".lsr-gate-name").join("");
+  const weight = (body: string) => /font-weight: (\d+);/.exec(body)?.[1];
+  assert.doesNotMatch(sentence, /font-weight: 600;/);
+  assert.notEqual(weight(sentence), weight(name), "the sentence reads as part of the heading");
   // And the card goes away the moment the diff is up: the room is the diff's.
   assert.match(
     rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="true"]) .lsr-gate').join(""),
@@ -538,7 +555,7 @@ test("the header's bar gives its room back before the exact count does", () => {
   assert.match(bar, /min-width: 8rem;/);
   assert.match(bar, /flex: 1 1 auto;/);
   // The bar takes the row's slack and gives it back first; fixed at content size it would starve
-  // the presence sentence.
+  // the presence label.
   assert.match(rulesFor(".lsr-progress").join(""), /flex: 1 1 12rem;/);
   assert.match(bare, /@media \(max-width: 746px\)\s*\{\s*\.lsr-progress-bar\s*\{\s*display: none;/);
   assert.match(rulesFor(".lsr-progress-count").join(""), /flex: 0 0 auto;/);
@@ -867,4 +884,12 @@ test("the round's announcement holds still too: no fold flight, no orbiting spar
   assert.match(quiet, /#lsr-round-popup\[data-state="folding"\] \{\s*display: none;/);
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\] \{\s*animation: none;/);
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\]::after \{\s*display: none;/);
+});
+
+test("the header sets the reviewer's move apart from the agent's by weight, not by hue", () => {
+  // Both keep the accent the conversation's working line wears — an agent is live either way.
+  // Only one asks something of the reviewer, and the turn wins over waiting, so the rule names both.
+  const theirs = rulesFor('.lsr-presence[data-turn="reviewer"][data-waiting="true"]').join("");
+  assert.match(theirs, /font-weight: 600;/);
+  assert.doesNotMatch(rulesFor('.lsr-presence[data-turn="agent"]').join(""), /font-weight/);
 });

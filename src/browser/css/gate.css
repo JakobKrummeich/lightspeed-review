@@ -90,10 +90,25 @@
   color: var(--lsr-strong);
 }
 
+/*
+ * The chapter's subtitle, and the one sentence the card exists to have read
+ * before the press: set in body weight and body ink it was the line skimmed on
+ * the way to the button. Strong ink, a half-step of weight, and the agent's
+ * speaker bar from the conversation (`conversation.css`): the rationale is the
+ * model's sentence, so it wears the agent's voice. Not 600: that is the name's
+ * weight, and the two would read as one heading. No tint behind it: a filled
+ * band is how `--lsr-selected` says "in use". The bar is inside the box, so
+ * its width comes back off the padding, which keeps the words on the same edge
+ * as the files summary's below.
+ */
 .lsr-gate-rationale {
   margin: 0;
+  padding-left: calc(var(--lsr-space-4) - 3px);
+  border-left: 3px solid var(--lsr-accent);
+  color: var(--lsr-strong);
   font-size: var(--lsr-size-lead);
   line-height: var(--lsr-leading);
+  font-weight: 500;
 }
 
 /*

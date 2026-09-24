@@ -482,8 +482,10 @@ whether anything reads them or not, so a `wait` killed mid-delivery looks
 exactly like one that read every word. The batch is held on the session until
 the confirmation lands, and the next `wait` is handed it again.
 
-While the agent holds it the reviewer's **Send** is disabled, so a round cannot
-change under an agent mid-edit. Their queue, their typing and their **End** are
+While the agent holds it the reviewer's **Send** reads **Queue** and nothing is
+sent, so a round cannot change under an agent mid-edit: general comments join
+the line comments in the queue, as many as they like, and all of it goes out in
+order on their next Send, whose label counts what is waiting. Their queue, their typing and their **End** are
 never disabled, so they are never stuck behind an agent that walked away. There
 is no timer and no override: an agent that died holding the turn is restarted in
 the terminal it came from.

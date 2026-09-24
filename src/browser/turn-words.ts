@@ -1,5 +1,5 @@
 /**
- * The header banner and the foot of the conversation both say this, and two
+ * The header's tooltip and the foot of the conversation both say this, and two
  * copies would drift — which a reviewer reads as two different things happening.
  */
 import type { AgentTurn } from "../session-store.ts";

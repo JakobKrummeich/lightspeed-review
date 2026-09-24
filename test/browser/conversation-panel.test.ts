@@ -4,6 +4,7 @@ import {
   renderCompose,
   renderPanel,
   renderScroll,
+  QUEUE_LABEL,
   SEND_LABEL,
   type PanelState,
 } from "../../src/browser/conversation-panel.ts";
@@ -204,6 +205,77 @@ test("the label in the compose markup is the constant the panel patches back", (
   const html = renderCompose({ status: "open", allApproved: false, turn: REVIEWERS_TURN });
 
   assert.match(html, new RegExp(`id="lsr-send"[^>]*>${SEND_LABEL}<`));
+});
+
+test("on the agent's turn the primary button queues, and says so", () => {
+  const html = renderCompose({ status: "open", allApproved: false, turn: AGENTS_TURN });
+
+  // Queue always: the press parks the comment in the tray instead of being taken away.
+  assert.match(html, new RegExp(`id="lsr-send"[^>]*>${QUEUE_LABEL}<`));
+  assert.doesNotMatch(html, /id="lsr-send"[^>]*disabled/);
+  assert.match(html, /placeholder="General comment — Enter queues…"/);
+});
+
+test("on the reviewer's turn the primary button sends, and Enter says it sends", () => {
+  const html = renderCompose({ status: "open", allApproved: false, turn: REVIEWERS_TURN });
+
+  assert.match(html, new RegExp(`id="lsr-send"[^>]*>${SEND_LABEL}<`));
+  assert.match(html, /placeholder="General comment — Enter sends…"/);
+});
+
+test("an ended review offers no queue, whoever held the turn when it ended", () => {
+  const html = renderCompose({ status: "ended", allApproved: false, turn: AGENTS_TURN });
+
+  assert.match(html, new RegExp(`id="lsr-send"[^>]*disabled[^>]*>${SEND_LABEL}<`));
+});
+
+test("a queued general comment is a pill in the tray, like a queued annotation", () => {
+  const html = renderScroll(
+    panelState({
+      pending: [annotation, { type: "message", comment: "and the migration is missing" }],
+      turn: AGENTS_TURN,
+    }),
+  );
+
+  assert.equal(html.match(/class="lsr-pill"/g)?.length, 2);
+  assert.match(html, /and the migration is missing/);
+  assert.match(html, /class="lsr-pill-remove" data-index="1"/);
+});
+
+test("on the reviewer's turn the button counts the queue it is about to send", () => {
+  const turn = { status: "open", allApproved: false, turn: REVIEWERS_TURN } as const;
+
+  // Nothing else says the tray is still waiting once the turn comes back.
+  assert.match(renderCompose(turn, 3), /id="lsr-send"[^>]*>Send 3 to Agent</);
+  assert.match(renderCompose(turn, 0), new RegExp(`id="lsr-send"[^>]*>${SEND_LABEL}<`));
+  assert.match(renderPanel(panelState({ pending: [annotation] })), />Send 1 to Agent</);
+});
+
+test("the count is the reviewer's to send, so the agent's turn and an ended review show none", () => {
+  assert.match(
+    renderCompose({ status: "open", allApproved: false, turn: AGENTS_TURN }, 3),
+    new RegExp(`id="lsr-send"[^>]*>${QUEUE_LABEL}<`),
+  );
+  assert.match(
+    renderCompose({ status: "ended", allApproved: false, turn: REVIEWERS_TURN }, 3),
+    new RegExp(`id="lsr-send"[^>]*>${SEND_LABEL}<`),
+  );
+});
+
+test("the compose row carries a polite, hidden region for what a Queue press did", () => {
+  const html = renderCompose({ status: "open", allApproved: false, turn: AGENTS_TURN });
+
+  assert.match(html, /<p id="lsr-queue-status" class="lsr-visually-hidden" role="status"><\/p>/);
+});
+
+test("an empty tray on the agent's turn points at the box as well as the diff", () => {
+  const agents = renderScroll(panelState({ turn: AGENTS_TURN }));
+  const reviewers = renderScroll(panelState());
+
+  assert.match(agents, /Nothing queued — select diff text, or type below, to add feedback\./);
+  // On the reviewer's turn the box sends rather than queues: pointing at it
+  // from the queue would promise a pill that never appears.
+  assert.match(reviewers, /Nothing queued — select diff text to add feedback\./);
 });
 
 test("an approved review says so above the button that finishes it", () => {

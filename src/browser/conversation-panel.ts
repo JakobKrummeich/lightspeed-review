@@ -40,18 +40,57 @@ const APPROVED_EVERYTHING = "Every file is approved — Send & End when you are 
  * "Sending…" or promising to send a queue it is about to drop.
  */
 export const SEND_LABEL = "Send to Agent";
+export const QUEUE_LABEL = "Queue";
 export const SENDING_LABEL = "Sending…";
 export const SEND_END_LABEL = "Send & End";
 export const END_ONLY_LABEL = "End without Sending";
 export const ANSWER_LABEL = "Answer";
 
 /**
- * The one gate in the page, and it gates one control: an ended review is
- * locked by its own status, and everything else is locked only while the
- * agent holds the turn.
+ * Whether words may reach the agent now. It takes no button away: the primary
+ * button queues instead while it holds on an open review (`queuesInstead`),
+ * and the question card's Answer is refused. An ended review is locked by its
+ * own status, and everything else only while the agent holds the turn.
  */
 export function sendIsLocked(state: ComposeState): boolean {
   return state.status === "ended" || state.turn.holder === "agent";
+}
+
+/**
+ * Queue always: on the agent's turn the primary button is not taken away but
+ * turned into the tray's own verb, so a general comment can wait out the turn
+ * beside the line comments instead of being held in the box, one at a time.
+ * An ended review queues nothing — there is no next send to queue for.
+ */
+export function queuesInstead(state: ComposeState): boolean {
+  return sendIsLocked(state) && state.status !== "ended";
+}
+
+/**
+ * "No agent is waiting" still reads `Send to Agent`: that press goes to the
+ * server, into the conversation, and out of the reviewer's hands — the agent's
+ * next `wait` is handed it. `Queue` promises a pill the reviewer can still take
+ * back, and only the agent's turn keeps that promise.
+ *
+ * On the reviewer's turn the label counts the tray: pills queued through the
+ * agent's turn do not go out by themselves, and once the turn is back nothing
+ * else on the page says they are still waiting on a press.
+ */
+export function sendLabel(state: ComposeState, queued = 0): string {
+  if (queuesInstead(state)) return QUEUE_LABEL;
+  return queued > 0 && state.status !== "ended" ? `Send ${queued} to Agent` : SEND_LABEL;
+}
+
+/** Said into the compose row's hidden region: a Queue press empties the box and
+ * adds a pill somewhere a reader following the box never looks. */
+export function queuedAnnouncement(queued: number): string {
+  return `Queued — ${queued} waiting for your next Send`;
+}
+
+export function composePlaceholder(state: ComposeState): string {
+  return queuesInstead(state)
+    ? "General comment — Enter queues…"
+    : "General comment — Enter sends…";
 }
 
 /**
@@ -60,7 +99,7 @@ export function sendIsLocked(state: ComposeState): boolean {
  */
 export function renderPanel(state: PanelState): string {
   return `<div class="lsr-panel-scroll">${renderScroll(state)}</div>
-<section class="lsr-compose">${renderCompose(state)}</section>`;
+<section class="lsr-compose">${renderCompose(state, state.pending.length)}</section>`;
 }
 
 /**
@@ -74,9 +113,19 @@ export function renderScroll(state: PanelState): string {
   ${renderConversation(state)}${renderTurnLine(state)}
   </section>
   <section class="lsr-queue">
-  ${state.pending.length === 0 ? `<p class="lsr-empty">Nothing queued — select diff text to add feedback.</p>` : state.pending.map((pill, index) => renderPill(pill, index, current)).join("\n  ")}
+  ${state.pending.length === 0 ? `<p class="lsr-empty">${emptyTray(state)}</p>` : state.pending.map((pill, index) => renderPill(pill, index, current)).join("\n  ")}
   </section>
 `;
+}
+
+/**
+ * Only the agent's turn points at the box: on the reviewer's own the box sends,
+ * and pointing at it from the tray would promise a pill that never appears.
+ */
+function emptyTray(state: PanelState): string {
+  return queuesInstead(state)
+    ? "Nothing queued — select diff text, or type below, to add feedback."
+    : "Nothing queued — select diff text to add feedback.";
 }
 
 export function composeNote(state: ComposeState): string {
@@ -85,20 +134,21 @@ export function composeNote(state: ComposeState): string {
 
 /**
  * Ending is never gated — not by the turn, not by anything but the review
- * already being over — so only Send carries the turn's lock, and the end
- * button says what it will do instead of being taken away. The `role="status"`
- * region is always in the markup, only filled/emptied: a region added on
- * demand is announced by no screen reader reliably.
+ * already being over — and neither is the primary button, which queues on the
+ * agent's turn; both say what they will do instead of being taken away. Both
+ * `role="status"` regions are always in the markup, only filled/emptied: a
+ * region added on demand is announced by no screen reader reliably.
  */
-export function renderCompose(state: ComposeState): string {
+export function renderCompose(state: ComposeState, queued = 0): string {
   const ended = state.status === "ended";
   return `
   <p class="lsr-complete" role="status">${escapeHtml(composeNote(state))}</p>
-  <textarea id="lsr-general-comment" placeholder="General comment — Enter sends…"${ended ? " disabled" : ""}></textarea>
+  <textarea id="lsr-general-comment" placeholder="${escapeHtml(composePlaceholder(state))}"${ended ? " disabled" : ""}></textarea>
   <div class="lsr-compose-actions">
-    <button type="button" id="lsr-send" class="lsr-primary"${sendIsLocked(state) ? " disabled" : ""}>${SEND_LABEL}</button>
+    <button type="button" id="lsr-send" class="lsr-primary"${ended ? " disabled" : ""}>${escapeHtml(sendLabel(state, queued))}</button>
     <button type="button" id="lsr-send-end" class="lsr-secondary"${ended ? " disabled" : ""}>${escapeHtml(endLabel(state))}</button>
   </div>
+  <p id="lsr-queue-status" class="lsr-visually-hidden" role="status"></p>
   ${ended ? `<p class="lsr-ended">This review has ended.</p>` : ""}
 `;
 }

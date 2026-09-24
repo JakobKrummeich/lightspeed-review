@@ -48,7 +48,7 @@ One baseline-aligned flex row:
 │ [Unified│Side-by-side] [scheme]  (Replay last round) (Round 2 is ready   │
 │  #lsr-view-switch  #lsr-scheme-switch  #lsr-replay-reopen   · 5 files)   │
 │                                              #lsr-round-offer            │
-│ status line · presence sentence                     #lsr-status-banner   │
+│ status line · presence label                        #lsr-status-banner   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,6 +62,12 @@ One baseline-aligned flex row:
   last ones on the bar because they are the last entries in the array
   (`trailSweeps`, `src/group-tier.ts`), which is what makes the bar, the survey
   and "Chapter n of m" name one order; the bar itself sorts nothing.
+- Presence label `.lsr-presence`: a short fixed label — "Agent is working"
+  (agent's turn, reading or working), "Waiting for your feedback" (an
+  agent is parked on `wait`; set in 600 weight, as the one state that asks
+  for the reviewer), "No agent is waiting". The full sentence (the declared plan, the send-anyway advice) is
+  its `title`, a hover-only convenience; the plan is written out at the foot of the conversation (§5,
+  `.lsr-working` line), so the header does not repeat it.
 - `#lsr-replay-reopen` and `#lsr-round-offer` are hidden until relevant.
 - Round-offer states: plain → **glow** (`lsr-offer-glow`, after the round
   popup folds into it) → **beckon** (orbiting spark via `::after` +
@@ -146,7 +152,7 @@ diff rendered but shut behind one press.
 │ ‹ All chapters                    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar
 │   ┌─ section.lsr-group (shut: 84ch, centred, lifted) ────┐        │
 │   │ Chapter name                                         │        │ .lsr-gate-name (title)
-│   │ What happened, one sentence.                         │        │ .lsr-gate-rationale (lead)
+│   │ ┃ What happened, one sentence.                       │        │ .lsr-gate-rationale (lead, strong, 500, accent bar)
 │   │ ▸ 2 files · +16 −3                                   │        │ details.lsr-gate-files / -summary (shut)
 │   │   src/path/file.ts              +12 −3               │        │ .lsr-gate-files-list / -file, once opened
 │   │   src/old/a.ts → src/new/a.ts   moved · +4 −0        │        │ .lsr-gate-path / -lines
@@ -198,6 +204,14 @@ held is the diff's:
   diff, they never do. A sweep chapter's card says why its tick is the press
   to make, under a `.lsr-gate-tier` label in the survey lane's words: there is
   nothing in it to decide.
+- The rationale is the chapter's subtitle and the one sentence the card is
+  there to have read before the press, so `.lsr-gate-rationale` is marked, not
+  merely unmuted: `--lsr-strong` ink, weight 500 — a half-step under the
+  name's 600, so the two never read as one heading — and a 3px
+  `--lsr-accent` bar down its left edge, the agent's speaker bar from the
+  conversation, since the sentence is the model's. The bar's width comes back
+  off the padding (`calc(var(--lsr-space-4) - 3px)`), so its words share the
+  files summary's edge below.
 - The file list is folded behind one line — `<details class="lsr-gate-files">`,
   its `.lsr-gate-files-summary` reading `2 files · +16 −3` in the survey's own
   words — because the count and the size are what a card is read for at a
@@ -271,8 +285,10 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ └────────────────────────────────────┘ │ │
 │ │ agent                                  │ │
 │ │   reply text                           │ │
-│ │ ●●● the agent is working on your       │ │ .lsr-working (animated dots;
-│ │     feedback                           │ │  gone once review ends)
+│ │ ●●● the agent is implementing your     │ │ .lsr-working (animated dots;
+│ │     feedback                           │ │  gone once review ends; or
+│ │                                        │ │  "the agent has your feedback",
+│ │                                        │ │  "implementing: <plan>")
 │ │                                        │ │
 │ │ ┌ section.lsr-queue ─────────────────┐ │ │
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │
@@ -280,21 +296,36 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ │ │ │ selection                  │   │ │ │ .lsr-pill-remove
 │ │ │ │ comment                      │   │ │ │
 │ │ │ └──────────────────────────────┘   │ │ │
-│ │ │ or: "Nothing queued — select diff  │ │ │ .lsr-empty
-│ │ │      text to add feedback."        │ │ │
+│ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │ general comment queued on
+│ │ │ │ general comment text     [×] │   │ │ │  the agent's turn (no badge)
+│ │ │ └──────────────────────────────┘   │ │ │
+│ │ │ or: "Nothing queued — select diff  │ │ │ .lsr-empty (agent's turn adds
+│ │ │      text to add feedback."        │ │ │  ", or type below,": only then
+│ │ │                                    │ │ │  does the box queue)
 │ │ └────────────────────────────────────┘ │ │
 │ └────────────────────────────────────────┘ │
 │ ┌ section.lsr-compose (pinned) ──────────┐ │
 │ │ Every file is approved — Send & End    │ │ .lsr-complete (conditional)
 │ │ when you are ready.                    │ │
 │ │ [General comment — Enter sends…      ] │ │ #lsr-general-comment
-│ │ [Send to Agent]         [Send & End]   │ │ #lsr-send (.lsr-primary)
+│ │ [Send to Agent]         [Send & End]   │ │ #lsr-send (.lsr-primary;
+│ │  or on the agent's turn:               │ │  "Queue" on the agent's turn)
+│ │ [Queue]         [End without Sending]  │ │
 │ └────────────────────────────────────────┘ │ #lsr-send-end (.lsr-secondary)
 └────────────────────────────────────────────┘
 ```
 
-States: sending — primary reads "Sending…", all compose controls disabled;
-ended — "This review has ended.", textarea disabled. The rail auto-reopens a
+States: agent's turn — primary reads "Queue" and stays live, placeholder
+"General comment — Enter queues…": a press (or Enter) turns the box into a
+message pill in `section.lsr-queue`, beside the annotation pills, removable by
+its own ×, and the box empties for the next one; the end button reads "End
+without Sending"; each press focuses the box again and says "Queued — N
+waiting for your next Send" in a visually-hidden `role="status"`
+(`#lsr-queue-status`, `.lsr-visually-hidden`). Reviewer's turn (an agent
+waiting or not) — "Send to Agent", or "Send N to Agent" while N pills wait,
+sends every pill in queue order plus the box. Sending — primary reads
+"Sending…", all compose controls disabled; ended — "This review has ended.",
+textarea and primary disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.
 
 Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's

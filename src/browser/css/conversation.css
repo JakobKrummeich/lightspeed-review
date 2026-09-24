@@ -365,6 +365,17 @@
   color: var(--lsr-accent);
 }
 
+/*
+ * Weight, not a second hue: both states keep the accent the conversation's
+ * working line wears, because a live agent is involved either way — but only
+ * this one asks something of the reviewer. Named with the turn because the
+ * turn wins over waiting: a parked second agent under "Agent is working" is
+ * no call to act.
+ */
+.lsr-presence[data-turn="reviewer"][data-waiting="true"] {
+  font-weight: 600;
+}
+
 .lsr-ended-overlay {
   position: fixed;
   inset: 0;

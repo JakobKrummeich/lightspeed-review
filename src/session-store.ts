@@ -17,7 +17,7 @@ export type ReviewCloser = "reviewer" | "agent";
 
 /**
  * Persisted rather than held in memory because a `serve` restart that silently
- * handed Send back would let the reviewer fire at an agent that is still
+ * handed sending back would let the reviewer fire at an agent that is still
  * editing. A union on `holder` so the fields that only mean something on one
  * side cannot be read on the other.
  */

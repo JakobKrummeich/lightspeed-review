@@ -196,7 +196,7 @@ body {
 }
 
 /*
- * The header is one row at every width: the presence sentence is the only part
+ * The header is one row at every width: the presence label is the only part
  * that can be cut and still read, so the branch, the count and the switches
  * keep their line. The bar is the distance and the count is the exact answer,
  * and neither is dropped: the mind does not turn `12/40` into how much is left.
@@ -220,7 +220,7 @@ body {
 /*
  * One segment per group, each as wide as the lines its group changed, by
  * `flex-grow` from the markup. The floor: below eight characters' worth it is
- * no longer a distance anybody can read, and the presence sentence beside it
+ * no longer a distance anybody can read, and the presence label beside it
  * is the part of the row built to be cut short instead. Narrower than the
  * floor fits, the bar is not drawn at all — the 746px query in `code.css`
  * measures where that is.
@@ -359,4 +359,20 @@ body {
    * review can never be scrolled up to where it is comfortable to read.
    */
   padding: var(--lsr-space-6) var(--lsr-space-4) var(--lsr-space-12);
+}
+
+/*
+ * Page-wide, for words only a screen reader needs — a live region announcing
+ * something the eye already sees happen. Clipped rather than `display: none`
+ * or `hidden`, which take the text out of the accessibility tree as well.
+ */
+.lsr-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
