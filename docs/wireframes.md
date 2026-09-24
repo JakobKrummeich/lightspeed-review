@@ -152,8 +152,7 @@ diff rendered but shut behind one press.
 │ ‹ All chapters                    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar
 │   ┌─ section.lsr-group (shut: 84ch, centred, lifted) ────┐        │
 │   │ Chapter name                                         │        │ .lsr-gate-name (title)
-│   │ ┃ IN SHORT                                           │        │ .lsr-gate-rationale::before (accent eyebrow)
-│   │ ┃ What happened, one sentence.                       │        │ .lsr-gate-rationale (lead, strong, 500, lit callout)
+│   │ What happened, one sentence.                         │        │ .lsr-gate-rationale (lead, --lsr-lead-ink, 500)
 │   │ ▸ 2 files · +16 −3                                   │        │ details.lsr-gate-files / -summary (shut)
 │   │   src/path/file.ts              +12 −3               │        │ .lsr-gate-files-list / -file, once opened
 │   │   src/old/a.ts → src/new/a.ts   moved · +4 −0        │        │ .lsr-gate-path / -lines
@@ -207,23 +206,17 @@ held is the diff's:
   nothing in it to decide.
 - The rationale is the chapter's subtitle — one sentence saying what the
   chapter's change does — and the one sentence the card is there to have read
-  before the press, so `.lsr-gate-rationale` is the card's callout, not merely
-  unmuted type: `--lsr-strong` ink at weight 500 — a half-step under the
-  name's 600, so the two never read as one heading — in a panel stretched
-  across the card. A 3px `--lsr-accent` spine down its left side, fading down
-  its length, lights an accent wash that falls off across the panel to a faint
-  tint, and an accent hairline rings it, so the panel reads as one shape; night
-  takes a larger share of the accent than paper. Graded on purpose: a flat
-  accent tint is `--lsr-selected`'s "in use", and this is no picked option.
-  The panel is square on the spine's side and rounded on the far one, since a
-  radius clipped the spine's ends. Above the sentence a `::before` eyebrow —
-  `IN SHORT`, the house eyebrow in the accent taken 30% toward the ink so it
-  clears AA on the wash — names the kind of sentence without claiming it is a
-  reason; its alt text is empty, so a screen reader hears the sentence
-  straight after the heading. Spine and wash are background layers, not a
-  border, so the words start `--lsr-space-4` in, on the files summary's edge
-  below, and the summary's arrow sits under the spine. Under forced colours
-  the wash goes and the spine comes back as a `CanvasText` border.
+  before the press, so `.lsr-gate-rationale` is set apart by its ink alone:
+  `--lsr-lead-ink`, the accent's hue at another lightness — navy below the
+  accent on paper, periwinkle above it at night — so it is neither the body's
+  grey, nor the name's near-black, nor the blue of the counter and the press
+  that a reviewer clicks. Weight 500, a half-step under the name's 600, so the
+  two never read as one heading; no underline, so it reads as a voice, not a
+  link. No stripe, no label and no box: those read as stock callout dressing.
+  It starts flush with the name and the files summary below. On an approved
+  card, which recedes to .55, it takes the strong ink back so it stays as
+  legible as the name. Under forced colours the ink goes and the sentence is
+  plain text under its heading.
 - The file list is folded behind one line — `<details class="lsr-gate-files">`,
   its `.lsr-gate-files-summary` reading `2 files · +16 −3` in the survey's own
   words — because the count and the size are what a card is read for at a

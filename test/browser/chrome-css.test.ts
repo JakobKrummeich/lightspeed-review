@@ -253,7 +253,8 @@ test("the chapter's rationale is set to be read, not to be skipped past", () => 
   );
   // Not muting it is not enough: set in body weight and body ink, the one
   // sentence the reviewer must read before pressing through was the one skimmed.
-  assert.match(sentence, /color: var\(--lsr-strong\);/);
+  // Its ink is its own (figures below), never the body's.
+  assert.doesNotMatch(sentence, /color: var\(--lsr-text\);/);
   // Heavier than body text, lighter than the name: in the name's weight, name
   // and sentence read as one heading.
   const name = rulesFor(".lsr-gate-name").join("");
@@ -267,92 +268,63 @@ test("the chapter's rationale is set to be read, not to be skipped past", () => 
   );
 });
 
-/** The accent's share in each scheme of a `light-dark()` pair of accent washes. */
-function accentShares(body: string, property: string): number[] {
-  const value = new RegExp(`${property}: ([^;]+);`).exec(body)?.[1] ?? "";
-  return [...value.matchAll(/var\(--lsr-accent\) (\d+)%/g)].map(([, share]) => Number(share));
-}
+test("the chapter's rationale is marked by its ink alone: no stripe, no label, no box", () => {
+  // A bar down its edge, an "In short" eyebrow over it and a tinted box round it
+  // all read as stock callout dressing: the sentence is set apart by colour.
+  const sentence = rulesFor(".lsr-gate-rationale").join("");
+  assert.doesNotMatch(sentence, /border|box-shadow|background|padding|border-radius/);
+  assert.equal(rulesFor(".lsr-gate-rationale::before").length, 0, "the sentence wears a label");
+  assert.doesNotMatch(css, /In short|--lsr-rationale-/);
 
-/** The left padding, from the longhand if there is one, else the shorthand's fourth side. */
-function paddingLeft(body: string): string | undefined {
-  const longhand = /padding-left: ([^;]+);/.exec(body)?.[1];
-  if (longhand !== undefined) return longhand;
-  const shorthand = /padding: ([^;]+);/.exec(body)?.[1] ?? "";
-  // One side per match, a function call and its nested calls kept whole.
-  const sides = shorthand.match(/[^\s(]+(?:\((?:[^()]|\([^()]*\))*\))?/g) ?? [];
-  return sides[3] ?? sides[1] ?? sides[0];
-}
-
-test("the chapter's rationale is the card's callout, lit and never read as selected", () => {
-  // Unmuted type behind a bar was a stock quote block the eye passed over: the
-  // sentence is a panel across the card, lit from an accent spine by a wash.
-  const forcedRule = /@media \(forced-colors: active\)\s*\{\s*\.lsr-gate-rationale\s*\{([^}]*)\}/;
-  const forced = forcedRule.exec(bare)?.[1] ?? "";
-  const panel = rulesFor(".lsr-gate-rationale")
-    .filter((body) => body !== forced)
-    .join("");
-  assert.match(panel, /align-self: stretch;/, "the panel stops short of the card's edge");
-  assert.match(panel, /linear-gradient\(var\(--lsr-accent\),[^;]*left \/ 3px 100% no-repeat/);
-
-  // Graded from the spine, never a flat band: a flat accent tint is how
-  // `--lsr-selected` says "in use", and this sentence is not a picked option.
-  assert.match(
-    panel,
-    /linear-gradient\(\d+deg, var\(--lsr-rationale-lit\), var\(--lsr-rationale-rest\) \d+%\)/,
-  );
-  assert.doesNotMatch(panel, /--lsr-selected/);
-  const lit = accentShares(panel, "--lsr-rationale-lit");
-  const rest = accentShares(panel, "--lsr-rationale-rest");
-  assert.equal(lit.length, 2, "the lit end is not set for both schemes");
-  assert.equal(rest.length, 2, "the far end is not set for both schemes");
-  for (const scheme of [0, 1]) {
-    // Falling to a faint tint, not to nothing, so the panel's far side exists.
-    assert.ok((lit[scheme] ?? 0) > (rest[scheme] ?? 0), "the wash does not fall off");
-    assert.ok((rest[scheme] ?? 0) > 0, "the wash fades to nothing and the panel loses its shape");
-  }
-  assert.ok((lit[1] ?? 0) > (lit[0] ?? 0), "the brighter night cobalt needs the larger share");
-  assert.match(panel, /box-shadow: inset 0 0 0 1px color-mix\(in oklab, var\(--lsr-accent\)/);
-
-  // Square on the spine's side: a radius there clipped its ends into slivers.
-  assert.match(panel, /border-radius: 0 \S+ \S+ 0;/);
-
-  // The spine is painted, not a border, so nothing comes off the padding: the
-  // words start one step in, on the files summary's edge below.
-  assert.doesNotMatch(panel, /border-left/);
-  assert.equal(paddingLeft(panel), "var(--lsr-space-4)");
-  assert.equal(paddingLeft(rulesFor(".lsr-gate-files-summary").join("")), "var(--lsr-space-4)");
-
-  // Forced colours drop the wash: the spine comes back as a border in the
-  // system's text colour, its width taken back off the padding.
-  assert.match(forced, /border-left: 3px solid CanvasText;/);
-  assert.match(forced, /background: none;/);
-  assert.equal(paddingLeft(forced), "calc(var(--lsr-space-4) - 3px)");
+  // With no box to inset it, the sentence starts where the name does and where
+  // the files summary below does: its arrow sits at the line's own left edge.
+  assert.match(rulesFor(".lsr-gate-files-summary::before").join(""), /left: 0;/);
 });
 
-test("the rationale's label is the house eyebrow, clears AA on the wash and is not read out", () => {
-  const eyebrow = rulesFor(".lsr-gate-rationale::before").join("");
-  const house = rulesFor(".lsr-closing-eyebrow").join("") + rulesFor(".lsr-closing-label").join("");
-  for (const property of ["font-size", "font-weight", "text-transform", "letter-spacing"]) {
-    const value = (body: string) => new RegExp(`${property}: ([^;]+);`).exec(body)?.[1];
-    assert.equal(value(eyebrow), value(house), `the eyebrow's ${property} is its own`);
+test("the rationale's ink is its own, clears AA on the card and never passes for a press", () => {
+  // `--lsr-lead-ink` keeps the accent's hue at another lightness. Paper: oklch
+  // 0.40/0.11, under the accent's 0.55/0.17 that the counter and the press wear,
+  // over the body's 0.32 and the name's 0.21 at chroma ~0.01. Night: 0.84/0.09,
+  // over the accent's 0.72/0.12, beside the body's 0.87 and under the name's
+  // 0.945, both at chroma ~0.01. A mix of accent and strong ink cannot reach it
+  // at night: at a share light enough to clear the accent (45%, L 0.84) its
+  // chroma is 0.057 and it reads as the body's grey.
+  //
+  // Measured at 19px weight 500, which is not large text, so 4.5:1 is the bar:
+  // 8.92:1 on the card on paper, 9.65:1 at night.
+  const tokens = rulesFor(":root").join("");
+  assert.match(
+    tokens,
+    /--lsr-lead-ink: light-dark\(oklch\(0\.4 0\.11 262\), oklch\(0\.84 0\.09 262\)\);/,
+    "re-measure the ink",
+  );
+  const sentence = rulesFor(".lsr-gate-rationale").join("");
+  assert.match(sentence, /color: var\(--lsr-lead-ink\);/);
+  assert.match(
+    sentence,
+    /font-weight: 500;/,
+    "600 is the name's weight: the two read as one heading",
+  );
+  assert.doesNotMatch(sentence, /text-decoration/, "an underline would make the sentence a link");
+  for (const other of [".lsr-gate-name", ".lsr-gate-counter", ".lsr-gate-press"]) {
+    assert.equal(
+      rulesFor(other).some((body) => /--lsr-lead-ink/.test(body)),
+      false,
+      `${other} shares the sentence's ink`,
+    );
   }
 
-  // A name for the kind of sentence, not a "why": the rationale says what the
-  // change does, and an ungrouped review's fallback is no reason at all.
-  assert.match(eyebrow, /content: "In short" \/ "";/, "a screen reader reads the label out");
-
-  // Measured on the wash's lit end, where the label sits: the plain accent is
-  // 3.84:1 on paper (3.97:1 at night), short of AA for 13px type. Taken 30%
-  // toward the ink it is 5.88:1 on paper and 5.06:1 at night (6.83:1 and
-  // 7.03:1 on the far end). On an approved card at .55 it is 2.35:1 and
-  // 2.70:1, level with the receded card's own accent counter (2.21:1, 2.86:1),
-  // and hover restores it.
+  // An approved card recedes to .55, where the tinted ink fell to 2.35:1 on
+  // paper and 2.70:1 at night. There it takes the strong ink back: 3.95:1 and
+  // 5.09:1 on the receded card, what it held before it was tinted, level with
+  // the name above it. Hover restores the card, not the tint.
   assert.match(
-    eyebrow,
-    /color: color-mix\(in oklab, var\(--lsr-accent\) 70%, var\(--lsr-strong\)\);/,
+    rulesFor(".lsr-group:has(.lsr-tick-all:checked) .lsr-gate-rationale").join(""),
+    /color: var\(--lsr-strong\);/,
   );
-  const panel = rulesFor(".lsr-gate-rationale").join("");
-  assert.deepEqual(accentShares(panel, "--lsr-rationale-lit"), [16, 26], "re-measure the label");
+  // Forced colours take the ink: the sentence is left plain text under its
+  // heading, and nothing needs to be put back.
+  assert.doesNotMatch(bare, /@media \(forced-colors: active\)\s*\{\s*\.lsr-gate-rationale/);
 });
 
 test("every chapter's card offers the chapter's tick", () => {

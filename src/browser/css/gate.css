@@ -92,48 +92,25 @@
 
 /*
  * The chapter's subtitle: the one sentence the card exists to have read
- * before the press, saying what the chapter's change does. A bar and a
- * half-step of weight made it one more quoted paragraph, the stock treatment
- * an eye has learnt to pass, so it is set as the card's callout: a panel
- * across the card's full measure, lit from a cobalt spine down its left edge,
- * under a label that says what kind of sentence it is.
+ * before the press, saying what the chapter's change does. It is marked by
+ * its ink and nothing else: a bar down its edge, a label over it and a tinted
+ * box round it all read as stock callout dressing, the kind an eye has learnt
+ * to pass. `--lsr-lead-ink` is the accent's hue at another lightness — navy
+ * below the accent on paper, periwinkle above it at night — so the sentence is
+ * neither the body's grey nor the name's near-black, and never the same blue
+ * as the counter and the press under it, which are what a reviewer clicks.
+ * No underline, so a whole sentence of it reads as a voice, not a link.
+ * Figures in `chrome-css.test.ts`.
  *
- * The wash is a gradient on purpose. A flat tint is how `--lsr-selected` says
- * "in use", and this is not an option in a set: light falling off across the
- * panel from a lit spine reads as a spotlight, never as a picked state. It
- * falls to a faint tint rather than to nothing, and an accent hairline rings
- * the panel, so the far side and its corners exist and the panel reads as one
- * shape. Night gets a stronger wash: at paper's share the brighter night
- * cobalt barely lifts the graphite.
- *
- * The spine fades down its length so the eye lands at the top, on the label.
- * It is square-cornered where the panel's far side is rounded: a radius on
- * the spine's side clipped its ends into slivers. Spine and wash are
- * background layers rather than a border, so the words start `--lsr-space-4`
- * in, on the files summary's edge below — its arrow sits under the spine,
- * its words under these.
- *
+ * Flush with the name, and with the files summary's edge below.
  * Not 600: that is the name's weight, and the two would read as one heading.
+ * Forced colours take the ink and leave plain text under its heading, which
+ * is what the sentence is: nothing is put back, since emphasis is all that is
+ * lost.
  */
 .lsr-gate-rationale {
-  --lsr-rationale-lit: light-dark(
-    color-mix(in oklab, var(--lsr-accent) 16%, transparent),
-    color-mix(in oklab, var(--lsr-accent) 26%, transparent)
-  );
-  --lsr-rationale-rest: light-dark(
-    color-mix(in oklab, var(--lsr-accent) 5%, transparent),
-    color-mix(in oklab, var(--lsr-accent) 9%, transparent)
-  );
-  align-self: stretch;
   margin: 0;
-  padding: var(--lsr-space-3) var(--lsr-space-4) var(--lsr-space-4);
-  border-radius: 0 0.5rem 0.5rem 0;
-  background:
-    linear-gradient(var(--lsr-accent), color-mix(in oklab, var(--lsr-accent) 35%, transparent))
-      left / 3px 100% no-repeat,
-    linear-gradient(100deg, var(--lsr-rationale-lit), var(--lsr-rationale-rest) 60%);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lsr-accent) 16%, transparent);
-  color: var(--lsr-strong);
+  color: var(--lsr-lead-ink);
   font-size: var(--lsr-size-lead);
   line-height: var(--lsr-leading);
   font-weight: 500;
@@ -141,44 +118,13 @@
 }
 
 /*
- * Forced colours drop the wash and the hairline, which leaves the sentence
- * nothing to mark it: the spine comes back as a real border in the system's
- * text colour, its width taken back off the padding so the words stay put.
+ * An approved card recedes to .55, and the tinted ink went down with it to
+ * 2.35:1 on paper: there it takes the strong ink the card's name wears, which
+ * is what it held before it was tinted. The highlight is for the sentence
+ * still to be read, and an approved chapter's has been.
  */
-@media (forced-colors: active) {
-  .lsr-gate-rationale {
-    padding-left: calc(var(--lsr-space-4) - 3px);
-    border-left: 3px solid CanvasText;
-    background: none;
-  }
-}
-
-/*
- * The house eyebrow (`closing.css`, `done.css`, `replay.css`), in the accent
- * rather than the grey: a muted label here would say the panel is metadata.
- * The accent is taken toward the ink, because on the wash's lit end the
- * plain accent falls short of AA for small type in both schemes (figures in
- * `chrome-css.test.ts`). "In short" and not a "why": the sentence says what
- * the change does, and the fallback for an ungrouped review is not a reason
- * either (`UNGROUPED_RATIONALE`).
- *
- * Hidden from assistive tech by the alt text after the slash: to a screen
- * reader the sentence already follows the chapter's heading, and a label read
- * out before every chapter is noise. The plain declaration first is for a
- * browser without the alt syntax, which drops the second and shows the label
- * rather than nothing.
- */
-.lsr-gate-rationale::before {
-  content: "In short";
-  content: "In short" / "";
-  display: block;
-  margin-bottom: var(--lsr-space-1);
-  color: color-mix(in oklab, var(--lsr-accent) 70%, var(--lsr-strong));
-  font-size: var(--lsr-size-label);
-  line-height: var(--lsr-leading-tight);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.lsr-group:has(.lsr-tick-all:checked) .lsr-gate-rationale {
+  color: var(--lsr-strong);
 }
 
 /*

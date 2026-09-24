@@ -41,6 +41,14 @@
   --lsr-strong: light-dark(oklch(0.21 0.015 270), oklch(0.945 0.006 262));
   --lsr-muted: light-dark(oklch(0.54 0.015 270), oklch(0.65 0.012 262));
   --lsr-accent: light-dark(oklch(0.55 0.17 262), oklch(0.72 0.12 262));
+  /*
+   * Ink for the one sentence a screen is there to have read (the chapter's
+   * subtitle on its gate card): the accent's hue, but never its lightness, so
+   * it reads as a voice and not as one more press. A deep navy on paper, below
+   * the accent; a pale periwinkle at night, above it, where a mix of accent and
+   * strong ink tops out at too little chroma to read as blue at all.
+   */
+  --lsr-lead-ink: light-dark(oklch(0.4 0.11 262), oklch(0.84 0.09 262));
   /* Text and glyphs on accent-filled controls: near-white on the deep light
    * cobalt, deep night ink on the brighter dark one. */
   --lsr-on-accent: light-dark(oklch(0.98 0.005 262), oklch(0.2 0.03 262));
