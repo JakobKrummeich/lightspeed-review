@@ -6,6 +6,14 @@ import { renderIntent, showIntentFor } from "../intent-view.ts";
 import { mountRoundOffer } from "./round-offer-mount.ts";
 import { mountRoundPopup } from "./round-popup.ts";
 import { fetchSession, type SessionData } from "./session-api.ts";
+import {
+  createSyncAsks,
+  drawnAfterFeedback,
+  isNews,
+  nextReopenDelay,
+  REOPEN_MS,
+  type SyncCause,
+} from "./session-sync.ts";
 import type { MountedDiff } from "./diff-mount.ts";
 import type { MountedPanel } from "./panel-mount.ts";
 import type { MountedRail } from "./panel-rail.ts";
@@ -26,7 +34,11 @@ export interface RoundHosts {
 
 export interface LiveSession {
   round: number;
-  conversation: SessionData["conversation"];
+  /**
+   * The session as last drawn: the next arrival's talk is judged against it,
+   * and a reopened stream's answer is drawn only past it (`isNews`).
+   */
+  drawn: SessionData;
 }
 
 export interface Wired {
@@ -51,8 +63,7 @@ export interface TurnAware {
  * first may take the reviewer's place, and only with their say-so.
  */
 export function wireSessionEvents(wired: Wired): void {
-  const { page, live, panel, banner } = wired;
-  const events = new EventSource(`/api/session/${page.key}/events`);
+  const { page, live } = wired;
   // Two mouths, one message: the offer stands for the whole wait, the popup
   // announces its start. Taking from either clears both; dismissing the popup
   // sets the offer beckoning — the page's one remaining word must be findable.
@@ -71,33 +82,70 @@ export function wireSessionEvents(wired: Wired): void {
     },
     onDismissed: () => offer.beckon(),
   });
-  events.addEventListener("session", () => {
-    void fetchSession(page.key).then((fresh) => {
-      if (waits(wired, fresh)) {
-        // Asked at the moment, not remembered: the queue is whatever it is when
-        // the round lands, and both mouths must name the same number.
-        const queued = wired.place().queued;
-        offer.offer(fresh, queued);
-        popup.offer(fresh, queued);
-        return;
-      }
-      // Whatever was offered is on screen now, or older than what is.
-      offer.clear();
-      popup.clear();
-      applyRound(wired, fresh);
-    });
+  // A reopen's fetch and an event's fetch can answer out of order; `land`
+  // drops the one that would put older state back.
+  const asks = createSyncAsks();
+  const syncSession = (cause: SyncCause): void => {
+    const ask = asks.send(cause);
+    fetchSession(page.key)
+      .then((fresh) => {
+        const landed = asks.land(ask);
+        if (landed === undefined || !isNews(landed, fresh, live.drawn)) return;
+        if (waits(wired, fresh)) {
+          // Asked at the moment, not remembered: the queue is whatever it is when
+          // the round lands, and both mouths must name the same number.
+          const queued = wired.place().queued;
+          offer.offer(fresh, queued);
+          popup.offer(fresh, queued);
+          return;
+        }
+        // Whatever was offered is on screen now, or older than what is.
+        offer.clear();
+        popup.clear();
+        applyRound(wired, fresh);
+      })
+      .catch(() => console.error("lightspeed: the session could not be refreshed"));
+  };
+  openStream(wired, syncSession, { delay: REOPEN_MS });
+}
+
+/**
+ * One stream and its listeners. Called again only for a stream the browser
+ * closed for good; a dropped one the browser reopens by itself.
+ */
+function openStream(
+  wired: Wired,
+  syncSession: (cause: SyncCause) => void,
+  reopen: { delay: number },
+): void {
+  const { page, live, panel, banner } = wired;
+  const events = new EventSource(`/api/session/${page.key}/events`);
+  // The server keeps no backlog (streams.ts is an in-memory map): a `start`
+  // right after `stop` publishes its round before this tab has reconnected,
+  // and a round can land between the page's `/data` load and its first
+  // subscribe. So every open, the first included, asks for the session;
+  // `isNews` makes that free when nothing moved. The turn is not this
+  // path's business: the presence frame written on subscribe carries it,
+  // and `applyRound` never touches it.
+  events.addEventListener("open", () => {
+    reopen.delay = REOPEN_MS;
+    syncSession("opened");
   });
+  events.addEventListener("session", () => syncSession("announced"));
   // The reviewer's feedback as the server wrote it: replaces the sending
   // tab's echo and reaches every other tab. Deliberately touches nothing
   // else — diff, replay and place are about the round, which has not changed.
   events.addEventListener("feedback", () => {
-    void fetchSession(page.key).then((fresh) => {
-      panel.update(fresh);
-      banner.setSession(fresh);
-      // Kept level with the panel's copy: the next arrival is compared against
-      // this, and skipping it would judge fresh talk against older talk.
-      live.conversation = fresh.conversation;
-    });
+    fetchSession(page.key)
+      .then((fresh) => {
+        panel.update(fresh);
+        banner.setSession(fresh);
+        // Kept level with the panel's copy: the next arrival is compared against
+        // this, and skipping it would judge fresh talk against older talk. Only
+        // what the panel and banner show counts as drawn, never the round.
+        live.drawn = drawnAfterFeedback(live.drawn, fresh);
+      })
+      .catch(() => console.error("lightspeed: the conversation could not be refreshed"));
   });
   // Everything that speaks for the turn hears it at once: the finish card
   // promises to carry the queue only when the queue can still go anywhere.
@@ -106,6 +154,13 @@ export function wireSessionEvents(wired: Wired): void {
     banner.setPresence(presence);
     panel.setTurn(presence.turn);
     wired.finish.setTurn(presence.turn);
+  });
+  // A dropped stream reconnects by itself; a refused one never does. The
+  // wait doubles while the server keeps refusing, and resets on an open.
+  events.addEventListener("error", () => {
+    if (events.readyState !== EventSource.CLOSED) return;
+    setTimeout(() => openStream(wired, syncSession, reopen), reopen.delay);
+    reopen.delay = nextReopenDelay(reopen.delay);
   });
 }
 
@@ -137,8 +192,8 @@ function applyRound(wired: Wired, fresh: SessionData): void {
   // last send included.
   banner.setSession(fresh);
   // An answer the reviewer never sees costs more than the width.
-  if (agentSpokeAgain(live.conversation, fresh.conversation)) railControl.expand();
-  live.conversation = fresh.conversation;
+  if (agentSpokeAgain(live.drawn.conversation, fresh.conversation)) railControl.expand();
+  live.drawn = fresh;
 }
 
 /**

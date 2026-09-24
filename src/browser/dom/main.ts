@@ -159,7 +159,7 @@ function openedOn(
 ): { live: LiveSession; place: ReviewPlace | undefined; focus: number | undefined } {
   const live: LiveSession = {
     round: currentRound(session.rounds),
-    conversation: session.conversation,
+    drawn: session,
   };
   const place = reviewPlace(readMemory(localStorage, page.key), live.round);
   // Clamped to what the diff will draw: a chapter a shorter grouping lost

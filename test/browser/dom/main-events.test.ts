@@ -52,9 +52,10 @@ test("a presence frame reaches every place the page speaks for the turn", () => 
 test("a round that lands mid-read waits behind the offer instead of taking the page", () => {
   // Regression: a round landing mid-read threw the reviewer to the top of a re-cut diff.
   // `holdsRound` is tested where it lives; here only that the page asks at all.
-  const listener = /addEventListener\("session"[\s\S]*?\n {2}\}\);/.exec(page)?.[0] ?? "";
+  const listener = /const syncSession = [\s\S]*?\n {2}\};/.exec(page)?.[0] ?? "";
 
   assert.ok(listener, "expected the session listener to be found");
+  assert.match(page, /events\.addEventListener\("session", \(\) => syncSession\("announced"\)\)/);
   assert.ok(
     listener.indexOf("waits(") < listener.indexOf("applyRound("),
     "the question is asked before the round is applied, not after it",
