@@ -479,6 +479,35 @@ test("a question the agent asked is drawn as a card, not as one more remark", ()
   assert.match(html, /per-request or per-batch/);
 });
 
+/** "AGENT" stacked on "THE AGENT IS ASKING" read as one header said twice. */
+test("a card that opens with a question is headed by the question, not by the role too", () => {
+  const html = renderScroll(panelState({ conversation: asked() }));
+
+  assert.doesNotMatch(html, /lsr-entry-role/);
+  assert.match(
+    html,
+    /<article[^>]*data-role="agent">\s*<div class="lsr-prompt" data-kind="question">/,
+  );
+});
+
+test("a question after a remark keeps the card's role label over the remark", () => {
+  const html = renderScroll(
+    panelState({
+      conversation: [
+        {
+          role: "agent",
+          at: "2025-01-01T00:05:00.000Z",
+          roundIndex: 0,
+          prompts: [{ type: "message", comment: "done with the retry" }, question],
+        },
+      ],
+    }),
+  );
+
+  assert.match(html, /<header class="lsr-entry-role">agent<\/header>\s*<div class="lsr-prompt">/);
+  assert.match(html, /the agent is asking/);
+});
+
 test("the open question carries its own answer box and its own press", () => {
   const html = renderScroll(panelState({ conversation: asked() }));
 

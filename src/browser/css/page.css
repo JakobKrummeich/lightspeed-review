@@ -339,18 +339,10 @@ body {
 }
 
 .lsr-base,
-.lsr-status,
 .lsr-file-stats,
 .lsr-binary,
 .lsr-unchanged {
   color: var(--lsr-muted);
-}
-
-.lsr-status {
-  margin: 0;
-  font-size: var(--lsr-size-label);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .lsr-diff {

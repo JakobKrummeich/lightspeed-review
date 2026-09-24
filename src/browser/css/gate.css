@@ -91,24 +91,40 @@
 }
 
 /*
- * The chapter's subtitle, and the one sentence the card exists to have read
- * before the press: set in body weight and body ink it was the line skimmed on
- * the way to the button. Strong ink, a half-step of weight, and the agent's
- * speaker bar from the conversation (`conversation.css`): the rationale is the
- * model's sentence, so it wears the agent's voice. Not 600: that is the name's
- * weight, and the two would read as one heading. No tint behind it: a filled
- * band is how `--lsr-selected` says "in use". The bar is inside the box, so
- * its width comes back off the padding, which keeps the words on the same edge
- * as the files summary's below.
+ * The chapter's subtitle: the one sentence the card exists to have read
+ * before the press, saying what the chapter's change does. It is marked by
+ * its ink and nothing else: a bar down its edge, a label over it and a tinted
+ * box round it all read as stock callout dressing, the kind an eye has learnt
+ * to pass. `--lsr-lead-ink` is the accent's hue at another lightness — navy
+ * below the accent on paper, periwinkle above it at night — so the sentence is
+ * neither the body's grey nor the name's near-black, and never the same blue
+ * as the counter and the press under it, which are what a reviewer clicks.
+ * No underline, so a whole sentence of it reads as a voice, not a link.
+ * Figures in `chrome-css.test.ts`.
+ *
+ * Flush with the name, and with the files summary's edge below.
+ * Not 600: that is the name's weight, and the two would read as one heading.
+ * Forced colours take the ink and leave plain text under its heading, which
+ * is what the sentence is: nothing is put back, since emphasis is all that is
+ * lost.
  */
 .lsr-gate-rationale {
   margin: 0;
-  padding-left: calc(var(--lsr-space-4) - 3px);
-  border-left: 3px solid var(--lsr-accent);
-  color: var(--lsr-strong);
+  color: var(--lsr-lead-ink);
   font-size: var(--lsr-size-lead);
   line-height: var(--lsr-leading);
   font-weight: 500;
+  text-wrap: pretty;
+}
+
+/*
+ * An approved card recedes to .55, and the tinted ink went down with it to
+ * 2.35:1 on paper: there it takes the strong ink the card's name wears, which
+ * is what it held before it was tinted. The highlight is for the sentence
+ * still to be read, and an approved chapter's has been.
+ */
+.lsr-group:has(.lsr-tick-all:checked) .lsr-gate-rationale {
+  color: var(--lsr-strong);
 }
 
 /*

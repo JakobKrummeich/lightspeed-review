@@ -238,9 +238,19 @@ function renderEntry(
   context: EntryContext,
 ): string {
   return `<article class="lsr-entry" data-round-state="${roundState(segment)}" data-role="${entry.role}">
-    <header class="lsr-entry-role">${entry.role}</header>
-    ${entry.prompts.map((prompt) => renderPrompt(prompt, context)).join("\n    ")}
+    ${renderRoleLabel(entry)}${entry.prompts.map((prompt) => renderPrompt(prompt, context)).join("\n    ")}
   </article>`;
+}
+
+/**
+ * A card that opens with a question is headed by the question's own label,
+ * "the agent is asking", which already says who speaks: the role label over it
+ * stacked two headers of one voice, in one colour.
+ */
+function renderRoleLabel(entry: ConversationEntry): string {
+  const first = entry.prompts[0];
+  if (first !== undefined && isQuestion(first)) return "";
+  return `<header class="lsr-entry-role">${entry.role}</header>\n    `;
 }
 
 function renderPrompt(prompt: FeedbackPrompt, context: EntryContext): string {

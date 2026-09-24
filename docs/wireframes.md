@@ -48,7 +48,7 @@ One baseline-aligned flex row:
 │ [Unified│Side-by-side] [scheme]  (Replay last round) (Round 2 is ready   │
 │  #lsr-view-switch  #lsr-scheme-switch  #lsr-replay-reopen   · 5 files)   │
 │                                              #lsr-round-offer            │
-│ status line · presence label                        #lsr-status-banner   │
+│ presence label                                      #lsr-status-banner   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,6 +62,9 @@ One baseline-aligned flex row:
   last ones on the bar because they are the last entries in the array
   (`trailSweeps`, `src/group-tier.ts`), which is what makes the bar, the survey
   and "Chapter n of m" name one order; the bar itself sorts nothing.
+- No status word: the session's `open`/`feedback`/`ended` is the store's
+  state, not news to the reviewer, so `#lsr-status-banner` holds the presence
+  label alone (and, once ended, the closing overlay).
 - Presence label `.lsr-presence`: a short fixed label — "Agent is working"
   (agent's turn, reading or working), "Waiting for your feedback" (an
   agent is parked on `wait`; set in 600 weight, as the one state that asks
@@ -152,7 +155,7 @@ diff rendered but shut behind one press.
 │ ‹ All chapters                    Chapter 2 of 5  [Previous][Next]│ .lsr-focus-bar
 │   ┌─ section.lsr-group (shut: 84ch, centred, lifted) ────┐        │
 │   │ Chapter name                                         │        │ .lsr-gate-name (title)
-│   │ ┃ What happened, one sentence.                       │        │ .lsr-gate-rationale (lead, strong, 500, accent bar)
+│   │ What happened, one sentence.                         │        │ .lsr-gate-rationale (lead, --lsr-lead-ink, 500)
 │   │ ▸ 2 files · +16 −3                                   │        │ details.lsr-gate-files / -summary (shut)
 │   │   src/path/file.ts              +12 −3               │        │ .lsr-gate-files-list / -file, once opened
 │   │   src/old/a.ts → src/new/a.ts   moved · +4 −0        │        │ .lsr-gate-path / -lines
@@ -204,14 +207,19 @@ held is the diff's:
   diff, they never do. A sweep chapter's card says why its tick is the press
   to make, under a `.lsr-gate-tier` label in the survey lane's words: there is
   nothing in it to decide.
-- The rationale is the chapter's subtitle and the one sentence the card is
-  there to have read before the press, so `.lsr-gate-rationale` is marked, not
-  merely unmuted: `--lsr-strong` ink, weight 500 — a half-step under the
-  name's 600, so the two never read as one heading — and a 3px
-  `--lsr-accent` bar down its left edge, the agent's speaker bar from the
-  conversation, since the sentence is the model's. The bar's width comes back
-  off the padding (`calc(var(--lsr-space-4) - 3px)`), so its words share the
-  files summary's edge below.
+- The rationale is the chapter's subtitle — one sentence saying what the
+  chapter's change does — and the one sentence the card is there to have read
+  before the press, so `.lsr-gate-rationale` is set apart by its ink alone:
+  `--lsr-lead-ink`, the accent's hue at another lightness — navy below the
+  accent on paper, periwinkle above it at night — so it is neither the body's
+  grey, nor the name's near-black, nor the blue of the counter and the press
+  that a reviewer clicks. Weight 500, a half-step under the name's 600, so the
+  two never read as one heading; no underline, so it reads as a voice, not a
+  link. No stripe, no label and no box: those read as stock callout dressing.
+  It starts flush with the name and the files summary below. On an approved
+  card, which recedes to .55, it takes the strong ink back so it stays as
+  legible as the name. Under forced colours the ink goes and the sentence is
+  plain text under its heading.
 - The file list is folded behind one line — `<details class="lsr-gate-files">`,
   its `.lsr-gate-files-summary` reading `2 files · +16 −3` in the survey's own
   words — because the count and the size are what a card is read for at a
@@ -329,11 +337,16 @@ textarea and primary disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.
 
 Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's
-hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — as a
-3px left bar and the `.lsr-entry-role` label colour; the card itself is the
-voice's bubble on every round, as in a chat: the reviewer's is `--lsr-raised`
-tinted 30% violet, the agent's `--lsr-raised` stepped 11% toward the ink, no
-hue, and every label on either bubble is stepped toward the text to stay AA.
+hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — on
+the `.lsr-entry-role` label; the card itself is the voice's bubble on
+every round, as in a chat: the reviewer's is `--lsr-raised` tinted 30% violet,
+the agent's `--lsr-raised` stepped 11% toward the ink, no hue, and every label
+on either bubble is stepped toward the text to stay AA. No card, question or
+answer wears a stripe down its left edge: the bubble is the glance, the label
+the word. The agent's answer to one comment (`.lsr-prompt-answer`) sits in the
+reviewer's card as a small bubble in the agent's own grey. A card that opens
+with a question drops its role label: "the agent is asking" already says who
+speaks, and the two stacked read as one header said twice.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 
@@ -452,20 +465,27 @@ at a time, before the new diff is read. Never shown together with §7.
 │   ┌ article.lsr-replay-card ───────────────────────────┐   │
 │   │ src/path/file.ts                     [addressed]   │   │ .lsr-replay-path + -chip
 │   │                                                    │   │  (addressed│unchanged│
-│   │ You said                                           │   │   repeated│unknown)
-│   │ │ quoted selected text                             │   │ .lsr-replay-quote
-│   │ comment text                                       │   │
-│   │                                                    │   │
-│   │ The agent's answer                                 │   │ .lsr-replay-answer
+│   │ ╭────────────────────────────────────────────────╮ │   │   repeated│unknown)
+│   │ │ YOU SAID                                       │ │   │ .lsr-replay-quote (violet
+│   │ │ quoted selected text                           │ │   │  bubble) + -quote-label
+│   │ │ comment text                                   │ │   │  (violet)
+│   │ ╰────────────────────────────────────────────────╯ │   │
+│   │ THE AGENT'S ANSWER                                 │   │ .lsr-replay-answer
 │   │ note text                                          │   │
 │   │                                                    │   │
-│   │ What changed                                       │   │ .lsr-replay-changes
+│   │ WHAT CHANGED                                       │   │ .lsr-replay-changes
 │   │ (per-file diff │ "no change" │ unrecorded note)    │   │
 │   └────────────────────────────────────────────────────┘   │
 │   [Previous]          ● ● ○ ○              [Next / Done]   │ .lsr-replay-nav + -dots
 │                   Skip to the diff                         │ .lsr-replay-skip
 └────────────────────────────────────────────────────────────┘
 ```
+
+The reviewer's quote is a bubble, not a ruled block: `--lsr-violet` at 16%,
+rounded on every side, under a "You said" label in the violet itself — the
+hue the reviewer's words wear in the sidechat and on the "commented last
+round" badge. No stripe down its edge: tint and label already set it apart
+from the agent's answer on the bare card below it.
 
 ## 10. Ended overlay — closing summary (status-banner.ts)
 

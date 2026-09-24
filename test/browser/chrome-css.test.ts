@@ -253,26 +253,78 @@ test("the chapter's rationale is set to be read, not to be skipped past", () => 
   );
   // Not muting it is not enough: set in body weight and body ink, the one
   // sentence the reviewer must read before pressing through was the one skimmed.
-  assert.match(sentence, /color: var\(--lsr-strong\);/);
-  assert.match(sentence, /font-weight: 500;/);
-  assert.match(sentence, /border-left: 3px solid var\(--lsr-accent\);/);
-  // The bar's 3px come back off the padding, so the words share the files
-  // summary's edge below them rather than sitting a pixel short of it.
-  assert.match(sentence, /padding-left: calc\(var\(--lsr-space-4\) - 3px\);/);
-  assert.match(
-    rulesFor(".lsr-gate-files-summary").join(""),
-    /padding: 0 0 0 var\(--lsr-space-4\);/,
-  );
-  // Set in the name's weight, name and sentence read as one heading.
+  // Its ink is its own (figures below), never the body's.
+  assert.doesNotMatch(sentence, /color: var\(--lsr-text\);/);
+  // Heavier than body text, lighter than the name: in the name's weight, name
+  // and sentence read as one heading.
   const name = rulesFor(".lsr-gate-name").join("");
-  const weight = (body: string) => /font-weight: (\d+);/.exec(body)?.[1];
-  assert.doesNotMatch(sentence, /font-weight: 600;/);
-  assert.notEqual(weight(sentence), weight(name), "the sentence reads as part of the heading");
+  const weight = (body: string) => Number(/font-weight: (\d+);/.exec(body)?.[1]);
+  assert.ok(weight(sentence) > 400, "the sentence is set in body weight");
+  assert.ok(weight(sentence) < weight(name), "the sentence reads as part of the heading");
   // And the card goes away the moment the diff is up: the room is the diff's.
   assert.match(
     rulesFor('.lsr-group:has(.lsr-gate-press[aria-expanded="true"]) .lsr-gate').join(""),
     /display: none;/,
   );
+});
+
+test("the chapter's rationale is marked by its ink alone: no stripe, no label, no box", () => {
+  // A bar down its edge, an "In short" eyebrow over it and a tinted box round it
+  // all read as stock callout dressing: the sentence is set apart by colour.
+  const sentence = rulesFor(".lsr-gate-rationale").join("");
+  assert.doesNotMatch(sentence, /border|box-shadow|background|padding|border-radius/);
+  assert.equal(rulesFor(".lsr-gate-rationale::before").length, 0, "the sentence wears a label");
+  assert.doesNotMatch(css, /In short|--lsr-rationale-/);
+
+  // With no box to inset it, the sentence starts where the name does and where
+  // the files summary below does: its arrow sits at the line's own left edge.
+  assert.match(rulesFor(".lsr-gate-files-summary::before").join(""), /left: 0;/);
+});
+
+test("the rationale's ink is its own, clears AA on the card and never passes for a press", () => {
+  // `--lsr-lead-ink` keeps the accent's hue at another lightness. Paper: oklch
+  // 0.40/0.11, under the accent's 0.55/0.17 that the counter and the press wear,
+  // over the body's 0.32 and the name's 0.21 at chroma ~0.01. Night: 0.84/0.09,
+  // over the accent's 0.72/0.12, beside the body's 0.87 and under the name's
+  // 0.945, both at chroma ~0.01. A mix of accent and strong ink cannot reach it
+  // at night: at a share light enough to clear the accent (45%, L 0.84) its
+  // chroma is 0.057 and it reads as the body's grey.
+  //
+  // Measured at 19px weight 500, which is not large text, so 4.5:1 is the bar:
+  // 8.92:1 on the card on paper, 9.65:1 at night.
+  const tokens = rulesFor(":root").join("");
+  assert.match(
+    tokens,
+    /--lsr-lead-ink: light-dark\(oklch\(0\.4 0\.11 262\), oklch\(0\.84 0\.09 262\)\);/,
+    "re-measure the ink",
+  );
+  const sentence = rulesFor(".lsr-gate-rationale").join("");
+  assert.match(sentence, /color: var\(--lsr-lead-ink\);/);
+  assert.match(
+    sentence,
+    /font-weight: 500;/,
+    "600 is the name's weight: the two read as one heading",
+  );
+  assert.doesNotMatch(sentence, /text-decoration/, "an underline would make the sentence a link");
+  for (const other of [".lsr-gate-name", ".lsr-gate-counter", ".lsr-gate-press"]) {
+    assert.equal(
+      rulesFor(other).some((body) => /--lsr-lead-ink/.test(body)),
+      false,
+      `${other} shares the sentence's ink`,
+    );
+  }
+
+  // An approved card recedes to .55, where the tinted ink fell to 2.35:1 on
+  // paper and 2.70:1 at night. There it takes the strong ink back: 3.95:1 and
+  // 5.09:1 on the receded card, what it held before it was tinted, level with
+  // the name above it. Hover restores the card, not the tint.
+  assert.match(
+    rulesFor(".lsr-group:has(.lsr-tick-all:checked) .lsr-gate-rationale").join(""),
+    /color: var\(--lsr-strong\);/,
+  );
+  // Forced colours take the ink: the sentence is left plain text under its
+  // heading, and nothing needs to be put back.
+  assert.doesNotMatch(bare, /@media \(forced-colors: active\)\s*\{\s*\.lsr-gate-rationale/);
 });
 
 test("every chapter's card offers the chapter's tick", () => {
@@ -406,9 +458,10 @@ test("an earlier round keeps its bubbles: history is neither flattened nor faded
   assert.deepEqual(faded, [], "a rule takes an earlier round's bubble away");
 });
 
-test("each voice of the sidechat is one hue, worn as a bar down the card and on its label", () => {
+test("each voice of the sidechat is one hue, worn on its label, with no stripe down the card", () => {
   // The agent keeps the accent it has everywhere else on the page; the reviewer the violet of
-  // the replay. The bar is the glance, the label the word for whoever cannot tell the hues apart.
+  // the replay. The bubble is the glance and the label the word, for whoever cannot tell the
+  // hues apart; a coloured bar down every card said nothing new and read as stock furniture.
   assert.match(
     rulesFor('.lsr-entry[data-role="agent"]').join(""),
     /--lsr-speaker: var\(--lsr-accent\);/,
@@ -418,11 +471,9 @@ test("each voice of the sidechat is one hue, worn as a bar down the card and on 
     /--lsr-speaker: var\(--lsr-violet\);/,
   );
 
+  // The card keeps the base padding, so its words line up with the pills sharing it.
   const card = rulesFor(".lsr-entry[data-role]").join("");
-  assert.match(card, /border-left: 3px solid var\(--lsr-speaker\);/);
-  // The bar is inside the box: without giving its width back, a card's words sat 3px right of
-  // the pills sharing the base padding.
-  assert.match(card, /padding-left: calc\(var\(--lsr-space-3\) - 3px\);/);
+  assert.doesNotMatch(card, /border-left|padding-left/);
 
   // Two fifths hue: the night reviewer's card is the ceiling, where the violet is 4.67:1 at
   // two fifths and 4.52:1 at half (paper 6.10:1); the accent on the agent's card is 6.14:1.
@@ -430,6 +481,50 @@ test("each voice of the sidechat is one hue, worn as a bar down the card and on 
     rulesFor(".lsr-entry[data-role] .lsr-entry-role").join(""),
     /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
   );
+});
+
+test("nothing in the sidechat or the replay wears a stripe down its left edge", () => {
+  // Cards, pills, the agent's question and answer, and the replay's quote of the reviewer alike:
+  // each is told apart by its bubble and its label, never by a bar — drawn as a border, an inset
+  // shadow, a painted layer or a thin absolutely placed pseudo-element.
+  const length = String.raw`[\d.]+(?:px|r?em)`;
+  const bar = new RegExp(
+    [
+      "border-left",
+      "border-inline-start",
+      `border-width: 0 0 0 ${length}`,
+      `inset ${length} 0`,
+      `left / ${length}`,
+    ].join("|"),
+  );
+  const thin = new RegExp(`(?:^|[\\s;])width: (?:[1-6]px|0?\\.[0-3]\\d*r?em);`);
+  const striped = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(([, list = ""]) => /\.lsr-(entry|prompt|question|answer|pill|replay)/.test(list))
+    .filter(([, list = "", body = ""]) => {
+      const pseudo = /::(before|after)/.test(list) && /position: absolute;/.test(body);
+      return bar.test(body) || (pseudo && thin.test(body));
+    })
+    .map(([, list]) => list?.trim());
+  assert.deepEqual(striped, []);
+});
+
+test("the replay quotes the reviewer in a violet bubble under a violet label", () => {
+  // With the stripe gone, tint and label are the quote's voice. 16% violet, not the 10% it had
+  // beside a stripe, at which the night bubble was a grey box. The label in the violet itself
+  // clears AA on it: 5.15:1 on paper, 5.62:1 at night — where the muted grey of the other
+  // replay labels is 3.80:1 and 3.54:1.
+  const quote = rulesFor(".lsr-replay-quote").join("");
+  assert.match(quote, /background: color-mix\(in oklab, var\(--lsr-violet\) 16%, transparent\);/);
+  assert.match(quote, /border-radius: 0\.5rem;/, "the bubble is rounded on every side");
+  // Exactly one rule colours the label, whatever else its selector says, so the violet applies
+  // by being the only colour on offer rather than by winning on source order or specificity.
+  const colours = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(([, list]) =>
+      (list ?? "").split(",").some((one) => /\.lsr-replay-quote-label(?![\w-])(?!.*::)/.test(one)),
+    )
+    .flatMap(([, , body]) => [...(body ?? "").matchAll(/(?:^|[\s;])color: ([^;]+);/g)])
+    .map(([, value]) => value);
+  assert.deepEqual(colours, ["var(--lsr-violet)"], "the label's colour is contested or muted");
 });
 
 test("the reviewer's bubble is violet and the agent's is grey, on every round", () => {
@@ -468,9 +563,9 @@ test("the reviewer's bubble is violet and the agent's is grey, on every round", 
 test("the small print on a bubble steps toward the text: the caption, and the accent labels", () => {
   // Every share is set by the night reviewer's card. Muted at 15% is 4.76:1 there (4.58:1 at
   // 20%; paper 6.81:1). The question label is the card's own voice and takes the role label's
-  // two fifths (6.14:1 on the night agent's card). The answer label is the accent on the
-  // violet, where a quarter is 4.69:1 and two fifths 4.35:1 (paper 6.23:1). Not on hover,
-  // which keeps the accent it answers with.
+  // two fifths (6.14:1 on the night agent's card), and so does the answer label, which sits on
+  // the agent's own bubble inside the reviewer's card. Not on hover, which keeps the accent it
+  // answers with.
   const caption = rulesFor(".lsr-entry[data-role] .lsr-prompt-file:not(:hover)").join("");
   assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 15%, var\(--lsr-text\)\);/);
 
@@ -481,9 +576,21 @@ test("the small print on a bubble steps toward the text: the caption, and the ac
   );
   assert.match(
     rulesFor(".lsr-entry[data-role] .lsr-prompt-answer-label").join(""),
-    /color: color-mix\(in oklab, var\(--lsr-accent\) 25%, var\(--lsr-text\)\);/,
+    /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
     "the answer label is left raw on the bubble",
   );
+});
+
+test("the agent's answer is a bubble of the agent's own inside the reviewer's card", () => {
+  // Without a rule down its edge the answer ran on as more of the reviewer's comment. It takes
+  // the agent's voice from the agent's own rule, so the grey and the label's hue cannot drift.
+  const answer = rulesFor(".lsr-prompt-answer");
+  assert.equal(
+    answer.find((body) => /--lsr-bubble:/.test(body)),
+    rulesFor('.lsr-entry[data-role="agent"]').join(""),
+    "the answer's voice is not the agent card's rule",
+  );
+  assert.match(answer.join(""), /background: var\(--lsr-bubble\);/);
 });
 
 test("the seam between two comments is drawn off the bubble, not off the border token", () => {
@@ -495,13 +602,6 @@ test("the seam between two comments is drawn off the bubble, not off the border 
     seam,
     /border-top: 1px solid\s+color-mix\(in oklab, var\(--lsr-text\) 20%, var\(--lsr-bubble, var\(--lsr-raised\)\)\);/,
   );
-});
-
-test("a question inside the agent's card keeps its inset but not its own bar", () => {
-  // The card's 3px accent bar and the question's 2px one stood a few px apart: two bars, one voice.
-  const question = rulesFor('.lsr-entry[data-role="agent"] .lsr-prompt[data-kind="question"]');
-  assert.equal(question.length, 1);
-  assert.match(question[0] ?? "", /border-left: 0;/);
 });
 
 // Regression: regions naming only one axis let auto-flow deal them the wrong cells.
