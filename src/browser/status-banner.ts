@@ -11,21 +11,20 @@ export interface StatusState {
   review: ClosedReview;
 }
 
-/** Pure so both the served HTML and the live SSE update render from one place. */
+/**
+ * Pure so both the served HTML and the live SSE update render from one place.
+ * No word for the session's status beside the presence label: `open`,
+ * `feedback` and `ended` are the store's states, not news to the reviewer —
+ * the label says whose move it is, and an ended review says so in its overlay.
+ */
 export function renderStatusBanner(state: StatusState): string {
   if (state.status === "ended") {
     // `role="status"`: a screen reader following the diff would otherwise get
     // no sign that everything stopped taking input. Polite by the role's
     // definition — the review is already over.
-    return `${statusLine("ended")}
-<div class="lsr-ended-overlay" role="status">${renderClosingSummary(state.review)}</div>`;
+    return `<div class="lsr-ended-overlay" role="status">${renderClosingSummary(state.review)}</div>`;
   }
-  return `${statusLine(state.status)}
-${presenceLine(state)}`;
-}
-
-function statusLine(status: SessionStatus): string {
-  return `<p class="lsr-status" data-status="${escapeHtml(status)}">${escapeHtml(status)}</p>`;
+  return presenceLine(state);
 }
 
 /**

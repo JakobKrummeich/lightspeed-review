@@ -322,8 +322,6 @@
 
 #lsr-status-banner {
   display: flex;
-  align-items: baseline;
-  gap: var(--lsr-space-3);
   min-width: 0;
 }
 

@@ -34,11 +34,18 @@ function banner(over: Partial<StatusState> = {}): StatusState {
   return { status: "open", agentWaiting: false, turn: REVIEWERS, review, ...over };
 }
 
-test("shows the session status", () => {
-  const html = renderStatusBanner(banner({ agentWaiting: false }));
+/** The store's status word ("FEEDBACK" in the header's corner) is not news to
+ * the reviewer: the presence label says whose move it is, whatever the status. */
+test("says no status word beside the presence label, in any status", () => {
+  for (const status of ["open", "feedback"] as const) {
+    const html = renderStatusBanner(banner({ status, agentWaiting: true }));
 
-  assert.match(html, /data-status="open"/);
-  assert.match(html, />open</);
+    assert.doesNotMatch(html, /lsr-status|data-status/, `a ${status} session shows a status line`);
+    assert.doesNotMatch(html, new RegExp(`>${status}<`), `a ${status} session says its status`);
+    assert.equal(presenceText(html), "Waiting for your feedback");
+  }
+  const ended = renderStatusBanner(banner({ status: "ended" }));
+  assert.doesNotMatch(ended, /lsr-status|>ended</, "an ended review says so only in its overlay");
 });
 
 /** What the header shows, as opposed to what its tooltip carries. */

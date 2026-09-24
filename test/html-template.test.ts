@@ -54,7 +54,6 @@ test("the page renders the status banner so it is right before the bundle loads"
   const html = renderReviewPage(session);
 
   assert.match(html, /id="lsr-status-banner"/);
-  assert.match(html, /data-status="open"/);
   // Only a live `wait` proves somebody is listening, and the record cannot say;
   // the page claims nobody until the stream says otherwise.
   assert.match(html, /data-waiting="false"/);

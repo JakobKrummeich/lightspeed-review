@@ -48,7 +48,7 @@ One baseline-aligned flex row:
 │ [Unified│Side-by-side] [scheme]  (Replay last round) (Round 2 is ready   │
 │  #lsr-view-switch  #lsr-scheme-switch  #lsr-replay-reopen   · 5 files)   │
 │                                              #lsr-round-offer            │
-│ status line · presence label                        #lsr-status-banner   │
+│ presence label                                      #lsr-status-banner   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,6 +62,9 @@ One baseline-aligned flex row:
   last ones on the bar because they are the last entries in the array
   (`trailSweeps`, `src/group-tier.ts`), which is what makes the bar, the survey
   and "Chapter n of m" name one order; the bar itself sorts nothing.
+- No status word: the session's `open`/`feedback`/`ended` is the store's
+  state, not news to the reviewer, so `#lsr-status-banner` holds the presence
+  label alone (and, once ended, the closing overlay).
 - Presence label `.lsr-presence`: a short fixed label — "Agent is working"
   (agent's turn, reading or working), "Waiting for your feedback" (an
   agent is parked on `wait`; set in 600 weight, as the one state that asks
