@@ -458,9 +458,10 @@ test("an earlier round keeps its bubbles: history is neither flattened nor faded
   assert.deepEqual(faded, [], "a rule takes an earlier round's bubble away");
 });
 
-test("each voice of the sidechat is one hue, worn as a bar down the card and on its label", () => {
+test("each voice of the sidechat is one hue, worn on its label, with no stripe down the card", () => {
   // The agent keeps the accent it has everywhere else on the page; the reviewer the violet of
-  // the replay. The bar is the glance, the label the word for whoever cannot tell the hues apart.
+  // the replay. The bubble is the glance and the label the word, for whoever cannot tell the
+  // hues apart; a coloured bar down every card said nothing new and read as stock furniture.
   assert.match(
     rulesFor('.lsr-entry[data-role="agent"]').join(""),
     /--lsr-speaker: var\(--lsr-accent\);/,
@@ -470,11 +471,9 @@ test("each voice of the sidechat is one hue, worn as a bar down the card and on 
     /--lsr-speaker: var\(--lsr-violet\);/,
   );
 
+  // The card keeps the base padding, so its words line up with the pills sharing it.
   const card = rulesFor(".lsr-entry[data-role]").join("");
-  assert.match(card, /border-left: 3px solid var\(--lsr-speaker\);/);
-  // The bar is inside the box: without giving its width back, a card's words sat 3px right of
-  // the pills sharing the base padding.
-  assert.match(card, /padding-left: calc\(var\(--lsr-space-3\) - 3px\);/);
+  assert.doesNotMatch(card, /border-left|padding-left/);
 
   // Two fifths hue: the night reviewer's card is the ceiling, where the violet is 4.67:1 at
   // two fifths and 4.52:1 at half (paper 6.10:1); the accent on the agent's card is 6.14:1.
@@ -482,6 +481,19 @@ test("each voice of the sidechat is one hue, worn as a bar down the card and on 
     rulesFor(".lsr-entry[data-role] .lsr-entry-role").join(""),
     /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
   );
+});
+
+test("nothing in the sidechat wears a stripe down its left edge", () => {
+  // Cards, pills, the agent's question and the agent's answer alike: each is told apart by its
+  // bubble and its label, never by a bar — drawn as a border, an inset shadow or a painted layer.
+  const striped = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(
+      ([, list, body]) =>
+        /\.lsr-(entry|prompt|question|answer|pill)/.test(list ?? "") &&
+        /border-left|border-inline-start|inset \d+px 0|left \/ \d+px/.test(body ?? ""),
+    )
+    .map(([, list]) => list?.trim());
+  assert.deepEqual(striped, []);
 });
 
 test("the reviewer's bubble is violet and the agent's is grey, on every round", () => {
@@ -520,9 +532,9 @@ test("the reviewer's bubble is violet and the agent's is grey, on every round", 
 test("the small print on a bubble steps toward the text: the caption, and the accent labels", () => {
   // Every share is set by the night reviewer's card. Muted at 15% is 4.76:1 there (4.58:1 at
   // 20%; paper 6.81:1). The question label is the card's own voice and takes the role label's
-  // two fifths (6.14:1 on the night agent's card). The answer label is the accent on the
-  // violet, where a quarter is 4.69:1 and two fifths 4.35:1 (paper 6.23:1). Not on hover,
-  // which keeps the accent it answers with.
+  // two fifths (6.14:1 on the night agent's card), and so does the answer label, which sits on
+  // the agent's own bubble inside the reviewer's card. Not on hover, which keeps the accent it
+  // answers with.
   const caption = rulesFor(".lsr-entry[data-role] .lsr-prompt-file:not(:hover)").join("");
   assert.match(caption, /color: color-mix\(in oklab, var\(--lsr-muted\) 15%, var\(--lsr-text\)\);/);
 
@@ -533,9 +545,21 @@ test("the small print on a bubble steps toward the text: the caption, and the ac
   );
   assert.match(
     rulesFor(".lsr-entry[data-role] .lsr-prompt-answer-label").join(""),
-    /color: color-mix\(in oklab, var\(--lsr-accent\) 25%, var\(--lsr-text\)\);/,
+    /color: color-mix\(in oklab, var\(--lsr-speaker\) 40%, var\(--lsr-text\)\);/,
     "the answer label is left raw on the bubble",
   );
+});
+
+test("the agent's answer is a bubble of the agent's own inside the reviewer's card", () => {
+  // Without a rule down its edge the answer ran on as more of the reviewer's comment. It takes
+  // the agent's voice from the agent's own rule, so the grey and the label's hue cannot drift.
+  const answer = rulesFor(".lsr-prompt-answer");
+  assert.equal(
+    answer.find((body) => /--lsr-bubble:/.test(body)),
+    rulesFor('.lsr-entry[data-role="agent"]').join(""),
+    "the answer's voice is not the agent card's rule",
+  );
+  assert.match(answer.join(""), /background: var\(--lsr-bubble\);/);
 });
 
 test("the seam between two comments is drawn off the bubble, not off the border token", () => {
@@ -547,13 +571,6 @@ test("the seam between two comments is drawn off the bubble, not off the border 
     seam,
     /border-top: 1px solid\s+color-mix\(in oklab, var\(--lsr-text\) 20%, var\(--lsr-bubble, var\(--lsr-raised\)\)\);/,
   );
-});
-
-test("a question inside the agent's card keeps its inset but not its own bar", () => {
-  // The card's 3px accent bar and the question's 2px one stood a few px apart: two bars, one voice.
-  const question = rulesFor('.lsr-entry[data-role="agent"] .lsr-prompt[data-kind="question"]');
-  assert.equal(question.length, 1);
-  assert.match(question[0] ?? "", /border-left: 0;/);
 });
 
 // Regression: regions naming only one axis let auto-flow deal them the wrong cells.

@@ -334,11 +334,16 @@ textarea and primary disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.
 
 Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's
-hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — as a
-3px left bar and the `.lsr-entry-role` label colour; the card itself is the
-voice's bubble on every round, as in a chat: the reviewer's is `--lsr-raised`
-tinted 30% violet, the agent's `--lsr-raised` stepped 11% toward the ink, no
-hue, and every label on either bubble is stepped toward the text to stay AA.
+hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — on
+the `.lsr-entry-role` label; the card itself is the voice's bubble on
+every round, as in a chat: the reviewer's is `--lsr-raised` tinted 30% violet,
+the agent's `--lsr-raised` stepped 11% toward the ink, no hue, and every label
+on either bubble is stepped toward the text to stay AA. No card, question or
+answer wears a stripe down its left edge: the bubble is the glance, the label
+the word. The agent's answer to one comment (`.lsr-prompt-answer`) sits in the
+reviewer's card as a small bubble in the agent's own grey. A card that opens
+with a question drops its role label: "the agent is asking" already says who
+speaks, and the two stacked read as one header said twice.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 

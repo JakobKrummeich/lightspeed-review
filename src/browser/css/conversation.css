@@ -105,8 +105,10 @@
  * where the agent speaks, the violet of the reviewer's own words in the replay
  * and on the "commented last round" badge. Swapping them would put the agent's
  * cobalt answer inside a cobalt reviewer card and say nothing. The hue is
- * painted as a bar down the edge and as the role label, so the label is also
- * the word, for whoever cannot tell cobalt from violet.
+ * worn by the role label, which is also the word, for whoever cannot tell
+ * cobalt from violet; the glance is the bubble. No bar down the card's edge:
+ * with the bubbles already telling the voices apart it said nothing new, and
+ * a coloured stripe down every card read as stock chat furniture.
  *
  * The bubbles are a chat's two, the reviewer's coloured and the agent's grey:
  * cobalt against violet is the rejected pair, since at 30% each the two cards
@@ -119,12 +121,9 @@
  * off the panel, a grey that is a card on both. Every round keeps its
  * bubbles: a flat earlier card would take the agent's grey off the page, and
  * opacity would take the reviewer's own words down with it.
- *
- * The bar is inside the box, so its width comes back off the padding: with it
- * left in, a card's words sat 3px right of the pills that share the base
- * padding above.
  */
-.lsr-entry[data-role="agent"] {
+.lsr-entry[data-role="agent"],
+.lsr-prompt-answer {
   --lsr-speaker: var(--lsr-accent);
   --lsr-bubble: color-mix(in oklab, var(--lsr-text) 11%, var(--lsr-raised));
 }
@@ -136,8 +135,6 @@
 
 .lsr-entry[data-role] {
   background: var(--lsr-bubble);
-  border-left: 3px solid var(--lsr-speaker);
-  padding-left: calc(var(--lsr-space-3) - 3px);
 }
 
 /*
@@ -146,20 +143,12 @@
  * reviewer's card sets the share, where the violet is 4.67:1 at two fifths
  * and 4.52:1 at half (paper 6.10:1); the accent on the agent's card is 6.14:1
  * (paper 6.99:1). The question label is the card's own voice and takes the
- * same step.
+ * same step, as does the answer's label on the agent's bubble it sits in.
  */
 .lsr-entry[data-role] .lsr-entry-role,
-.lsr-entry[data-role] .lsr-question-label {
-  color: color-mix(in oklab, var(--lsr-speaker) 40%, var(--lsr-text));
-}
-
-/*
- * The agent's answer sits on the reviewer's violet, where the accent needs a
- * smaller share than the violet does: a quarter is 4.69:1 at night and two
- * fifths 4.35:1 (paper 6.23:1).
- */
+.lsr-entry[data-role] .lsr-question-label,
 .lsr-entry[data-role] .lsr-prompt-answer-label {
-  color: color-mix(in oklab, var(--lsr-accent) 25%, var(--lsr-text));
+  color: color-mix(in oklab, var(--lsr-speaker) 40%, var(--lsr-text));
 }
 
 /*
@@ -221,23 +210,6 @@
   margin: 0;
 }
 
-/*
- * The one prompt in the panel that is owed something back, drawn as a card
- * rather than another line of talk: a reviewer skims the agent's turns as
- * reports, and skimming the one sentence that is blocking the agent is how a
- * review stalls with both ends waiting.
- */
-.lsr-prompt[data-kind="question"] {
-  border-left: 2px solid var(--lsr-accent);
-  padding-left: var(--lsr-space-3);
-}
-
-/* Inside the agent's own card the voice's bar already runs down the edge: two
- * bars, one voice. The inset stays. */
-.lsr-entry[data-role="agent"] .lsr-prompt[data-kind="question"] {
-  border-left: 0;
-}
-
 .lsr-question-label {
   margin: 0 0 var(--lsr-space-1);
   color: var(--lsr-accent);
@@ -262,14 +234,18 @@
 }
 
 /*
- * The agent's declared answer, set under the words it answers. The accent
- * rules its edge as everywhere the agent speaks, at 55% because an answer is
- * read after the comment above it, never instead of it.
+ * The agent's declared answer, set under the words it answers: a bubble of
+ * the agent's own inside the reviewer's card, as a chat quotes a reply — it
+ * takes the agent's voice with the agent's selector above, so the grey and
+ * the label's hue are one definition. Not a rule down its edge: the chat's
+ * cards wear no stripes, and without one the answer ran on as more of the
+ * reviewer's comment.
  */
 .lsr-prompt-answer {
   margin-top: var(--lsr-space-2);
-  padding-left: var(--lsr-space-2);
-  border-left: 2px solid color-mix(in oklab, var(--lsr-accent) 55%, transparent);
+  padding: var(--lsr-space-2) var(--lsr-space-3);
+  border-radius: 0.375rem;
+  background: var(--lsr-bubble);
   display: flex;
   flex-direction: column;
   gap: var(--lsr-space-1);
