@@ -1,7 +1,7 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import type { DomainErrorBody } from "../server.ts";
 import { openCall } from "../open-call.ts";
-import { helpReopen, helpRestart, reattachCall } from "../turn-help.ts";
+import { helpEndedOn, helpReopen, helpRestart, reattachCall } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /**
@@ -56,7 +56,7 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
     return new ReviewError({
       code: "session_ended",
       message: "the reviewer ended this review; only they ask for a new round",
-      suggestions: [helpReopen(target(about))],
+      suggestions: [helpEndedOn(target(about)), helpReopen(target(about))],
     });
   }
   if (status === 503) {

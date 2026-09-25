@@ -636,6 +636,7 @@ test("publish checks the turn, the review and the tip before it groups anything"
       ["turn_not_yours", "turn_still_yours", "nothing_to_publish", "session_ended"],
     );
     assert.equal(harness.grouped.length, grouped, "no model call for a publish refused anyway");
+    assert.match(ended.suggestions.join("\n"), /lightspeed approvals feature-auth main/);
   });
 });
 

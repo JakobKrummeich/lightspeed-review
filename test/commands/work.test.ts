@@ -203,6 +203,8 @@ test("work on an ended review is refused as ended, and declares nothing", async 
       (error: unknown) => {
         assert.ok(error instanceof ReviewError);
         assert.equal(error.code, "session_ended");
+        // What the review ended on is the answer the agent is after next.
+        assert.match(error.suggestions[0]!, /lightspeed approvals feature-auth main/);
         assert.match(error.suggestions.join("\n"), /--reopen/);
         return true;
       },
