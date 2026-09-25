@@ -1,0 +1,7 @@
+# no-mistakes repository config. The pipeline's test and lint steps run exactly
+# what CI runs (.github/workflows/ci.yml), so a change the gate passes is one CI
+# passes. no-mistakes reads these commands from the default branch, never from
+# the branch under validation: a change to them takes effect once merged.
+commands:
+  test: pnpm run test:coverage
+  lint: pnpm run check

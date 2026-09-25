@@ -1,15 +1,35 @@
-# maintenance-agent target config. Local to this machine: the tool it drives is
-# not part of the repository, so the file is gitignored.
+# maintenance-agent target config. The agent runs nightly from its own clone,
+# which `setup` gives a no-mistakes gate of its own; delivery goes through that
+# gate (review, test, lint, push, PR, CI), whose commands are .no-mistakes.yaml's.
+# Whether an agent PR may merge itself is decided on the host, not here.
 version: 1
 base_branch: main
-delivery: github # github | no-mistakes | push-only
+delivery: no-mistakes # github | no-mistakes | push-only
 diff_limit: 200
 churn_paths: [src, scripts, bin, test]
-protected_paths: [] # paths the agent must never touch
-setup: pnpm install --frozen-lockfile
-gates: # the five checks CI runs (.github/workflows/ci.yml)
+# What defines the gates, and so what a green run means: an agent that could edit
+# these could pass its own work by loosening the check instead of the code.
+# package.json is here because the coverage floors live in its scripts; the price
+# is that dependency bumps and new scripts are a human's job.
+protected_paths:
+  - .github
+  - eslint.config.js
+  - tsconfig*.json
+  - .prettierrc
+  - .prettierignore
+  - .jscpd.json
+  - .no-mistakes.yaml
+  - .githooks
+  - .maintenance-agent.yaml
+  - SECURITY.md
+  - package.json
+setup: no-mistakes init && pnpm install --frozen-lockfile
+# The checks CI runs (.github/workflows/ci.yml), one gate each so a failure names
+# its check. Not CI's `pnpm audit`: an advisory published overnight against a
+# dependency would block every unrelated agent change until a human upgrades it.
+gates:
   - name: test
-    run: pnpm test
+    run: pnpm test:coverage
   - name: typecheck
     run: pnpm typecheck
   - name: lint
@@ -18,6 +38,8 @@ gates: # the five checks CI runs (.github/workflows/ci.yml)
     run: pnpm format:check
   - name: skill
     run: pnpm build:skill --check
+  - name: duplication
+    run: pnpm dup
 # Analyzer tooling is fetched on demand or already a devDependency: an absolute
 # path into one machine's tool directory is an analyzer nobody else can run.
 # eslint's `unix` formatter left core in v9, so awk carries the file name over
@@ -33,7 +55,9 @@ analyzers:
       of [0-9][0-9]|too many lines/{print file": "$0}'
     note: "repo gates are CC<=7 and 60 lines; these functions are within one step of the limit — early decay warning"
   - name: duplication
-    run: npx -y jscpd --min-tokens 70 --reporters consoleFull src scripts | grep -E 'Clone found|^ - |^   [a-zA-Z]|Found [0-9]+ .*clones'
+    # Same paths and token floor as the `duplication` gate (.jscpd.json); this
+    # lists each clone, where the gate only fails past the 1% threshold.
+    run: ./node_modules/.bin/jscpd --no-colors | grep -E 'Clone found|^ - |^   [^ ]|^Found [0-9]+ clones'
     note: "clones that must stay in sync are latent divergence bugs"
   - name: possibly-dead-exports
     run: npx -y knip --no-exit-code --reporter compact

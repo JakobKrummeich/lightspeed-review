@@ -1,0 +1,7 @@
+{
+  "threshold": 1,
+  "minTokens": 50,
+  "path": ["src", "scripts", "bin"],
+  "reporters": ["console"],
+  "absolute": true
+}

@@ -11,21 +11,45 @@ Node >= 22.19. Tests and the CLI run TypeScript sources directly, so there is
 nothing to build before working; `dist/` is built by `pnpm run build` and is not
 checked in.
 
+`pnpm install` also points git at `.githooks/` (`core.hooksPath`), unless a
+hooks path is already set — then run `git config core.hooksPath .githooks`
+yourself if you want the hook. Its pre-commit hook runs prettier over the staged
+files and re-stages them, so `format:check` never fails a commit over whitespace.
+A file with unstaged changes as well is committed exactly as staged and left
+unformatted — formatting it would sweep the unstaged hunks into the commit — and
+the hook says so. It never blocks a commit; CI is the gate.
+
 ## The gate
 
-All five have to pass before a change lands, and CI runs exactly these:
+All of these have to pass before a change lands, and CI runs exactly these:
 
 ```sh
 pnpm run typecheck
 pnpm run lint
-pnpm test
+pnpm run test:coverage
 pnpm run format:check
 pnpm run build:skill --check
+pnpm run dup
+pnpm audit --prod --audit-level=high
 ```
 
-The last one is the one people forget: `skills/lightspeed/SKILL.md` is generated
-from the CLI's own `help[]` strings, so changing help text means running
-`pnpm run build:skill` and committing the regenerated file with it.
+`pnpm run check` runs all but the tests and the audit in one go. The no-mistakes
+gate (`.no-mistakes.yaml`) runs `test:coverage` and `check`.
+
+- `test:coverage` is the whole suite with coverage floors for `src/` and
+  `scripts/` (lines 97%, branches 93%, functions 94% — a point under what the
+  suite covered when the floors came in). Plain `pnpm test` runs the same tests
+  without coverage, which is quicker while working.
+- `dup` is jscpd over `src/`, `scripts/` and `bin/` (`.jscpd.json`), failing past
+  1% duplicated lines. Tests are not scanned: spelling each case out in full is
+  what makes it readable on its own.
+- The audit covers runtime dependencies at high severity and above. It is not a
+  gate for the maintenance agent, whose work an unrelated new advisory would
+  otherwise block.
+
+`build:skill --check` is the one people forget: `skills/lightspeed/SKILL.md` is
+generated from the CLI's own `help[]` strings, so changing help text means
+running `pnpm run build:skill` and committing the regenerated file with it.
 
 ## Style
 

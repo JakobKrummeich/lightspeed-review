@@ -37,7 +37,7 @@
   },
   "packageManager": "pnpm@11.15.1",
   "scripts": {
-    "prepare": "node scripts/build.ts",
+    "prepare": "node scripts/build.ts && node scripts/git-hooks.ts",
     "prepack": "node scripts/build.ts",
     "build": "node scripts/build.ts",
     "build:skill": "node scripts/build-skill.ts",
@@ -45,10 +45,14 @@
     "judge:grouping": "node scripts/judge-grouping.ts",
     "pretest": "node scripts/build.ts",
     "test": "node --test \"test/**/*.test.ts\"",
+    "pretest:coverage": "node scripts/build.ts",
+    "test:coverage": "node --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-lines=97 --test-coverage-branches=93 --test-coverage-functions=94 --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "dup": "jscpd",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run build:skill --check && pnpm run dup"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.87.1",
@@ -63,6 +67,7 @@
     "@types/node": "^22.20.4",
     "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
+    "jscpd": "^5.3.2",
     "prettier": "^3.9.8",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.1"
