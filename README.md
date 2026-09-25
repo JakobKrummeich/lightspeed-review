@@ -4,7 +4,8 @@ Semantic diff review with targeted agent feedback.
 
 An agent opens a review of a branch; a human reads the grouped diff in the
 browser, selects the exact lines that are wrong and writes a comment. The agent
-waits, receives the comment together with the selected code, and fixes it.
+receives the comment together with the selected code, answers it in its thread
+or fixes it, and the two take turns until the review is done.
 
 ## Quickstart
 
@@ -20,17 +21,18 @@ cd ~/your-repo
 lightspeed init --config                  # writes .lightspeed.conf.json — put a real model in it
 
 # 3. open a review of a branch
-lightspeed start your-branch main --intent "why this branch exists"
+lightspeed open your-branch main --intent "why this branch exists"
 ```
 
 **Restart your agent after step 1.** Skills are scanned when an agent starts, so
 a session that is already running cannot see the file that was just written —
 in pi, `/reload` does it without leaving the session.
 
-`start` prints a URL and opens it. You read the grouped diff, select the lines
-that are wrong and comment; the agent picks the comments up with
-`lightspeed wait your-branch main`, which blocks in the foreground until you
-send. Everything below is detail.
+`open` prints a URL, opens it, and waits for your first Send. You read the
+grouped diff, select the lines that are wrong and comment; your Send is what
+`open` returns to the agent, which then answers (`reply`) or changes code
+(`work`, then `publish`) — every one of those that hands the turn back waits for
+your next Send itself. Everything below is detail.
 
 ## Install
 
@@ -119,11 +121,11 @@ from its own documentation.
 
 A pair nothing resolves is `pi_model_unknown` — and it does not fail the review,
 because grouping is the only thing the model is used for: the round comes back
-as one `All Changes` group whose reason, printed by `start`, is the rule that
+as one `All Changes` group whose reason, printed by `open`/`publish`, is the rule that
 was broken and not the pair you wrote — for a model id, that `model` must be
 `<provider>/<model-id>`, e.g. `anthropic/claude-sonnet-4-5`. So a wrong model id
 costs a reading order rather than a review, and a diff of one file never notices
-at all, because that one skips the model. `start --model <name>` overrides the
+at all, because that one skips the model. `--model <name>` on `open` or `publish` overrides the
 configured model for a single run, which is how to try one without editing the
 file.
 
@@ -210,7 +212,7 @@ any other Pi client would.
 pi auth login anthropic          # or: export ANTHROPIC_API_KEY=…
 ```
 
-Without either, `start` **fails** with `pi_auth_missing` rather than
+Without either, `open` **fails** with `pi_auth_missing` rather than
 reviewing an ungrouped diff — an unconfigured provider is an unfinished install,
 not a bad day for the model, and one big group is exactly the failure grouping
 exists to prevent. Every other model failure still degrades to that one group,
@@ -349,7 +351,7 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 2.2.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.0.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 Every command but `init` (the explicit install) then checks the places `init`
@@ -406,13 +408,13 @@ Set lightspeed up in this repository. These are two separate jobs; do both.
 2. The skill, which you need, and only if you do not already have one: run
    `lightspeed init --agent <your agent: pi | claude-code | codex | opencode | vscode>`.
    Add `--scope project` if it should live in this repo rather than on the machine.
-   Skip this step entirely if `lightspeed start` is already something you know how to run.
+   Skip this step entirely if `lightspeed open` is already something you know how to run.
 3. If step 2 wrote a skill, tell me to restart you (or run `/reload` if you are pi).
    Skills are scanned at startup, so you cannot use the one you just wrote until then.
 4. Then open a review with:
-   `lightspeed start <branch> <base> --intent "<why this branch exists>"`
-   then `lightspeed wait <branch> <base>` in the foreground — it blocks until I send
-   feedback, so do not background it and do not wrap it in a timeout.
+   `lightspeed open <branch> <base> --intent "<why this branch exists>"`
+   in the foreground — it waits for my Send, so do not background it and do not
+   wrap it in a timeout. Every output ends in a `next:` rule: follow it.
 ```
 
 Credentials are agent-independent: the model named in `.lightspeed.conf.json`
@@ -479,22 +481,27 @@ pulling the tests out of it would leave the group behind them empty.
 
 ## Commands
 
-| Command                                             | Purpose                                                                                                           |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `lightspeed start <branch> [base] --intent "<why>"` | Extract the diff, group it, open the review page                                                                  |
-| `lightspeed wait [branch] [base]`                   | Block until the reviewer sends — and take the turn when they do                                                   |
-| `lightspeed ask "<question>" [branch] [base]`       | Put a question to the reviewer, as a card with its own answer box, and block on the answer                        |
-| `lightspeed say "<text>" [branch] [base]`           | Say something without blocking; `--for <id>` pins it under the comment it answers                                 |
-| `lightspeed work "<plan>" [branch] [base]`          | Declare the silence you are about to keep — the reviewer's banner names the plan                                  |
-| `lightspeed approvals [branch] [base]`              | Name the files behind the counts: approved, swept, unapproved — the first 50 of each list, `--full` for every one |
-| `lightspeed end [branch] [base]`                    | Close the session from the agent side                                                                             |
-| `lightspeed stop`                                   | Shut the background review server down                                                                            |
-| `lightspeed feedback [sub]`                         | Read the feedback ledger: summary, list, show, prune                                                              |
-| `lightspeed init --agent <id>`                      | Write one agent's integration instructions where it reads them                                                    |
-| `lightspeed skill --agent <id>`                     | Print one agent's integration instructions — see [Agents](#agents)                                                |
-| `lightspeed serve`                                  | Run the review server in the foreground — `start` spawns it for you                                               |
-| `lightspeed login <provider>`                       | Sign in to a subscription provider — a human, in their own terminal                                               |
-| `lightspeed logout <provider>`                      | Drop lightspeed's stored credential for one provider                                                              |
+| Command                                                     | Purpose                                                                                                           |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `lightspeed`                                                | Home: where you are, the open items, and the one command to run next                                              |
+| `lightspeed open <branch> [base] --intent "<why>"`          | Extract the diff, group it, open the review page, and wait for the first Send; on a live review, re-attach        |
+| `lightspeed reply --to <id> "<text>" [--to …]`              | Every answer of a discussion turn in one call, each under its item (`main` = the main chat); waits for the Send   |
+| `lightspeed work "<plan>"`                                  | Discussion over, code changes next: the reviewer's header names the plan and they can only queue                  |
+| `lightspeed publish --intent "<what>" [--to <id> "<text>"]` | New commits become the next round, `done: …` notes land in their threads; waits for the Send                      |
+| `lightspeed approvals [branch] [base]`                      | Name the files behind the counts: approved, swept, unapproved — the first 50 of each list, `--full` for every one |
+| `lightspeed end [branch] [base]`                            | Close the session from the agent side                                                                             |
+| `lightspeed stop`                                           | Shut the background review server down                                                                            |
+| `lightspeed feedback [sub]`                                 | Read the feedback ledger: summary, list, show, prune                                                              |
+| `lightspeed init --agent <id>`                              | Write one agent's integration instructions where it reads them                                                    |
+| `lightspeed skill --agent <id>`                             | Print one agent's integration instructions — see [Agents](#agents)                                                |
+| `lightspeed serve`                                          | Run the review server in the foreground — `open` spawns it for you                                                |
+| `lightspeed login <provider>`                               | Sign in to a subscription provider — a human, in their own terminal                                               |
+| `lightspeed logout <provider>`                              | Drop lightspeed's stored credential for one provider                                                              |
+
+`wait`, `ask`, `say` and `start` were removed in 3.0. They answer
+`error: 'wait' was removed in 3.0, run lightspeed for your next step` (exit 2),
+so an agent still running a stale skill is pointed at home rather than left
+guessing.
 
 Every command prints TOON on stdout — failures included, as
 `error: {code, message, detail}` plus `help[]`, and `skill_stale` (help pages
@@ -504,57 +511,86 @@ failures are still TOON.
 
 ## The turn
 
-> Queue always. End always. Send only on your turn.
+> Discussion strictly alternates. The agent ends each turn by talking or by
+> working, never both. Every command that hands the turn back also waits for the
+> next Send.
 
-A review has exactly one turn holder. It is the reviewer's until a blocking
-`lightspeed wait` is handed their feedback; it is the agent's from that moment
-until the agent asks a question, publishes a new round, ends the review, or
-waits again on a review with nothing queued — parking says the agent is
-listening rather than editing. Delivery is the only thing that hands it over —
-not the press of Send, because feedback nobody is waiting for simply queues.
+A review is in one of three live states:
+
+| State         | Reviewer's header                              | Reviewer can                                                            | Agent ends it with                    |
+| ------------- | ---------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
+| You compose   | "Agent is listening" / "Agent isn't listening" | read replies, reply in any thread, resolve threads, add items, **Send** | —                                     |
+| Agent digests | "Agent is reading your 5 items"                | read the diff and approve files; compose, replies and queue are locked  | `reply` (talk) or `work` (start work) |
+| Agent works   | "Working on: _plan_"                           | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
+
+**End** is available in every state, and `lightspeed end` closes the review from
+the agent's side. Delivery of a Send to a listening agent is what moves the turn
+to digesting; `reply` hands it back; `work` moves it to working; `publish` opens
+the next round and hands it back, and the reviewer's queue drops into that round.
+`reply` from working is refused unless nothing has changed since `work` — HEAD
+has not moved and the tree is clean — because there is then nothing half-written
+to protect; otherwise the agent publishes what exists and asks in the new round.
+
+`open`, `reply` and `publish` **wait for the reviewer's Send**: they do not
+return until the next batch arrives (or the review ends), so one call is one
+turn and there is no separate listening command to forget. `work` and `end` wait
+for nothing. If a waiting command is killed — a harness timeout, a server
+restart — re-running the _same_ command re-attaches: the server recognises the
+reply or publish it already has and waits again, so nothing is posted twice.
+`open` on a live review is the same re-attach: no new round, just the wait, and
+`--intent` is only required when opening fresh.
 
 A delivery is not finished until the agent's client confirms it arrived. The
 server cannot see that for itself: the answer's bytes reach the client's kernel
-whether anything reads them or not, so a `wait` killed mid-delivery looks
-exactly like one that read every word. The batch is held on the session until
-the confirmation lands, and the next `wait` is handed it again.
+whether anything reads them or not, so a command killed mid-delivery looks
+exactly like one that read every word. The batch stays with the session, and a
+re-attaching command is handed it again.
 
-While the agent holds it the reviewer's **Send** reads **Queue** and nothing is
-sent, so a round cannot change under an agent mid-edit: general comments join
-the line comments in the queue, as many as they like, and all of it goes out in
-order on their next Send, whose label counts what is waiting. Their queue, their typing and their **End** are
-never disabled, so they are never stuck behind an agent that walked away. There
-is no timer and no override: an agent that died holding the turn is restarted in
-the terminal it came from.
+What the agent reads after each Send is one item per thread the batch touched,
+with its id (`t4`), whether it is `new`, a `reply`, `resolved` or `reopened`,
+where it points (`file:line`), the agent's own last words there (`you`) and the
+reviewer's new ones — and a `next:` block that is a decision rule, not a menu:
+anything that needs the reviewer goes in one `reply`; nothing left to discuss and
+something to change means `work`; anything ambiguous in a change request is
+worth asking now. Every refusal names the one right command: `work` or `reply`
+on the reviewer's turn answer `turn_not_yours`, `publish` while digesting answers
+`turn_still_yours`, `publish` on an unmoved HEAD answers `nothing_to_publish`
+naming `reply`. Refusals exit 2 — read the help, do not retry. There is no timer
+and no override: an agent that died holding the turn is recovered by re-running
+the command it died in.
 
-Every answer the CLI prints carries `turn` and `round`, and its `help[]` lists
-the moves that are legal from there. Two commands can be refused over the turn,
-one from each end: `work` without it answers `turn_not_yours`, naming the `wait`
-that would earn it, and a second `wait` from an agent that declared `work`
-answers `turn_still_yours` — parking would hand Send back mid-edit — naming
-`start … --wait` and `ask`, which give the turn up deliberately. Both exit 2.
+**Threads.** Every reviewer item, line or general, opens a thread with a short,
+session-stable id (`t1`, `t2`…); `main` is the main chat, where the agent's
+`--to main` lands. In the page a thread is the item followed by its whole
+exchange, stacked top to bottom, with a reply box at its foot and a line
+thread's jump to its lines. **Resolve** folds a thread; it sends nothing by
+itself and travels with the next Send, where the agent reads `t4 resolved` — for
+a question "no further questions", for a change request "I agree with what you
+last said", not a withdrawn request. Thread replies and resolves queue like any
+other item and go out together on Send.
 
 ## Intent
 
-`start` requires `--intent`, repeatable. The agent that opens the review is the
+`open` requires `--intent` when it opens fresh, and `publish` always does,
+repeatable. The agent that opens the review is the
 only party that knows why the branch exists, and a reviewer who does not know
 what a change is _for_ cannot tell a mistake from a decision:
 
 ```sh
-lightspeed start feature-auth main \
+lightspeed open feature-auth main \
   --intent "replace session cookies with signed tokens" \
   --intent "drop the legacy /login handler"
 ```
 
 The reasons render above the diff, in the order given, and go to the grouping
 model as the strongest signal it gets. They belong to the round, so the next
-`start` can state different ones without disturbing what is already approved.
+`publish` can state different ones without disturbing what is already approved.
 Omitting the flag fails with `intent_missing` before any git or model work.
 
 ## Rounds
 
-`start` is meant to be re-run after every round of fixes, and each run appends a
-round to the session. A file the reviewer ticked approved in an earlier round
+`publish` ends every round of fixes, and each one appends a round to the
+session; it is refused while HEAD has not moved since the last round. A file the reviewer ticked approved in an earlier round
 arrives in the next one **already ticked and dimmed**, and only while its blob
 sha proves the text has not moved since — edit it and the tick is gone, and the
 file says **changed after approval** so the reviewer knows their own verdict was
@@ -563,7 +599,7 @@ before says **commented last round**, so the answer they came back to read is
 visible from the file row rather than only from the conversation beside it. Un-ticking is the same authority the other way: take a
 tick off and the file is unapproved from that moment, in the next round as much
 as in this one. All of this holds however the previous round was left — sending
-feedback, ending the review or just re-running `start` all carry the ticks
+feedback, ending the review or publishing the next round all carry the ticks
 forward. A file the round has no blob sha for is never carried, because the
 round cannot prove the text stood still: a binary file has no sha in its patch,
 and neither has a rename git found 100% identical, whose patch is a `rename
@@ -666,7 +702,7 @@ you pass those flags yourself.
 
 ### Verdicts
 
-When the next `start` opens a round on the same branch, every earlier comment is
+When the next `publish` opens a round on the same branch, every earlier comment is
 judged against what the agent actually did — the diff between the two rounds'
 head commits, whether the reviewer marked the file again, and whether they
 ticked it approved. That judgement is the item's `verdict`:
@@ -682,7 +718,7 @@ A comment is re-judged on every later round, so a verdict reflects the whole
 review, not just the round after it. `feedback list --verdict repeated` is the
 shortest path to what this reviewer has had to say twice.
 
-`start` prints where it writes and whether it is healthy. Switch it off with:
+`open` and `publish` print where they write and whether it is healthy. Switch it off with:
 
 ```json
 { "model": "anthropic/claude-haiku-4-5", "thinking": "off", "feedbackLog": "off" }
@@ -705,6 +741,11 @@ A ledger failure never fails a review: it is reported as
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
+- The conversation is threads: each item with its exchange stacked under it,
+  a reply box at the foot, and a **Resolve** toggle that folds it. The header
+  and the foot of the conversation say whose turn it is, and a small
+  "Connection lost — reconnecting…" chip shows while the live update stream is
+  down.
 - A file that moved or was renamed shows both of its paths (`old → new`), the
   word for which it was, and how much of the file survived. One git found
   identical says so in place of an empty diff, and pairs are found down to 40%

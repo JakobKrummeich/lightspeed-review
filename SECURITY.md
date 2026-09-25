@@ -26,7 +26,7 @@ people you would not let read the diff, do not run a review on it.
 
 ## What leaves the machine
 
-The diff of the branch under review, and the intent you give `start`, are sent to
+The diff of the branch under review, and the intents you give `open` and `publish`, are sent to
 the model named in `.lightspeed.conf.json` for grouping. Nothing else is sent
 anywhere; there is no telemetry. Provider credentials come from the environment
 (`${VAR}` in the config) or from `lightspeed login`, which stores them in

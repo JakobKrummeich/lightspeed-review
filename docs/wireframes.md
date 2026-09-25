@@ -65,12 +65,18 @@ One baseline-aligned flex row:
 - No status word: the session's `open`/`feedback`/`ended` is the store's
   state, not news to the reviewer, so `#lsr-status-banner` holds the presence
   label alone (and, once ended, the closing overlay).
-- Presence label `.lsr-presence`: a short fixed label — "Agent is working"
-  (agent's turn, reading or working), "Waiting for your feedback" (an
-  agent is parked on `wait`; set in 600 weight, as the one state that asks
-  for the reviewer), "No agent is waiting". The full sentence (the declared plan, the send-anyway advice) is
-  its `title`, a hover-only convenience; the plan is written out at the foot of the conversation (§5,
-  `.lsr-working` line), so the header does not repeat it.
+- Presence label `.lsr-presence` (`data-turn`, `data-waiting`), worded by
+  `turn-words.ts` so the header and the foot of the conversation never
+  disagree. Agent's turn, digesting: "Agent is reading your N items" (N =
+  threads in the batch); working: "Working on: <plan>" (or "Working on your
+  feedback" with no plan). Reviewer's turn: "Agent is listening" (a CLI call
+  holds the turn-handback stream open; 600 weight, the one state that asks
+  for the reviewer) or "Agent isn't listening" — a fact about a live
+  connection, never a timer. The full sentence (the send-anyway advice) is its
+  `title`, a hover-only convenience.
+- Connection chip `#lsr-connection.lsr-connection` (`role="status"`, hidden
+  by default): "Connection lost — reconnecting…", shown on any EventSource
+  error and hidden again when the stream reopens.
 - `#lsr-replay-reopen` and `#lsr-round-offer` are hidden until relevant.
 - Round-offer states: plain → **glow** (`lsr-offer-glow`, after the round
   popup folds into it) → **beckon** (orbiting spark via `::after` +
@@ -286,20 +292,25 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ ┌ .lsr-panel-scroll ─────────────────────┐ │
 │ │ ── Round 1 · earlier round ──          │ │ .lsr-round-mark (separator,
 │ │                                        │ │  only when >1 round on screen)
-│ │ reviewer                               │ │ .lsr-entry-role
-│ │ ┌ article.lsr-entry ─────────────────┐ │ │
-│ │ │ [file.ts]           ← basename btn │ │ │ .lsr-prompt-file (full path
-│ │ │ │ quoted selected text             │ │ │  in tooltip; press jumps to
-│ │ │ comment text                       │ │ │  the diff line)
-│ │ │ ─────────── hairline seam ──────── │ │ │ .lsr-prompt-selection (pre)
-│ │ │ second prompt of the same turn…    │ │ │ .lsr-prompt-comment
+│ │ ┌ article.lsr-thread ────────────────┐ │ │ one card per item sent
+│ │ │ t3  [file.ts]           [Resolve]  │ │ │ .lsr-thread-head: .lsr-thread-id,
+│ │ │ │ quoted selected text             │ │ │  .lsr-prompt-file (full path in
+│ │ │ you                                │ │ │  tooltip; press jumps to the
+│ │ │   comment text                     │ │ │  diff line), .lsr-thread-resolve
+│ │ │ agent                              │ │ │ .lsr-message[data-role]
+│ │ │   reply text                       │ │ │  (.lsr-message-role +
+│ │ │ you                                │ │ │   .lsr-prompt-comment),
+│ │ │   follow-up…                       │ │ │  flat, oldest first
+│ │ │ [Reply — Enter adds it…  ] [Reply] │ │ │ .lsr-thread-reply-box /
+│ │ └────────────────────────────────────┘ │ │  .lsr-thread-reply-add
+│ │ ┌ article.lsr-thread[data-resolved] ─┐ │ │ resolved: folded to its head
+│ │ │ t1  [file.ts]           [Reopen]   │ │ │  + .lsr-thread-summary (first
+│ │ │ first comment, one line            │ │ │  comment, one line)
 │ │ └────────────────────────────────────┘ │ │
-│ │ agent                                  │ │
-│ │   reply text                           │ │
-│ │ ●●● the agent is working on your       │ │ .lsr-working (animated dots;
-│ │     feedback                           │ │  gone once review ends; or
-│ │                                        │ │  "the agent has your feedback",
-│ │                                        │ │  "<plan>" alone, no prefix)
+│ │ ●●● Agent is reading your 3 items      │ │ .lsr-working (animated dots;
+│ │                                        │ │  agent's turn only, gone once
+│ │                                        │ │  review ends; "Working on:
+│ │                                        │ │  <plan>" while it works)
 │ │                                        │ │
 │ │ ┌ section.lsr-queue ─────────────────┐ │ │
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │
@@ -310,9 +321,14 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │ general comment queued on
 │ │ │ │ general comment text     [×] │   │ │ │  the agent's turn (no badge)
 │ │ │ └──────────────────────────────┘   │ │ │
-│ │ │ or: "Nothing queued — select diff  │ │ │ .lsr-empty (agent's turn adds
-│ │ │      text to add feedback."        │ │ │  ", or type below,": only then
-│ │ │                                    │ │ │  does the box queue)
+│ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │ .lsr-pill-thread: a reply
+│ │ │ │ reply in t3              [×] │   │ │ │  or resolve pill names its
+│ │ │ │ reply text                   │   │ │ │  thread
+│ │ │ └──────────────────────────────┘   │ │ │
+│ │ │ or: "Nothing queued — select diff  │ │ │ .lsr-empty ("…, reply in a
+│ │ │      text or reply in a thread…"   │ │ │  thread, or type below." while
+│ │ │                                    │ │ │  the agent works; "Nothing
+│ │ │                                    │ │ │  queued." while it reads)
 │ │ └────────────────────────────────────┘ │ │
 │ └────────────────────────────────────────┘ │
 │ ┌ section.lsr-compose (pinned) ──────────┐ │
@@ -320,36 +336,52 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ when you are ready.                    │ │
 │ │ [General comment — Enter sends…      ] │ │ #lsr-general-comment
 │ │ [Send to Agent]         [Send & End]   │ │ #lsr-send (.lsr-primary;
-│ │  or on the agent's turn:               │ │  "Queue" on the agent's turn)
-│ │ [Queue]         [End without Sending]  │ │
+│ │  or while the agent works:             │ │  "Queue" while it works,
+│ │ [Queue]         [End without Sending]  │ │  disabled while it reads)
 │ └────────────────────────────────────────┘ │ #lsr-send-end (.lsr-secondary)
 └────────────────────────────────────────────┘
 ```
 
-States: agent's turn — primary reads "Queue" and stays live, placeholder
+Threads: every item the reviewer sent is an `article.lsr-thread` with its
+whole exchange stacked under it, placed in the round segment the item opened
+in (`.lsr-round-mark` rules only when more than one round is on screen). A
+reply typed in a thread's box and a Resolve/Reopen press are both pills: they
+travel with the next Send, so answering three threads is still one batch for
+the agent. The fold happens at the press (`data-resolved`, with "resolves on
+your next Send" in `.lsr-thread-queued`); pressing again removes the queued
+toggle. Items from a v2 session, which carry no id, render as read-only
+legacy threads (`data-legacy`, no id, toggle or reply box).
+
+The lock follows the turn (`composeMode`): reviewer's turn — everything is
+live; agent working — the box and the popup queue, pills are removable;
+agent digesting — the box, Send, the popup and pill removal are locked
+("Locked while the agent reads your feedback — you can still read and
+approve."), while reading, approving and ending stay open.
+
+States: agent working — primary reads "Queue" and stays live, placeholder
 "General comment — Enter queues…": a press (or Enter) turns the box into a
 message pill in `section.lsr-queue`, beside the annotation pills, removable by
 its own ×, and the box empties for the next one; the end button reads "End
 without Sending"; each press focuses the box again and says "Queued — N
 waiting for your next Send" in a visually-hidden `role="status"`
-(`#lsr-queue-status`, `.lsr-visually-hidden`). Reviewer's turn (an agent
-waiting or not) — "Send to Agent", or "Send N to Agent" while N pills wait,
+(`#lsr-queue-status`, `.lsr-visually-hidden`). Agent digesting — placeholder
+"Locked while the agent reads your feedback", textarea and primary disabled
+(the primary still counts the queue). Reviewer's turn (an agent
+listening or not) — "Send to Agent", or "Send N to Agent" while N pills wait,
 sends every pill in queue order plus the box. Sending — primary reads
 "Sending…", all compose controls disabled; ended — "This review has ended.",
 textarea and primary disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.
 
-Voices: every `article.lsr-entry` carries `data-role` and wears its speaker's
-hue — agent cobalt (`--lsr-accent`), reviewer violet (`--lsr-violet`) — on
-the `.lsr-entry-role` label; the card itself is the voice's bubble on
-every round, as in a chat: the reviewer's is `--lsr-raised` tinted 30% violet,
-the agent's `--lsr-raised` stepped 11% toward the ink, no hue, and every label
-on either bubble is stepped toward the text to stay AA. No card, question or
-answer wears a stripe down its left edge: the bubble is the glance, the label
-the word. The agent's answer to one comment (`.lsr-prompt-answer`) sits in the
-reviewer's card as a small bubble in the agent's own grey. A card that opens
-with a question drops its role label: "the agent is asking" already says who
-speaks, and the two stacked read as one header said twice.
+Voices: every `.lsr-message` in a thread carries `data-role` and wears its
+speaker's hue — agent cobalt (`--lsr-accent`), reviewer violet
+(`--lsr-violet`) — on the `.lsr-message-role` label ("you" / "agent"); the
+message itself is the voice's bubble, as in a chat: the reviewer's is
+`--lsr-raised` tinted 30% violet, the agent's `--lsr-raised` stepped 11%
+toward the ink, no hue, and every label on either bubble is stepped toward the
+text to stay AA. No message wears a stripe down its left edge: the bubble is
+the glance, the label the word. Messages stack flat, oldest first, never
+nested deeper than the thread.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 
@@ -368,7 +400,9 @@ mouseup on a non-empty selection inside the branch diff.
 ```
 
 Enter queues (pill appears in the panel), Shift+Enter is a newline, clicking
-elsewhere dismisses.
+elsewhere dismisses. While the agent reads (digesting) the popup shows the
+selection with `.lsr-popup-locked` "Locked while the agent reads your
+feedback." in place of the box and button.
 
 ## 7. Opening overlay — round 0 ceremony (opening-view.ts, dom/opening-overlay.ts)
 
