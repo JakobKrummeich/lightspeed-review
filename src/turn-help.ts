@@ -22,6 +22,16 @@ export const WAITS_FOR_SEND =
   "it waits for the reviewer's Send, so run it in the foreground and never under a timeout;" +
   " if it is killed anyway, re-run the same command — it posts nothing twice";
 
+/**
+ * What the wait after a hand-back does, said before it starts: a batch the agent
+ * already holds comes straight back, and anything else waits for a Send.
+ */
+export function waitClause(turn: TurnLabel | undefined): string {
+  return turn === "agent digesting"
+    ? "handing back the batch you are digesting"
+    : "waiting for the reviewer's Send";
+}
+
 /** The three rules the protocol reduces to, quoted wherever an agent might guess. */
 export const TURN_RULES = [
   "Discussion strictly alternates: the reviewer sends a batch, you digest it and hand back.",

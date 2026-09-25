@@ -779,9 +779,55 @@ test("a re-run publish on a tip the last round already shows goes straight back 
     assert.equal(output, LISTENED);
     assert.equal(extractions(), 2);
     assert.equal(harness.store.get(key)?.rounds.length, 2);
-    assert.match(String(harness.announced[0]?.message), /already published/);
+    assert.match(
+      String(harness.announced[0]?.message),
+      /already published; waiting for the reviewer's Send/,
+    );
     assert.equal(harness.announced[0]?.rerun, true);
     assert.match(ifKilled(harness.announced[0]), /lightspeed publish feature-auth main/);
+  });
+});
+
+/** Unacknowledged: the Send reached a publish that died before saying so. */
+function heldUnacked(store: SessionStore, key: string): void {
+  store.save({
+    ...store.get(key)!,
+    batch: { id: "b2", prompts: [], at: AT_START, acked: false },
+    turn: agentDigesting(AT_START),
+  });
+}
+
+test("a server-recognised re-run over a batch never acknowledged says it hands that batch back", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    const deps: RoundDeps = { ...harness.deps, extractDiff: () => extractedAt(2) };
+    await publishNext(harness, { deps });
+    heldUnacked(harness.store, KEY);
+    harness.announced.length = 0;
+
+    await publish(harness, { deps });
+
+    const [shown] = harness.announced;
+    assert.equal(shown?.rerun, true);
+    assert.equal(shown?.turn, "agent digesting");
+    assert.match(String(shown?.message), /handing back the batch you are digesting/);
+  });
+});
+
+test("a local re-run over a batch never acknowledged says it hands that batch back", async () => {
+  await withHarness(async (harness) => {
+    const { repoRoot, key, deps } = await publishedAtTip(harness);
+    heldUnacked(harness.store, key);
+
+    await publish(harness, { repoRoot, deps });
+
+    const [shown] = harness.announced;
+    assert.equal(shown?.rerun, true);
+    assert.equal(shown?.turn, "agent digesting");
+    assert.match(
+      String(shown?.message),
+      /already published; handing back the batch you are digesting/,
+    );
   });
 });
 

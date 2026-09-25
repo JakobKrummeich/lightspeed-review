@@ -268,6 +268,31 @@ test("a re-run reply says it landed nothing new before it waits again", async ()
 
       assert.equal(announced[0]?.rerun, true);
       assert.equal("replied" in announced[0]!, false);
+      assert.match(String(announced[0]?.message), /waiting for the reviewer's Send/);
+    },
+  );
+});
+
+/** A Send delivered but never acknowledged: the wait hands it straight back, and says so. */
+test("a re-run reply over a batch it never acknowledged says it hands that batch back", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, store, repoRoot, key }) => {
+      const notes = [{ to: "t1", text: "it is one already" }];
+      await reply(port, repoRoot, notes);
+      store.save({
+        ...store.get(key)!,
+        batch: { id: "b2", prompts: [], at: AT, acked: false },
+        turn: { holder: "agent", mode: "digesting", at: AT },
+      });
+      const announced: StructuredOutput[] = [];
+
+      await reply(port, repoRoot, notes, announced);
+
+      assert.equal(announced[0]?.rerun, true);
+      assert.equal(announced[0]?.turn, "agent digesting");
+      assert.match(String(announced[0]?.message), /handing back the batch you are digesting/);
+      assert.doesNotMatch(String(announced[0]?.message), /waiting for the reviewer's Send/);
     },
   );
 });

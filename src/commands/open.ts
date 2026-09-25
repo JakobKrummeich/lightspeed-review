@@ -6,7 +6,7 @@ import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { stillWorking } from "../server.ts";
 import { turnFacts, turnLabel } from "../turn.ts";
-import { helpReopen, ifKilled, publishCall, reattachCall } from "../turn-help.ts";
+import { helpReopen, ifKilled, publishCall, reattachCall, waitClause } from "../turn-help.ts";
 import { refusalError } from "./api-client.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
 import {
@@ -116,10 +116,7 @@ function reattached(session: SessionRecord, input: OpenInput): StructuredOutput 
       base: input.base,
       url: `${serverOrigin(input.config.port)}/session/${session.key}`,
     },
-    message:
-      turnLabel(session) === "agent digesting"
-        ? "re-attached to the live review; handing back the batch you are digesting"
-        : "re-attached to the live review; waiting for the reviewer's Send",
+    message: `re-attached to the live review; ${waitClause(turnLabel(session))}`,
     ...(input.intents.length === 0 ? {} : { note: intentIgnored(input) }),
     ...ifKilled(reattachCall(`${input.branch} ${input.base}`)),
   };

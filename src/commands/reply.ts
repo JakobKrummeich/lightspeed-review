@@ -4,7 +4,7 @@ import { branchState } from "../git-state.ts";
 import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
-import { ifKilled, replyRerun } from "../turn-help.ts";
+import { ifKilled, replyRerun, waitClause } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { scanArgs } from "./args.ts";
 import { listen, type ListenInput } from "./listen.ts";
@@ -77,11 +77,11 @@ function landed(
     answer.rerun === true
       ? {
           rerun: true,
-          message: "already replied; nothing posted twice — waiting for the reviewer's Send",
+          message: `already replied; nothing posted twice — ${waitClause(answer.turn)}`,
         }
       : {
           replied: [...new Set(notes.map((note) => note.to))],
-          message: "replied; waiting for the reviewer's Send",
+          message: `replied; ${waitClause(answer.turn)}`,
         };
   return { ...turnBlock(answer), ...said, ...ifKilled(replyRerun(target, notes)) };
 }

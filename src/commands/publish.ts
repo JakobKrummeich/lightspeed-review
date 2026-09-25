@@ -8,7 +8,7 @@ import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { turnFacts, turnLabel } from "../turn.ts";
 import { handbackOf, isRerun } from "../turn-moves.ts";
-import { ifKilled, publishCall, publishRerun } from "../turn-help.ts";
+import { ifKilled, publishCall, publishRerun, waitClause } from "../turn-help.ts";
 import { publishRefusal } from "../server.ts";
 import { refusalError, sessionGone, type SessionRef } from "./api-client.ts";
 import { allValues, lastValue, scanArgs } from "./args.ts";
@@ -90,7 +90,7 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
     run.announce({
       ...turnFacts(existing),
       rerun: true,
-      message: "this round is already published; waiting for the reviewer's Send",
+      message: `this round is already published; ${waitClause(turnLabel(existing))}`,
       ...rerun,
     });
     return await run.listen({ ...input, port: input.config.port });
@@ -101,7 +101,7 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
   run.announce({
     ...publishedRound(outcome),
     ...(outcome.created.rerun === true ? { rerun: true } : {}),
-    message: "published; waiting for the reviewer's next Send",
+    message: `published; ${waitClause(outcome.created.turn)}`,
     ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
     ...rerun,
   });
