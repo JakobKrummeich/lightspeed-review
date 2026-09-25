@@ -97,7 +97,7 @@ test("a plan declared mid-silence reaches the header's tooltip without a reload"
     },
   });
 
-  assert.match(root.innerHTML, /title="implementing: splitting the helper out">Agent is working</);
+  assert.match(root.innerHTML, /title="splitting the helper out">Agent is working</);
 });
 
 test("a session that ended draws the summary of what the fresh read says", (t) => {

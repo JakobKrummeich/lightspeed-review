@@ -221,7 +221,7 @@ test("the agent's declared plan is what the foot of the conversation says", (t) 
   // sentence, which is the reason `work` takes a plan at all.
   assert.match(
     root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "",
-    /implementing: splitting the transaction helper out/,
+    /<\/span>\s*splitting the transaction helper out\s*<\/p>/,
   );
 });
 
