@@ -7,6 +7,7 @@ import {
   renderFetchedForm,
 } from "../../src/browser/approved-form.ts";
 import { renderClosingSummary, type ClosedReview } from "../../src/browser/closing-summary.ts";
+import { renderIntent } from "../../src/browser/intent-view.ts";
 import { renderOpening } from "../../src/browser/opening-view.ts";
 import { renderReplayOverlay } from "../../src/browser/round-replay.ts";
 import type { ApprovedFormData } from "../../src/rounds/approved-form.ts";
@@ -191,8 +192,8 @@ function approvedForms(): string {
  *
  * The emitters not listed here are guarded by nothing; adding one is an entry
  * plus a fixture, where every class the module draws is painted in one area.
- * Measured 2026-09-01, three of the remaining eleven qualify: progress-bar.ts
- * and intent-view.ts (page.css), annotation.ts (popup.css). The rest want a
+ * Measured 2026-09-25, two of the remaining ten qualify: progress-bar.ts
+ * (page.css) and annotation.ts (popup.css). The rest want a
  * decision about where an area's edge runs that this table has no shape for:
  * diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts,
  * status-banner.ts and full-file.ts each draw across two or more areas by
@@ -230,6 +231,16 @@ const AREA_OWNERS: AreaOwner[] = [
     // module that defines them covers both.
     render: approvedForms,
     marker: "lsr-approved-form",
+  },
+  {
+    module: "src/browser/intent-view.ts",
+    area: "page.css",
+    // Both bodies the band can hold: stated reasons draw a list, a round opened
+    // before `--intent` was required draws the "none" line instead.
+    render: () =>
+      renderIntent({ intents: ["sign the tokens"], commits: [] }) +
+      renderIntent({ intents: [], commits: ["some commit"] }),
+    marker: "lsr-intent-press",
   },
 ];
 
