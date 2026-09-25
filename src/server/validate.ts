@@ -70,20 +70,24 @@ export async function readFeedback(request: IncomingMessage) {
 export interface ReplyRequest {
   replies: AgentNote[];
   head?: string;
+  tree?: string;
   clean?: boolean;
 }
 
 export async function readReply(request: IncomingMessage): Promise<ReplyRequest | undefined> {
-  const body = await readJsonSafely<{ replies?: unknown; head?: unknown; clean?: unknown }>(
-    request,
-  );
+  const body = await readJsonSafely<{
+    replies?: unknown;
+    head?: unknown;
+    tree?: unknown;
+    clean?: unknown;
+  }>(request);
   if (body === undefined) return undefined;
   const replies = parseNotes(body.replies);
   // A reply with nothing to say is not a reply (D1).
   if (replies === undefined || replies.length === 0) return undefined;
   return {
     replies,
-    ...(typeof body.head === "string" ? { head: body.head } : {}),
+    ...stringFields(body, ["head", "tree"]),
     ...(typeof body.clean === "boolean" ? { clean: body.clean } : {}),
   };
 }
@@ -108,13 +112,26 @@ export async function readDelivered(request: IncomingMessage): Promise<string | 
   return delivery;
 }
 
-export async function readWork(
-  request: IncomingMessage,
-): Promise<{ plan: string; head?: string } | undefined> {
-  const body = await readJsonSafely<{ plan?: unknown; head?: unknown }>(request);
+export interface WorkRequest {
+  plan: string;
+  head?: string;
+  tree?: string;
+}
+
+export async function readWork(request: IncomingMessage): Promise<WorkRequest | undefined> {
+  const body = await readJsonSafely<{ plan?: unknown; head?: unknown; tree?: unknown }>(request);
   const plan = body?.plan;
   if (typeof plan !== "string" || plan.trim() === "") return undefined;
-  return { plan, ...(typeof body?.head === "string" ? { head: body.head } : {}) };
+  return { plan, ...stringFields(body!, ["head", "tree"]) };
+}
+
+function stringFields<K extends string>(
+  body: Partial<Record<K, unknown>>,
+  keys: readonly K[],
+): Partial<Record<K, string>> {
+  return Object.fromEntries(
+    keys.flatMap((key) => (typeof body[key] === "string" ? [[key, body[key]]] : [])),
+  ) as Partial<Record<K, string>>;
 }
 
 export async function parseApproved(request: IncomingMessage): Promise<string[] | undefined> {

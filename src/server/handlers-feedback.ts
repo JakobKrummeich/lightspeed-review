@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { withAgentReplies, withFeedback } from "../feedback.ts";
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
-import type { FeedbackPrompt, SessionRecord } from "../session-types.ts";
+import type { AgentTurn, FeedbackPrompt, SessionRecord } from "../session-types.ts";
 import { nextThreadId } from "../threads.ts";
 import { turnFacts } from "../turn.ts";
 import { handbackOf, isRerun, withHandback } from "../turn-moves.ts";
@@ -186,12 +186,22 @@ export async function handleAgentReply(
 function replyRefusal(session: SessionRecord, reply: ReplyRequest): DomainErrorBody | undefined {
   const turn = session.turn;
   if (turn.holder === "reviewer") return reviewerHolds(session, "reply");
-  if (turn.mode === "working" && (reply.head !== turn.head || reply.clean !== true)) {
+  const changed = turn.mode === "working" ? changedSinceWork(turn, reply) : undefined;
+  if (changed !== undefined) {
     return stillWorking(
       session,
-      "reply from working is only for when nothing has changed since `work`: HEAD has moved" +
-        " or the tree is dirty, and the reviewer would be answering beside half-written code",
+      `reply from working is only for when nothing has changed since \`work\`: ${changed},` +
+        " and the reviewer would be answering beside half-written code",
     );
   }
   return unknownNotes(session, reply.replies);
+}
+
+/** Which condition failed, named: "HEAD moved or the tree is dirty" sent agents hunting. */
+function changedSinceWork(turn: AgentTurn, reply: ReplyRequest): string | undefined {
+  if (turn.head === undefined) return "no HEAD was recorded at work, so nothing vouches for it";
+  if (reply.head !== turn.head) return "HEAD moved since work";
+  // A turn declared before the tree was recorded can only ask for a clean one.
+  if (turn.tree === undefined) return reply.clean === true ? undefined : "the tree is dirty";
+  return reply.tree === turn.tree ? undefined : "the working tree changed since work";
 }

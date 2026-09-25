@@ -30,10 +30,10 @@ export function parseWorkArgs(args: string[]): VerbArgs {
 export async function runWork(input: WorkInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const target = `${input.branch} ${input.base}`;
-  const { head } = branchState(input.repoRoot, input.branch);
+  const { head, tree } = branchState(input.repoRoot, input.branch);
   const declared = (await apiRequest(
     `${serverOrigin(input.port)}/api/session/${key}/work`,
-    jsonPost({ plan: input.plan, ...(head === undefined ? {} : { head }) }),
+    jsonPost({ plan: input.plan, head, tree }),
     { key, target },
   )) as Partial<TurnFacts> & { changed?: boolean; open?: string[] };
   return {

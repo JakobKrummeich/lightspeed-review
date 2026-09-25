@@ -40,6 +40,12 @@ export interface AgentTurn {
    * protect, so talking instead of publishing loses nothing.
    */
   head?: string;
+  /**
+   * `git status --porcelain` hashed when `work` was declared: the tree a
+   * `reply` from `working` must still match. Absent on turns declared before
+   * it was recorded, which fall back to requiring a clean tree.
+   */
+  tree?: string;
 }
 
 /**

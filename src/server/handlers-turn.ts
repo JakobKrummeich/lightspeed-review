@@ -31,10 +31,10 @@ export async function handleWork(
   // Redeclaring rewrites the plan and keeps the HEAD the work started from:
   // that HEAD is what a later `reply` from working is measured against.
   const changed = turn.mode !== "working" || turn.note !== work.plan;
-  const head = turn.mode === "working" ? turn.head : work.head;
+  const found = turn.mode === "working" ? { head: turn.head, tree: turn.tree } : work;
   const updated: SessionRecord = {
     ...session,
-    turn: agentWorking(now, work.plan, head),
+    turn: agentWorking(now, work.plan, found),
     updatedAt: now,
   };
   context.store.save(updated);

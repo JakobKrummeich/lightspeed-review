@@ -19,13 +19,19 @@ export function agentDigesting(now: string): Turn {
   return { holder: "agent", mode: "digesting", at: now };
 }
 
-export function agentWorking(now: string, note: string, head?: string): Turn {
+/** `at` is where `work` found the branch: its tip and its tree. */
+export function agentWorking(
+  now: string,
+  note: string,
+  at: { head?: string; tree?: string } = {},
+): Turn {
   return {
     holder: "agent",
     mode: "working",
     at: now,
     note,
-    ...(head === undefined ? {} : { head }),
+    ...(at.head === undefined ? {} : { head: at.head }),
+    ...(at.tree === undefined ? {} : { tree: at.tree }),
   };
 }
 

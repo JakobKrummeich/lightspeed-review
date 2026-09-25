@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parsePublishArgs } from "../../src/commands/publish.ts";
 import { parseReplyArgs, runReply } from "../../src/commands/reply.ts";
+import { runWork } from "../../src/commands/work.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer } from "../../src/server.ts";
@@ -313,6 +314,70 @@ test("a reply from working after new commits is refused", async () => {
       const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "?" }]));
 
       assert.equal(error.code, "turn_still_yours");
+    },
+  );
+});
+
+function work(port: number, repoRoot: string) {
+  return runWork({ repoRoot, branch: BRANCH, base: BASE, port, plan: "the plan" });
+}
+
+/**
+ * Measured against the tree `work` found, not against a clean one: a stray
+ * untracked file there when work began is not half-written code.
+ */
+test("a reply from working over a tree dirty since before work is legal", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, store, repoRoot, key }) => {
+      writeFileSync(join(repoRoot, "notes.txt"), "the agent's scratch\n");
+      await work(port, repoRoot);
+
+      await reply(port, repoRoot, [{ to: "t1", text: "one question first" }]);
+
+      assert.equal(store.get(key)!.turn.holder, "reviewer");
+    },
+  );
+});
+
+test("a reply from working after an edit names the tree as what changed", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, repoRoot }) => {
+      await work(port, repoRoot);
+      writeFileSync(join(repoRoot, "a.txt"), "half-written\n");
+
+      const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "?" }]));
+
+      assert.equal(error.code, "turn_still_yours");
+      assert.match(error.detail ?? "", /the working tree changed since work/);
+      assert.doesNotMatch(error.detail ?? "", /HEAD/);
+    },
+  );
+});
+
+test("a reply from working after a commit names HEAD as what moved", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, repoRoot }) => {
+      await work(port, repoRoot);
+      execFileSync("git", ["commit", "-q", "--allow-empty", "-m", "two"], { cwd: repoRoot });
+
+      const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "?" }]));
+
+      assert.match(error.detail ?? "", /HEAD moved since work/);
+    },
+  );
+});
+
+test("a reply from a working turn that recorded no HEAD says so", async () => {
+  await withServer(
+    (repoRoot) =>
+      session(repoRoot, { turn: { holder: "agent", mode: "working", at: AT, note: "p" } }),
+    async ({ port, repoRoot }) => {
+      const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "?" }]));
+
+      assert.match(error.detail ?? "", /no HEAD was recorded at work/);
     },
   );
 });
