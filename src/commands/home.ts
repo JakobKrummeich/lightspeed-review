@@ -1,6 +1,7 @@
 import { REACHABLE_MODELS } from "../config.ts";
 import type { StructuredOutput } from "../output.ts";
 import type { SessionRecord } from "../session-store.ts";
+import { startCall } from "../start-call.ts";
 import { roundNumber, turnLabel, type HelpForm, type TurnLabel } from "../turn.ts";
 
 export interface SessionSummary {
@@ -22,15 +23,6 @@ export interface SessionSummary {
    * columns.
    */
   note?: string;
-}
-
-/**
- * `--intent` is not optional — a `start` without one exits 2 on
- * `intent_missing` — so no help line may spell one without it, whatever else
- * that line is about: a dead server, a corrupt session file, a 404.
- */
-export function startCall(target: string): string {
-  return `lightspeed start ${target} --intent "<why this branch exists>"`;
 }
 
 export const HELP_START = `Run \`${startCall("<branch> [base]")}\` to open a review session; repeat --intent once per reason`;

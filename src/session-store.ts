@@ -4,7 +4,7 @@ import type { DiffFileStatus, DiffGroup } from "./diff-extract.ts";
 import { trailSweeps } from "./group-tier.ts";
 import type { GroupingMode } from "./llm/grouping.ts";
 import { ReviewError } from "./errors.ts";
-import { startCall } from "./commands/home.ts";
+import { startCall } from "./start-call.ts";
 import { sessionFilePath, sessionsDirPath } from "./paths.ts";
 
 export type SessionStatus = "open" | "feedback" | "ended";

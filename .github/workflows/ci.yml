@@ -44,6 +44,11 @@ jobs:
       # Fails past 1% duplicated lines in src/, scripts/ and bin/ (.jscpd.json).
       - run: pnpm run dup
 
+      # Module boundaries in src/, scripts/ and bin/ (.dependency-cruiser.mjs): no
+      # import cycles, src/server/ only via server.ts, no test/ imports, and
+      # src/commands/ only from cli.ts.
+      - run: pnpm run arch
+
       # Runtime dependencies only: dev tooling never ships to a user. High and
       # critical only, so a moderate advisory with no upgrade yet cannot hold
       # every PR hostage. CI-only, not a maintenance-agent gate — see

@@ -2,7 +2,7 @@ import { request as httpRequest } from "node:http";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import { apiRequest, jsonPost, parseBody, type SessionRef } from "./api-client.ts";
-import { startCall } from "./home.ts";
+import { startCall } from "../start-call.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
