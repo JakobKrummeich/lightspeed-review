@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { migrateV2 } from "../src/session-migrate.ts";
 import type { SessionRecord } from "../src/session-types.ts";
@@ -32,9 +33,21 @@ test("2.x's reading turn becomes digesting, with the batch rebuilt from the revi
     v2Session({
       turn: { holder: "agent", mode: "reading", at: "2024-01-03T00:00:00.000Z" },
       conversation: [
-        { role: "reviewer", at: "a", prompts: [{ type: "message", id: "t1", comment: "old" }] },
-        { role: "agent", at: "b", prompts: [{ type: "reply", thread: "t1", comment: "ok" }] },
-        { role: "reviewer", at: "c", prompts: [{ type: "message", id: "t2", comment: "new" }] },
+        {
+          role: "reviewer",
+          at: "2024-01-01T00:00:00.000Z",
+          prompts: [{ type: "message", id: "t1", comment: "old" }],
+        },
+        {
+          role: "agent",
+          at: "2024-01-01T01:00:00.000Z",
+          prompts: [{ type: "reply", thread: "t1", comment: "ok" }],
+        },
+        {
+          role: "reviewer",
+          at: "2024-01-02T00:00:00.000Z",
+          prompts: [{ type: "message", id: "t2", comment: "new" }],
+        },
       ],
     }),
   );
@@ -69,7 +82,7 @@ test("an agent turn that already carries a batch keeps it", () => {
   const migrated = migrateV2(
     v2Session({ turn: { holder: "agent", mode: "digesting", at: "x" }, batch }),
   );
-  assert.equal(migrated.batch, batch);
+  assert.deepEqual(migrated.batch, batch);
 });
 
 test("an unconfirmed delivery goes back to the head of the queue and the turn back to the reviewer", () => {
@@ -88,15 +101,18 @@ test("an unconfirmed delivery goes back to the head of the queue and the turn ba
   assert.equal(migrated.batch, undefined);
 });
 
-test("an unconfirmed delivery under a working turn leaves the turn alone", () => {
+test("an unconfirmed delivery under a working turn is the batch being worked on, not queued again", () => {
+  const delivered = { type: "message", id: "t1", comment: "x" };
   const migrated = migrateV2(
     v2Session({
       turn: { holder: "agent", mode: "working", at: "w" },
-      delivering: { id: "d", prompts: [{ type: "message", id: "t1", comment: "x" }], at: "w" },
+      conversation: [{ role: "reviewer", at: "v", prompts: [delivered] }],
+      delivering: { id: "d", prompts: [delivered], at: "v" },
     }),
   );
   assert.equal(migrated.turn.holder, "agent");
-  assert.equal(migrated.pending.length, 1);
+  assert.equal(migrated.pending.length, 0, "working means it was read: never delivered twice");
+  assert.deepEqual(migrated.batch?.prompts, [delivered]);
 });
 
 test("say --for answers become agent replies in their thread, placed by time", () => {
@@ -180,4 +196,52 @@ test("a session 3.0 wrote comes through unchanged", () => {
     pending: [{ type: "message", id: "t1", comment: "c" }],
   });
   assert.deepEqual(migrateV2(session), session);
+});
+
+/**
+ * A real 2.x file: the agent was reading its first batch, answered one item
+ * with `say --for` and chatted once, and the reviewer queued two more items
+ * meanwhile — which 2.x recorded both in the conversation and in `pending`.
+ */
+function realV2(): SessionRecord {
+  const url = new URL("./fixtures/sessions/v2-reading.json", import.meta.url);
+  return JSON.parse(readFileSync(url, "utf8")) as SessionRecord;
+}
+
+function words(prompts: readonly { type: string }[]): string[] {
+  return prompts.map((prompt) => (prompt as { comment?: string }).comment ?? prompt.type);
+}
+
+test("a real 2.x reading session: the agent holds the batch it was delivered, the queue stays queued, nothing twice", () => {
+  const migrated = migrateV2(realV2());
+
+  assert.deepEqual(migrated.turn, {
+    holder: "agent",
+    mode: "digesting",
+    at: "2026-09-25T22:10:54.083Z",
+  });
+  assert.deepEqual(words(migrated.batch!.prompts), ["why 2?", "general v2 q"]);
+  assert.deepEqual(words(migrated.pending), ["queued while reading", "queued line"]);
+  const batchIds = migrated.batch!.prompts.map((prompt) => (prompt as { id?: string }).id);
+  const pendingIds = migrated.pending.map((prompt) => (prompt as { id?: string }).id);
+  assert.deepEqual(batchIds, ["evt_0muhilres_0004", "t1"]);
+  assert.deepEqual(pendingIds, ["t2", "evt_0muhilv37_0009"]);
+  // The id-less message reads as the same thread in the conversation as in the batch.
+  const said = migrated.conversation.flatMap((entry) => entry.prompts);
+  assert.ok(said.some((prompt) => prompt.type === "message" && prompt.id === "t1"));
+  assert.ok(said.some((prompt) => prompt.type === "message" && prompt.id === "t2"));
+});
+
+test("a 2.x agent turn whose every recent word is still queued goes back to the reviewer", () => {
+  const queued = { type: "message", comment: "queued while reading" };
+  const migrated = migrateV2(
+    v2Session({
+      turn: { holder: "agent", mode: "reading", at: "2024-01-03T00:00:00.000Z" },
+      conversation: [{ role: "reviewer", at: "2024-01-02T00:00:00.000Z", prompts: [queued] }],
+      pending: [queued],
+    }),
+  );
+  assert.deepEqual(migrated.turn, { holder: "reviewer", at: "2024-01-03T00:00:00.000Z" });
+  assert.equal(migrated.batch, undefined);
+  assert.equal(migrated.pending.length, 1);
 });

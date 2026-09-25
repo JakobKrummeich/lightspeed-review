@@ -23,7 +23,7 @@ interface V2Fields {
  */
 export function migrateV2(parsed: SessionRecord & V2Fields): SessionRecord {
   const withTurn = { ...parsed, turn: migratedTurn(parsed) } as SessionRecord & V2Fields;
-  return withBatch(withIds(withAnswers(withRecoveredDelivery(withTurn))));
+  return withIds(withBatch(withAnswers(withRecoveredDelivery(withTurn))));
 }
 
 /**
@@ -43,16 +43,22 @@ function migratedTurn(parsed: SessionRecord & V2Fields): Turn {
 /**
  * A 2.x delivery nobody confirmed goes back to the head of the queue, as
  * 2.x's own next poll would have put it — and a digesting turn goes back with
- * it, or the agent would be holding a batch that is also still queued.
+ * it, or the agent would be holding a batch that is also still queued. Under a
+ * working turn it was read — the agent declared work on it — so it is the
+ * batch, and queuing it again would hand the reviewer's words over twice.
  */
 function withRecoveredDelivery(session: SessionRecord & V2Fields): SessionRecord & V2Fields {
   if (session.delivering === undefined) return session;
   const { delivering, ...rest } = session;
-  const digesting = session.turn.holder === "agent" && session.turn.mode === "digesting";
+  const turn = session.turn;
+  if (turn.holder === "agent" && turn.mode === "working") {
+    const { id, prompts, at } = delivering;
+    return { ...rest, batch: { id, prompts, at, acked: true } };
+  }
   return {
     ...rest,
     pending: [...delivering.prompts, ...session.pending],
-    ...(digesting ? { turn: { holder: "reviewer" as const, at: session.turn.at } } : {}),
+    ...(turn.holder === "agent" ? { turn: { holder: "reviewer" as const, at: turn.at } } : {}),
   };
 }
 
@@ -77,52 +83,94 @@ function withAnswers(session: SessionRecord & V2Fields): SessionRecord & V2Field
 }
 
 /**
- * 2.x minted no id for a general message, so a queued one would reach the
- * agent as an item it cannot reply to. It gets a thread id here — in the queue
- * and on the conversation entry that recorded it.
+ * 2.x minted no id for a general message (and none for a line comment with the
+ * ledger off), so such an item would reach the agent as one it cannot reply
+ * to. It gets a thread id here — in the batch, in the queue, and on the
+ * conversation entry that recorded it. The batch first: it was sent first.
  */
 function withIds(session: SessionRecord): SessionRecord {
   let conversation = session.conversation;
-  let minted = [...conversation.flatMap((entry) => entry.prompts), ...session.pending];
-  const pending = session.pending.map((prompt) => {
-    if (prompt.type !== "message" || prompt.id !== undefined) return prompt;
-    const id = nextThreadId(minted);
-    const named = { ...prompt, id };
+  let minted = [
+    ...conversation.flatMap((entry) => entry.prompts),
+    ...session.pending,
+    ...(session.batch?.prompts ?? []),
+  ];
+  const name = (prompt: FeedbackPrompt, latest: boolean): FeedbackPrompt => {
+    if (prompt.type === "reply" || prompt.type === "resolve" || prompt.id !== undefined) {
+      return prompt;
+    }
+    const named = { ...prompt, id: nextThreadId(minted) };
     minted = [...minted, named];
-    conversation = namedInConversation(conversation, prompt.comment, id);
+    conversation = namedInConversation(conversation, prompt, named, latest);
     return named;
-  });
-  return { ...session, pending, conversation };
+  };
+  const batch = session.batch && {
+    ...session.batch,
+    prompts: session.batch.prompts.map((prompt) => name(prompt, false)),
+  };
+  const pending = session.pending.map((prompt) => name(prompt, true));
+  return { ...session, pending, conversation, ...(batch === undefined ? {} : { batch }) };
 }
 
+/**
+ * The same words stand in the conversation without an id; the queue's copy is
+ * the latest one, the batch's the earliest.
+ */
 function namedInConversation(
   conversation: ConversationEntry[],
-  comment: string,
-  id: string,
+  unnamed: FeedbackPrompt,
+  named: FeedbackPrompt,
+  latest: boolean,
 ): ConversationEntry[] {
-  const at = conversation.findLastIndex((entry) =>
-    entry.prompts.some((p) => p.type === "message" && p.id === undefined && p.comment === comment),
-  );
+  const same = (prompt: FeedbackPrompt) => identity(prompt) === identity(unnamed);
+  const holds = (entry: ConversationEntry) => entry.prompts.some(same);
+  const at = latest ? conversation.findLastIndex(holds) : conversation.findIndex(holds);
   if (at === -1) return conversation;
   const entry = conversation[at]!;
-  const prompts = entry.prompts.map((p) =>
-    p.type === "message" && p.id === undefined && p.comment === comment ? { ...p, id } : p,
-  );
-  return conversation.map((e, index) => (index === at ? { ...entry, prompts } : e));
+  const index = entry.prompts.findIndex(same);
+  const prompts = entry.prompts.map((prompt, position) => (position === index ? named : prompt));
+  return conversation.map((e, position) => (position === at ? { ...entry, prompts } : e));
+}
+
+function identity(prompt: FeedbackPrompt): string {
+  return JSON.stringify(prompt);
 }
 
 /**
  * A 2.x agent turn has no batch on record — the delivery was confirmed and
- * dropped. What it was holding is rebuilt from the reviewer's words since the
- * agent last spoke, so a re-attaching `open` is handed something to digest.
+ * dropped. What it was holding is rebuilt from the reviewer's words up to the
+ * moment the turn moved (2.x moved it on delivery), since the agent last spoke
+ * before then — minus whatever is still queued, which 2.x also wrote into the
+ * conversation and which the next delivery hands over. When the queue took
+ * every word, the agent was handed nothing: the turn goes back to the reviewer.
  */
 function withBatch(session: SessionRecord): SessionRecord {
-  if (session.turn.holder !== "agent" || session.batch !== undefined) return session;
-  const lastAgent = session.conversation.findLastIndex((entry) => entry.role === "agent");
-  const prompts = session.conversation
+  const turn = session.turn;
+  if (turn.holder !== "agent" || session.batch !== undefined) return session;
+  const said = session.conversation;
+  const lastAgent = said.findLastIndex((entry) => entry.role === "agent" && entry.at < turn.at);
+  const sent = said
     .slice(lastAgent + 1)
-    .filter((entry) => entry.role === "reviewer")
+    .filter((entry) => entry.role === "reviewer" && entry.at <= turn.at)
     .flatMap((entry) => entry.prompts);
-  const batch: Batch = { id: "migrated", prompts, at: session.turn.at, acked: true };
+  const prompts = withoutQueued(sent, session.pending);
+  // Only when the queue accounts for every word: an agent turn with nothing
+  // said since is still the agent's, but one whose every word is still queued
+  // was handed nothing.
+  if (prompts.length === 0 && sent.length > 0 && turn.mode === "digesting") {
+    return { ...session, turn: { holder: "reviewer", at: turn.at } };
+  }
+  const batch: Batch = { id: "migrated", prompts, at: turn.at, acked: true };
   return { ...session, batch };
+}
+
+/** Each queued item cancels one identical sent one: the same words may be said twice. */
+function withoutQueued(sent: FeedbackPrompt[], queued: FeedbackPrompt[]): FeedbackPrompt[] {
+  const left = queued.map(identity);
+  return sent.filter((prompt) => {
+    const at = left.indexOf(identity(prompt));
+    if (at === -1) return true;
+    left.splice(at, 1);
+    return false;
+  });
 }

@@ -4,6 +4,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import type { SessionRecord } from "../src/session-store.ts";
 import {
   annotation,
@@ -590,5 +591,27 @@ test("publish on no session is a 404, and on an ended one a 409", async () => {
     const { key } = await postSession(url);
     await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
     assert.equal((await publish(url)).status, 409);
+  });
+});
+
+/** Finding 3: 2.x wrote queued words into the conversation too; they must reach the agent once. */
+test("a real 2.x session re-attached under 3.0 hands over its batch, then its queue, each once", async () => {
+  await withServer(async ({ url, store }) => {
+    const fixture = new URL("./fixtures/sessions/v2-reading.json", import.meta.url);
+    const v2 = JSON.parse(readFileSync(fixture, "utf8")) as SessionRecord;
+    store.save(v2);
+
+    const held = await pollAndAck(url, v2.key);
+    const reviewerSaid = (items: unknown) =>
+      (items as { reviewer: string[] }[]).map((item) => item.reviewer.join(" "));
+    assert.deepEqual(reviewerSaid(held.items), ["why 2?", "general v2 q"]);
+
+    const replied = await postReply(url, v2.key, {
+      replies: [{ to: "t1", text: "answered" }],
+    });
+    assert.equal(replied.status, 200);
+    const next = await pollAndAck(url, v2.key);
+    assert.deepEqual(reviewerSaid(next.items), ["queued while reading", "queued line"]);
+    assert.equal(store.get(v2.key)!.pending.length, 0);
   });
 });
