@@ -11,6 +11,5 @@ dist/
 # part of the project. `lightspeed init --agent pi` writes the one skill this
 # project does own, wherever the contributor wants it.
 .pi/
-.maintenance-agent.yaml
 # pnpm owns the lockfile; install.sh's npm fallback is told not to write one.
 package-lock.json

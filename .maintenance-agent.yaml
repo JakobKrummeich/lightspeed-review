@@ -1,0 +1,43 @@
+# maintenance-agent target config. Local to this machine: the tool it drives is
+# not part of the repository, so the file is gitignored.
+version: 1
+base_branch: main
+delivery: github # github | no-mistakes | push-only
+diff_limit: 200
+churn_paths: [src, scripts, bin, test]
+protected_paths: [] # paths the agent must never touch
+setup: pnpm install --frozen-lockfile
+gates: # the five checks CI runs (.github/workflows/ci.yml)
+  - name: test
+    run: pnpm test
+  - name: typecheck
+    run: pnpm typecheck
+  - name: lint
+    run: pnpm lint
+  - name: format
+    run: pnpm format:check
+  - name: skill
+    run: pnpm build:skill --check
+# Analyzer tooling is fetched on demand or already a devDependency: an absolute
+# path into one machine's tool directory is an analyzer nobody else can run.
+# eslint's `unix` formatter left core in v9, so awk carries the file name over
+# from stylish's header line rather than adding a dependency for one report.
+analyzers:
+  - name: near-limit-functions
+    # Folded, because the awk prints `file: line` and a bare `: ` would make YAML
+    # read the rest of the command as a nested mapping.
+    run: >-
+      ./node_modules/.bin/eslint --no-inline-config --rule
+      '{"complexity":["warn",4],"max-lines-per-function":["warn",{"max":39,"skipBlankLines":true,"skipComments":true}]}'
+      'src/**/*.ts' 'scripts/**/*.ts' | awk '/^\//{file=$0} /complexity of [5-9]|complexity
+      of [0-9][0-9]|too many lines/{print file": "$0}'
+    note: "repo gates are CC<=7 and 60 lines; these functions are within one step of the limit — early decay warning"
+  - name: duplication
+    run: npx -y jscpd --min-tokens 70 --reporters consoleFull src scripts | grep -E 'Clone found|^ - |^   [a-zA-Z]|Found [0-9]+ .*clones'
+    note: "clones that must stay in sync are latent divergence bugs"
+  - name: possibly-dead-exports
+    run: npx -y knip --no-exit-code --reporter compact
+    note: "CAUTION - exported types and entry points may be intentional API; verify each before deleting"
+  - name: coverage-weak-spots
+    run: node --experimental-test-coverage --test 'test/**/*.test.ts' 2>/dev/null | grep -E '^# .*\.(ts|js|css).*\|' | awk -F'|' '{v=$2; gsub(/ /,"",v); if (v+0 < 95) print}'
+    note: "files under 95% line coverage (basenames from coverage tree - resolve full path; files never imported by tests are absent entirely)"
