@@ -202,7 +202,9 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
     description:
       "Print the integration instructions for one coding agent as raw markdown —" +
       " redirect stdout into the file that agent reads. `lightspeed init` does the" +
-      " redirecting for you; this is the escape hatch for a path of your own",
+      " redirecting for you; this is the escape hatch for a path of your own. codex," +
+      " opencode and vscode get it between lightspeed:start/end markers, so a copy" +
+      " appended to a shared file is refreshed like the block `init` writes",
     flags: {
       "--agent <id>": `one of ${SKILL_AGENTS.join(", ")}; defaults to pi`,
     },
@@ -224,9 +226,11 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
   },
 };
 
-export function commandHelp(command: string): string | undefined {
+/** `notice` rides along after the page, so a stale skill is reported on the
+ * help an agent reads most. */
+export function commandHelp(command: string, notice: StructuredOutput = {}): string | undefined {
   const help = COMMAND_HELP[command];
-  return help === undefined ? undefined : `${renderToon(help)}\n`;
+  return help === undefined ? undefined : `${renderToon({ ...help, ...notice })}\n`;
 }
 
 /**

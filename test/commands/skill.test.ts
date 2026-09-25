@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { parseSkillArgs, runSkill } from "../../src/commands/skill.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { renderSkill, SKILL_AGENTS } from "../../src/skill.ts";
-import { readStamp, stampSkill } from "../../src/skill-stamp.ts";
+import { readStamp, stampedSkillFor, stampSkill } from "../../src/skill-stamp.ts";
 import { CLI_VERSION } from "../../src/version.ts";
 
 test("pi and claude-code get the checked-in SKILL.md form, stamped", () => {
@@ -25,13 +25,25 @@ test("every dialect is stamped with the version of the CLI that printed it", () 
 test("codex, opencode and vscode get plain markdown without frontmatter", () => {
   for (const agent of ["codex", "opencode", "vscode"]) {
     const output = runSkill({ agent });
-    assert.match(output, /^<!-- written by lightspeed .*-->\n# lightspeed\n/, agent);
+    assert.match(output, /^<!-- written by lightspeed .*-->\n# lightspeed\n/m, agent);
     // Frontmatter is a leading `---` block, not any `---` anywhere: the body has a
     // markdown table in it, whose separator row is dashes too.
     assert.doesNotMatch(output, /^---$/m, `${agent} carries no frontmatter`);
     assert.doesNotMatch(output, /^name: lightspeed$/m, agent);
     assert.match(output, /## The loop/, agent);
     assert.match(output, /Use when work is ready for review/, agent);
+  }
+});
+
+/** A copy appended to a shared AGENTS.md is then a block the freshness pass
+ * owns, the same as one `init` merged in. */
+test("codex, opencode and vscode get their skill between the lightspeed markers", () => {
+  for (const agent of ["codex", "opencode", "vscode"] as const) {
+    assert.equal(
+      runSkill({ agent }),
+      `<!-- lightspeed:start -->\n${stampedSkillFor(agent, CLI_VERSION).trimEnd()}\n<!-- lightspeed:end -->`,
+      agent,
+    );
   }
 });
 

@@ -2,7 +2,7 @@ import type { StructuredOutput } from "./output.ts";
 import {
   installSkill,
   knownSkillTargets,
-  ownedSkillText,
+  readSkillText,
   type InitRoots,
   type KnownTarget,
 } from "./skill-install.ts";
@@ -28,8 +28,9 @@ type Verdict = { kind: "current" } | { kind: "refresh" } | { kind: "stale"; prob
  * Runs before every command. An agent reads its skill once, at startup, and
  * trusts it; `lightspeed init` was the only thing that ever updated one, and
  * nobody re-ran it after an upgrade — so skills went on teaching verbs the CLI
- * had removed. A skill lightspeed stamped and nobody edited is rewritten here
- * without a word; any other lightspeed skill is left as it is and reported.
+ * had removed. A machine-wide skill lightspeed stamped and nobody edited is
+ * rewritten here without a word; any other lightspeed skill is left as it is
+ * and reported.
  *
  * Kept cheap enough to run on every call: no network, one read per known path
  * (ten at most), and a write only when a stamped skill is behind.
@@ -39,7 +40,8 @@ export function refreshSkills(roots: InitRoots, version: string = CLI_VERSION): 
 }
 
 function refreshOne(known: KnownTarget, version: string): StaleSkill[] {
-  const owned = ownedSkillText(known.target);
+  const { owned, rest } = readSkillText(known.target);
+  if (readStamp(rest) !== undefined) return [staleSkill(known, OUTSIDE_BLOCK)];
   if (owned === undefined) return [];
   const verdict = judge(owned, known, version);
   if (verdict.kind === "current") return [];
@@ -64,6 +66,15 @@ function judge(owned: string, known: KnownTarget, version: string): Verdict {
     };
   }
   if (stamp.content === renderedContentHash(known.agent)) return { kind: "current" };
+  // A rewrite in a repository is a dirty tracked file nobody asked for.
+  if (known.scope === "project") {
+    return {
+      kind: "stale",
+      problem:
+        `written by lightspeed ${stamp.version} and behind this ${version};` +
+        " a repository's skill is reported, never rewritten",
+    };
+  }
   return { kind: "refresh" };
 }
 
@@ -74,6 +85,12 @@ function judge(owned: string, known: KnownTarget, version: string): Verdict {
 const UNSTAMPED =
   "no lightspeed version stamp: written by hand or by an older lightspeed," +
   " so it may teach commands this CLI no longer has";
+
+/** Without its markers nothing says where the pasted skill ends, so rewriting
+ * it could eat the user's own lines after it. */
+const OUTSIDE_BLOCK =
+  "a lightspeed skill outside the lightspeed:start/end markers, which lightspeed" +
+  " cannot rewrite in place: delete it, then run the fix";
 
 /** A skill that could not be refreshed is a notice, never a failed command:
  * the review the agent came for does not depend on it. */

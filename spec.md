@@ -246,7 +246,8 @@ lightspeed init --agent <id> [--scope global|project] [--config]
 lightspeed skill --agent <id>
   # Print the integration instructions in the dialect one coding agent expects,
   #   stamped like init's; redirect stdout into the file that agent reads.
-  #   --agent defaults to pi.
+  #   codex, opencode and vscode get it between the lightspeed:start/end
+  #   markers, like init's block. --agent defaults to pi.
   #   pi → .pi/skills/lightspeed/SKILL.md (repo) or ~/.pi/agent/skills/… (machine)
   #   claude-code → .claude/skills/lightspeed/SKILL.md or ~/.claude/skills/…
   #   codex → append to AGENTS.md
@@ -264,7 +265,7 @@ or `skill` writes carries one stamp line (under the frontmatter, or first in the
 plain dialect and inside the `<!-- lightspeed:start -->` block):
 
 ```
-<!-- written by lightspeed 2.2.0 for pi; content 0123456789abcdef; lightspeed rewrites this file when it upgrades, unless it was edited -->
+<!-- written by lightspeed 2.2.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 `content` hashes the skill as written. Before every command except `init`, the
@@ -273,16 +274,20 @@ the project ones under the working directory, no network, one read per path —
 and for each lightspeed skill it finds:
 
 - stamped, unedited (hash matches), stamp version ≤ the CLI's, content differs
-  from what this CLI renders → rewritten in place, silently;
+  from what this CLI renders → rewritten in place, silently, when it is
+  machine-wide (under `HOME`); reported, never rewritten, when it is a project
+  skill, since a rewrite would leave a tracked file dirty behind the user's back;
 - stamped and current → left alone;
 - unstamped (hand-written or pre-stamp), edited since stamped, stamped by a
-  newer lightspeed, or not writable → left alone and reported.
+  newer lightspeed, or not writable → left alone and reported;
+- a stamp line in a shared instructions file outside the lightspeed:start/end
+  markers → reported, never rewritten, since nothing says where it ends.
 
 A reported skill adds `skill_stale[N]{path,problem,fix}` to every TOON answer of
-that run, successes and failures alike; `fix` is
+that run, successes, failures and help pages alike; `fix` is
 `lightspeed init --agent <id> [--scope project], then restart your agent`. A
-shared instructions file with no lightspeed block is not a lightspeed skill and
-is never read further. `init` is exempt because it is the explicit install and
+shared instructions file with neither a lightspeed block nor a stamp is not a
+lightspeed skill and is never read further. `init` is exempt because it is the explicit install and
 its `--dry-run` writes nothing. `skill` prints its markdown untouched. Tests that
 spawn the CLI point `HOME` at a temporary directory, so a run of the suite never
 rewrites the developer's own skills.

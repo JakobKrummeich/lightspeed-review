@@ -25,7 +25,7 @@ export function stampedSkillFor(agent: SkillAgent, version: string): string {
 export function stampSkill(rendered: string, version: string, agent = "pi"): string {
   const line =
     `<!-- written by lightspeed ${version} for ${agent}; content ${contentHash(rendered)};` +
-    " lightspeed rewrites this file when it upgrades, unless it was edited -->\n";
+    " a later lightspeed refreshes or reports it, and never overwrites an edit -->\n";
   const at = afterFrontmatter(rendered);
   return `${rendered.slice(0, at)}${line}${rendered.slice(at)}`;
 }

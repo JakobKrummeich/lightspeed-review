@@ -103,5 +103,46 @@ test("skill prints the document alone, even while another skill is stale", async
   const { stdout, code } = await runCli(["skill", "--agent", "codex"], home);
 
   assert.equal(code, 0);
-  assert.equal(stdout, stampedSkillFor("codex", CLI_VERSION).trimEnd() + "\n");
+  assert.equal(
+    stdout,
+    `<!-- lightspeed:start -->\n${stampedSkillFor("codex", CLI_VERSION).trimEnd()}\n<!-- lightspeed:end -->\n`,
+  );
+});
+
+/** An agent on a stale skill reaches for help when a verb it was taught fails. */
+test("the top-level help carries skill_stale, asked for either way", async () => {
+  const { home } = homeWithPiSkill(PRE_STAMP_SKILL);
+
+  for (const args of [["--help"], ["help"]]) {
+    const { stdout, code } = await runCli(args, home);
+
+    assert.equal(code, 0, args.join(" "));
+    assert.match(stdout, /^commands:$/m, args.join(" "));
+    assert.match(stdout, /^skill_stale\[1\]\{path,problem,fix\}:$/m, args.join(" "));
+  }
+});
+
+test("a command's help carries skill_stale, asked for either way", async () => {
+  const { home } = homeWithPiSkill(PRE_STAMP_SKILL);
+
+  for (const args of [
+    ["start", "--help"],
+    ["help", "start"],
+  ]) {
+    const { stdout, code } = await runCli(args, home);
+
+    assert.equal(code, 0, args.join(" "));
+    assert.match(stdout, /^command: start$/m, args.join(" "));
+    assert.match(stdout, /^skill_stale\[1\]\{path,problem,fix\}:$/m, args.join(" "));
+  }
+});
+
+test("help reads as before when no installed skill is stale", async () => {
+  const { home } = homeWithPiSkill(stampedSkillFor("pi", CLI_VERSION));
+
+  for (const args of [["--help"], ["start", "--help"]]) {
+    const { stdout } = await runCli(args, home);
+
+    assert.doesNotMatch(stdout, /skill_stale/, args.join(" "));
+  }
 });

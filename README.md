@@ -349,15 +349,19 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 2.2.0 for pi; content 0123456789abcdef; lightspeed rewrites this file when it upgrades, unless it was edited -->
+<!-- written by lightspeed 2.2.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
-Every command then checks the places `init` writes to. A skill lightspeed
-stamped, that nobody has edited since, and that an older (or the same)
-version wrote is brought up to date in place, without a word. Anything else it
-recognises as a lightspeed skill — no stamp, edited by hand, written by a newer
-lightspeed, or not writable — it leaves alone, and every answer carries a notice
-until it is fixed:
+Every command then checks the places `init` writes to. A machine-wide skill
+(under your home directory) that lightspeed stamped, that nobody has edited
+since, and that an older (or the same) version wrote is brought up to date in
+place, without a word. A skill in a repository is never rewritten behind your
+back — that would leave a tracked file dirty — so a behind one there is reported
+instead. So is anything else it recognises as a lightspeed skill — no stamp,
+edited by hand, written by a newer lightspeed, pasted into a shared
+instructions file outside the lightspeed markers, or not writable. It leaves
+those alone, and every answer, help included, carries a notice until it is
+fixed:
 
 ```
 skill_stale[1]{path,problem,fix}:
@@ -381,8 +385,11 @@ mkdir -p ~/.config/opencode && lightspeed skill --agent opencode >> ~/.config/op
 mkdir -p .github && lightspeed skill --agent vscode > .github/copilot-instructions.md
 ```
 
-The `>>` rows append with no markers around them, so re-running one of those
-appends a second copy — which is what `init` exists to stop.
+codex, opencode and vscode get the skill between the same
+`<!-- lightspeed:start -->` / `<!-- lightspeed:end -->` markers `init` writes, so
+a copy written with `>` or `>>` is kept current exactly like one `init` wrote.
+Re-running a `>>` row still appends a second copy, which is then reported —
+`init` replaces its block in place instead.
 
 ## For agents
 
@@ -490,8 +497,8 @@ pulling the tests out of it would leave the group behind them empty.
 | `lightspeed logout <provider>`                      | Drop lightspeed's stored credential for one provider                                                              |
 
 Every command prints TOON on stdout — failures included, as
-`error: {code, message, detail}` plus `help[]`, and `skill_stale` when an
-installed skill is behind (see [Keeping the skill current](#keeping-the-skill-current)).
+`error: {code, message, detail}` plus `help[]`, and `skill_stale` (help pages
+too) when an installed skill is behind (see [Keeping the skill current](#keeping-the-skill-current)).
 The one exception is `skill`, whose stdout is the markdown document itself; its
 failures are still TOON.
 

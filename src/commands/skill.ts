@@ -1,5 +1,6 @@
 import { ReviewError, invocationError } from "../errors.ts";
 import { isSkillAgent, SKILL_AGENTS } from "../skill.ts";
+import { printedSkill } from "../skill-install.ts";
 import { stampedSkillFor } from "../skill-stamp.ts";
 import { CLI_VERSION } from "../version.ts";
 import { scanArgs } from "./args.ts";
@@ -10,12 +11,13 @@ export interface SkillInput {
 
 /** stdout is redirected straight into the file the named agent reads, so the
  * answer is raw markdown — deliberately not TOON, no trailing `help[]`. Failures
- * are still TOON like every other command's. Stamped like `init`'s, so a file
- * written this way is one a later CLI can refresh too. */
+ * are still TOON like every other command's. Stamped like `init`'s, and marked
+ * like its block for a shared file, so a copy written this way is one a later
+ * CLI can find and refresh too. */
 export function runSkill(input: SkillInput): string {
   const { agent } = input;
   if (!isSkillAgent(agent)) throw unknownAgent(agent);
-  return stampedSkillFor(agent, CLI_VERSION);
+  return printedSkill(agent, stampedSkillFor(agent, CLI_VERSION));
 }
 
 export function parseSkillArgs(args: string[]): SkillInput {

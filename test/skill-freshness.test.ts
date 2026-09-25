@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { refreshSkills, skillNoticeOutput } from "../src/skill-freshness.ts";
 import { stampedSkillFor, stampSkill } from "../src/skill-stamp.ts";
+import { printedSkill } from "../src/skill-install.ts";
 import { renderSkillFor } from "../src/skill.ts";
 
 interface Roots {
@@ -137,6 +138,84 @@ test("a marked block in a shared instructions file is refreshed and the prose ar
   assert.ok(contents.includes(stampedSkillFor("codex", "2.3.0").trimEnd()));
   assert.ok(contents.endsWith("<!-- lightspeed:end -->\n\nRun the tests.\n"));
   assert.ok(!contents.includes("lightspeed poll"));
+});
+
+test("a skill `skill` printed and appended to a shared file is refreshed like init's block", () => {
+  const place = roots();
+  const printed = printedSkill(
+    "codex",
+    stampSkill("# lightspeed\n\nRun `lightspeed poll`.\n", "2.0.0", "codex"),
+  );
+  const path = seed(join(place.home, ".codex/AGENTS.md"), `# House rules\n${printed}\n`);
+
+  assert.deepEqual(refreshSkills(place, "2.3.0"), []);
+  const contents = readFileSync(path, "utf8");
+  assert.ok(contents.startsWith("# House rules\n<!-- lightspeed:start -->\n"));
+  assert.ok(contents.includes(stampedSkillFor("codex", "2.3.0").trimEnd()));
+  assert.ok(!contents.includes("lightspeed poll"));
+});
+
+/** Without markers nothing says where the pasted skill ends, so it is reported
+ * rather than rewritten. */
+test("a stamped skill outside the markers of a shared file is reported and left as it was", () => {
+  const place = roots();
+  const pasted = `# House rules\n\n${stampSkill("# lightspeed\n\nRun `lightspeed poll`.\n", "2.0.0", "vscode")}`;
+  const path = seed(join(place.cwd, ".github/copilot-instructions.md"), pasted);
+
+  const stale = refreshSkills(place, "2.3.0");
+
+  assert.equal(stale.length, 1);
+  assert.equal(stale[0]!.path, path);
+  assert.match(stale[0]!.problem, /outside the lightspeed:start\/end markers/);
+  assert.equal(
+    stale[0]!.fix,
+    "lightspeed init --agent vscode --scope project, then restart your agent",
+  );
+  assert.equal(readFileSync(path, "utf8"), pasted);
+});
+
+test("a second stamped copy after lightspeed's block is reported, not left unseen", () => {
+  const place = roots();
+  const current = printedSkill("codex", stampedSkillFor("codex", "2.3.0"));
+  const stray = stampSkill("# lightspeed\n\nRun `lightspeed poll`.\n", "2.0.0", "codex");
+  const contents = `${current}\n\n${stray}`;
+  const path = seed(join(place.home, ".codex/AGENTS.md"), contents);
+
+  const stale = refreshSkills(place, "2.3.0");
+
+  assert.equal(stale.length, 1);
+  assert.match(stale[0]!.problem, /outside the lightspeed:start\/end markers/);
+  assert.equal(readFileSync(path, "utf8"), contents);
+});
+
+/** A rewrite inside a repository is a dirty tracked file its owner never asked for. */
+test("a stale stamped project skill is reported and its file left byte for byte", () => {
+  const place = roots();
+  const old = stampSkill(OLD_SKILL, "2.0.0", "claude-code");
+  const path = seed(join(place.cwd, ".claude/skills/lightspeed/SKILL.md"), old);
+
+  const stale = refreshSkills(place, "2.3.0");
+
+  assert.equal(stale.length, 1);
+  assert.equal(stale[0]!.path, path);
+  assert.match(stale[0]!.problem, /written by lightspeed 2\.0\.0 and behind this 2\.3\.0/);
+  assert.equal(
+    stale[0]!.fix,
+    "lightspeed init --agent claude-code --scope project, then restart your agent",
+  );
+  assert.equal(readFileSync(path, "utf8"), old);
+});
+
+test("a stale stamped block in a repository's shared AGENTS.md is reported, not rewritten", () => {
+  const place = roots();
+  const contents = `# House rules\n\n${printedSkill("codex", stampSkill("# lightspeed\n", "2.0.0", "codex"))}\n`;
+  const path = seed(join(place.cwd, "AGENTS.md"), contents);
+
+  const stale = refreshSkills(place, "2.3.0");
+
+  assert.equal(stale.length, 1);
+  assert.match(stale[0]!.problem, /behind this 2\.3\.0/);
+  assert.equal(readFileSync(path, "utf8"), contents);
 });
 
 test("a shared instructions file with no lightspeed block is left alone and not reported", () => {

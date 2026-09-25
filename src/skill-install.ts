@@ -143,16 +143,34 @@ export function installSkill(
   };
 }
 
+export interface SkillText {
+  owned: string | undefined;
+  rest: string;
+}
+
 /**
- * What lightspeed owns in a target: the whole file, or only what sits between
- * its markers — a shared instructions file without them holds nothing of ours.
+ * What lightspeed owns in a target — the whole file, or only what sits between
+ * its markers — and the rest, which is the user's. The rest is returned too: a
+ * skill pasted in without markers is one lightspeed cannot rewrite, since its
+ * extent is unknown, but its stamp still says whose it is.
  */
-export function ownedSkillText(target: SkillTarget): string | undefined {
-  const existing = readIfAny(target.path);
-  if (existing === undefined || target.mode === "file") return existing;
+export function readSkillText(target: SkillTarget): SkillText {
+  if (target.mode === "file") return { owned: readIfAny(target.path), rest: "" };
+  const existing = readIfAny(target.path) ?? "";
   const bounds = blockBounds(existing);
-  if (bounds === undefined) return undefined;
-  return existing.slice(bounds.start + BLOCK_START.length, bounds.end - BLOCK_END.length);
+  if (bounds === undefined) return { owned: undefined, rest: existing };
+  return {
+    owned: existing.slice(bounds.start + BLOCK_START.length, bounds.end - BLOCK_END.length),
+    rest: `${existing.slice(0, bounds.start)}${existing.slice(bounds.end)}`,
+  };
+}
+
+/**
+ * What `skill` prints. A shared-file agent's copy comes between the markers, so
+ * one appended by hand is a block a later CLI finds and refreshes like `init`'s.
+ */
+export function printedSkill(agent: SkillAgent, rendered: string): string {
+  return DESTINATIONS[agent].mode === "file" ? rendered : block(rendered);
 }
 
 function block(rendered: string): string {

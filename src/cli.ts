@@ -71,12 +71,15 @@ const HELP_ALL =
  * under the listing name the loop: three of eleven commands are it, and a flat
  * list cannot say which three.
  */
-const topLevelHelp = `${renderToon({
-  description,
-  commands: Object.fromEntries(COMMAND_NAMES.map((name) => [name, commandSummary(name)])),
-  flags: { "--all": HELP_ALL },
-  help: [TURN_RULE, HELP_START, HELP_WAIT, HELP_END],
-})}\n`;
+function topLevelHelp(notice: StructuredOutput): string {
+  return `${renderToon({
+    description,
+    commands: Object.fromEntries(COMMAND_NAMES.map((name) => [name, commandSummary(name)])),
+    flags: { "--all": HELP_ALL },
+    help: [TURN_RULE, HELP_START, HELP_WAIT, HELP_END],
+    ...notice,
+  })}\n`;
+}
 
 /**
  * `model` and `thinking` are read only by the one command that sends a diff to
@@ -375,8 +378,8 @@ if (leadingProblem !== undefined) {
       exitCode: exitCodeFor(error),
     }),
     version,
-    topLevelHelp,
-    getCommandHelp: commandHelp,
+    topLevelHelp: topLevelHelp(skillNotice),
+    getCommandHelp: (command) => commandHelp(command, skillNotice),
     renderUnknownCommand: unknownCommandOutput,
     commands: noticedCommands,
     home: () => withSkillNotice(homeOutput(homeInput(allRepos))),
