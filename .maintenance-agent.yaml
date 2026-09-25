@@ -18,6 +18,7 @@ protected_paths:
   - .prettierrc
   - .prettierignore
   - .jscpd.json
+  - .dependency-cruiser.mjs
   - .no-mistakes.yaml
   - .githooks
   - .maintenance-agent.yaml
@@ -40,6 +41,8 @@ gates:
     run: pnpm build:skill --check
   - name: duplication
     run: pnpm dup
+  - name: architecture
+    run: pnpm arch
 # Analyzer tooling is fetched on demand or already a devDependency: an absolute
 # path into one machine's tool directory is an analyzer nobody else can run.
 # eslint's `unix` formatter left core in v9, so awk carries the file name over

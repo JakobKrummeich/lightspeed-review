@@ -30,6 +30,7 @@ pnpm run test:coverage
 pnpm run format:check
 pnpm run build:skill --check
 pnpm run dup
+pnpm run arch
 pnpm audit --prod --audit-level=high
 ```
 
@@ -43,6 +44,14 @@ gate (`.no-mistakes.yaml`) runs `test:coverage` and `check`.
 - `dup` is jscpd over `src/`, `scripts/` and `bin/` (`.jscpd.json`), failing past
   1% duplicated lines. Tests are not scanned: spelling each case out in full is
   what makes it readable on its own.
+- `arch` is dependency-cruiser over the imports of `src/`, `scripts/` and `bin/`
+  (`.dependency-cruiser.mjs`; type-only imports count). No import cycles;
+  `src/server/` is imported only through `src/server.ts`; production code never
+  imports `test/`; `src/commands/` is the CLI's top layer, imported only by
+  `src/cli.ts` and itself. What core code and a command both need lives below
+  `commands/` (as `src/start-call.ts` does). The few modules that imported
+  `commands/` before the rule are listed in the config as known exceptions, to
+  be retired, not added to.
 - The audit covers runtime dependencies at high severity and above. It is not a
   gate for the maintenance agent, whose work an unrelated new advisory would
   otherwise block.
