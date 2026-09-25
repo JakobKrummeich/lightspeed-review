@@ -294,7 +294,26 @@ test("a reviewer's turn someone is listening on says to leave the wait running, 
   const next = output.next as Record<string, string>;
   assert.deepEqual(Object.keys(next), ["listening"]);
   assert.match(next.listening!, /already waiting/);
-  assert.doesNotMatch(next.listening!, /lightspeed open/);
+  assert.match(next.listening!, /leave it running/);
+});
+
+/**
+ * The waiter home sees may be a leftover from a killed session: an agent that
+ * cannot read its output must still have a way to take the batch.
+ */
+test("a wait the agent cannot see is taken over by re-attaching, which ends the old one", () => {
+  const output = homeOutput({
+    repoRoot: "/repo",
+    sessions: [record({ branch: "feat/tokens" })],
+    listening: true,
+  });
+
+  const listening = (output.next as Record<string, string>).listening!;
+  assert.match(
+    listening,
+    /cannot see that command's output, run `lightspeed open feat\/tokens main` now/,
+  );
+  assert.match(listening, /newest wait takes over and the old one exits/);
 });
 
 /** Sent, and nobody there to receive it: the one command that takes the batch. */
@@ -347,6 +366,9 @@ test("a digesting agent is told how to get the batch it lost, then the rule", ()
   const next = output.next as Record<string, string>;
   assert.equal(Object.keys(next)[0], "reread");
   assert.match(next.reread!, /lightspeed open feature-auth main/);
+  assert.match(next.reread!, /the batch you are digesting/);
+  // Digesting, no Send is coming: `open` hands the held batch straight back.
+  assert.doesNotMatch(next.reread!, /next Send|waits for the reviewer/);
   assert.match(next.talk!, /--to t3 '<answer>'/);
 });
 

@@ -390,7 +390,7 @@ repo: /home/me/app
 sessions[1]{branch,base,turn,round,pending}:
   feature-auth,main,agent digesting,1,0
 next:
-  reread: "Lost the batch? Run `lightspeed open feature-auth main` to listen for the reviewer's next Send — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice — it hands you the same batch"
+  reread: "Lost the batch? Run `lightspeed open feature-auth main`: it hands back the batch you are digesting at once, and posts nothing"
   talk: "Anything that needs the reviewer — an answer, a doubt about a change request, a question of your own → one call, every reply in it: lightspeed reply --to t1 '<answer>' --to t2 '<answer>' feature-auth main"
   work: "Nothing left to discuss and something to change (clear change requests go straight here) → lightspeed work '<plan>' feature-auth main, then edit, test, commit and publish"
   ambiguity: "Anything ambiguous in a change request? Ask now with reply: asking is cheaper than redoing a round built on a guess."
@@ -405,7 +405,9 @@ On the reviewer's turn home asks the server whether a waiting command is parked
 on the session (`GET /api/session/:key/presence` → `{waiting}`; no server means
 nobody). Only when nobody is listening does it say to run `open`: with a wait
 already parked it says `listening:` — leave it running, since a second `open`
-would supersede it — and with a Send nobody received it says `receive: the
+would supersede it; but if the agent cannot see that command's output (a
+leftover from a killed shell), run `open` now: the newest wait takes over and
+the old one exits `superseded` — and with a Send nobody received it says `receive: the
 reviewer sent N items — \`lightspeed open <branch> <base>\` receives them`.
 
 ### Empty state (definitive)

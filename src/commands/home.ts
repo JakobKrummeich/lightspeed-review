@@ -9,7 +9,6 @@ import {
   HELP_OPEN,
   TURN_RULES,
   WAITS_FOR_SEND,
-  helpReattach,
   nextRule,
   reattachCall,
 } from "../turn-help.ts";
@@ -187,7 +186,7 @@ function agentsNext(only: SessionRecord, target: string, label: TurnLabel): Stru
   if (label !== "agent digesting") return { next: rule };
   return {
     next: {
-      reread: `Lost the batch? ${helpReattach(target)} — it hands you the same batch`,
+      reread: `Lost the batch? Run \`${reattachCall(target)}\`: it hands back the batch you are digesting at once, and posts nothing`,
       ...rule,
     },
   };
@@ -195,7 +194,9 @@ function agentsNext(only: SessionRecord, target: string, label: TurnLabel): Stru
 
 /**
  * "Run open" only when nobody is listening: re-attaching beside a running wait
- * supersedes it, and the agent's own command exits with nothing.
+ * supersedes it, and the agent's own command exits with nothing. Unless the
+ * wait is one the agent cannot see — a leftover from a killed shell — which it
+ * must be able to take over rather than be stranded behind.
  */
 function reviewersNext(
   session: SessionRecord,
@@ -206,7 +207,8 @@ function reviewersNext(
     return {
       listening:
         "A waiting command is already waiting for the reviewer's Send on this review — leave it" +
-        " running; it receives the batch",
+        " running; it receives the batch. If you cannot see that command's output, run" +
+        ` \`${reattachCall(target)}\` now: the newest wait takes over and the old one exits`,
     };
   }
   const sent = batchSize(session.pending);
