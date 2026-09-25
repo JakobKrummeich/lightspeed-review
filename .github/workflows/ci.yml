@@ -28,10 +28,24 @@ jobs:
 
       - run: pnpm run typecheck
       - run: pnpm run lint
-      - run: pnpm test
+
+      # The whole suite, failing below the coverage floors in package.json's
+      # `test:coverage` — set a point under what the suite covered when they were
+      # introduced: a change that drops coverage noticeably fails, and lowering a
+      # floor is an edit a reviewer sees.
+      - run: pnpm run test:coverage
       - run: pnpm run format:check
 
       # The checked-in skill is a build artifact of the CLI's own help strings.
       # A stale one ships guidance the CLI no longer prints, and nothing else in
       # the gate would notice.
       - run: pnpm run build:skill --check
+
+      # Fails past 1% duplicated lines in src/, scripts/ and bin/ (.jscpd.json).
+      - run: pnpm run dup
+
+      # Runtime dependencies only: dev tooling never ships to a user. High and
+      # critical only, so a moderate advisory with no upgrade yet cannot hold
+      # every PR hostage. CI-only, not a maintenance-agent gate — see
+      # .maintenance-agent.yaml.
+      - run: pnpm audit --prod --audit-level=high
