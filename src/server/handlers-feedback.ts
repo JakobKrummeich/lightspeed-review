@@ -3,7 +3,7 @@
  * ledger never changes an answer.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { withAgentReplies, withFeedback } from "../feedback.ts";
+import { withAgentReplies, withFeedback, type FeedbackRequest } from "../feedback.ts";
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
 import type { AgentTurn, FeedbackPrompt, SessionRecord } from "../session-types.ts";
@@ -61,7 +61,7 @@ export async function handleFeedback(
     badRequest(response, "expected JSON {prompts: [{type, comment, ...}], ended: bool}");
     return;
   }
-  const locked = lockedOut(session, feedback.ended);
+  const locked = lockedOut(session, feedback);
   if (locked !== undefined) {
     sendJson(response, 409, locked);
     return;
@@ -88,11 +88,14 @@ export async function handleFeedback(
 /**
  * The page's lock, enforced where it cannot be raced: a tab that missed the
  * presence frame, or a second tab, must not change the batch under an agent
- * reading it, nor slip words into a round the agent is building. Ending is
- * never refused — the reviewer can always walk away.
+ * reading it, nor slip words into a round the agent is building. Ending with
+ * nothing is never refused — the reviewer can always walk away — but an ending
+ * Send's words are: no command ever hands them to an agent that holds the turn,
+ * whose next call only hears that the review ended.
  */
-function lockedOut(session: SessionRecord, ended: boolean): DomainErrorBody | undefined {
-  if (ended || session.status === "ended" || session.turn.holder !== "agent") return undefined;
+function lockedOut(session: SessionRecord, feedback: FeedbackRequest): DomainErrorBody | undefined {
+  if (session.status === "ended" || session.turn.holder !== "agent") return undefined;
+  if (feedback.ended) return feedback.prompts.length === 0 ? undefined : wordsOnEnd();
   const message =
     session.turn.mode === "working"
       ? "the agent is working on your feedback; queue this for the next round"
@@ -104,6 +107,20 @@ function lockedOut(session: SessionRecord, ended: boolean): DomainErrorBody | un
       detail: "nothing was sent; your words are still on the page",
     },
     help: ["End the review at any time; everything else waits for the agent to hand back"],
+  };
+}
+
+function wordsOnEnd(): DomainErrorBody {
+  return {
+    error: {
+      code: "agent_holds_turn",
+      message:
+        "the agent holds the turn, so words sent with the end would never be read — End without Sending ends the review now",
+      detail: "nothing was sent and the review is still open; your words are still on the page",
+    },
+    help: [
+      "End without Sending ends the review now; to have them read, wait for the agent to hand back",
+    ],
   };
 }
 

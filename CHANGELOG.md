@@ -61,7 +61,9 @@ that hands the turn back waits for the reviewer's next Send itself.
   reconnecting…" chip shows while the live update stream is down, with the
   header presence greyed to "Connection lost".
 - The server enforces the lock: a Send while the agent holds the turn is refused
-  `agent_holds_turn` and the page says "Not sent — …"; Send & End always goes.
+  `agent_holds_turn` and the page says "Not sent — …", a Send & End carrying
+  words included; End without Sending always goes. `work` and `publish` on an
+  ended review point at `lightspeed approvals` for the verdict it ended on.
 - Each `--to main` post is its own card, with no Resolve toggle or reply box.
   The agent answering in a resolved thread reopens it, and every thread the
   agent spoke in since the last Send is marked new and moved to the foot of the

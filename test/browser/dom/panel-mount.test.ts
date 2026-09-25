@@ -1006,6 +1006,42 @@ test("a Send the server refuses because the agent took the turn keeps everything
   );
 });
 
+/**
+ * The page believed the turn was the reviewer's, but the agent took it on the
+ * wire: the end is refused whole, so the review stays open and every word stays.
+ */
+test("a Send & End refused because the agent took the turn ends nothing and keeps every word", async (t) => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        error: {
+          code: "agent_holds_turn",
+          message: "the agent holds the turn, so words sent with the end would never be read",
+        },
+      },
+      { status: 409 },
+    );
+  t.after(() => {
+    globalThis.fetch = real;
+  });
+  const { root, panel, box, storage, ended } = mount(t);
+  panel.queue(queued);
+  type(root, box()!, "and one more thing");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send-end") });
+  await tick(0);
+
+  assert.equal(ended(), false);
+  assert.equal(root.querySelector("#lsr-send-end")?.disabled, false);
+  assert.equal(box()!.value, "and one more thing");
+  assert.equal(readMemory(storage, "key").pending.length, queued.length);
+  assert.match(
+    root.querySelector(".lsr-complete")?.textContent ?? "",
+    /Not sent — the agent holds the turn, so words sent with the end would never be read/,
+  );
+});
+
 function shown(root: FakeNode): string {
   return root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "";
 }

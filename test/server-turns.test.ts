@@ -258,6 +258,28 @@ test("the reviewer's Send is refused while the agent holds the turn; ending neve
   });
 });
 
+/**
+ * Words on an ending Send while the agent holds the turn would land where no
+ * command ever hands them over: the agent's next call only hears the review
+ * ended. Refused whole, so nothing is lost; ending with nothing always goes.
+ */
+test("an ending Send that carries words is refused while the agent holds the turn", async () => {
+  await withServer(async (running) => {
+    const key = await digesting(running);
+    assert.equal((await postWork(running.url, key, { plan: "split it", head: "h" })).status, 200);
+
+    const refused = await postFeedback(running.url, key, { prompts: [message], ended: true });
+
+    assert.equal(refused.status, 409);
+    const body = refused.json as { error: { code: string; message: string }; help: string[] };
+    assert.equal(body.error.code, "agent_holds_turn");
+    assert.match(body.error.message, /would never be read/);
+    assert.match(body.help.join(" "), /End without Sending/);
+    assert.notEqual(running.store.get(key)!.status, "ended", "the review is not ended");
+    assert.equal(running.store.get(key)!.pending.length, 0, "nothing was queued");
+  });
+});
+
 test("End without Sending ends a review the agent is still reading", async () => {
   await withServer(async (running) => {
     const key = await digesting(running);
