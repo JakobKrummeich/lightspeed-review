@@ -53,6 +53,12 @@ export interface PollPayload {
    */
   approval?: EndApproval;
   endedBy?: ReviewCloser;
+  /**
+   * A newer waiting command took over listening for this review, so this one
+   * was answered with nothing and has nothing left to do.
+   */
+  superseded?: boolean;
+  message?: string;
 }
 
 /**

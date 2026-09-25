@@ -245,6 +245,24 @@ test("a resolved item is not offered as one to reply to", () => {
   assert.doesNotMatch((output.next as { talk: string }).talk, /--to t1/);
 });
 
+test("a wait another command took over exits with nothing to do, not with a batch", () => {
+  const output = batchOutput(
+    {
+      status: "open",
+      ended: false,
+      items: [],
+      superseded: true,
+      message: "another lightspeed command took over listening for this review; nothing to do here",
+    },
+    "feature-auth main",
+  );
+
+  assert.equal(output.superseded, true);
+  assert.match(String(output.message), /another lightspeed command took over listening/);
+  assert.equal(output.items, undefined);
+  assert.match((output.next as { done: string }).done, /nothing to do/i);
+});
+
 /**
  * Regression: a `serve` left over from an older install answered with no `turn`
  * and no `round`, and the client defaulted its way past it. A wait that cannot

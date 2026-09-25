@@ -7,7 +7,7 @@ import type { ServerResponse } from "node:http";
 import type { PresenceFacts } from "../turn.ts";
 import { sseFrame } from "./http.ts";
 
-export type WakeReason = "feedback" | "shutdown";
+export type WakeReason = "feedback" | "shutdown" | "superseded";
 
 /**
  * A parked poller. Answering takes what was queued, so it says whether it did:
@@ -45,7 +45,15 @@ export class SessionTransport {
     this.streams.get(key)?.delete(response);
   }
 
+  /**
+   * The newest poll wins: every poller already parked on the session is
+   * answered `superseded` first. An agent that re-ran its waiting command left
+   * the old one behind — a background job, a harness that lost track of it —
+   * and that orphan would otherwise take the next batch into a terminal nobody
+   * reads, leaving the agent digesting nothing and the reviewer locked out.
+   */
   addPoller(key: string, wake: Waker): void {
+    for (const older of [...(this.pollers.get(key) ?? [])]) older("superseded");
     const waiting = this.pollers.get(key) ?? new Set<Waker>();
     waiting.add(wake);
     this.pollers.set(key, waiting);
@@ -58,10 +66,10 @@ export class SessionTransport {
   /**
    * Copied first: a woken poller removes itself from the set as it answers. The
    * loop stops at the one that takes the feedback, and goes on past the ones
-   * that cannot — a poller whose connection died takes nothing. Stopping is the
-   * whole of "whoever loses the race stays parked": a delivery is not spent
-   * until the agent confirms it, so a second poller woken after the first would
-   * otherwise be handed the batch that is still in flight to the first.
+   * that cannot — a poller whose connection died takes nothing. `addPoller`
+   * keeps at most one live poller per session, so the loop is a guard, not a
+   * race: a delivery is not spent until the agent confirms it, and a second
+   * poller must never be handed the batch still in flight to the first.
    */
   wakePollers(key: string): void {
     for (const wake of [...(this.pollers.get(key) ?? [])]) {

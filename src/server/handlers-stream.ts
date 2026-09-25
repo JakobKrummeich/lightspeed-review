@@ -71,6 +71,7 @@ export function handlePoll(
         error: { code: "server_stopped", message: "the review server shut down" },
       });
     }
+    if (reason === "superseded") sendJson(response, 200, SUPERSEDED);
     return true;
   };
   context.transport.addPoller(session.key, wake);
@@ -80,6 +81,15 @@ export function handlePoll(
     context.transport.publishPresence(session.key);
   });
 }
+
+/**
+ * Not an error: the command that took over is the agent's own, and the one
+ * answered here has nothing left to do but exit.
+ */
+const SUPERSEDED = {
+  superseded: true,
+  message: "another lightspeed command took over listening for this review; nothing to do here",
+};
 
 /**
  * A poll that finds the agent already digesting is a waiting command re-run

@@ -43,6 +43,7 @@ export async function listen(input: ListenInput): Promise<StructuredOutput> {
  * rule for ending this turn is the last thing the agent reads (D5).
  */
 export function batchOutput(result: PollPayload, target: string): StructuredOutput {
+  if (result.superseded === true) return supersededOutput(result);
   const items = result.items.map(itemRow);
   if (result.ended) {
     return {
@@ -61,6 +62,23 @@ export function batchOutput(result: PollPayload, target: string): StructuredOutp
     ...turnBlock({ ...result, turn: turnOf(result) }),
     items,
     next: nextRule(turnOf(result), target, ids),
+  };
+}
+
+/**
+ * The agent re-ran its waiting command and this is the old one: the newer
+ * command holds the wait and will hand over the Send. No turn, no items — the
+ * process that prints this is a leftover, and its only move is to stop.
+ */
+function supersededOutput(result: PollPayload): StructuredOutput {
+  return {
+    superseded: true,
+    message:
+      result.message ??
+      "another lightspeed command took over listening for this review; nothing to do here",
+    next: {
+      done: "Nothing to do in this process: the command that took over hands you the reviewer's Send",
+    },
   };
 }
 

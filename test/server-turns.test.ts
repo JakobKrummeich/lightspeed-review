@@ -213,6 +213,24 @@ test("a parked poll moves no turn and is answered by the reviewer's next Send", 
   });
 });
 
+test("the newest poll takes over listening: the older one is told it was superseded", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    const orphan = await parkedFetch(url, key);
+    const current = await parkedFetch(url, key);
+
+    const told = (await (await orphan.answer).json()) as Record<string, unknown>;
+    assert.equal(told.superseded, true);
+    assert.match(String(told.message), /another lightspeed command took over listening/);
+    assert.equal(store.get(key)!.turn.holder, "reviewer", "superseding moves no turn");
+
+    await send(url, key, [message]);
+    const answer = (await (await current.answer).json()) as Record<string, unknown>;
+    assert.equal(answer.turn, "agent digesting");
+    assert.partialDeepStrictEqual(answer.items, [{ id: "t1", status: "new" }]);
+  });
+});
+
 test("ending releases a parked poll with the review's account of itself", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);

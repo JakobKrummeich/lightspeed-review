@@ -357,6 +357,28 @@ test("a reply killed mid-wait is re-run: nothing is posted twice, and the Send s
   });
 });
 
+/** Finding 1: a leftover waiting command must not take the batch into a terminal nobody reads. */
+test("a second open takes over listening: the first exits superseded, the Send reaches the second", async () => {
+  await withLoop(async (loop) => {
+    const { origin, repoRoot, key } = loop;
+    const orphan = runCli(["open", "feature", "--intent", "why", "--no-open"], repoRoot);
+    await untilListening(origin, key);
+
+    const current = runCli(["open", "feature", "main"], repoRoot);
+    // The orphan is answered the moment the newer command parks.
+    const left = await orphan;
+    assert.equal(left.code, 0, left.stdout);
+    assert.match(left.stdout, /^superseded: true$/m);
+    assert.match(left.stdout, /another lightspeed command took over listening/);
+
+    await send(origin, key, [question]);
+    const took = await current;
+    assert.equal(took.code, 0, took.stdout);
+    assert.equal(item(answerOf(took.stdout), "t1").reviewer, "why 2?");
+    assert.equal((await sessionData(origin, key)).turn.holder, "agent");
+  });
+});
+
 test("an ended review refuses open and work; only --reopen starts a new round", async () => {
   await withLoop(async (loop) => {
     const { origin, repoRoot, key } = loop;
