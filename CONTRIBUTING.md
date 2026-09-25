@@ -26,6 +26,7 @@ All of these have to pass before a change lands, and CI runs exactly these:
 ```sh
 pnpm run typecheck
 pnpm run lint
+pnpm run lint:css
 pnpm run test:coverage
 pnpm run format:check
 pnpm run build:skill --check
@@ -41,6 +42,13 @@ gate (`.no-mistakes.yaml`) runs `test:coverage` and `check`.
   `scripts/` (lines 97%, branches 93%, functions 94% — a point under what the
   suite covered when the floors came in). Plain `pnpm test` runs the same tests
   without coverage, which is quicker while working.
+- `lint:css` is Stylelint over `src/**/*.css` (`stylelint.config.mjs`):
+  stylelint-config-standard, fitted to the stylesheets' own conventions, plus
+  the token rule — every colour comes from a `--lsr-*` custom property (or a
+  `color-mix()`/`light-dark()` of them, or a keyword such as `transparent` or
+  `currentcolor`), and `src/browser/css/tokens.css` is the only file that
+  writes a colour literal. A colour with no token either earns one there or
+  carries a `stylelint-disable` comment whose `--` says why.
 - `dup` is jscpd over `src/`, `scripts/` and `bin/` (`.jscpd.json`), failing past
   1% duplicated lines. Tests are not scanned: spelling each case out in full is
   what makes it readable on its own.

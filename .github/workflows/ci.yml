@@ -29,6 +29,11 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run lint
 
+      # Stylelint over src/**/*.css (stylelint.config.mjs): stylelint-config-standard,
+      # and colours only from the --lsr-* tokens, with tokens.css the one file
+      # that writes a literal.
+      - run: pnpm run lint:css
+
       # The whole suite, failing below the coverage floors in package.json's
       # `test:coverage` — set a point under what the suite covered when they were
       # introduced: a change that drops coverage noticeably fails, and lowering a
