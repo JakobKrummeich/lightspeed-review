@@ -188,7 +188,9 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
       "Safe to re-run: a whole-file target is rewritten only when it differs, and a" +
       " shared AGENTS.md keeps its own content with lightspeed's block replaced in place." +
       " The skill is stamped with this CLI's version, so any later lightspeed command" +
-      " refreshes it after an upgrade unless it was edited by hand",
+      " refreshes a machine-wide one after an upgrade unless it was edited by hand;" +
+      " a project one is reported as skill_stale instead, so your repo is never" +
+      " changed behind your back",
     examples: [
       "lightspeed init --agent pi",
       "lightspeed init --config",
