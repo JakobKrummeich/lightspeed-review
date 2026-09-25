@@ -393,11 +393,11 @@ test("an ended review refuses open and work; only --reopen starts a new round", 
     assert.equal(item(answer, "t1").reviewer, "why 2?");
 
     const illegal = await runCli(["work", "carrying on regardless", "feature", "main"], repoRoot);
-    assert.equal(illegal.code, 1, illegal.stdout);
+    assert.equal(illegal.code, 2, illegal.stdout);
     assert.match(illegal.stdout, /^ {2}code: session_ended$/m);
 
     const refused = await runCli(["open", "feature", "--intent", "again", "--no-open"], repoRoot);
-    assert.equal(refused.code, 1, refused.stdout);
+    assert.equal(refused.code, 2, refused.stdout);
     assert.match(refused.stdout, /^ {2}code: session_ended$/m);
     assert.match(refused.stdout, /--reopen/);
 

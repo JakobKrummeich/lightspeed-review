@@ -150,7 +150,7 @@ test("a command about a review nothing holds names the reviews that are held", a
 
   const { stdout, code } = await runCli(["approvals", "other/branch", "main"], repoRoot);
 
-  assert.equal(code, 1);
+  assert.equal(code, 2);
   assert.match(stdout, /^ {2}code: session_not_found$/m);
   assert.match(
     stdout,
@@ -178,7 +178,7 @@ test("a session the server does not know is named the same way as one on disk", 
 
   const { stdout, code } = await runCli(["work", "the plan", "other/branch", "main"], repoRoot);
 
-  assert.equal(code, 1);
+  assert.equal(code, 2);
   assert.match(stdout, /^ {2}code: session_not_found$/m);
   assert.match(stdout, /message: no review session for other\/branch against main/);
   assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
@@ -239,7 +239,7 @@ test("a failing command reports code, message and help as TOON on stdout, exit 1
 test("open without a branch and no live review names the branch it needs", async () => {
   const { stdout, code } = await runCli(["open"], emptyRepo());
 
-  assert.equal(code, 1);
+  assert.equal(code, 2);
   assert.match(stdout, /^ {2}code: ambiguous_session$/m);
   assert.match(stdout, /lightspeed open <branch> \[base\] --intent/);
 });

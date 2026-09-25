@@ -107,8 +107,9 @@ const RULES = `## Rules
 - Run \`open\`, \`reply\` and \`publish\` in the foreground, never under a
   timeout. If one is killed anyway, re-run the same command: the server
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
-- Every refusal names the one right command in its \`help[]\` and exits 2 —
-  read it rather than retrying. \`turn_not_yours\`: the reviewer holds the turn.
+- Every refusal of a move — out of turn, an ended, unknown or ambiguous
+  review — names the one right command in its \`help[]\` and exits 2: read
+  it rather than retrying. \`turn_not_yours\`: the reviewer holds the turn.
   \`turn_still_yours\`: you are working, so publish. \`nothing_to_publish\`:
   HEAD has not moved since the last round, so commit or reply.
 - \`wait\`, \`ask\`, \`say\` and \`start\` were removed in 3.0 and answer
@@ -158,9 +159,12 @@ const OUTPUT = `## Output
 
 Every command answers TOON on stdout, led by \`round\` and \`turn\` and closed
 by \`next:\`: the rule for what to do next, keyed by what you decide. Every failure
-answers \`error: {code, message, detail}\` plus \`help[]\` — exit 2 when the
-command line itself is wrong (unknown command, subcommand or flag, a missing or
-unparseable argument), exit 1 for everything else. Run
+answers \`error: {code, message, detail}\` plus \`help[]\` — exit 2 when
+re-running the same command cannot help: the command line is wrong, or the move
+is wrong for the review's state (out of turn, ended, not found, ambiguous), and
+\`help[]\` names the right one. Exit 1 when the machine got in the way — the
+server, git, the model, the config — and the same command may work once that is
+fixed. Run
 \`lightspeed <command> --help\` for a command's flags and two worked examples.`;
 
 const SECTIONS = `${THE_TURN}
