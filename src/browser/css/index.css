@@ -343,8 +343,9 @@
   opacity: 0.55;
 }
 
-.lsr-file[data-approval="approved"]:hover,
-.lsr-file[data-approval="approved"]:focus-within {
+/* Repeats the `:has()` above, whose argument counts toward specificity: the
+ * bare `:hover` and `:focus-within` were a class short and never won. */
+.lsr-file[data-approval="approved"]:has(.lsr-approved:checked):is(:hover, :focus-within) {
   opacity: 1;
 }
 
