@@ -67,6 +67,31 @@ gate (`.no-mistakes.yaml`) runs `test:coverage` and `check`.
 generated from the CLI's own `help[]` strings, so changing help text means
 running `pnpm run build:skill` and committing the regenerated file with it.
 
+## Pull requests go through no-mistakes
+
+Every pull request to `main` is raised through
+[no-mistakes](https://github.com/kunchenguid/no-mistakes): it runs review,
+tests, docs and lint on the committed branch, then pushes it and opens the PR.
+Run `no-mistakes init` once in your clone, commit on a feature branch, then
+either
+
+```sh
+no-mistakes axi run --intent "what the change is for"
+# or
+git push no-mistakes <branch>
+```
+
+The pipeline writes a signature and an attestation bound to the head commit
+into the PR body. The `PR must be raised via no-mistakes` check
+(`.github/workflows/no-mistakes-required.yml`) fails any PR whose body lacks
+them, or whose attestation names an older head than the one pushed. That
+includes the owner and the maintenance agent's bot. Only `dependabot[bot]` and
+`github-actions[bot]` are exempt: automation that cannot run the pipeline.
+
+The check is a guardrail against raising a PR by accident outside the
+pipeline, not a forgery-proof boundary. The attestation is plain text in the
+PR body, and anyone who can edit that body can write one by hand.
+
 ## Style
 
 Comments say **why**, not what. The code already states what it does; a comment
