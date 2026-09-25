@@ -2,7 +2,7 @@ import { request as httpRequest } from "node:http";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import { apiRequest, jsonPost, parseBody, type SessionRef } from "./api-client.ts";
-import { openCall } from "../start-call.ts";
+import { helpRestart, reattachCall } from "../turn-help.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
@@ -103,7 +103,7 @@ function portIsNotServing(
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepted a connection on port ${port}`,
-      suggestions: [`Run \`${openCall(target)}\` to start the review server`],
+      suggestions: [helpRestart(target)],
     });
   }
   return new ReviewError({
@@ -112,7 +112,7 @@ function portIsNotServing(
     detail: `${detail}; the machine answered nothing at all on that port`,
     suggestions: [
       `Re-run the command that was waiting, in the foreground — it posts nothing twice`,
-      `Run \`lightspeed stop\` and then \`${openCall(target)}\` if it keeps failing`,
+      `Run \`lightspeed stop\` and then \`${reattachCall(target)}\` if it keeps failing`,
     ],
   });
 }
@@ -125,7 +125,7 @@ function notAReviewServer(port: number, failure: unknown, target: string): Revie
     detail: `${messageOf(failure)}; the port accepts connections but /health does not answer`,
     suggestions: [
       `Set a free \`port\` in .lightspeed.conf.json instead of ${port}`,
-      `Stop whatever is listening there and run \`${openCall(target)}\` again`,
+      `Stop whatever is listening there and run \`${reattachCall(target)}\` again`,
     ],
   });
 }

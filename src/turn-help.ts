@@ -35,6 +35,15 @@ export function reattachCall(target: string): string {
   return `lightspeed open ${target}`;
 }
 
+/**
+ * The server is gone but the review is not: `open` on it starts the server and
+ * re-attaches. Never the fresh-open line — its `--intent` reads as "open a new
+ * review", and one the reviewer ended stays ended.
+ */
+export function helpRestart(target: string): string {
+  return `Run \`${reattachCall(target)}\` to restart the review server and re-attach — ${WAITS_FOR_SEND}`;
+}
+
 export function helpReattach(target: string): string {
   return `Run \`${reattachCall(target)}\` to listen for the reviewer's next Send — ${WAITS_FOR_SEND}`;
 }

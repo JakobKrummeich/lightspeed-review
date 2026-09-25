@@ -1,7 +1,7 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import type { DomainErrorBody } from "../server.ts";
 import { openCall } from "../start-call.ts";
-import { helpReopen } from "../turn-help.ts";
+import { helpReopen, helpRestart, reattachCall } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /**
@@ -25,7 +25,7 @@ export async function apiRequest(
   try {
     response = await sendOnce(url, init);
   } catch (error) {
-    throw await transportError(url, error);
+    throw await transportError(url, error, about);
   }
   const answer = parseBody(response.status, await response.text(), about);
   if (answer instanceof ReviewError) throw answer;
@@ -63,7 +63,7 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
     return new ReviewError({
       code: "server_not_running",
       message: "the review server shut down while the command was waiting",
-      suggestions: [`Run \`${openCall(target(about))}\` to restart the review server`],
+      suggestions: [helpRestart(target(about))],
     });
   }
   return undefined;
@@ -156,7 +156,11 @@ function readErrorBody(body: string): ErrorBody {
  * listening, and calling anything else "no server" sends the agent to restart a
  * running one. The port is probed the same retried way the long poll probes it, so
  * one command cannot call a port dead the other still waits on. */
-export async function transportError(url: string, error: unknown): Promise<ReviewError> {
+export async function transportError(
+  url: string,
+  error: unknown,
+  about?: SessionRef,
+): Promise<ReviewError> {
   const port = portOf(url);
   const detail = failureDetail(error);
   if ((await diagnosePort(port)) === "refused") {
@@ -164,7 +168,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepts a connection on port ${port}`,
-      suggestions: [`Run \`${openCall("<branch> [base]")}\` to start the review server`],
+      suggestions: [helpRestart(target(about))],
     });
   }
   return new ReviewError({
@@ -173,7 +177,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
     detail: `${detail}; the port is still reachable, so the server is there`,
     suggestions: [
       "Re-run the command; the connection failed, not the review",
-      `Run \`lightspeed stop\` and then \`${openCall("<branch> [base]")}\` if it keeps failing`,
+      `Run \`lightspeed stop\` and then \`${reattachCall(target(about))}\` if it keeps failing`,
     ],
   });
 }

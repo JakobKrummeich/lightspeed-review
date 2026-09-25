@@ -187,12 +187,13 @@ test("nothing listening is reported as server_not_running once the probes are sp
     (error: ReviewError) => {
       assert.equal(error.code, "server_not_running");
       assert.match(error.detail ?? "", /nothing accepted a connection on port 1/);
-      // The review is the one the wait was already pointed at, and `start`
-      // refuses to run without the intent this line now carries.
+      // The review is the one the wait was already pointed at, and it is still
+      // there: `open` on it restarts the server and re-attaches, no --intent.
       assert.match(
         error.suggestions.join(" "),
-        /lightspeed open feature-auth main --intent '<why this branch exists>'/,
+        /`lightspeed open feature-auth main` to restart the review server and re-attach/,
       );
+      assert.doesNotMatch(error.suggestions.join(" "), /--intent/);
       return true;
     },
   );
@@ -217,6 +218,7 @@ test("a port held by something that is not a review server is named, not waited 
     (error: ReviewError) => {
       assert.equal(error.code, "server_unreachable");
       assert.match(error.message, /is held by something that is not a review server/);
+      assert.doesNotMatch(error.suggestions.join(" "), /--intent/);
       return true;
     },
   );
