@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { helpAsk, helpPublishAndWait, helpSay, nextMoves } from "../../src/commands/home.ts";
+import { helpAsk, helpPublishAndWait, helpSay, nextMoves } from "../../src/turn-help.ts";
 import { parseWorkArgs, runWork } from "../../src/commands/work.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";

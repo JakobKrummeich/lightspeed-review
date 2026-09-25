@@ -10,7 +10,7 @@ import {
 } from "../../ledger/export.ts";
 import { VERDICTS, type Verdict } from "../../ledger/records.ts";
 import type { StructuredOutput } from "../../output.ts";
-import { HELP_START } from "../home.ts";
+import { HELP_START } from "../../turn-help.ts";
 import {
   DEFAULT_LIST_LIMIT,
   DEFAULT_LIST_MAX_BYTES,

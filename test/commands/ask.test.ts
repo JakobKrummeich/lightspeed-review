@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseAskArgs, runAsk } from "../../src/commands/ask.ts";
 import { runWait } from "../../src/commands/wait.ts";
-import { nextMoves } from "../../src/commands/home.ts";
+import { nextMoves } from "../../src/turn-help.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer } from "../../src/server.ts";

@@ -25,6 +25,14 @@ export const SELECTION_LIMIT = 200;
  */
 export const PROMPT_LIMIT = 20;
 
+/**
+ * A branch-sized review fits under it whole, and the reviews that do not are
+ * exactly the ones whose full account costs the reading agent most. No byte
+ * budget beside it, unlike `feedback list`: a path has a length a copied hunk
+ * does not, so counting paths bounds the answer on its own.
+ */
+export const DEFAULT_PATH_LIMIT = 50;
+
 export function truncateContent(value: string, limit: number, rest: string): string {
   if (value.length <= limit) return value;
   return `${value.slice(0, limit)}\n(truncated, ${value.length} chars — use --full; ${rest})`;

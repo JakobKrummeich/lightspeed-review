@@ -3,11 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  DEFAULT_PATH_LIMIT,
-  parseApprovalsArgs,
-  runApprovals,
-} from "../../src/commands/approvals.ts";
+import { parseApprovalsArgs, runApprovals } from "../../src/commands/approvals.ts";
+import { DEFAULT_PATH_LIMIT } from "../../src/output.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { SessionStore, type SessionRecord } from "../../src/session-store.ts";

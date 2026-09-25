@@ -1,7 +1,6 @@
-import { DEFAULT_PATH_LIMIT } from "./commands/approvals.ts";
-import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./commands/home.ts";
 import { REACHABLE_MODELS } from "./config.ts";
-import { PROMPT_LIMIT, SELECTION_LIMIT } from "./output.ts";
+import { DEFAULT_PATH_LIMIT, PROMPT_LIMIT, SELECTION_LIMIT } from "./output.ts";
+import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./turn-help.ts";
 
 export const SKILL_PATH = "skills/lightspeed/SKILL.md";
 

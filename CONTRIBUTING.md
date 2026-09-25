@@ -57,9 +57,8 @@ gate (`.no-mistakes.yaml`) runs `test:coverage` and `check`.
   `src/server/` is imported only through `src/server.ts`; production code never
   imports `test/`; `src/commands/` is the CLI's top layer, imported only by
   `src/cli.ts` and itself. What core code and a command both need lives below
-  `commands/` (as `src/start-call.ts` does). The few modules that imported
-  `commands/` before the rule are listed in the config as known exceptions, to
-  be retired, not added to.
+  `commands/` (as `src/start-call.ts` and `src/turn-help.ts` do); the rule has
+  no exceptions.
 - The audit covers runtime dependencies at high severity and above. It is not a
   gate for the maintenance agent, whose work an unrelated new advisory would
   otherwise block.

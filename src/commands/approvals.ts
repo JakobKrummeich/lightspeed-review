@@ -1,10 +1,10 @@
 import { ReviewError, invocationError } from "../errors.ts";
-import type { StructuredOutput } from "../output.ts";
+import { DEFAULT_PATH_LIMIT, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { approvalPaths, type ApprovalPaths } from "../review-files.ts";
 import { SessionStore } from "../session-store.ts";
+import { HELP_START } from "../turn-help.ts";
 import { hasFlag, scanArgs } from "./args.ts";
-import { HELP_START } from "./home.ts";
 
 export interface ApprovalsArgs {
   /** Unset when the reviewer left it to `resolveSession` to work out. */
@@ -22,14 +22,6 @@ export interface ApprovalsInput {
 }
 
 const APPROVALS_FLAGS = ["--full"];
-
-/**
- * A branch-sized review fits under it whole, and the reviews that do not are
- * exactly the ones whose full account costs the reading agent most. No byte
- * budget beside it, unlike `feedback list`: a path has a length a copied hunk
- * does not, so counting paths bounds the answer on its own.
- */
-export const DEFAULT_PATH_LIMIT = 50;
 
 const HELP_FULL =
   `A bare listing stops at ${DEFAULT_PATH_LIMIT} paths per list:` +

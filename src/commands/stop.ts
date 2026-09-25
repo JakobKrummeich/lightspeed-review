@@ -1,6 +1,6 @@
 import type { StructuredOutput } from "../output.ts";
+import { HELP_START } from "../turn-help.ts";
 import { requestShutdown } from "./server-address.ts";
-import { HELP_START } from "./home.ts";
 
 export interface StopInput {
   port: number;

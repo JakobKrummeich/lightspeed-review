@@ -4,7 +4,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { helpAsk, helpNextRound, helpReopen, helpSay, helpWork } from "../../src/commands/home.ts";
+import { helpAsk, helpNextRound, helpReopen, helpSay, helpWork } from "../../src/turn-help.ts";
 import { parseWaitArgs, runWait } from "../../src/commands/wait.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { PROMPT_LIMIT, SELECTION_LIMIT } from "../../src/output.ts";

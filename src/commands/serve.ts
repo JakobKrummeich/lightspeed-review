@@ -4,7 +4,7 @@ import { ledgerFor } from "../ledger/store.ts";
 import type { StructuredOutput } from "../output.ts";
 import { createReviewServer } from "../server.ts";
 import { SessionStore } from "../session-store.ts";
-import { HELP_START } from "./home.ts";
+import { HELP_START } from "../turn-help.ts";
 import { reviewServerIsUp } from "./server-address.ts";
 
 export interface ServeInput {

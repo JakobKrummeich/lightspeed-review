@@ -13,8 +13,8 @@ import {
   type SkillTarget,
 } from "../skill-install.ts";
 import { isSkillAgent, renderSkillFor, SKILL_AGENTS, type SkillAgent } from "../skill.ts";
+import { HELP_START } from "../turn-help.ts";
 import { hasFlag, lastValue, scanArgs } from "./args.ts";
-import { HELP_START } from "./home.ts";
 
 export interface InitArgs {
   agent: string | undefined;

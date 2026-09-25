@@ -4,6 +4,7 @@ import { repoRows, selectItems, verdictCounts, type ExportItem } from "../ledger
 import { ledgerFor, type LedgerReadResult } from "../ledger/store.ts";
 import type { StructuredOutput } from "../output.ts";
 import { feedbackDirPath } from "../paths.ts";
+import { HELP_START } from "../turn-help.ts";
 import { listFeedback } from "./feedback/list.ts";
 import { pruneFeedback } from "./feedback/prune.ts";
 import {
@@ -15,7 +16,6 @@ import {
   type FeedbackContext,
 } from "./feedback/shared.ts";
 import { showFeedback } from "./feedback/show.ts";
-import { HELP_START } from "./home.ts";
 
 /** Everything printed comes from `ledger/export.ts`: command files only parse
  * flags, shape output and compose `help[]`. */
