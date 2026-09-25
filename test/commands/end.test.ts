@@ -7,7 +7,8 @@ import { runEnd } from "../../src/commands/end.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer } from "../../src/server.ts";
-import { SessionStore, type SessionRecord } from "../../src/session-store.ts";
+import { SessionStore } from "../../src/session-store.ts";
+import type { SessionRecord } from "../../src/session-types.ts";
 
 const REPO = "/repo";
 const BRANCH = "feature-auth";
@@ -56,7 +57,11 @@ test("closes the session and reports it as ended", async () => {
     // has to reconcile, and the one that goes stale.
     assert.equal(output.turn, "ended");
     assert.ok(!("status" in (output.session as object)));
-    assert.ok((output.help as string[]).some((line) => line.includes("start feature-auth main")));
+    // Reopening is the reviewer's call, so the only move named is the one they ask for.
+    assert.match(
+      (output.next as { done: string }).done,
+      /lightspeed open feature-auth main --reopen/,
+    );
   });
 });
 

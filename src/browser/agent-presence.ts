@@ -37,10 +37,10 @@ function readTurn(value: unknown): Turn {
   const plan = text(note);
   return {
     holder: "agent",
-    // A mode nobody knows reads as `reading`, not as a hole: `mode` only decides
-    // which sentence the panel writes, the holder beside it still turns Send
-    // into Queue, and "the agent has your feedback" is the claim that assumes least.
-    mode: mode === "working" ? "working" : "reading",
+    // A mode nobody knows reads as `digesting`, not as a hole: `mode` only
+    // decides which sentence the panel writes, the holder beside it still locks
+    // Send, and "the agent is reading" is the claim that assumes least.
+    mode: mode === "working" ? "working" : "digesting",
     at: stamped,
     ...(plan === undefined ? {} : { note: plan }),
   };

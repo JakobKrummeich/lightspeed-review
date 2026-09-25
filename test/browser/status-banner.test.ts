@@ -28,7 +28,7 @@ const review: ClosedReview = {
 };
 
 const REVIEWERS: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
-const READING: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
+const READING: Turn = { holder: "agent", mode: "digesting", at: "2025-01-01T00:06:00.000Z" };
 
 function banner(over: Partial<StatusState> = {}): StatusState {
   return { status: "open", agentWaiting: false, turn: REVIEWERS, review, ...over };

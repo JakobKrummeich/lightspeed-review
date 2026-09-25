@@ -92,7 +92,7 @@ test("a completed login reports the provider, the credential type and the file",
   assert.equal(typeof seen.login?.interaction.notify, "function");
   const help = output.help as string[];
   assert.ok(help.some((line) => line.includes("model") && line.includes("anthropic/")));
-  assert.ok(help.some((line) => line.includes("lightspeed start")));
+  assert.ok(help.some((line) => line.includes("lightspeed open")));
 });
 
 test("no token material reaches the output", async () => {

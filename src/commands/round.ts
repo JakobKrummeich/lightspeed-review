@@ -1,6 +1,6 @@
 import type { LightspeedConfig } from "../config.ts";
 import { extractDiff as extractDiffFromGit, type ExtractedDiff } from "../diff-extract.ts";
-import { invocationError } from "../errors.ts";
+import type { AgentNote } from "../feedback.ts";
 import { groupDiff as groupDiffWithModel, type GroupDiffInput } from "../llm/grouping.ts";
 import type { GroupingResult } from "../llm/grouping.ts";
 import type { PreviousGroup } from "../llm/prompts.ts";
@@ -10,138 +10,94 @@ import { currentGroupingMode } from "../rounds/session-round.ts";
 import type { LedgerReport } from "../server.ts";
 import { SessionStore, type SessionStatus } from "../session-store.ts";
 import { turnBlock, type TurnLabel } from "../turn.ts";
-import { helpEnd, helpWait } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
-import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
+import { listen, type ListenInput } from "./listen.ts";
 import { serverOrigin } from "./server-address.ts";
 import { openBrowser } from "./open-browser.ts";
 import { ensureServerRunning, type EnsureServerOptions } from "./server-lifecycle.ts";
-import { runWait } from "./wait.ts";
-
-export interface StartArgs {
-  branch: string | undefined;
-  base: string | undefined;
-  open: boolean;
-  model: string | undefined;
-  reopen: boolean;
-  wait: boolean;
-  intents: string[];
-}
 
 /** Seams for tests. */
-export interface StartDeps {
+export interface RoundDeps {
   extractDiff?: (repoRoot: string, branch: string, base: string) => ExtractedDiff;
   groupDiff?: (input: GroupDiffInput) => Promise<GroupingResult>;
   ensureServerRunning?: (options: EnsureServerOptions) => Promise<void>;
   openBrowser?: (url: string) => void;
-  write?: (text: string) => void;
+  /** Where the round (or re-attach) block is shown before the wait begins. */
+  announce?: (block: StructuredOutput) => void;
+  /** The wait itself; tests stub it so a round can be published without a reviewer. */
+  listen?: (input: ListenInput) => Promise<StructuredOutput>;
 }
 
-function resolveDeps(deps: StartDeps = {}): Required<StartDeps> {
-  return {
-    extractDiff: deps.extractDiff ?? extractDiffFromGit,
-    groupDiff: deps.groupDiff ?? groupDiffWithModel,
-    ensureServerRunning: deps.ensureServerRunning ?? ensureServerRunning,
-    openBrowser: deps.openBrowser ?? openBrowser,
-    write: deps.write ?? ((text) => void process.stdout.write(text)),
-  };
+const DEFAULT_DEPS: Required<RoundDeps> = {
+  extractDiff: extractDiffFromGit,
+  groupDiff: groupDiffWithModel,
+  ensureServerRunning,
+  openBrowser,
+  announce: (block) => void process.stdout.write(`${renderToon(block)}\n`),
+  listen,
+};
+
+/** A seam left `undefined` is the real thing, not a hole. */
+export function resolveDeps(deps: RoundDeps = {}): Required<RoundDeps> {
+  const given = Object.fromEntries(
+    Object.entries(deps).filter(([, value]) => value !== undefined),
+  ) as RoundDeps;
+  return { ...DEFAULT_DEPS, ...given };
 }
 
 /** The status is the server's, not ours: a review the reviewer ended stays ended
  * until they open a new one. */
-interface CreatedSession {
+export interface CreatedSession {
   key: string;
   url: string;
   status: SessionStatus;
   turn?: TurnLabel;
   round?: number;
   ledger?: LedgerReport;
+  /** `open` on a live session: nothing was opened, the agent re-attached. */
+  reattached?: boolean;
+  /** A re-run `publish` the server recognised: nothing was posted twice. */
+  rerun?: boolean;
 }
 
-export interface StartInput {
+export interface RoundInput {
   repoRoot: string;
   branch: string;
   base: string;
   config: LightspeedConfig;
   intents: string[];
-  open?: boolean;
+  verb: "open" | "publish";
   /** Only ever true because the reviewer asked; the agent never decides this. */
   reopen?: boolean;
-  wait?: boolean;
-  deps?: StartDeps;
+  notes?: AgentNote[];
+  deps?: RoundDeps;
 }
 
-const VALUE_FLAGS = ["--base", "--model", "--intent"];
-
-const SWITCHES = ["--no-open", "--reopen", "--wait"];
-
-const START_FLAGS = [...VALUE_FLAGS, ...SWITCHES];
-
-export function parseStartArgs(args: string[]): StartArgs {
-  // A flag last on the line has no value; `allValues`/`lastValue` skip the hit.
-  const scanned = scanArgs(args, {
-    value: VALUE_FLAGS,
-    boolean: SWITCHES,
-    // Fail loud: a mistyped `--intnet` once became the base branch, so the agent
-    // was told the git ref was wrong rather than the flag.
-    onUnknown: unknownStartFlag,
-  });
-  return {
-    branch: scanned.positional[0],
-    base: lastValue(scanned, "--base") ?? scanned.positional[1],
-    open: !hasFlag(scanned, "--no-open"),
-    model: lastValue(scanned, "--model"),
-    reopen: hasFlag(scanned, "--reopen"),
-    wait: hasFlag(scanned, "--wait"),
-    // A blank intent is dropped here; the caller reports it missing rather than
-    // storing a reason nobody can read.
-    intents: allValues(scanned, "--intent")
-      .map((intent) => intent.trim())
-      .filter(nonEmpty),
-  };
-}
-
-function unknownStartFlag(flag: string): Error {
-  return invocationError("unknown_flag", `unknown flag ${flag}`, [
-    `Known here: ${START_FLAGS.join(", ")}`,
-    "Run `lightspeed start --help` for what each flag does",
-  ]);
-}
-
-function nonEmpty(value: string): boolean {
-  return value !== "";
-}
-
-/** Idempotent by design: an agent re-runs it after every round of fixes. */
-export async function runStart(input: StartInput): Promise<StructuredOutput> {
-  const { repoRoot, branch, base, config } = input;
-  const run = resolveDeps(input.deps);
-  const extracted = run.extractDiff(repoRoot, branch, base);
+/**
+ * Extract, group and post: the half of `open` and `publish` that makes a round.
+ * The server decides whether it opens one — and whether an ended review may.
+ */
+export async function makeRound(
+  input: RoundInput,
+  run: Required<RoundDeps>,
+): Promise<RoundOutcome> {
+  const extracted = run.extractDiff(input.repoRoot, input.branch, input.base);
   const grouping = await run.groupDiff({
     files: extracted.files,
-    config,
+    config: input.config,
     intents: input.intents,
     ...previousGrouping(input),
   });
-  await run.ensureServerRunning({ port: config.port });
+  await run.ensureServerRunning({ port: input.config.port });
   const created = await publishRound(input, extracted, grouping);
-  if (input.open !== false) run.openBrowser(created.url);
-  const outcome = { created, extracted, grouping, branch, base, intents: input.intents };
-  // The round is written out before the block rather than returned after it:
-  // the reviewer's url is no use to anybody after they have sent, and a command
-  // that prints nothing for the length of a review is one nobody can hand the
-  // person whose turn it is.
-  if (input.wait === true) {
-    run.write(`${renderToon(blockingOutput(outcome))}\n`);
-    return await runWait({ repoRoot, branch, base, port: config.port });
-  }
-  return startOutput(outcome);
+  const { branch, base, intents } = input;
+  return { created, extracted, grouping, branch, base, intents };
 }
 
 /** The server decides whether this opens a session or a new round on one — and
  * whether an ended review may have either. */
 async function publishRound(
-  input: StartInput,
+  input: RoundInput,
   extracted: ExtractedDiff,
   grouping: GroupingResult,
 ): Promise<CreatedSession> {
@@ -158,6 +114,8 @@ async function publishRound(
       intents: input.intents,
       commits: extracted.commits,
       reopen: input.reopen === true,
+      verb: input.verb,
+      notes: input.notes ?? [],
     }),
     {
       key: sessionKey(input.repoRoot, input.branch, input.base),
@@ -175,7 +133,7 @@ async function publishRound(
  * after a degraded one starting over is the right way round: the reviewer had
  * nothing to learn from that round's order either.
  */
-function previousGrouping(input: StartInput): { previous?: PreviousGroup[] } {
+function previousGrouping(input: RoundInput): { previous?: PreviousGroup[] } {
   const { repoRoot, branch, base, config } = input;
   const session = new SessionStore(config.stateDir).get(sessionKey(repoRoot, branch, base));
   if (session === undefined || currentGroupingMode(session) !== "llm") return {};
@@ -187,7 +145,7 @@ function previousGrouping(input: StartInput): { previous?: PreviousGroup[] } {
   };
 }
 
-interface StartOutcome {
+export interface RoundOutcome {
   created: CreatedSession;
   extracted: ExtractedDiff;
   grouping: GroupingResult;
@@ -196,14 +154,14 @@ interface StartOutcome {
   intents: string[];
 }
 
-function publishedRound({
+export function publishedRound({
   created,
   extracted,
   grouping,
   branch,
   base,
   intents,
-}: StartOutcome): StructuredOutput {
+}: RoundOutcome): StructuredOutput {
   return {
     ...turnBlock(created),
     // No `status`: `turn` above already names whose move it is, and the word
@@ -227,41 +185,11 @@ function publishedRound({
   };
 }
 
-function ledgerReport(created: CreatedSession): LedgerReport {
+export function ledgerReport(created: CreatedSession): LedgerReport {
   return created.ledger ?? { status: "off" };
 }
 
-function startOutput(outcome: StartOutcome): StructuredOutput {
-  const target = `${outcome.branch} ${outcome.base}`;
-  const ledger = ledgerReport(outcome.created);
-  return {
-    ...publishedRound(outcome),
-    // An ended review never gets here (server refuses the round), so this help
-    // assumes an active one.
-    help: [
-      helpWait(target),
-      "The reviewer selects diff text and sends targeted comments; `wait` returns them and the turn",
-      helpEnd(target),
-      ...(ledger.status === "degraded" ? [helpLedgerDegraded(ledger)] : []),
-    ],
-  };
-}
-
-/**
- * No `help[]`: every move it would name is one this command is already making,
- * and the one thing left to do with this block is give the url to the reviewer.
- * A broken ledger still says so — that warning appears nowhere else.
- */
-function blockingOutput(outcome: StartOutcome): StructuredOutput {
-  const ledger = ledgerReport(outcome.created);
-  return {
-    ...publishedRound(outcome),
-    message: "published; now blocking on the reviewer — give them the url above",
-    ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
-  };
-}
-
 /** A failing ledger loses mining data, not the review, so it is help and not an error. */
-function helpLedgerDegraded(ledger: LedgerReport): string {
+export function helpLedgerDegraded(ledger: LedgerReport): string {
   return `The feedback ledger could not be written (${ledger.reason ?? "unknown"}) — fix ${ledger.path ?? "the state dir"} or set \`"feedbackLog": "off"\` in .lightspeed.conf.json`;
 }

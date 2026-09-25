@@ -10,6 +10,8 @@ import type { LedgerRecord, OutcomeRecord } from "../src/ledger/records.ts";
 import { git, newRepo } from "./helpers/git-repo.ts";
 import { SessionStore } from "../src/session-store.ts";
 import { createReviewServer, type ReviewServer } from "../src/server.ts";
+import { agentWorking } from "../src/turn.ts";
+import { pollAndAck } from "./helpers/review-server.ts";
 
 interface Running {
   url: string;
@@ -105,6 +107,21 @@ async function reopenRound(
   payload: Record<string, unknown> = sessionPayload,
 ): Promise<Created> {
   return await startRound(url, { ...payload, reopen: true });
+}
+
+/**
+ * The next round the way 3.0 opens one: a publish from a working turn on a
+ * HEAD that moved. The turn is written straight onto the record — these tests
+ * are about the ledger, not about how the turn got there.
+ */
+async function publishNext(
+  url: string,
+  store: SessionStore,
+  key: string,
+  payload: Record<string, unknown> = { ...sessionPayload, headCommit: "ccc3333" },
+): Promise<Response> {
+  store.save({ ...store.get(key)!, turn: agentWorking(new Date().toISOString(), "fixes") });
+  return await postJson(`${url}/api/sessions`, { ...payload, verb: "publish" });
 }
 
 /** Two commits of one file, so a second round has a real diff to point at. */
@@ -245,7 +262,11 @@ test("an item stays readable after the repository it came from is deleted", asyn
   });
 });
 
-test("a queued annotation and its ledger record share one id", async () => {
+/**
+ * A thread id (`t1`) is unique within its session only, and ledger ids span
+ * every session the ledger holds: the two are different names on purpose.
+ */
+test("a queued annotation gets a thread id; its ledger record keeps a ledger-wide one", async () => {
   await withServer("on", async ({ url, store, ledger }) => {
     const { key } = await startRound(url);
     await postJson(`${url}/api/session/${key}/feedback`, {
@@ -263,128 +284,54 @@ test("a queued annotation and its ledger record share one id", async () => {
 
     const queued = store.get(key)!.pending[0] as { id?: string };
     const record = (ledger?.read({}).records ?? []).find((entry) => entry.kind === "annotation");
-    assert.match(queued.id ?? "", /^evt_/);
-    assert.equal(record?.id, queued.id);
+    assert.equal(queued.id, "t1");
+    assert.match(record?.id ?? "", /^evt_/);
   });
 });
 
-/** One reviewed round answered by a second: the shape every declaration is made in. */
-async function declaredRounds(url: string, store: SessionStore) {
-  const { repoRoot, first, second } = repoWithTwoCommits();
-  const { key } = await startRound(url, roundPayload(repoRoot, first, "2222bbb"));
-  await postJson(`${url}/api/session/${key}/feedback`, {
-    prompts: [
-      {
-        type: "annotation",
-        file: "users.ts",
-        group: "API Handlers",
-        selected_text: "+new",
-        comment: "use a constant",
-      },
-    ],
-    ended: false,
-  });
-  const id = (store.get(key)!.pending[0] as { id: string }).id;
-  await startRound(url, roundPayload(repoRoot, second, "3333ccc"));
-  return { key, id };
-}
-
-test("a declared file the between-round diff touched passes; one it never did is refused", async () => {
-  await withServer("on", async ({ url, store }) => {
-    const { key, id } = await declaredRounds(url, store);
-
-    const accepted = await postJson(`${url}/api/session/${key}/reply`, {
-      comment: "made it a constant",
-      declarations: [{ id, note: "a constant now", files: ["users.ts"] }],
-    });
-    const refused = await postJson(`${url}/api/session/${key}/reply`, {
-      comment: "made it a constant",
-      declarations: [{ id, note: "a constant now", files: ["untouched.ts"] }],
-    });
-
-    assert.equal(accepted.status, 200);
-    assert.equal(refused.status, 422);
-    const body = (await refused.json()) as { error: { detail: string } };
-    assert.match(body.error.detail, /untouched\.ts is not in the between-round diff/);
-  });
-});
-
-test("an accepted declaration is written to the ledger, about the annotation's id", async () => {
+test("a publish --to note is written to the ledger as the agent's reply", async () => {
   await withServer("on", async ({ url, store, ledger }) => {
-    const { key, id } = await declaredRounds(url, store);
+    const { key } = await startRound(url);
+    await postJson(`${url}/api/session/${key}/feedback`, {
+      prompts: [{ type: "message", comment: "use a constant" }],
+      ended: false,
+    });
+    await pollAndAck(url, key);
 
-    await postJson(`${url}/api/session/${key}/reply`, {
-      comment: "made it a constant",
-      declarations: [{ id, note: "a constant now", files: ["users.ts"] }],
+    const published = await publishNext(url, store, key, {
+      ...sessionPayload,
+      headCommit: "ccc3333",
+      intents: ["a constant now"],
+      notes: [{ to: "t1", text: "done: a constant now" }],
     });
 
-    const records = ledger?.read({ kind: "declaration" }).records ?? [];
-    assert.equal(records.length, 1);
-    assert.partialDeepStrictEqual(records[0], {
-      kind: "declaration",
-      about: id,
-      note: "a constant now",
-      files: ["users.ts"],
-      round: store.get(key)?.round,
-    });
+    assert.equal(published.status, 200);
+    const replies = (ledger?.read({}).records ?? []).filter((r) => r.kind === "agent_reply");
+    assert.equal(replies.length, 1);
+    assert.partialDeepStrictEqual(replies[0], { comment: "done: a constant now" });
+    assert.equal(
+      (ledger?.read({ kind: "declaration" }).records ?? []).length,
+      0,
+      "3.0 writes no declarations",
+    );
   });
 });
 
-test("an accepted declaration survives the next start", async () => {
-  await withServer("on", async ({ url, store }) => {
-    const { key, id } = await declaredRounds(url, store);
-    await postJson(`${url}/api/session/${key}/reply`, {
-      comment: "made it a constant",
-      declarations: [{ id, note: "a constant now", files: ["users.ts"] }],
-    });
-    const repoRoot = store.get(key)!.repoRoot;
-    const head = store.get(key)!.headCommit!;
-
-    // The round boundary the replay reads from: a new `start` must not shed
-    // the only ledger-independent copy of the agent's word.
-    await startRound(url, roundPayload(repoRoot, head, "4444ddd"));
-
-    assert.partialDeepStrictEqual(store.get(key)!.declarations, {
-      [id]: { note: "a constant now", files: ["users.ts"] },
-    });
-  });
-});
-
-test("re-sending the same declaration is safe: one entry, same content", async () => {
-  await withServer("on", async ({ url, store }) => {
-    const { key, id } = await declaredRounds(url, store);
-    const reply = {
-      comment: "made it a constant",
-      declarations: [{ id, note: "a constant now", files: ["users.ts"] }],
-    };
-
-    assert.equal((await postJson(`${url}/api/session/${key}/reply`, reply)).status, 200);
-    assert.equal((await postJson(`${url}/api/session/${key}/reply`, reply)).status, 200);
-
-    const declarations = store.get(key)!.declarations!;
-    assert.deepEqual(Object.keys(declarations), [id]);
-    assert.partialDeepStrictEqual(declarations[id], {
-      note: "a constant now",
-      files: ["users.ts"],
-    });
-  });
-});
-
-test("with the ledger off, ids and declarations still work off the session alone", async () => {
+test("with the ledger off, thread ids and replies still work off the session alone", async () => {
   await withServer("off", async ({ url, store }) => {
-    const { key, id } = await declaredRounds(url, store);
+    const { key } = await startRound(url);
+    await postJson(`${url}/api/session/${key}/feedback`, {
+      prompts: [{ type: "message", comment: "why?" }],
+      ended: false,
+    });
+    await pollAndAck(url, key);
 
     const response = await postJson(`${url}/api/session/${key}/reply`, {
-      comment: "made it a constant",
-      declarations: [{ id, note: "a constant now", files: ["users.ts"] }],
+      replies: [{ to: "t1", text: "because" }],
     });
 
-    assert.match(id, /^evt_/);
     assert.equal(response.status, 200);
-    assert.partialDeepStrictEqual(store.get(key)!.declarations?.[id], {
-      note: "a constant now",
-      files: ["users.ts"],
-    });
+    assert.equal(store.get(key)!.conversation.at(-1)?.role, "agent");
   });
 });
 
@@ -417,7 +364,11 @@ test("a full round leaves exactly the records that round produced", async () => 
       ],
       ended: false,
     });
-    await postJson(`${url}/api/session/${key}/reply`, { comment: "Fixed" });
+    await pollAndAck(url, key);
+    const replied = await postJson(`${url}/api/session/${key}/reply`, {
+      replies: [{ to: "t1", text: "Fixed" }],
+    });
+    assert.equal(replied.status, 200);
     await postJson(`${url}/api/session/${key}/end`, {});
 
     assert.deepEqual(kinds(ledger), [
@@ -428,8 +379,6 @@ test("a full round leaves exactly the records that round produced", async () => 
       "agent_reply",
       "round_end",
     ]);
-    // A reply that declares nothing writes no `declaration` record: an empty
-    // one would read as the agent having said "nothing", which it never did.
   });
 });
 
@@ -540,14 +489,14 @@ test("a round-end record separates approval earned here from approval carried in
 });
 
 test("approval from a round nobody ended is logged as carried, not earned again", async () => {
-  await withServer("on", async ({ url, ledger }) => {
+  await withServer("on", async ({ url, store, ledger }) => {
     const { key } = await startRound(url);
     await postJson(`${url}/api/session/${key}/approved`, { approved: ["src/api/users.ts"] });
-    // "Send to Agent": the round stays open, and the agent starts the next one.
+    // "Send to Agent": the round stays open, and the agent publishes the next one.
     await postJson(`${url}/api/session/${key}/feedback`, {
       prompts: [{ type: "message", comment: "one more pass" }],
     });
-    await startRound(url);
+    assert.equal((await publishNext(url, store, key)).status, 200);
     await postJson(`${url}/api/session/${key}/end`, {});
 
     const ends = (ledger?.read({}).records ?? []).filter((record) => record.kind === "round_end");

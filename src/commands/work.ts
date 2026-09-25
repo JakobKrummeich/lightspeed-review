@@ -1,7 +1,8 @@
+import { branchState } from "../git-state.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
-import { turnHelp } from "../turn-help.ts";
+import { nextRule } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { parseVerb, type VerbArgs } from "./verb-args.ts";
 import { serverOrigin } from "./server-address.ts";
@@ -18,20 +19,21 @@ export function parseWorkArgs(args: string[]): VerbArgs {
   return parseVerb(
     args,
     { verb: "work", placeholder: "plan" },
-    "the plan you are about to go quiet over",
+    "the plan you are about to carry out",
   );
 }
 
 /**
- * `work` does not take the turn, it only says what is being done with it;
- * nothing here blocks.
+ * The discussion is over: the reviewer's header names the plan and they can
+ * only Queue until `publish`. Waits for nothing — the agent has work to do.
  */
 export async function runWork(input: WorkInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const target = `${input.branch} ${input.base}`;
+  const { head } = branchState(input.repoRoot, input.branch);
   const declared = (await apiRequest(
     `${serverOrigin(input.port)}/api/session/${key}/work`,
-    jsonPost({ plan: input.plan }),
+    jsonPost({ plan: input.plan, ...(head === undefined ? {} : { head }) }),
     { key, target },
   )) as Partial<TurnFacts> & { changed?: boolean };
   return {
@@ -41,10 +43,8 @@ export async function runWork(input: WorkInput): Promise<StructuredOutput> {
     // agent from reading a second `work` as a second thing it did.
     message:
       declared.changed === false
-        ? "the reviewer's banner already named this plan (no-op)"
-        : "the reviewer's banner names this plan until you speak again",
-    // Never `wait`: the agent is working by the time it reads this, and the poll
-    // refuses a wait from a working agent with `turn_still_yours` and exit 2.
-    help: turnHelp(declared.turn ?? "agent working", target, declared.helpForm),
+        ? "the reviewer's header already names this plan (no-op)"
+        : "the reviewer's header names this plan; they can queue, not send, until you publish",
+    next: nextRule(declared.turn ?? "agent working", target),
   };
 }

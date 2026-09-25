@@ -71,7 +71,6 @@ export function shownOf(session: SessionData): string {
     status: session.status,
     endedBy: session.endedBy,
     talk: [session.conversation.length, last?.role, last?.at],
-    declarations: session.declarations,
   });
 }
 
@@ -97,7 +96,6 @@ export function drawnAfterFeedback(drawn: SessionData, fresh: SessionData): Sess
   return {
     ...drawn,
     conversation: fresh.conversation,
-    declarations: fresh.declarations,
     ...(fresh.status === "ended" ? {} : { status: fresh.status }),
   };
 }

@@ -7,11 +7,11 @@ import type {
   AnnotationPrompt,
   AnnotationSide,
   ConversationEntry,
-  DeclaredAnswer,
   LineAnchor,
   SessionRecord,
   SessionRound,
 } from "../session-store.ts";
+import { threadsOf } from "../threads.ts";
 import { MAX_APPROVED_FORM_BYTES } from "./approved-form.ts";
 import { changedBetween, currentName, fileApproval, fileHistory } from "./history.ts";
 
@@ -45,19 +45,14 @@ export type ReplayState = "ok" | "unrecorded" | "unreachable" | "oversize";
 export interface ReplayAnswer {
   /** The file's name today — a rename since the comment shows the new name. */
   file: string;
-  /**
-   * Empty on a declared answer = no text lines to show (empty patch, binary,
-   * unreadable). Deliberately not told apart on the wire: the declaration
-   * survived validation, so none is evidence against the agent's word — all
-   * render as "no code change to show", never as failure.
-   */
+  /** Empty = the file has no text lines to show between the rounds. */
   hunks: DiffHunk[];
   /** Present when the file's patch outgrew the cap; its hunks are withheld. */
   oversized?: true;
 }
 
 export interface ReplayComment {
-  /** Null on comments stored before ids existed; such a card is never declared. */
+  /** Null on comments stored before ids existed; such a card has no thread to answer in. */
   id: string | null;
   /** The file as last round's diff named it. */
   file: string;
@@ -67,10 +62,12 @@ export interface ReplayComment {
   comment: string;
   context?: string;
   status: ReplayStatus;
-  /** Whether the agent declared this comment's answer; false means mechanical. */
+  /** Whether the agent answered in the comment's thread (`note`). */
   declared: boolean;
   state: ReplayState;
+  /** Always read off the anchor (the mechanical answer); the agent's words are `note`. */
   answers: ReplayAnswer[];
+  /** The agent's last words in the comment's thread — a `publish --to` "done: …" note. */
   note?: string;
 }
 
@@ -85,6 +82,8 @@ interface Review {
   current: SessionRound;
   /** Reviewer annotations from rounds after `made`, for the `repeated` verdict. */
   later: AnnotationPrompt[];
+  /** The agent's last words per thread id. */
+  answered: Map<string, string>;
   ask: ReadBetween;
   readFileAt: ReadFileAt;
 }
@@ -105,6 +104,7 @@ export function replayData(
     made,
     current,
     later: annotations(session.conversation, rounds, (round) => round > made.index),
+    answered: agentAnswers(session.conversation),
     ask: askOnce(readBetween),
     readFileAt,
   };
@@ -130,6 +130,15 @@ function annotations(
     .filter((prompt) => prompt.type === "annotation");
 }
 
+function agentAnswers(conversation: ConversationEntry[]): Map<string, string> {
+  const answers = new Map<string, string>();
+  for (const thread of threadsOf(conversation)) {
+    const last = thread.messages.findLast((message) => message.role === "agent");
+    if (last !== undefined) answers.set(thread.id, last.comment);
+  }
+  return answers;
+}
+
 /**
  * The same question is put to git once per replay rather than once per card:
  * every undeclared comment on one file asks for the same patch.
@@ -147,8 +156,7 @@ function askOnce(readBetween: ReadBetween): ReadBetween {
 }
 
 function replayComment(review: Review, prompt: AnnotationPrompt): ReplayComment {
-  const declaration =
-    prompt.id === undefined ? undefined : review.session.declarations?.[prompt.id];
+  const note = prompt.id === undefined ? undefined : review.answered.get(prompt.id);
   return {
     id: prompt.id ?? null,
     file: prompt.file,
@@ -157,24 +165,19 @@ function replayComment(review: Review, prompt: AnnotationPrompt): ReplayComment 
     selected_text: prompt.selected_text,
     comment: prompt.comment,
     ...contextOf(review, prompt),
-    declared: declaration !== undefined,
-    ...(declaration?.note === undefined ? {} : { note: declaration.note }),
-    ...outcomeOf(review, prompt, declaration),
+    declared: note !== undefined,
+    ...(note === undefined ? {} : { note }),
+    ...outcomeOf(review, prompt),
   };
 }
 
 /**
  * The judged half of a card. Only missing/unreachable commits degrade the whole
- * card. An oversize patch of the annotated file degrades a declared card's
- * status alone — declared answers are read per-file by `declaredAnswer`, and
- * losing them over a different file's size would drop the one part the agent
- * vouched for; the mechanical fallback has only that patch, so an undeclared
- * card stays status-only `oversize`.
+ * card; an oversize patch leaves it status-only `oversize`.
  */
 function outcomeOf(
   review: Review,
   prompt: AnnotationPrompt,
-  declaration: DeclaredAnswer | undefined,
 ): { status: ReplayStatus; state: ReplayState; answers: ReplayAnswer[] } {
   const path = currentName(review.current, prompt.file);
   const from = review.made.headCommit;
@@ -187,10 +190,6 @@ function outcomeOf(
     return { status: "unknown", state: "unreachable", answers: [] };
   }
   const status = read.state === "patch" ? statusOf(review, path) : "unknown";
-  if (declaration !== undefined) {
-    const answers = declaration.files.map((file) => declaredAnswer(review, from, to, file));
-    return { status, state: "ok", answers };
-  }
   if (read.state === "oversize") return { status, state: "oversize", answers: [] };
   return { status, state: "ok", answers: mechanicalAnswers(prompt, path, read.patch) };
 }
@@ -254,21 +253,6 @@ function contextOf(review: Review, prompt: AnnotationPrompt): { context?: string
 function sideName(made: SessionRound, path: string, side: AnnotationSide): string {
   if (side === "new") return path;
   return made.files.find((entry) => entry.path === path)?.previousPath ?? path;
-}
-
-/**
- * One declared file's answer: its whole between-round patch as hunks, never
- * anchor-filtered — the agent's word is that the whole change answers the
- * comment. An unreadable patch answers with no hunks rather than failing the
- * card: absence is not evidence against the agent's word.
- */
-function declaredAnswer(review: Review, from: string, to: string, file: string): ReplayAnswer {
-  const read = review.ask(from, to, gitNames(review, file));
-  if (read.state === "oversize") return { file, hunks: [], oversized: true };
-  if (read.state === "unreachable") return { file, hunks: [] };
-  const found = parseDiff(read.patch).find((entry) => entry.path === file);
-  if (found === undefined || found.diff === "") return { file, hunks: [] };
-  return cappedHunks(file, found.diff);
 }
 
 /**

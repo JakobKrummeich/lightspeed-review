@@ -41,7 +41,7 @@ function said(role: "reviewer" | "agent", comments: number): ConversationEntry {
 }
 
 const REVIEWERS_TURN = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" } as const;
-const AGENTS_TURN = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" } as const;
+const AGENTS_TURN = { holder: "agent", mode: "digesting", at: "2025-01-01T00:06:00.000Z" } as const;
 
 function session(over: Partial<SessionData> = {}): SessionData {
   const base: SessionData = {

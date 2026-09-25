@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { helpAsk, helpPublishAndWait, helpSay, nextMoves } from "../../src/turn-help.ts";
+import { nextRule } from "../../src/turn-help.ts";
 import { parseWorkArgs, runWork } from "../../src/commands/work.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer } from "../../src/server.ts";
-import { SessionStore, type SessionRecord } from "../../src/session-store.ts";
+import { SessionStore } from "../../src/session-store.ts";
+import type { SessionRecord } from "../../src/session-types.ts";
 
 const REPO = "/repo";
 const BRANCH = "feature-auth";
@@ -23,7 +24,7 @@ function session(overrides: Partial<SessionRecord> = {}): SessionRecord {
     branch: BRANCH,
     base: BASE,
     status: "feedback",
-    turn: { holder: "agent", mode: "reading", at: AT },
+    turn: { holder: "agent", mode: "digesting", at: AT },
     createdAt: AT,
     updatedAt: AT,
     groups: [],
@@ -72,11 +73,11 @@ test("work takes no flags, and says so rather than listing none", () => {
   );
 });
 
-test("a blank plan is refused: the banner would name nothing", () => {
+test("a blank plan is refused: the header would name nothing", () => {
   assert.throws(
     () => parseWorkArgs(["  "]),
     (error: unknown) => {
-      assert.match((error as Error).message, /work needs the plan you are about to go quiet over/);
+      assert.match((error as Error).message, /work needs the plan you are about to carry out/);
       return true;
     },
   );
@@ -95,13 +96,15 @@ test("declaring the plan names it on the turn the agent already holds", async ()
     assert.equal(output.turn, "agent working");
     assert.equal(output.round, 1);
     assert.equal(output.plan, "splitting the helper out");
-    assert.equal(output.message, "the reviewer's banner names this plan until you speak again");
+    assert.equal(
+      output.message,
+      "the reviewer's header names this plan; they can queue, not send, until you publish",
+    );
   });
 });
 
-/** The whole array: a joined string hid a `wait` here, which the poll refuses
- * with `turn_still_yours` the moment this command succeeds. */
-test("the moves after work are the ones that give the turn up, never a wait", async () => {
+/** Work waits for nothing, so its answer closes with the one way out: publish. */
+test("the answer after work closes with the rule for a working turn", async () => {
   await withServer(session(), async ({ port }) => {
     const output = await runWork({
       repoRoot: REPO,
@@ -111,11 +114,12 @@ test("the moves after work are the ones that give the turn up, never a wait", as
       plan: "splitting the helper out",
     });
 
-    assert.deepEqual(output.help, [
-      helpPublishAndWait("feature-auth main"),
-      helpAsk("feature-auth main"),
-      helpSay("feature-auth main"),
-    ]);
+    assert.deepEqual(output.next, nextRule("agent working", "feature-auth main"));
+    assert.equal(Object.keys(output).at(-1), "next");
+    assert.match(
+      (output.next as { publish: string }).publish,
+      /lightspeed publish feature-auth main/,
+    );
   });
 });
 
@@ -129,8 +133,8 @@ test("redeclaring the same plan says so, and refining it does not", async () => 
     const again = await runWork({ ...input, plan: "splitting the helper out" });
     const refined = await runWork({ ...input, plan: "splitting the helper out, then the test" });
 
-    assert.equal(again.message, "the reviewer's banner already named this plan (no-op)");
-    assert.equal(refined.message, "the reviewer's banner names this plan until you speak again");
+    assert.equal(again.message, "the reviewer's header already names this plan (no-op)");
+    assert.match(String(refined.message), /^the reviewer's header names this plan;/);
   });
 });
 
@@ -144,7 +148,7 @@ test("work without the turn is refused, with the command that earns it", async (
       (error: unknown) => {
         assert.ok(error instanceof ReviewError);
         assert.equal(error.code, "turn_not_yours");
-        assert.match(error.suggestions.join("\n"), /lightspeed wait feature-auth main/);
+        assert.match(error.suggestions.join("\n"), /lightspeed open feature-auth main/);
         return true;
       },
     );
@@ -155,7 +159,7 @@ test("work without the turn is refused, with the command that earns it", async (
 /** Regression: the turn on an ended record is whoever held it last, and `work`
  * from that agent was written onto the closed session. */
 test("work on an ended review is refused as ended, and declares nothing", async () => {
-  const record = session({ status: "ended", turn: { holder: "agent", mode: "reading", at: AT } });
+  const record = session({ status: "ended", turn: { holder: "agent", mode: "digesting", at: AT } });
   await withServer(record, async ({ port, store }) => {
     await assert.rejects(
       () => runWork({ repoRoot: REPO, branch: BRANCH, base: BASE, port, plan: "carrying on" }),
@@ -166,7 +170,7 @@ test("work on an ended review is refused as ended, and declares nothing", async 
         return true;
       },
     );
-    assert.deepEqual(store.get(KEY)?.turn, { holder: "agent", mode: "reading", at: AT });
+    assert.deepEqual(store.get(KEY)?.turn, { holder: "agent", mode: "digesting", at: AT });
   });
 });
 
@@ -183,41 +187,21 @@ test("declaring work on an unknown session fails with session_not_found", async 
   });
 });
 
-/**
- * The four-line block is how an agent learns the protocol from one answer, and
- * every repeat of it inside the same round is bytes it already has — 74% of a
- * `work` answer.
- */
-test("the first answer of a round spells the moves out, the next one names them", async () => {
-  await withServer(session(), async ({ port, store }) => {
-    const input = { repoRoot: REPO, branch: BRANCH, base: BASE, port };
-
-    const first = await runWork({ ...input, plan: "splitting the helper out" });
-    const second = await runWork({ ...input, plan: "and re-running the suite" });
-
-    assert.equal((first.help as string[]).length, 3);
-    assert.deepEqual(second.help, [nextMoves("agent working", "feature-auth main")]);
-    // On the record, because the next command is a fresh process with no memory
-    // of this one: the round it was told about is the only place that can say.
-    assert.equal(store.get(KEY)?.helpShownRound, 1);
-  });
-});
-
-/** A round is where the moves change, so it is where the full block earns its
- * tokens again — and `start` resets nothing to make that happen. */
-test("a new round spells the moves out again", async () => {
+/** W2: the branch tip `work` found is what a later `reply` from working is measured against. */
+test("redeclaring keeps the head the work started from", async () => {
   await withServer(session(), async ({ port, store }) => {
     const input = { repoRoot: REPO, branch: BRANCH, base: BASE, port };
     await runWork({ ...input, plan: "splitting the helper out" });
-    const record = store.get(KEY)!;
-    store.save({
-      ...record,
-      rounds: [...record.rounds, { index: 1, at: AT, files: [], approvedAtEnd: [] }],
-    });
+    const first = store.get(KEY)!.turn;
+    store.save({ ...store.get(KEY)!, turn: { ...first, head: "c".repeat(40) } as typeof first });
 
-    const output = await runWork({ ...input, plan: "second round work" });
+    await runWork({ ...input, plan: "and re-running the suite" });
 
-    assert.equal(output.round, 2);
-    assert.equal((output.help as string[]).length, 3);
+    const turn = store.get(KEY)!.turn;
+    assert.equal(turn.holder === "agent" && turn.mode === "working" && turn.head, "c".repeat(40));
+    assert.equal(
+      turn.holder === "agent" && turn.mode === "working" && turn.note,
+      "and re-running the suite",
+    );
   });
 });

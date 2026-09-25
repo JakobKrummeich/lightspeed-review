@@ -14,7 +14,6 @@ import {
 import type { AnnotationSide } from "../../src/ledger/records.ts";
 import {
   agentReplyRecords,
-  declarationRecords,
   feedbackRecords,
   type ReadSideFile,
   recordSafely,
@@ -425,7 +424,8 @@ test("an agent reply is logged as its own kind", () => {
   assert.equal(records.length, 1);
 });
 
-test("a prompt the server already stamped keeps its id in the ledger", () => {
+/** A thread id (`t4`) is unique within its session only; ledger ids span every session. */
+test("an annotation's ledger id is the ledger's own, never its thread id", () => {
   const records = feedbackRecords({
     session: session(),
     repo,
@@ -433,7 +433,7 @@ test("a prompt the server already stamped keeps its id in the ledger", () => {
     prompts: [
       {
         type: "annotation",
-        id: "evt_stamped_0001",
+        id: "t4",
         file: "src/server.ts",
         group: "Write path",
         selected_text: "+new",
@@ -444,33 +444,24 @@ test("a prompt the server already stamped keeps its id in the ledger", () => {
     nextId,
   });
 
-  assert.equal(records[0]?.id, "evt_stamped_0001");
+  assert.match(records[0]?.id ?? "", /^evt_/);
 });
 
-test("each declared comment writes one declaration record naming that comment", () => {
-  const records = declarationRecords({
+test("a resolve toggle writes nothing; a reply in a thread is a message", () => {
+  const records = feedbackRecords({
     session: session(),
     repo,
-    declarations: [
-      { id: "evt_a", files: ["src/server.ts"], note: "one transaction now" },
-      { id: "evt_b", files: [] },
+    readFile: noFile,
+    prompts: [
+      { type: "resolve", thread: "t4", resolved: true },
+      { type: "reply", thread: "t4", comment: "fine, go ahead" },
     ],
     now: NOW,
     nextId,
   });
 
-  assert.equal(records.length, 2);
-  assert.deepEqual(
-    records.map((record) => record.kind),
-    ["declaration", "declaration"],
-  );
-  const [first, second] = records;
-  assert.equal(first?.kind === "declaration" ? first.about : "", "evt_a");
-  assert.deepEqual(first?.kind === "declaration" ? first.files : [], ["src/server.ts"]);
-  assert.equal(first?.kind === "declaration" ? first.note : "", "one transaction now");
-  assert.equal(second?.kind === "declaration" ? second.about : "", "evt_b");
-  assert.equal(second?.kind === "declaration" && "note" in second, false);
-  assert.equal(second?.kind === "declaration" ? second.round : "", "rnd_1");
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.kind, "message");
 });
 
 test("the end of a round records which files the reviewer had ticked approved", () => {

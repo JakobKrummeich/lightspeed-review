@@ -11,7 +11,7 @@ import {
 } from "./records.ts";
 
 /**
- * Every `start` re-judges all earlier annotations — evidence keeps arriving,
+ * Every round opened re-judges all earlier annotations — evidence keeps arriving,
  * and the read side keeps the newest outcome per annotation as the standing
  * one.
  */
@@ -36,7 +36,7 @@ export interface OutcomesInput {
   now: string;
   nextId: IdSource;
   nextRound: string;
-  /** The session as it stands after that `start`, so its newest round is the open one. */
+  /** The session as it stands after that round opened, so its newest round is the open one. */
   session: SessionRecord;
   annotations: AnnotationRecord[];
   diffFile: ReadFileDiff;
@@ -76,7 +76,7 @@ export function outcomeRecords(input: OutcomesInput): OutcomeRecord[] {
 
 /**
  * Every annotation of a round names the same few files, and each ask is a git
- * subprocess, so the same question is put to git once per `start` rather than
+ * subprocess, so the same question is put to git once per round opened rather than
  * once per annotation.
  */
 function askOnce(diffFile: ReadFileDiff): ReadFileDiff {

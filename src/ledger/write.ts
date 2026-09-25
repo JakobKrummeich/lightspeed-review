@@ -8,11 +8,9 @@ import {
   type Approval,
 } from "../rounds/history.ts";
 import { sliceContext } from "./context.ts";
-import type { CommentDeclaration } from "../declarations.ts";
 import {
   anchorOf,
   buildAgentReplyRecord,
-  buildDeclarationRecord,
   buildAnnotationRecord,
   buildMessageRecord,
   buildRoundEndRecord,
@@ -56,11 +54,6 @@ export interface FeedbackInput extends WriteContext {
 export interface ReplyInput extends WriteContext {
   session: SessionRecord;
   comment: string;
-}
-
-export interface DeclareInput extends WriteContext {
-  session: SessionRecord;
-  declarations: CommentDeclaration[];
 }
 
 export interface EndInput extends WriteContext {
@@ -152,10 +145,17 @@ function roundFileRecord(
   });
 }
 
+/**
+ * A resolve toggle carries no words, so it has no record: the ledger is what
+ * was said. A reply in a thread is a message like any other.
+ */
 export function feedbackRecords(input: FeedbackInput): LedgerRecord[] {
-  return input.prompts.map((prompt) =>
-    prompt.type === "annotation" ? annotationRecord(input, prompt) : messageRecord(input, prompt),
-  );
+  return input.prompts.flatMap((prompt) => {
+    if (prompt.type === "resolve") return [];
+    return [
+      prompt.type === "annotation" ? annotationRecord(input, prompt) : messageRecord(input, prompt),
+    ];
+  });
 }
 
 function annotationRecord(input: FeedbackInput, prompt: AnnotationPrompt): LedgerRecord {
@@ -165,9 +165,9 @@ function annotationRecord(input: FeedbackInput, prompt: AnnotationPrompt): Ledge
   const side = prompt.side ?? "new";
   const context = sliceContext(input.readFile(prompt.file, side), prompt);
   return buildAnnotationRecord({
-    // The server stamps the prompt's id before it queues it, so the record and
-    // the prompt the agent is handed are the same comment under the same name.
-    id: prompt.id ?? input.nextId("evt", now),
+    // Always the ledger's own: a thread id (`t4`) is unique only within its
+    // session, and a ledger id must be unique across every session it holds.
+    id: input.nextId("evt", now),
     at: now,
     round: roundOf(session),
     repo,
@@ -240,27 +240,6 @@ export function agentReplyRecords(input: ReplyInput): LedgerRecord[] {
       comment: input.comment,
     }),
   ];
-}
-
-/**
- * Written only after the whole declaration validated: the ledger holds what the
- * session accepted, nothing else.
- */
-export function declarationRecords(input: DeclareInput): LedgerRecord[] {
-  const { session, repo, now } = input;
-  return input.declarations.map((declaration) =>
-    buildDeclarationRecord({
-      id: input.nextId("evt", now),
-      at: now,
-      round: roundOf(session),
-      repo,
-      branch: session.branch,
-      base: session.base,
-      about: declaration.id,
-      files: declaration.files,
-      ...(declaration.note === undefined ? {} : { note: declaration.note }),
-    }),
-  );
 }
 
 export function roundEndRecords(input: EndInput): LedgerRecord[] {

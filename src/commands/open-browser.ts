@@ -7,7 +7,7 @@ export function openBrowser(url: string): void {
 }
 
 /** Best effort: a headless box with no `xdg-open` must not fail a review the agent
- * can still `wait` on, and the URL is in the output anyway. The spawn failure arrives as
+ * can still wait on, and the URL is in the output anyway. The spawn failure arrives as
  * an event — without a listener it takes the process down. */
 export function launchBrowser(command: string, url: string): void {
   const child = spawn(command, [url], { detached: true, stdio: "ignore" });

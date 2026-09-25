@@ -191,7 +191,7 @@ test("nothing listening is reported as server_not_running once the probes are sp
       // refuses to run without the intent this line now carries.
       assert.match(
         error.suggestions.join(" "),
-        /lightspeed start feature-auth main --intent "<why this branch exists>"/,
+        /lightspeed open feature-auth main --intent '<why this branch exists>'/,
       );
       return true;
     },

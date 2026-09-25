@@ -1,5 +1,7 @@
 import { ReviewError } from "./errors.ts";
-import type { SessionRecord } from "./session-store.ts";
+import type { SessionRecord } from "./session-types.ts";
+import { openCall } from "./start-call.ts";
+import { replyCall, workCall } from "./turn-help.ts";
 
 export interface ResolvedSession {
   branch: string;
@@ -25,7 +27,7 @@ export function missingSession(input: MissingSessionInput): ReviewError {
   const live = input.sessions.filter(
     (session) => session.repoRoot === input.repoRoot && session.status !== "ended",
   );
-  const open = `Run \`lightspeed start ${input.branch} ${input.base} --intent "<why this branch exists>"\` to open it`;
+  const open = `Run \`${openCall(`${input.branch} ${input.base}`)}\` to open it`;
   return new ReviewError({
     code: "session_not_found",
     message: `no review session for ${input.branch} against ${input.base} in ${input.repoRoot}`,
@@ -40,17 +42,25 @@ function liveDetail(live: SessionRecord[]): string {
   return `${live.length} live session${live.length === 1 ? "" : "s"} in this repo: ${named}`;
 }
 
+/** The verbs that take more than a session: a line naming only the branch would
+ * be refused for the argument it left out. */
+const CALLS: Record<string, (target: string) => string> = { reply: replyCall, work: workCall };
+
+function callFor(verb: string, target: string): string {
+  return CALLS[verb]?.(target) ?? `lightspeed ${verb} ${target}`;
+}
+
 /** One live session is a command to run; several are a choice only the agent can
  * make, so it gets the form and the list above it rather than a guess. */
 function instead(verb: string, live: SessionRecord[]): string[] {
   const only = live.length === 1 ? live[0] : undefined;
   if (only !== undefined) {
     return [
-      `Or run \`lightspeed ${verb} ${only.branch} ${only.base}\` for the session that exists`,
+      `Or run \`${callFor(verb, `${only.branch} ${only.base}`)}\` for the session that exists`,
     ];
   }
   if (live.length === 0) return [];
-  return [`Or name one of the sessions above: \`lightspeed ${verb} <branch> [base]\``];
+  return [`Or name one of the sessions above: \`${callFor(verb, "<branch> [base]")}\``];
 }
 
 /** Explicit arguments always win — that is what makes concurrent sessions unambiguous. */
@@ -70,7 +80,7 @@ export function resolveSession(
     throw new ReviewError({
       code: "ambiguous_session",
       message: `no live review session for ${repoRoot}`,
-      suggestions: [NAME_THE_BRANCH, "Run `lightspeed start <branch> [base]` to open one"],
+      suggestions: [NAME_THE_BRANCH, `Run \`${openCall("<branch> [base]")}\` to open one`],
     });
   }
   throw new ReviewError({

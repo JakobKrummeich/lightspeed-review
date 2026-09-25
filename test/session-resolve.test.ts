@@ -40,7 +40,7 @@ test("a review nothing holds is named by its branch pair and its repository", ()
   assert.equal(error.message, "no review session for other/branch against main in /repo");
   assert.equal(error.detail, "1 live session in this repo: feature/greeting against main");
   assert.deepEqual(error.suggestions, [
-    'Run `lightspeed start other/branch main --intent "<why this branch exists>"` to open it',
+    "Run `lightspeed open other/branch main --intent '<why this branch exists>'` to open it",
     "Or run `lightspeed wait feature/greeting main` for the session that exists",
   ]);
 });

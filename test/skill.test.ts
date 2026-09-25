@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { HELP_START, BLOCKS_IN_FOREGROUND, TURN_RULE } from "../src/turn-help.ts";
+import { HELP_OPEN, TURN_RULES, WAITS_FOR_SEND, nextRule } from "../src/turn-help.ts";
 import { REACHABLE_MODELS } from "../src/config.ts";
 import { renderSkill, SKILL_PATH } from "../src/skill.ts";
 
@@ -12,16 +12,16 @@ test("the skill opens with frontmatter a skill loader can read", () => {
   assert.match(skill, /^---\nname: lightspeed\ndescription: .+\n---\n/);
 });
 
-test("the skill teaches the whole loop, start to close", () => {
-  for (const command of ["start", "wait", "ask", "say", "work", "end"]) {
+test("the skill teaches the whole loop, open to close", () => {
+  for (const command of ["open", "reply", "work", "publish", "end"]) {
     assert.match(skill, new RegExp(`lightspeed ${command}`), command);
   }
 });
 
-/** The one sentence the whole protocol reduces to, worded once in the CLI and
- * quoted everywhere: two copies would drift and the agent would learn the stale one. */
-test("the skill states the turn rule in the CLI's own words", () => {
-  assert.ok(skill.includes(TURN_RULE));
+/** The rules the whole protocol reduces to, worded once in the CLI and quoted
+ * everywhere: two copies would drift and the agent would learn the stale one. */
+test("the skill states the turn rules in the CLI's own words", () => {
+  for (const rule of TURN_RULES) assert.ok(skill.includes(rule), rule);
   assert.match(skill, /^## The turn$/m);
   // What the agent has to know to pick a command: where the turn comes from, and
   // that it is stated on every answer.
@@ -29,19 +29,34 @@ test("the skill states the turn rule in the CLI's own words", () => {
   assert.match(skill, /`round`/);
 });
 
-test("the skill repeats the foreground-wait rule in the words the CLI uses", () => {
-  assert.ok(skill.includes(BLOCKS_IN_FOREGROUND));
+test("the skill repeats the waits-for-your-Send rule in the words the CLI uses", () => {
+  assert.ok(skill.includes(WAITS_FOR_SEND));
+});
+
+/** D3: "locked" is the browser's word, "waits for your Send" the CLI's. */
+test("the skill never says blocking", () => {
+  assert.doesNotMatch(skill, /\bblock(s|ing|ed)?\b/i);
+});
+
+test("the skill quotes the next rule the CLI prints, not a paraphrase of it", () => {
+  const digesting = nextRule("agent digesting", "<branch>", ["t4", "t2"]);
+  assert.ok(skill.includes(digesting.talk!));
+  assert.ok(skill.includes(digesting.work!));
+  assert.ok(skill.includes(nextRule("agent working", "<branch>", ["t4"]).publish!));
 });
 
 /** `poll` is gone, not renamed: a skill still naming it teaches a command the CLI
  * answers with "Unknown command". */
-test("the skill never names the command that was replaced", () => {
-  assert.doesNotMatch(skill, /lightspeed poll/);
-  assert.doesNotMatch(skill, /--agent-reply/);
+test("the skill never teaches a command that was replaced", () => {
+  for (const gone of ["poll", "wait", "ask", "say", "start"]) {
+    assert.doesNotMatch(skill, new RegExp(`lightspeed ${gone}\\b`), gone);
+  }
+  assert.doesNotMatch(skill, /--agent-reply|--wait|--for /);
+  assert.match(skill, /removed_verb/);
 });
 
-test("the skill quotes the CLI's own start guidance rather than a second copy", () => {
-  assert.ok(skill.includes(HELP_START));
+test("the skill quotes the CLI's own open guidance rather than a second copy", () => {
+  assert.ok(skill.includes(HELP_OPEN));
 });
 
 /**
@@ -57,7 +72,7 @@ test("the skill's setup names models that exist instead of a placeholder", () =>
 
 test("the skill says an ended review is refused, and how the reviewer asks for more", () => {
   assert.match(skill, /session_ended/);
-  assert.match(skill, /start <branch> \[base\] --reopen/);
+  assert.match(skill, /open <branch> \[base\] --reopen/);
 });
 
 test("the checked-in SKILL.md is current — run `pnpm run build:skill`", () => {

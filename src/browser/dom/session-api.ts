@@ -4,7 +4,6 @@ import type { ReplayData } from "../../rounds/replay.ts";
 import type { Approval } from "../../rounds/history.ts";
 import type {
   ConversationEntry,
-  DeclaredAnswer,
   FeedbackPrompt,
   ReviewCloser,
   RoundFile,
@@ -29,8 +28,6 @@ export interface SessionData {
    */
   rounds: (RoundMark & { files?: RoundFile[] })[];
   pending: FeedbackPrompt[];
-  /** Keyed by comment id (`say --for <id>`). */
-  declarations?: Record<string, DeclaredAnswer>;
   status: SessionStatus;
   turn: Turn;
   /**

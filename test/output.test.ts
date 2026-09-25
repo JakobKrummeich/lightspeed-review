@@ -22,7 +22,7 @@ test("long content is cut and says how much there was and where the rest is", ()
 
   assert.equal(
     truncated,
-    `${"x".repeat(10)}\n(truncated, 50 chars — use --full; lines 1-1 of a.txt have the rest)`,
+    `${"x".repeat(10)}\n(truncated, 50 chars; lines 1-1 of a.txt have the rest)`,
   );
 });
 

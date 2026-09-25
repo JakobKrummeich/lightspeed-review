@@ -113,7 +113,6 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     update(fresh: SessionData) {
       state.conversation = fresh.conversation;
       state.rounds = fresh.rounds;
-      state.declarations = fresh.declarations;
       draw(view);
       setStatus(view, fresh.status);
     },
@@ -148,7 +147,6 @@ function openingState(session: SessionData, pending: PanelState["pending"]): Pan
     pending,
     conversation: session.conversation,
     rounds: session.rounds,
-    declarations: session.declarations,
     status: session.status,
     allApproved: false,
     turn: session.turn,

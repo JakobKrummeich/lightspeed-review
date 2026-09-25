@@ -1,5 +1,5 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
-import { startCall } from "../start-call.ts";
+import { openCall } from "../start-call.ts";
 import { helpReopen } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
 
@@ -43,7 +43,7 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
         about === undefined
           ? "the review server knows no such session"
           : `no review session ${about.key}`,
-      suggestions: [`Run \`${startCall(target(about))}\` to open the session first`],
+      suggestions: [`Run \`${openCall(target(about))}\` to open the session first`],
     });
   }
   if (status === 409) {
@@ -57,7 +57,7 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
     return new ReviewError({
       code: "server_not_running",
       message: "the review server shut down while the command was waiting",
-      suggestions: [`Run \`${startCall(target(about))}\` to restart the review server`],
+      suggestions: [`Run \`${openCall(target(about))}\` to restart the review server`],
     });
   }
   return undefined;
@@ -95,9 +95,10 @@ export function parseBody(status: number, body: string, about?: SessionRef): unk
  * `turn_not_yours` first reached agents as `internal_error`: a bug in
  * lightspeed, they read, instead of an illegal move they could fix. */
 const DOMAIN_ERROR_CODES = new Set<ReviewErrorCode>([
-  "declaration_invalid",
   "turn_not_yours",
   "turn_still_yours",
+  "nothing_to_publish",
+  "feedback_item_unknown",
 ]);
 
 function isDomainCode(code: unknown): code is ReviewErrorCode {
@@ -157,7 +158,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepts a connection on port ${port}`,
-      suggestions: [`Run \`${startCall("<branch> [base]")}\` to start the review server`],
+      suggestions: [`Run \`${openCall("<branch> [base]")}\` to start the review server`],
     });
   }
   return new ReviewError({
@@ -166,7 +167,7 @@ export async function transportError(url: string, error: unknown): Promise<Revie
     detail: `${detail}; the port is still reachable, so the server is there`,
     suggestions: [
       "Re-run the command; the connection failed, not the review",
-      `Run \`lightspeed stop\` and then \`${startCall("<branch> [base]")}\` if it keeps failing`,
+      `Run \`lightspeed stop\` and then \`${openCall("<branch> [base]")}\` if it keeps failing`,
     ],
   });
 }

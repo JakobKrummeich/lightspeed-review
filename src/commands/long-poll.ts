@@ -2,7 +2,7 @@ import { request as httpRequest } from "node:http";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import { apiRequest, jsonPost, parseBody, type SessionRef } from "./api-client.ts";
-import { startCall } from "../start-call.ts";
+import { openCall } from "../start-call.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
 export interface LongPollInput {
@@ -52,7 +52,7 @@ export async function longPoll(input: LongPollInput): Promise<unknown> {
  * The server cannot see for itself that the handover arrived: the bytes reach
  * the kernel whether or not anything reads them. Best effort, because the
  * prompts are already in this process's hands: a failed acknowledgement costs
- * one re-delivery on the next poll, while a failed `wait` would cost the agent
+ * one re-delivery on the next poll, while a failed listen would cost the agent
  * the feedback it is holding.
  */
 async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<void> {
@@ -103,7 +103,7 @@ function portIsNotServing(
       code: "server_not_running",
       message: "no lightspeed server is listening",
       detail: `${detail}; nothing accepted a connection on port ${port}`,
-      suggestions: [`Run \`${startCall(target)}\` to start the review server`],
+      suggestions: [`Run \`${openCall(target)}\` to start the review server`],
     });
   }
   return new ReviewError({
@@ -111,8 +111,8 @@ function portIsNotServing(
     message: `port ${port} neither accepted a connection nor refused one`,
     detail: `${detail}; the machine answered nothing at all on that port`,
     suggestions: [
-      `Re-run \`lightspeed wait ${target}\` in the foreground`,
-      `Run \`lightspeed stop\` and then \`${startCall(target)}\` if it keeps failing`,
+      `Re-run the command that was waiting, in the foreground — it posts nothing twice`,
+      `Run \`lightspeed stop\` and then \`${openCall(target)}\` if it keeps failing`,
     ],
   });
 }
@@ -125,7 +125,7 @@ function notAReviewServer(port: number, failure: unknown, target: string): Revie
     detail: `${messageOf(failure)}; the port accepts connections but /health does not answer`,
     suggestions: [
       `Set a free \`port\` in .lightspeed.conf.json instead of ${port}`,
-      `Stop whatever is listening there and run \`${startCall(target)}\` again`,
+      `Stop whatever is listening there and run \`${openCall(target)}\` again`,
     ],
   });
 }

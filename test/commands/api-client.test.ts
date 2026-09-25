@@ -83,22 +83,20 @@ test("a POST is never retried, so a dropped reply cannot be sent twice", async (
 test("a 422 relays the server's own structured error, help and all", () => {
   const body = JSON.stringify({
     error: {
-      code: "declaration_invalid",
-      message: "the reply was rejected whole: 1 declaration problem(s)",
-      detail: "evt_a: declares nothing",
+      code: "feedback_item_unknown",
+      message: "no such item: t9 — nothing was posted",
+      detail: "items in this review: t1, main",
     },
-    help: ["Ids come from the annotations in `lightspeed wait` output"],
+    help: ["Re-run with ids from the list"],
   });
 
   const parsed = parseBody(422, body);
 
   assert.ok(parsed instanceof ReviewError);
-  assert.equal(parsed.code, "declaration_invalid");
-  assert.match(parsed.message, /rejected whole/);
-  assert.equal(parsed.detail, "evt_a: declares nothing");
-  assert.deepEqual(parsed.suggestions, [
-    "Ids come from the annotations in `lightspeed wait` output",
-  ]);
+  assert.equal(parsed.code, "feedback_item_unknown");
+  assert.match(parsed.message, /nothing was posted/);
+  assert.equal(parsed.detail, "items in this review: t1, main");
+  assert.deepEqual(parsed.suggestions, ["Re-run with ids from the list"]);
 });
 
 /** Regression: a code this client did not know about reached the agent as
@@ -168,18 +166,18 @@ test("nothing listening is still reported as no server, once retried", async () 
     (error: ReviewError) => {
       assert.equal(error.code, "server_not_running");
       assert.match(error.detail ?? "", /nothing accepts a connection on port 1/);
-      assert.match(error.suggestions.join(" "), /lightspeed start <branch> \[base\] --intent/);
+      assert.match(error.suggestions.join(" "), /lightspeed open <branch> \[base\] --intent/);
       return true;
     },
   );
 });
 
 /**
- * `start` exits 2 without `--intent`, so a help line that spells `start` without
+ * A fresh `open` exits 2 without `--intent`, so a help line that spells `open` without
  * it costs the turn it was written to save — and the review it names is the one
  * on the command line the agent already typed.
  */
-test("every start these failures suggest names this review and carries --intent", () => {
+test("every open these failures suggest names this review and carries --intent", () => {
   const about = { key: "abc", target: "feature-auth main" };
 
   for (const status of [404, 503]) {
@@ -188,7 +186,7 @@ test("every start these failures suggest names this review and carries --intent"
     assert.ok(parsed instanceof ReviewError, String(status));
     assert.match(
       parsed.suggestions.join(" "),
-      /lightspeed start feature-auth main --intent "<why this branch exists>"/,
+      /lightspeed open feature-auth main --intent '<why this branch exists>'/,
       String(status),
     );
   }

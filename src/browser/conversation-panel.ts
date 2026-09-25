@@ -5,7 +5,6 @@ import { stalePillRound, type QueuedPill } from "./queued-pill.ts";
 import type {
   ConversationEntry,
   AnnotationPrompt,
-  DeclaredAnswer,
   FeedbackPrompt,
   RoundMark,
   SessionStatus,
@@ -21,12 +20,6 @@ export interface PanelState {
   status: SessionStatus;
   allApproved: boolean;
   turn: Turn;
-  /**
-   * `say --for <id>` answers, keyed by comment id. Optional because only the
-   * live session carries them; everything else that builds a panel builds
-   * conversation and rounds.
-   */
-  declarations?: Record<string, DeclaredAnswer>;
 }
 
 export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
@@ -195,7 +188,6 @@ function openQuestion(state: PanelState): FeedbackPrompt | undefined {
 }
 
 interface EntryContext {
-  declarations?: Record<string, DeclaredAnswer>;
   open?: FeedbackPrompt;
 }
 
@@ -206,7 +198,7 @@ interface EntryContext {
 function renderConversation(state: PanelState): string {
   const segments = roundSegments(state.conversation, state.rounds);
   const ruled = segments.length > 1;
-  const context: EntryContext = { declarations: state.declarations, open: openQuestion(state) };
+  const context: EntryContext = { open: openQuestion(state) };
   const parts: string[] = [];
   for (const segment of segments) {
     if (ruled) parts.push(renderRoundMark(segment));
@@ -255,7 +247,7 @@ function renderRoleLabel(entry: ConversationEntry): string {
 
 function renderPrompt(prompt: FeedbackPrompt, context: EntryContext): string {
   const asked = isQuestion(prompt);
-  return `<div class="lsr-prompt"${asked ? ` data-kind="question"` : ""}>${renderQuestionLabel(asked)}${renderPromptBody(prompt)}${renderAnswerBox(prompt === context.open)}${renderAnswer(prompt, context.declarations)}</div>`;
+  return `<div class="lsr-prompt"${asked ? ` data-kind="question"` : ""}>${renderQuestionLabel(asked)}${renderPromptBody(prompt)}${renderAnswerBox(prompt === context.open)}</div>`;
 }
 
 function isQuestion(prompt: FeedbackPrompt): boolean {
@@ -285,20 +277,6 @@ function renderAnswerBox(open: boolean): string {
     </div>`;
 }
 
-/** Files-only declarations show nothing: "I touched these" is the between-rounds diff's story. */
-function renderAnswer(
-  prompt: FeedbackPrompt,
-  declarations?: Record<string, DeclaredAnswer>,
-): string {
-  if (prompt.type !== "annotation" || prompt.id === undefined) return "";
-  const note = declarations?.[prompt.id]?.note;
-  if (note === undefined) return "";
-  return `\n    <div class="lsr-prompt-answer">
-    <p class="lsr-prompt-answer-label">the agent's answer</p>
-    <p class="lsr-prompt-answer-note">${escapeHtml(note)}</p>
-    </div>`;
-}
-
 function renderPill(pill: QueuedPill, index: number, current: number): string {
   return `<div class="lsr-pill">
     ${renderStaleBadge(pill, current)}${renderPromptBody(pill)}
@@ -319,8 +297,11 @@ function renderStaleBadge(pill: QueuedPill, current: number): string {
 }
 
 function renderPromptBody(prompt: FeedbackPrompt): string {
+  if (prompt.type === "resolve") {
+    return `<p class="lsr-prompt-comment">${escapeHtml(`${prompt.resolved ? "resolved" : "reopened"} ${prompt.thread}`)}</p>`;
+  }
   const comment = `<p class="lsr-prompt-comment">${escapeHtml(prompt.comment)}</p>`;
-  if (prompt.type === "message") return comment;
+  if (prompt.type !== "annotation") return comment;
   return `${renderFilePress(prompt)}
     <pre class="lsr-prompt-selection">${escapeHtml(prompt.selected_text)}</pre>
     ${comment}`;

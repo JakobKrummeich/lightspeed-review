@@ -19,7 +19,8 @@ export type ReviewErrorCode =
   | "session_corrupt"
   | "session_not_found"
   | "session_ended"
-  | "declaration_invalid"
+  | "nothing_to_publish"
+  | "removed_verb"
   | "turn_not_yours"
   | "turn_still_yours"
   | "ambiguous_session"
@@ -97,6 +98,10 @@ const ARGUMENT_ERROR_CODES: readonly string[] = [
   "turn_not_yours",
   // Waiting while still holding the turn is the same mistake from the other end.
   "turn_still_yours",
+  "nothing_to_publish",
+  "feedback_item_unknown",
+  // A 2.x verb: the command line is wrong for this version.
+  "removed_verb",
 ];
 
 export function exitCodeFor(error: unknown): number {

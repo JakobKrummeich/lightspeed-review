@@ -14,7 +14,7 @@ export interface VerbSpec {
   value?: readonly string[];
   boolean?: readonly string[];
   /**
-   * Worded the same here and in `--help`: `ask` once asked for a `<text>` in its
+   * Worded the same here and in `--help`: 2.x's `ask` once asked for a `<text>` in its
    * error and a `<question>` in its help, which is two names for one argument.
    */
   placeholder?: string;

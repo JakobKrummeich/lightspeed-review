@@ -1,7 +1,7 @@
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
-import { legalMoves } from "../turn-help.ts";
+import { nextRule } from "../turn-help.ts";
 import { apiRequest } from "./api-client.ts";
 import { serverOrigin } from "./server-address.ts";
 
@@ -29,6 +29,6 @@ export async function runEnd(input: EndInput): Promise<StructuredOutput> {
     // No `status`: `turn: ended` above is the same fact, said once.
     session: { key, branch: input.branch, base: input.base },
     message: "the review session is closed; the browser shows it as ended",
-    help: legalMoves("ended", target),
+    next: nextRule("ended", target),
   };
 }

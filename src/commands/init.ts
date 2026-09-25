@@ -15,7 +15,7 @@ import {
 import { isSkillAgent, SKILL_AGENTS, type SkillAgent } from "../skill.ts";
 import { stampedSkillFor } from "../skill-stamp.ts";
 import { CLI_VERSION } from "../version.ts";
-import { HELP_START } from "../turn-help.ts";
+import { HELP_OPEN } from "../turn-help.ts";
 import { hasFlag, lastValue, scanArgs } from "./args.ts";
 
 export interface InitArgs {
@@ -172,11 +172,11 @@ function initHelp(installed: boolean, dryRun: boolean, config: ConfigReport | un
     // every agent alone.
     ...(installed ? [HELP_RESTART_AGENT] : []),
     ...configHelp(config),
-    HELP_START,
+    HELP_OPEN,
   ];
 }
 
-/** A starter config names no model, so the `start` in the line below it would
+/** A starter config names no model, so the `open` in the line below it would
  * fail on the placeholder; one that was there already was left alone, and the
  * caller has to know the settings in force are not the ones init would write. */
 function configHelp(config: ConfigReport | undefined): string[] {

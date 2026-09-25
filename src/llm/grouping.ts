@@ -28,7 +28,7 @@ export interface GroupingResult {
   /** Why the LLM was skipped or abandoned; absent when `mode` is `llm`. */
   reason?: string;
   /**
-   * `start` exits 0 on a degraded grouping — the review still opens — so this
+   * `open`/`publish` exit 0 on a degraded grouping — the review still opens — so this
    * edit is the whole of the warning an agent gets that the product's main
    * feature is off.
    */

@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { homeOutput, sessionSummaries, type SessionSummary } from "../../src/commands/home.ts";
-import { helpPublishAndWait } from "../../src/turn-help.ts";
-import type { SessionRecord } from "../../src/session-store.ts";
+import { HELP_END, HELP_OPEN, TURN_RULES, nextRule } from "../../src/turn-help.ts";
+import type { SessionRecord } from "../../src/session-types.ts";
 
 function record(overrides: Partial<SessionRecord>): SessionRecord {
   return {
@@ -90,12 +90,12 @@ test("empty state is definitive: sessions 0 plus a message", () => {
   assert.equal(output.message, "no active review sessions");
 });
 
-test("empty state offers exactly the start command as next step", () => {
+test("empty state offers exactly the open command as next step", () => {
   const output = homeOutput({ repoRoot: "/repo", sessions: [] });
 
   const help = output.help as string[];
   assert.equal(help.length, 1);
-  assert.match(help[0]!, /^Run `lightspeed start <branch> \[base\] --intent /);
+  assert.match(help[0]!, /^Run `lightspeed open <branch> \[base\] --intent /);
 });
 
 /**
@@ -120,7 +120,7 @@ test("a repository with no config says so, instead of reporting no sessions", ()
   assert.equal(help.length, 2);
   assert.match(help[0]!, /^Run `lightspeed init --config` to write \.lightspeed\.conf\.json here/);
   assert.match(help[0]!, /anthropic\/claude-sonnet-4-5/);
-  assert.match(help[1]!, /^Run `lightspeed start <branch> \[base\] --intent /);
+  assert.match(help[1]!, /^Run `lightspeed open <branch> \[base\] --intent /);
 });
 
 test("a config that is there but unreadable is named as that, not as missing", () => {
@@ -218,13 +218,8 @@ test("an ended review is counted nowhere: not in the rows, the tally or the help
 
   assert.deepEqual(output.sessions, [row({ branch: "feat/tokens" })]);
   assert.ok(!("elsewhere" in output));
-  assert.deepEqual(output.help, [
-    "Queue always. End always. Send only on your turn.",
-    ...(
-      homeOutput({ repoRoot: "/repo", sessions: [record({ branch: "feat/tokens" })] })
-        .help as string[]
-    ).slice(1),
-  ]);
+  // One live session, so the answer is its own rule and not the several-session help.
+  assert.deepEqual(output.next, nextRule("reviewer", "feat/tokens main"));
 });
 
 test("a blocked repo counts only the live sessions it cannot reach", () => {
@@ -262,10 +257,10 @@ test("--all lists every repository's sessions, each under the repo it belongs to
 
 /**
  * Regression: the static help offered `wait` to a session showing `agent
- * working`, which the poll refuses with `turn_still_yours`. `legalMoves` is the
- * one list no answer may contradict.
+ * working`, which the poll refuses with `turn_still_yours`. With one session,
+ * home ends in the same `next:` rule every command ends in.
  */
-test("one session in the repo: the help is that session's own legal moves", () => {
+test("one session in the repo: the answer is that session's own next rule", () => {
   const output = homeOutput({
     repoRoot: "/repo",
     sessions: [
@@ -276,45 +271,48 @@ test("one session in the repo: the help is that session's own legal moves", () =
     ],
   });
 
-  const help = output.help as string[];
-  assert.equal(help[0], "Queue always. End always. Send only on your turn.");
-  assert.equal(help[1], helpPublishAndWait("feat/tokens main"));
-  assert.ok(!help.some((line) => /lightspeed wait/.test(line)));
+  assert.deepEqual(output.next, nextRule("agent working", "feat/tokens main"));
+  assert.equal("help" in output, false);
 });
 
-test("a reviewer's turn is the one turn the home view offers a wait from", () => {
+test("a reviewer's turn is the one turn home offers to listen from", () => {
   const output = homeOutput({ repoRoot: "/repo", sessions: [record({ branch: "feat/tokens" })] });
 
-  assert.deepEqual(output.help, [
-    "Queue always. End always. Send only on your turn.",
-    "Run `lightspeed wait feat/tokens main` in the foreground to take the turn when the" +
-      " reviewer sends — it blocks until the reviewer sends, so never background it or wrap" +
-      " it in a timeout",
-  ]);
+  assert.deepEqual(output.next, nextRule("reviewer", "feat/tokens main"));
+  assert.match((output.next as { listen: string }).listen, /lightspeed open feat\/tokens main`/);
+  assert.match((output.next as { listen: string }).listen, /foreground/);
 });
 
-/** Two sessions, two turns: no single set of moves is the answer. */
-test("session listing help leads with the rule and covers start, wait and end", () => {
+/** Compaction loses the batch; `open` hands the same one back. */
+test("a digesting agent is told how to get the batch it lost, then the rule", () => {
+  const output = homeOutput({
+    repoRoot: "/repo",
+    sessions: [
+      record({
+        turn: { holder: "agent", mode: "digesting", at: "2025-01-02T00:00:00.000Z" },
+        batch: {
+          id: "dlv_1",
+          at: "2025-01-02T00:00:00.000Z",
+          prompts: [{ type: "message", id: "t3", comment: "why?" }],
+          acked: true,
+        },
+      }),
+    ],
+  });
+
+  const next = output.next as Record<string, string>;
+  assert.equal(Object.keys(next)[0], "reread");
+  assert.match(next.reread!, /lightspeed open feature-auth main/);
+  assert.match(next.talk!, /--to t3 '<answer>'/);
+});
+
+/** Two sessions, two turns: no single rule is the answer. */
+test("several sessions: the help is the turn rules, then open and end", () => {
   const output = homeOutput({
     repoRoot: "/repo",
     sessions: [record({}), record({ key: "b", branch: "fix-billing" })],
   });
 
-  const help = output.help as string[];
-  assert.equal(help.length, 4);
-  assert.equal(help[0]!, "Queue always. End always. Send only on your turn.");
-  assert.match(help[1]!, /^Run `lightspeed start <branch> \[base\] --intent /);
-  assert.match(help[2]!, /^Run `lightspeed wait <branch> \[base\]`/);
-  assert.match(help[3]!, /^Run `lightspeed end <branch> \[base\]`/);
-});
-
-test("wait help warns it must block in the foreground", () => {
-  const output = homeOutput({
-    repoRoot: "/repo",
-    sessions: [record({}), record({ key: "b", branch: "fix-billing" })],
-  });
-
-  const waitHelp = (output.help as string[])[2]!;
-  assert.match(waitHelp, /foreground/);
-  assert.match(waitHelp, /never background it or wrap it in a timeout/);
+  assert.deepEqual(output.help, [...TURN_RULES, HELP_OPEN, HELP_END]);
+  assert.equal("next" in output, false);
 });

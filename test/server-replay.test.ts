@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionStore } from "../src/session-store.ts";
 import { createReviewServer } from "../src/server.ts";
+import { agentWorking } from "../src/turn.ts";
 import type { ReplayData } from "../src/rounds/replay.ts";
 import { git, newRepo } from "./helpers/git-repo.ts";
 
@@ -115,22 +116,25 @@ async function annotate(harness: Harness): Promise<string> {
   return prompt.id;
 }
 
-async function nextRound(harness: Harness, headCommit: string): Promise<void> {
+/**
+ * The next round the way 3.0 opens one: `publish` from a working turn, its
+ * `--to` notes landing in the threads they answer. The turn is written onto
+ * the record — this file is about the replay, not the turn.
+ */
+async function nextRound(
+  harness: Harness,
+  headCommit: string,
+  notes: { to: string; text: string }[] = [],
+): Promise<void> {
+  const session = harness.store.get(harness.key)!;
+  harness.store.save({ ...session, turn: agentWorking(new Date().toISOString(), "renaming") });
   const response = await fetch(`${harness.url}/api/sessions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(roundPayload(harness.repoRoot, harness.commits[0]!, headCommit)),
-  });
-  assert.equal(response.status, 200);
-}
-
-async function declare(harness: Harness, id: string): Promise<void> {
-  const response = await fetch(`${harness.url}/api/session/${harness.key}/reply`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      comment: "renamed it",
-      declarations: [{ id, note: "now it counts users", files: [USERS] }],
+      ...(roundPayload(harness.repoRoot, harness.commits[0]!, headCommit) as object),
+      verb: "publish",
+      notes,
     }),
   });
   assert.equal(response.status, 200);
@@ -142,15 +146,14 @@ async function readReplay(harness: Harness): Promise<ReplayData> {
   return (await response.json()) as ReplayData;
 }
 
-test("the replay endpoint serves a declared comment with its note and real hunks", async () => {
+test("the replay endpoint serves an answered comment with its note and real hunks", async () => {
   const harness = await startReview({
     "Take the users handler off the old constant": "const fresh = 2;\n",
     "Name the constant after what it counts": "const users = 2;\n",
   });
   try {
     const id = await annotate(harness);
-    await nextRound(harness, harness.commits[2]!);
-    await declare(harness, id);
+    await nextRound(harness, harness.commits[2]!, [{ to: id, text: "now it counts users" }]);
 
     const { comments } = await readReplay(harness);
 
@@ -173,7 +176,7 @@ test("the replay endpoint serves a declared comment with its note and real hunks
   }
 });
 
-test("an undeclared comment falls back to anchor-matched hunks, without a note", async () => {
+test("an unanswered comment gets its anchor-matched hunks, without a note", async () => {
   const harness = await startReview({
     "Take the users handler off the old constant": "const fresh = 2;\n",
     "Name the constant after what it counts": "const users = 2;\n",
@@ -213,8 +216,7 @@ test("history a force-push rewrote degrades to status-only cards, never blocking
   });
   try {
     const id = await annotate(harness);
-    await nextRound(harness, harness.commits[2]!);
-    await declare(harness, id);
+    await nextRound(harness, harness.commits[2]!, [{ to: id, text: "now it counts users" }]);
     git(harness.repoRoot, "reset", "--hard", "HEAD~2");
     git(harness.repoRoot, "reflog", "expire", "--expire=now", "--all");
     git(harness.repoRoot, "gc", "--prune=now", "--quiet");

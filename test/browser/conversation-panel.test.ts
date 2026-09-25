@@ -29,7 +29,7 @@ const delivered: ConversationEntry[] = [
 ];
 
 const REVIEWERS_TURN: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
-const AGENTS_TURN: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
+const AGENTS_TURN: Turn = { holder: "agent", mode: "digesting", at: "2025-01-01T00:06:00.000Z" };
 
 const oneRound = [{ index: 0, at: "2025-01-01T00:00:00.000Z" }];
 const twoRounds = [...oneRound, { index: 1, at: "2025-01-02T00:00:00.000Z" }];
@@ -68,51 +68,24 @@ test("renders delivered conversation entries with their author", () => {
   assert.match(html, /done, wrapped it/);
 });
 
-test("the agent's answer to a specific comment appears under that comment", () => {
-  // `say "<text>" --for <id>` answers one comment by id; the panel must show the declaration with the
-  // words it answers, not only in the replay.
-  const withId: FeedbackPrompt = { ...annotation, id: "evt_1" };
-  const other: FeedbackPrompt = { ...annotation, id: "evt_2", comment: "rename this" };
-  const html = renderPanel(
-    panelState({
-      conversation: [
-        {
-          role: "reviewer",
-          at: "2025-01-01T00:00:00.000Z",
-          roundIndex: 0,
-          prompts: [withId, other],
-        },
-      ],
-      declarations: {
-        evt_1: { note: "kept as-is <deliberately>", files: [], at: "2025-01-01T00:06:00.000Z" },
-      },
-    }),
-  );
-
-  const prompts = html.split('lsr-prompt"');
-  assert.equal(prompts.length, 3, "expected two prompts in the card");
-  assert.match(prompts[1] ?? "", /lsr-prompt-answer/);
-  assert.match(prompts[1] ?? "", /the agent's answer/);
-  assert.match(prompts[1] ?? "", /kept as-is &lt;deliberately&gt;/, "the note is escaped");
-  assert.doesNotMatch(prompts[2] ?? "", /lsr-prompt-answer/, "the unanswered comment stays bare");
-});
-
-test("a declaration without a note, or without a matching id, adds nothing", () => {
-  const withId: FeedbackPrompt = { ...annotation, id: "evt_1" };
+test("the agent's reply in a thread is shown, escaped, with the agent as its author", () => {
+  const withId: FeedbackPrompt = { ...annotation, id: "t1" };
   const html = renderPanel(
     panelState({
       conversation: [
         { role: "reviewer", at: "2025-01-01T00:00:00.000Z", roundIndex: 0, prompts: [withId] },
+        {
+          role: "agent",
+          at: "2025-01-01T00:06:00.000Z",
+          roundIndex: 0,
+          prompts: [{ type: "reply", thread: "t1", comment: "kept as-is <deliberately>" }],
+        },
       ],
-      declarations: {
-        evt_1: { files: ["src/api/users.ts"], at: "2025-01-01T00:06:00.000Z" },
-        evt_9: { note: "about someone else", files: [], at: "2025-01-01T00:06:00.000Z" },
-      },
     }),
   );
 
-  assert.doesNotMatch(html, /lsr-prompt-answer/);
-  assert.doesNotMatch(html, /about someone else/);
+  assert.match(html, /data-role="agent"/);
+  assert.match(html, /kept as-is &lt;deliberately&gt;/, "the reply is escaped");
 });
 
 test("offers a general comment box and both send buttons while the session is open", () => {

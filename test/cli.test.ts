@@ -157,7 +157,7 @@ test("a command about a review nothing holds names the reviews that are held", a
     new RegExp(`message: no review session for other/branch against main in ${repoRoot}`),
   );
   assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
-  assert.match(stdout, /lightspeed start other\/branch main --intent/);
+  assert.match(stdout, /lightspeed open other\/branch main --intent/);
   assert.match(stdout, /lightspeed approvals feature\/greeting main/);
 });
 
@@ -176,13 +176,14 @@ test("a session the server does not know is named the same way as one on disk", 
     }),
   );
 
-  const { stdout, code } = await runCli(["wait", "other/branch", "main"], repoRoot);
+  const { stdout, code } = await runCli(["work", "the plan", "other/branch", "main"], repoRoot);
 
   assert.equal(code, 1);
   assert.match(stdout, /^ {2}code: session_not_found$/m);
   assert.match(stdout, /message: no review session for other\/branch against main/);
   assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
-  assert.match(stdout, /lightspeed wait feature\/greeting main/);
+  // The way out keeps the argument the verb needs, so it runs as printed.
+  assert.match(stdout, /lightspeed work '<plan>' feature\/greeting main/);
 });
 
 /** Regression: the strict config load gated `approvals` on a `model` it never uses. */
@@ -209,7 +210,7 @@ test("a git failure says nothing on stderr that stdout has not already said", as
   const repoRoot = emptyRepo();
 
   const { stdout, stderr, code } = await runCli(
-    ["start", "no/such/branch", "main", "--intent", "why", "--no-open"],
+    ["open", "no/such/branch", "main", "--intent", "why", "--no-open"],
     repoRoot,
   );
 
@@ -223,7 +224,7 @@ test("a failing command reports code, message and help as TOON on stdout, exit 1
   const outsideAnyRepo = mkdtempSync(join(tmpdir(), "lsr-cli-"));
 
   const { stdout, code } = await runCli(
-    ["start", "feature-auth", "--intent", "why"],
+    ["open", "feature-auth", "--intent", "why"],
     outsideAnyRepo,
   );
 
@@ -234,22 +235,36 @@ test("a failing command reports code, message and help as TOON on stdout, exit 1
   assert.match(stdout, /^help\[\d+\]/m);
 });
 
-test("start without a branch says which argument is missing", async () => {
-  const { stdout, code } = await runCli(["start"]);
+/** Re-attaching may leave the branch out; with no session there is nothing to re-attach to. */
+test("open without a branch and no live review names the branch it needs", async () => {
+  const { stdout, code } = await runCli(["open"], emptyRepo());
 
-  assert.equal(code, 2);
-  assert.match(stdout, /^ {2}code: invalid_arguments$/m);
+  assert.equal(code, 1);
+  assert.match(stdout, /^ {2}code: ambiguous_session$/m);
+  assert.match(stdout, /lightspeed open <branch> \[base\] --intent/);
 });
 
-test("start without --intent fails before it looks for a repository at all", async () => {
-  const outsideAnyRepo = mkdtempSync(join(tmpdir(), "lsr-cli-nointent-"));
-
-  const { stdout, code } = await runCli(["start", "feature-auth"], outsideAnyRepo);
+test("a fresh open without --intent fails before any git or model work", async () => {
+  const { stdout, code } = await runCli(["open", "no/such/branch", "--no-open"], emptyRepo());
 
   assert.equal(code, 2);
   assert.match(stdout, /^ {2}code: intent_missing$/m);
-  assert.match(stdout, /--intent/);
-  assert.doesNotMatch(stdout, /git_repo_not_found/);
+  assert.doesNotMatch(stdout, /git_ref_not_found/);
+});
+
+/** Section 11: a stale skill's verb is answered with where the next step is. */
+test("a removed verb exits 2 and points at bare lightspeed", async () => {
+  for (const verb of ["wait", "ask", "say", "start"]) {
+    const { stdout, code } = await runCli([verb, "feature-auth"]);
+
+    assert.equal(code, 2, verb);
+    assert.match(stdout, /^ {2}code: removed_verb$/m);
+    assert.match(
+      stdout,
+      new RegExp(`'${verb}' was removed in 3\\.0, run lightspeed for your next step`),
+    );
+    assert.match(stdout, /Run `lightspeed` \(no arguments\)/);
+  }
 });
 
 /**
@@ -267,11 +282,11 @@ test("unknown flag before a command exits 2, under a code that names the mistake
 });
 
 test("a forgotten argument is its own code, not the code an unknown flag has", async () => {
-  const { stdout, code } = await runCli(["ask"]);
+  const { stdout, code } = await runCli(["reply", "feature-auth"]);
 
   assert.equal(code, 2);
   assert.match(stdout, /^ {2}code: argument_missing$/m);
-  assert.match(stdout, /ask needs the question/);
+  assert.match(stdout, /reply needs at least one --to/);
 });
 
 test("an unknown command fails in the same error shape as everything else", async () => {
@@ -282,7 +297,7 @@ test("an unknown command fails in the same error shape as everything else", asyn
   assert.match(stdout, /^ {2}code: unknown_command$/m);
   assert.match(stdout, /^ {2}message: "?Unknown command: nonsense"?$/m);
   assert.match(stdout, /^help\[\d+\]/m);
-  assert.match(stdout, /start, wait, ask, say, work, approvals/);
+  assert.match(stdout, /open, reply, work, publish, approvals/);
 });
 
 test("--help lists every command the CLI answers", async () => {
@@ -290,11 +305,10 @@ test("--help lists every command the CLI answers", async () => {
 
   assert.equal(code, 0);
   for (const command of [
-    "start",
-    "wait",
-    "ask",
-    "say",
+    "open",
+    "reply",
     "work",
+    "publish",
     "approvals",
     "end",
     "serve",
@@ -307,9 +321,12 @@ test("--help lists every command the CLI answers", async () => {
   ]) {
     assert.match(stdout, new RegExp(`^ {2}"?${command}"?: `, "m"), command);
   }
-  // The rule leads, then the workflow: start, wait, end in order.
-  assert.match(stdout, /^help\[4\]/m);
-  assert.match(stdout, /Queue always\. End always\. Send only on your turn\./);
+  // The turn rules lead, then open and end.
+  assert.match(stdout, /^help\[5\]/m);
+  assert.match(stdout, /Discussion strictly alternates/);
+  for (const gone of ["wait", "ask", "say", "start"]) {
+    assert.doesNotMatch(stdout, new RegExp(`^ {2}"?${gone}"?: `, "m"), gone);
+  }
 });
 
 /** `help` is what an agent types before it has read anything. */
@@ -322,10 +339,10 @@ test("`help` is a word the CLI answers, not a command it does not have", async (
 });
 
 test("`help <command>` describes that command, the same as `<command> --help`", async () => {
-  const { stdout, code } = await runCli(["help", "start"]);
+  const { stdout, code } = await runCli(["help", "publish"]);
 
   assert.equal(code, 0);
-  assert.match(stdout, /^command: start$/m);
+  assert.match(stdout, /^command: publish$/m);
   assert.doesNotMatch(stdout, /error:/);
 });
 
@@ -337,10 +354,10 @@ test("`help nonsense` fails as the unknown command it names", async () => {
 });
 
 test("a subcommand's --help describes it instead of running it", async () => {
-  const { stdout, code } = await runCli(["start", "--help"]);
+  const { stdout, code } = await runCli(["open", "--help"]);
 
   assert.equal(code, 0);
-  assert.match(stdout, /^command: start$/m);
+  assert.match(stdout, /^command: open$/m);
   assert.match(stdout, /--intent/);
   assert.match(stdout, /--no-open/);
   assert.doesNotMatch(stdout, /error:/);
@@ -387,8 +404,8 @@ test("feedback --repo . outside a repository explains that there is none", async
 });
 
 /** Regression: a mistyped flag was read as a branch name and reported as a bad git ref. */
-test("start rejects an unknown flag instead of running with it", async () => {
-  const { stdout, code } = await runCli(["start", "feature", "main", "--no-opne", "--intent", "x"]);
+test("open rejects an unknown flag instead of running with it", async () => {
+  const { stdout, code } = await runCli(["open", "feature", "main", "--no-opne", "--intent", "x"]);
 
   assert.equal(code, 2);
   assert.match(stdout, /^ {2}code: unknown_flag$/m);
@@ -416,17 +433,7 @@ test("a missing or unparseable argument exits 2 like an unknown flag does", asyn
 });
 
 test("every command answers --help", async () => {
-  for (const command of [
-    "start",
-    "wait",
-    "ask",
-    "say",
-    "work",
-    "end",
-    "serve",
-    "stop",
-    "feedback",
-  ]) {
+  for (const command of ["open", "reply", "work", "publish", "end", "serve", "stop", "feedback"]) {
     const { stdout, code } = await runCli([command, "--help"]);
 
     assert.equal(code, 0, command);

@@ -9,7 +9,6 @@ import type { AnnotationRecord, AnnotationSide, IdSource } from "../ledger/recor
 import type { LedgerStore } from "../ledger/store.ts";
 import {
   agentReplyRecords,
-  declarationRecords,
   feedbackRecords,
   recordSafely,
   roundEndRecords,
@@ -17,7 +16,6 @@ import {
   type LedgerWriteResult,
 } from "../ledger/write.ts";
 import { repoRef } from "../repo.ts";
-import type { CommentDeclaration } from "../declarations.ts";
 import type { FeedbackPrompt, SessionRecord } from "../session-store.ts";
 import { readSessionFile } from "./session-files.ts";
 
@@ -105,18 +103,6 @@ export function logAgentReply(
   const repo = repoRef(session.repoRoot);
   const { ledger, nextId } = log;
   recordSafely(ledger, agentReplyRecords({ session, repo, comment, now, nextId }));
-}
-
-export function logDeclarations(
-  log: LedgerLog,
-  session: SessionRecord,
-  declarations: CommentDeclaration[],
-  now: string,
-): void {
-  if (declarations.length === 0) return;
-  const repo = repoRef(session.repoRoot);
-  const { ledger, nextId } = log;
-  recordSafely(ledger, declarationRecords({ session, repo, declarations, now, nextId }));
 }
 
 export function logRoundEnd(log: LedgerLog, session: SessionRecord, now: string): void {

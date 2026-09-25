@@ -3,10 +3,12 @@ import { trailSweeps } from "../group-tier.ts";
 import type { GroupingMode } from "../llm/grouping.ts";
 import { readBlobs } from "../ledger/write.ts";
 import { carriedApproval } from "./history.ts";
+import type { AgentNote } from "../feedback.ts";
 import type {
+  Batch,
   ConversationEntry,
-  DeclaredAnswer,
   FeedbackPrompt,
+  Handback,
   ReviewCloser,
   RoundFile,
   SessionRecord,
@@ -31,6 +33,13 @@ export interface CreateSessionRequest {
   /** Subjects of the commits the branch adds, newest first. */
   commits: string[];
   reopen?: boolean;
+  /**
+   * `open` starts a review (or re-attaches to a live one: no round); `publish`
+   * opens the next round on the agent's new commits. Absent reads as `open`.
+   */
+  verb?: "open" | "publish";
+  /** `publish --to`: "done: …" notes, each into the thread it addressed. */
+  notes?: AgentNote[];
 }
 
 export interface RoundStamp {
@@ -89,12 +98,13 @@ function carriedOver(
   createdAt: string;
   conversation: ConversationEntry[];
   pending: FeedbackPrompt[];
-  declarations?: Record<string, DeclaredAnswer>;
+  batch?: Batch;
+  lastHandback?: Handback;
 } {
   if (existing === undefined) {
     return { status: "open", createdAt: now, conversation: [], pending: [] };
   }
-  const { createdAt, conversation, pending, declarations } = existing;
+  const { createdAt, conversation, pending, batch, lastHandback } = existing;
   // Reopening is the reviewer's word relayed by the agent, so it is the one
   // thing that turns an ended review back into work.
   const status = reopen ? "open" : existing.status;
@@ -105,9 +115,10 @@ function carriedOver(
     createdAt,
     conversation,
     pending,
-    // Carried with the conversation that holds their comments: the agent's word
-    // does not expire on re-group, and the replay reads them right after a `start`.
-    ...(declarations === undefined ? {} : { declarations }),
+    // Carried so a `publish` killed after the round opened is still recognised
+    // as the same command when it is re-run (`isRerun`).
+    ...(batch === undefined ? {} : { batch }),
+    ...(lastHandback === undefined ? {} : { lastHandback }),
   };
 }
 
@@ -165,7 +176,7 @@ export function currentGroupingMode(session: SessionRecord): GroupingMode {
 
 /**
  * `end` closes where it stands so the ledger says what was approved without
- * another `start`; opening a round closes the one it displaces. Re-closing
+ * another `publish`; opening a round closes the one it displaces. Re-closing
  * writes the same paths — idempotent wherever a round stops being current.
  */
 export function withClosedRound(session: SessionRecord): SessionRecord {

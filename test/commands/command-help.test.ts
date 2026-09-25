@@ -4,11 +4,10 @@ import { commandHelp, commandSummary } from "../../src/commands/command-help.ts"
 
 test("every command the CLI registers has help", () => {
   const commands = [
-    "start",
-    "wait",
-    "ask",
-    "say",
+    "open",
+    "reply",
     "work",
+    "publish",
     "approvals",
     "end",
     "serve",
@@ -42,27 +41,35 @@ test("a command without a help entry is summarised as its own --help", () => {
   assert.equal(commandSummary("nonsense"), "Run `lightspeed nonsense --help`");
 });
 
-test("wait help repeats that it blocks in the foreground", () => {
-  const help = commandHelp("wait") ?? "";
-
-  assert.match(help, /foreground/);
-  assert.match(help, /never background it or wrap it in a timeout/);
+/** The three verbs that hand the turn back all wait, and all say so the same way. */
+test("every waiting verb's help says to run it in the foreground and re-run it if killed", () => {
+  for (const verb of ["open", "reply", "publish"]) {
+    const help = commandHelp(verb) ?? "";
+    assert.match(help, /foreground/, verb);
+    assert.match(help, /never under a timeout/, verb);
+    assert.match(help, /re-run the same command/, verb);
+  }
 });
 
 /** The verbs are only usable if their help states where the turn lands, since
  * that is what decides which command is legal next. */
-test("every speaking verb's help names what it does to the turn", () => {
-  assert.match(commandHelp("wait") ?? "", /^turn: .*yours on delivery/m);
-  assert.match(commandHelp("ask") ?? "", /^turn: .*back to the reviewer/m);
-  assert.match(commandHelp("say") ?? "", /^turn: .*unchanged/m);
-  assert.match(commandHelp("work") ?? "", /^turn: /m);
+test("every turn verb's help names what it does to the turn", () => {
+  assert.match(commandHelp("open") ?? "", /^turn: .*then yours \(digesting\)/m);
+  assert.match(commandHelp("reply") ?? "", /^turn: .*The reviewer's afterwards/m);
+  assert.match(commandHelp("work") ?? "", /^turn: .*yours \(working\) after/m);
+  assert.match(commandHelp("publish") ?? "", /^turn: "?working before, the reviewer's after/m);
 });
 
 /** Two examples each: one plain, one with the flag that command exists for. */
-test("every speaking verb's help shows two examples", () => {
-  for (const verb of ["wait", "ask", "say", "work"]) {
+test("every turn verb's help shows two examples", () => {
+  for (const verb of ["open", "reply", "work", "publish"]) {
     assert.match(commandHelp(verb) ?? "", /^examples\[2\]:/m, verb);
   }
+});
+
+/** 2.x verbs are answered by the CLI, not by help: they have none. */
+test("the removed verbs have no help entry", () => {
+  for (const verb of ["start", "wait", "ask", "say"]) assert.equal(commandHelp(verb), undefined);
 });
 
 test("feedback help documents every subcommand and the list flags", () => {
@@ -112,21 +119,18 @@ test("skill help names every agent and where its file lives", () => {
   assert.match(help, /copilot-instructions\.md/);
 });
 
-test("start help lists its flags", () => {
-  const help = commandHelp("start") ?? "";
+test("open help lists its flags", () => {
+  const help = commandHelp("open") ?? "";
 
   assert.match(help, /--no-open/);
+  assert.match(help, /--reopen/);
   assert.match(help, /--base/);
   assert.match(help, /--model/);
+  assert.match(help, /--intent/);
 });
 
-/**
- * `say --help` showed `--files` beside a comment id with nothing to say the round
- * has to come first — the dead end the CLI then refuses with `declaration_invalid`.
- */
-test("say help says --files needs a published round, in the flag and in the example", () => {
-  const help = commandHelp("say") ?? "";
-
-  assert.match(help, /--files <a,b>.*published/);
-  assert.match(help, /lightspeed say .*published.*--for evt_\w+ --files /);
+test("reply and publish help show --to taking an item id and its text", () => {
+  assert.match(commandHelp("reply") ?? "", /--to <id> '<text>'/);
+  assert.match(commandHelp("publish") ?? "", /--to <id> '<text>'/);
+  assert.match(commandHelp("reply") ?? "", /`main` for the main\s+chat/);
 });

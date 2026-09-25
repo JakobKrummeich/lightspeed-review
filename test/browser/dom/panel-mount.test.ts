@@ -16,7 +16,7 @@ import { readMemory, updateMemory } from "../../../src/browser/review-memory.ts"
 import { SAVE_DELAY_MS } from "../../../src/browser/dom/save-later.ts";
 
 const REVIEWERS: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
-const READING: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
+const READING: Turn = { holder: "agent", mode: "digesting", at: "2025-01-01T00:06:00.000Z" };
 
 const working = (note: string): Turn => ({
   holder: "agent",
@@ -142,9 +142,9 @@ test("an agent reply leaves the half-written comment and its textarea untouched"
   );
 });
 
-test("a per-comment answer arriving with an update lands under its comment", (t) => {
-  // `say --for` publishes a session change; the redraw must show the declaration live,
-  // not only on the next visit's mount.
+test("a reply arriving with an update is drawn live", (t) => {
+  // `reply` publishes a session change; the redraw must show it live, not only
+  // on the next visit's mount.
   const { root, panel } = mount(t);
   const asked: ConversationEntry = {
     role: "reviewer",
@@ -153,7 +153,7 @@ test("a per-comment answer arriving with an update lands under its comment", (t)
     prompts: [
       {
         type: "annotation",
-        id: "evt_7",
+        id: "t7",
         file: "src/api/users.ts",
         group: "API",
         selected_text: "+const user = 1;",
@@ -162,17 +162,16 @@ test("a per-comment answer arriving with an update lands under its comment", (t)
     ],
   };
 
-  panel.update(
-    session({
-      conversation: [asked],
-      declarations: {
-        evt_7: { note: "held as designed", files: [], at: "2025-01-01T01:00:00.000Z" },
-      },
-    }),
-  );
+  const answered: ConversationEntry = {
+    role: "agent",
+    at: "2025-01-01T01:00:00.000Z",
+    roundIndex: 0,
+    prompts: [{ type: "reply", thread: "t7", comment: "held as designed" }],
+  };
+
+  panel.update(session({ conversation: [asked, answered] }));
 
   const scroll = root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "";
-  assert.match(scroll, /lsr-prompt-answer/);
   assert.match(scroll, /held as designed/);
 });
 
@@ -361,7 +360,7 @@ test("general comments queue on the agent's turn one after another, beside the p
   await stored();
   const remembered = readMemory(storage, "key");
   assert.deepEqual(
-    remembered.pending.map((pill) => pill.comment),
+    remembered.pending.map((pill) => ("comment" in pill ? pill.comment : undefined)),
     [
       "wrap in a transaction",
       "the migration is missing",
@@ -767,7 +766,7 @@ test("the word given elsewhere ends the review exactly as the panel's own button
   assert.equal(sent.length, 1);
   assert.equal(sent[0]?.ended, true);
   assert.deepEqual(
-    sent[0]?.prompts.map((prompt) => prompt.comment),
+    sent[0]?.prompts.map((prompt) => ("comment" in prompt ? prompt.comment : undefined)),
     ["one last thing"],
     "the comment box is sent, not dropped",
   );

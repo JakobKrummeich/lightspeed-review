@@ -1,7 +1,8 @@
 import { parsePrompt } from "./feedback-prompt.ts";
 import { approvalPaths, type ApprovalPaths } from "./review-files.ts";
-import type { FeedbackPrompt, ReviewCloser, SessionRecord } from "./session-store.ts";
-import { reviewerTurn, type HelpForm, type TurnLabel } from "./turn.ts";
+import type { FeedbackPrompt, ReviewCloser, SessionRecord } from "./session-types.ts";
+import { batchItems, type BatchItem } from "./threads.ts";
+import { reviewerTurn, turnFacts, type TurnLabel } from "./turn.ts";
 
 export interface FeedbackRequest {
   prompts: FeedbackPrompt[];
@@ -36,19 +37,13 @@ export type EndVerdict = (typeof END_VERDICTS)[number];
 export interface PollPayload {
   status: string;
   ended: boolean;
-  prompts: FeedbackPrompt[];
-  /**
-   * Added by the delivery handler, not by `drainPending`: the turn moves with
-   * the bytes, so only the handler knows what it became. Absent from a payload
-   * an older server wrote.
-   */
+  /** One per thread the batch touched, in the order the reviewer touched them. */
+  items: BatchItem[];
   turn?: TurnLabel;
   round?: number;
-  /** Absent from an older server's payload, which reads as `full` — the only form it ever sent. */
-  helpForm?: HelpForm;
   /**
    * Transport, not review: echoed by the client to
-   * `POST /api/session/:key/delivered` to say the prompts arrived, and never
+   * `POST /api/session/:key/delivered` to say the batch arrived, and never
    * printed — no agent acts on it.
    */
   delivery?: string;
@@ -63,7 +58,7 @@ export interface PollPayload {
 /**
  * A `Send & End` with nothing queued adds no entry: an empty "reviewer" entry
  * reads as words lost, not words never said. The turn does not move here — the
- * reviewer's Send never hands it over, only delivery to a live `wait` does —
+ * reviewer's Send never hands it over, only delivery to a live waiting command does —
  * except on the end, which owes nobody a move.
  */
 export function withFeedback(
@@ -88,19 +83,23 @@ export function withFeedback(
   };
 }
 
+/** One `--to` of the agent's: the thread it answers, and what it says there. */
+export interface AgentNote {
+  to: string;
+  text: string;
+}
+
 /**
- * A question hands the turn back — it is the agent asking to be answered, and
- * Send has to send for that. Plain speech does not: an agent that answers one comment
- * and keeps editing is still working, and handing sending back between its
- * sentences would flip the reviewer's button between Send and Queue for the
- * length of a round.
+ * The agent's words, each into the thread it names, as one conversation entry:
+ * one call is one turn. The turn is the caller's to move — `reply` hands it
+ * back, `publish` has already opened the round these notes land in.
  */
-export function withAgentReply(
+export function withAgentReplies(
   session: SessionRecord,
-  comment: string,
+  notes: readonly AgentNote[],
   now: string,
-  kind?: "question",
 ): SessionRecord {
+  if (notes.length === 0) return session;
   return {
     ...session,
     conversation: [
@@ -109,18 +108,17 @@ export function withAgentReply(
         role: "agent",
         at: now,
         ...currentRound(session),
-        prompts: [{ type: "message", comment, ...(kind === undefined ? {} : { kind }) }],
+        prompts: notes.map((note) => ({ type: "reply", thread: note.to, comment: note.text })),
       },
     ],
-    ...(kind === "question" ? { turn: reviewerTurn(now) } : {}),
     updatedAt: now,
   };
 }
 
 /**
  * Stamped at append time: afterwards nothing but the clock ties a message to a
- * round. It is the round on screen, not the round the words are about — a `say`
- * answering round 2 lands after fix+`start`, so it stamps round 3, the diff the
+ * round. It is the round on screen, not the round the words are about — a `reply`
+ * answering round 2 lands after fix+`publish`, so it stamps round 3, the diff the
  * reviewer reads alongside it. No rounds stamps nothing, not round 0.
  */
 function currentRound(session: SessionRecord): { roundIndex?: number } {
@@ -129,21 +127,37 @@ function currentRound(session: SessionRecord): { roundIndex?: number } {
 }
 
 /**
- * An ended session always answers so a waiting agent is never left blocking on
- * a review that is over; `undefined` means "keep waiting".
+ * What the agent is handed for the batch it holds: every poll while it holds
+ * one gets the same answer, which is what makes a killed command safe to re-run.
  */
-export function drainPending(
-  session: SessionRecord,
-): { session: SessionRecord; payload: PollPayload } | undefined {
-  const ended = session.status === "ended";
-  if (session.pending.length === 0 && !ended) return undefined;
+export function batchPayload(session: SessionRecord): PollPayload {
+  const batch = session.batch;
+  return {
+    status: session.status,
+    ended: false,
+    items: batch === undefined ? [] : batchItems(batch.prompts, session.conversation),
+    ...turnFacts(session),
+    ...(batch === undefined ? {} : { delivery: batch.id }),
+  };
+}
+
+/**
+ * An ended session always answers, so a waiting agent is never left waiting on
+ * a review that is over; whatever the reviewer sent with `Send & End` goes with
+ * it, read once — the queue is emptied on the way out.
+ */
+export function endedPayload(session: SessionRecord): {
+  session: SessionRecord;
+  payload: PollPayload;
+} {
   return {
     session: { ...session, pending: [] },
     payload: {
       status: session.status,
-      ended,
-      prompts: session.pending,
-      ...(ended ? endEvidence(session) : {}),
+      ended: true,
+      items: batchItems(session.pending, session.conversation),
+      ...turnFacts(session),
+      ...endEvidence(session),
     },
   };
 }
@@ -191,7 +205,7 @@ export function closedBy(session: SessionRecord, closer: ReviewCloser): { endedB
 
 /**
  * The browser is untrusted like any client, and a malformed prompt would reach
- * the agent as a `wait` result, so the shape is checked here.
+ * the agent as a waiting command's result, so the shape is checked here.
  */
 export function parseFeedbackRequest(payload: unknown): FeedbackRequest | undefined {
   if (typeof payload !== "object" || payload === null) return undefined;

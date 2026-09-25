@@ -82,7 +82,9 @@ test("the queue keeps the order the reviewer queued it in", () => {
   updateMemory(storage, "abc123", { pending });
 
   assert.deepEqual(
-    readMemory(storage, "abc123").pending.map((prompt) => prompt.comment),
+    readMemory(storage, "abc123").pending.map((prompt) =>
+      "comment" in prompt ? prompt.comment : undefined,
+    ),
     ["one", "two", "three"],
   );
 });

@@ -1,14 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  batchPayload,
   closedBy,
-  drainPending,
+  endedPayload,
   parseFeedbackRequest,
-  withAgentReply,
+  withAgentReplies,
   withFeedback,
 } from "../src/feedback.ts";
 import type { DiffGroup } from "../src/diff-extract.ts";
-import type { SessionRecord } from "../src/session-store.ts";
+import type { SessionRecord } from "../src/session-types.ts";
 
 /** Two groups that share a file, so the total counts distinct paths and not rows. */
 function groups(): DiffGroup[] {
@@ -208,8 +209,8 @@ test("feedback is stamped with the round it was sent in", () => {
 });
 
 test("an agent's summary is stamped with the round it opened, not the one it answers", () => {
-  // Workflow is fix, `start`, then `say`: the summary lands after its round is
-  // open, and stamping the on-screen round puts it under that round's own line.
+  // `publish` opens the round, then its `--to` notes land: stamping the
+  // on-screen round puts "done: …" under that round's own line.
   const answered = withFeedback(
     session(1),
     { prompts: [{ type: "message", comment: "still leaks" }], ended: false },
@@ -217,7 +218,11 @@ test("an agent's summary is stamped with the round it opened, not the one it ans
   );
   const reopened = { ...answered, rounds: session(2).rounds };
 
-  const replied = withAgentReply(reopened, "fixed, and split the helper out", "2025-01-02T01:00Z");
+  const replied = withAgentReplies(
+    reopened,
+    [{ to: "main", text: "fixed, and split the helper out" }],
+    "2025-01-02T01:00Z",
+  );
 
   assert.deepEqual(
     replied.conversation.map((entry) => entry.roundIndex),
@@ -226,7 +231,11 @@ test("an agent's summary is stamped with the round it opened, not the one it ans
 });
 
 test("a session with no rounds stamps nothing rather than inventing a round", () => {
-  const updated = withAgentReply(session(0), "fixed", "2025-01-02T01:00:00.000Z");
+  const updated = withAgentReplies(
+    session(0),
+    [{ to: "main", text: "fixed" }],
+    "2025-01-02T01:00:00.000Z",
+  );
 
   assert.equal("roundIndex" in (updated.conversation.at(-1) ?? {}), false);
 });
@@ -268,32 +277,33 @@ test("ending the review returns the turn, whoever was holding it", () => {
 });
 
 /**
- * `say` is free speech, not a handover: an agent that reported progress mid-edit
- * is still mid-edit, and a `say` that returned the turn would make the `work`
- * the agent runs next an illegal move.
+ * The turn is the handler's to move — `reply` hands it back, `publish` has
+ * already opened the round — so writing the words moves nothing on its own.
  */
-test("the agent saying something keeps the turn it is holding", () => {
+test("the agent's replies are one entry, one reply per thread, and move no turn", () => {
   const held = agentsTurn();
 
-  const replied = withAgentReply(held, "wrapped it in a transaction", "2025-01-02T02:00:00.000Z");
-
-  assert.deepEqual(replied.turn, held.turn);
-  assert.equal(replied.conversation.at(-1)?.prompts[0]?.comment, "wrapped it in a transaction");
-});
-
-/** A question is the one thing an agent cannot go on without, so asking it is a
- * handover: the reviewer now owns the move, and the plan goes with the turn —
- * a banner naming work nobody is doing is worse than none. */
-test("the agent asking a question gives the turn back to the reviewer", () => {
-  const replied = withAgentReply(
-    agentsTurn(),
-    "per-request or per-batch?",
+  const replied = withAgentReplies(
+    held,
+    [
+      { to: "t1", text: "wrapped it in a transaction" },
+      { to: "main", text: "and the suite is green" },
+    ],
     "2025-01-02T02:00:00.000Z",
-    "question",
   );
 
-  assert.deepEqual(replied.turn, { holder: "reviewer", at: "2025-01-02T02:00:00.000Z" });
-  assert.partialDeepStrictEqual(replied.conversation.at(-1)?.prompts[0], { kind: "question" });
+  assert.deepEqual(replied.turn, held.turn);
+  assert.equal(replied.conversation.length, 1);
+  assert.deepEqual(replied.conversation[0]?.prompts, [
+    { type: "reply", thread: "t1", comment: "wrapped it in a transaction" },
+    { type: "reply", thread: "main", comment: "and the suite is green" },
+  ]);
+});
+
+test("no replies write nothing", () => {
+  const held = agentsTurn();
+
+  assert.equal(withAgentReplies(held, [], "2025-01-02T02:00:00.000Z"), held);
 });
 
 test("an end from the browser is recorded as the reviewer's", () => {
@@ -345,16 +355,16 @@ test("an ended poll carries what was approved, counted over distinct paths", () 
     approved: ["shared.ts", "a.ts"],
   };
 
-  const drained = drainPending(ended);
+  const drained = endedPayload(ended);
 
-  assert.deepEqual(drained?.payload.approval, {
+  assert.deepEqual(drained.payload.approval, {
     verdict: "partial",
     approved: 2,
     unapproved: 1,
     swept: 0,
     total: 3,
   });
-  assert.equal(drained?.payload.endedBy, "reviewer");
+  assert.equal(drained.payload.endedBy, "reviewer");
 });
 
 test("every file approved is the one verdict that reads as a sign-off", () => {
@@ -365,7 +375,7 @@ test("every file approved is the one verdict that reads as a sign-off", () => {
     approved: ["a.ts", "shared.ts", "b.ts"],
   };
 
-  assert.deepEqual(drainPending(ended)?.payload.approval, {
+  assert.deepEqual(endedPayload(ended).payload.approval, {
     verdict: "signed-off",
     approved: 3,
     unapproved: 0,
@@ -377,7 +387,7 @@ test("every file approved is the one verdict that reads as a sign-off", () => {
 test("a review ended holding no files is empty, which is not a sign-off", () => {
   const ended: SessionRecord = { ...session(1), status: "ended", groups: [] };
 
-  assert.deepEqual(drainPending(ended)?.payload.approval, {
+  assert.deepEqual(endedPayload(ended).payload.approval, {
     verdict: "empty",
     approved: 0,
     unapproved: 0,
@@ -395,7 +405,7 @@ test("an approval taken in a sweep lane is reported as approved and unread", () 
   };
 
   // `shared.ts` is not swept: the study chapter put it in front of the reviewer.
-  assert.deepEqual(drainPending(ended)?.payload.approval, {
+  assert.deepEqual(endedPayload(ended).payload.approval, {
     verdict: "signed-off",
     approved: 3,
     unapproved: 0,
@@ -412,7 +422,7 @@ test("a sweep lane nobody ticked is swept nowhere: it is only unapproved", () =>
     approved: ["a.ts"],
   };
 
-  assert.deepEqual(drainPending(ended)?.payload.approval, {
+  assert.deepEqual(endedPayload(ended).payload.approval, {
     verdict: "partial",
     approved: 1,
     unapproved: 2,
@@ -429,7 +439,7 @@ test("an approval for a path the grouping dropped is not counted", () => {
     approved: ["a.ts", "gone.ts"],
   };
 
-  assert.deepEqual(drainPending(ended)?.payload.approval, {
+  assert.deepEqual(endedPayload(ended).payload.approval, {
     verdict: "partial",
     approved: 1,
     unapproved: 2,
@@ -447,7 +457,36 @@ test("an open poll carries no approval evidence: the review is not over", () => 
     pending: [{ type: "message", comment: "look again" }],
   };
 
-  assert.equal("approval" in (drainPending(open)?.payload ?? {}), false);
+  assert.equal("approval" in batchPayload(open), false);
+});
+
+test("a reviewer's reply and resolve toggle parse, each naming its thread", () => {
+  assert.deepEqual(
+    parseFeedbackRequest({
+      prompts: [
+        { type: "reply", thread: "t1", comment: "fine, do it" },
+        { type: "resolve", thread: "t1", resolved: true },
+      ],
+      ended: false,
+    })?.prompts,
+    [
+      { type: "reply", thread: "t1", comment: "fine, do it" },
+      { type: "resolve", thread: "t1", resolved: true },
+    ],
+  );
+});
+
+test("a reply or resolve without its thread, words or state is rejected", () => {
+  assert.equal(parseFeedbackRequest(request({ type: "reply", comment: "x" })), undefined);
+  assert.equal(
+    parseFeedbackRequest(request({ type: "reply", thread: "t1", comment: " " })),
+    undefined,
+  );
+  assert.equal(parseFeedbackRequest(request({ type: "resolve", thread: "t1" })), undefined);
+  assert.equal(
+    parseFeedbackRequest(request({ type: "resolve", thread: "", resolved: true })),
+    undefined,
+  );
 });
 
 test("a malformed payload is rejected", () => {
