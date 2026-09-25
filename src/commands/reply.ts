@@ -7,7 +7,7 @@ import { apiRequest, jsonPost } from "./api-client.ts";
 import { scanArgs } from "./args.ts";
 import { listen, type ListenInput } from "./listen.ts";
 import { serverOrigin } from "./server-address.ts";
-import { takeToPairs } from "./to-args.ts";
+import { branchAndBase, takeToPairs } from "./to-args.ts";
 
 export interface ReplyArgs {
   notes: AgentNote[];
@@ -41,7 +41,7 @@ export function parseReplyArgs(args: string[]): ReplyArgs {
       "Nothing to say and something to change? Run `lightspeed work '<plan>'` instead",
     ]);
   }
-  return { notes, branch: scanned.positional[0], base: scanned.positional[1] };
+  return { notes, ...branchAndBase(scanned.positional, "reply") };
 }
 
 /**

@@ -17,7 +17,7 @@ import {
   resolveDeps,
   type RoundDeps,
 } from "./round.ts";
-import { takeToPairs } from "./to-args.ts";
+import { branchAndBase, takeToPairs } from "./to-args.ts";
 
 export interface PublishArgs {
   branch: string | undefined;
@@ -49,9 +49,10 @@ export function parsePublishArgs(args: string[]): PublishArgs {
         "Run `lightspeed publish --help` for what each flag does",
       ]),
   });
+  const session = branchAndBase(scanned.positional, "publish");
   return {
-    branch: scanned.positional[0],
-    base: lastValue(scanned, "--base") ?? scanned.positional[1],
+    branch: session.branch,
+    base: lastValue(scanned, "--base") ?? session.base,
     model: lastValue(scanned, "--model"),
     intents: allValues(scanned, "--intent")
       .map((intent) => intent.trim())

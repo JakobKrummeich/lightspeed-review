@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parsePublishArgs } from "../../src/commands/publish.ts";
 import { parseReplyArgs, runReply } from "../../src/commands/reply.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
@@ -132,6 +133,28 @@ test("a --to missing its text is refused rather than posting the next flag", () 
   assert.throws(() => parseReplyArgs(["--to", "t1"]), /--to needs an item id and the text/);
   assert.throws(() => parseReplyArgs(["--to", "--to", "t1", "x"]), /--to needs an item id/);
   assert.throws(() => parseReplyArgs(["--to", "t1", "  "]), /--to needs an item id/);
+});
+
+test("a --to whose text is the next flag is refused, not posted as words", () => {
+  assert.throws(
+    () => parseReplyArgs(["--to", "t1", "--to", "t2", "x"]),
+    /--to t1 has no text: the next word is the flag --to/,
+  );
+  assert.throws(
+    () => parsePublishArgs(["--to", "t2", "--intent", "renamed"]),
+    /--to t2 has no text: the next word is the flag --intent/,
+  );
+});
+
+test("unquoted words after --to are refused rather than read as a branch and base", () => {
+  assert.throws(
+    () => parseReplyArgs(["--to", "t1", "it", "retries", "three", "times"]),
+    /more than a branch and a base/,
+  );
+  assert.throws(
+    () => parsePublishArgs(["--intent", "x", "--to", "t1", "done:", "renamed", "a", "b"]),
+    /more than a branch and a base/,
+  );
 });
 
 test("an unknown flag is refused", () => {
