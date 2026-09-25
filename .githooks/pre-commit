@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Formats the staged files prettier handles and re-stages them, so a commit never
+# fails CI's `format:check` over whitespace. A convenience, not a gate: whatever
+# goes wrong here is reported and the commit goes through — `format:check` in CI
+# is the gate. `pnpm install` wires this directory in through `core.hooksPath`
+# (scripts/git-hooks.ts).
+set -u
+# Staged names are paths, not pathspecs: a `[` or `*` in one must not glob.
+export GIT_LITERAL_PATHSPECS=1
+
+cd "$(git rev-parse --show-toplevel)" || exit 0
+
+prettier=node_modules/.bin/prettier
+if [ ! -x "$prettier" ]; then
+  echo "pre-commit: prettier is not installed (pnpm install); committing unformatted" >&2
+  exit 0
+fi
+
+files=()
+while IFS= read -r -d '' file; do
+  # Re-staging the formatted file would sweep its unstaged hunks into this
+  # commit, so a partially staged file is committed exactly as staged.
+  if ! git diff --quiet -- "$file"; then
+    echo "pre-commit: $file has unstaged changes; left unformatted (pnpm format)" >&2
+    continue
+  fi
+  files+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+if [ ${#files[@]} -eq 0 ]; then
+  exit 0
+fi
+
+# --ignore-unknown skips files prettier has no parser for, and .prettierignore
+# still applies to paths named explicitly. A file prettier cannot parse is left
+# as it is, but the others were still written, so they are re-staged either way.
+if ! "$prettier" --write --ignore-unknown --log-level warn -- "${files[@]}"; then
+  echo "pre-commit: prettier could not format everything; committing the rest formatted" >&2
+fi
+git add -- "${files[@]}" || echo "pre-commit: could not re-stage the formatted files" >&2
+exit 0

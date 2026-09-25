@@ -37,7 +37,7 @@
   },
   "packageManager": "pnpm@11.15.1",
   "scripts": {
-    "prepare": "node scripts/build.ts",
+    "prepare": "node scripts/build.ts && node scripts/git-hooks.ts",
     "prepack": "node scripts/build.ts",
     "build": "node scripts/build.ts",
     "build:skill": "node scripts/build-skill.ts",
