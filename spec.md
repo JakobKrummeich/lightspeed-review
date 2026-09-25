@@ -127,7 +127,10 @@ if the agent is digesting, it is handed the same batch again.
 `publish` prints the round it published (or `rerun: true`), `open` prints the
 round or the re-attach — each closed by `next.if_killed`: the exact command to
 re-run if the wait is killed (`lightspeed open <branch> [base]`, no `--intent`,
-for `open`). `open` on a working turn is refused `turn_still_yours` before any
+for `open`). The line is pasted as printed, TOON escapes included, so a `reply`
+or `publish` whose words hold an apostrophe, a double quote, a backslash or a
+line break — none of which survives that trip — names `lightspeed open <branch>
+[base]` instead: the words have landed, and re-attaching waits for the same Send. `open` on a working turn is refused `turn_still_yours` before any
 wait is announced, since nobody sends while the agent works; an `--intent` given
 to `open` on a live review is reported as ignored in a `note`.
 

@@ -10,7 +10,7 @@ import type { DiffFile, ExtractedDiff } from "../../src/diff-extract.ts";
 import { parseOpenArgs, runOpen } from "../../src/commands/open.ts";
 import { parsePublishArgs, runPublish } from "../../src/commands/publish.ts";
 import type { RoundDeps } from "../../src/commands/round.ts";
-import type { StructuredOutput } from "../../src/output.ts";
+import { renderToon, type StructuredOutput } from "../../src/output.ts";
 import { agentDigesting, agentWorking } from "../../src/turn.ts";
 import { launchBrowser } from "../../src/commands/open-browser.ts";
 import { ReviewError } from "../../src/errors.ts";
@@ -664,7 +664,7 @@ test("before it waits, publish says the round is out and the exact command that 
 
     await publishNext(harness, {
       intents: ["sign the tokens", "drop the cookie"],
-      notes: [{ to: "main", text: "done: it's signed" }],
+      notes: [{ to: "main", text: "done: signed" }],
     });
 
     const [shown] = harness.announced;
@@ -672,8 +672,26 @@ test("before it waits, publish says the round is out and the exact command that 
     assert.equal(Object.keys(shown!).at(-1), "next");
     assert.match(
       ifKilled(shown),
-      /lightspeed publish feature-auth main --intent 'sign the tokens' --intent 'drop the cookie' --to main 'done: it'\\''s signed'$/,
+      /lightspeed publish feature-auth main --intent 'sign the tokens' --intent 'drop the cookie' --to main 'done: signed'$/,
     );
+  });
+});
+
+/** An apostrophe cannot be quoted in a line that pastes as printed: re-attaching recovers the wait. */
+test("a publish whose words have an apostrophe prints a kill recovery that pastes as shown", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.announced.length = 0;
+
+    await publishNext(harness, {
+      intents: ["the cookie's gone"],
+      notes: [{ to: "main", text: "done: signed" }],
+    });
+
+    const printed = renderToon(harness.announced[0]!);
+    const line = printed.split("\n").find((one) => one.includes("if_killed"))!;
+    assert.doesNotMatch(line.slice(line.indexOf("lightspeed"), -1), /[\\"']/);
+    assert.match(line, /: lightspeed open feature-auth main"$/);
   });
 });
 

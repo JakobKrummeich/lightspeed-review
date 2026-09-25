@@ -64,17 +64,28 @@ export function publishCall(target: string, id = "<id>"): string {
   return `lightspeed publish ${target} --intent '<what this round changed>' --to ${id} 'done: <what you did>'`;
 }
 
-/** Single-quoted for a POSIX shell, where the quote itself is the one character to escape. */
-export function shellWord(text: string): string {
-  return `'${text.replaceAll("'", "'\\''")}'`;
+/**
+ * Whether a word survives the trip as printed: single-quoted, and inside a TOON
+ * string that escapes `"`, `\` and line breaks. An apostrophe cannot be
+ * shell-quoted without a `"` or a `\`, and a word holding any escaped character
+ * is printed escaped — so a line with one pastes into a shell as something else.
+ */
+function pastesAsPrinted(text: string): boolean {
+  return !/['"\\\n\r\t]/.test(text);
 }
 
 function toPairs(notes: readonly { to: string; text: string }[]): string[] {
-  return notes.map((note) => `--to ${note.to} ${shellWord(note.text)}`);
+  return notes.map((note) => `--to ${note.to} '${note.text}'`);
 }
 
-/** The reply as typed, so a killed wait is recovered by the command itself: it posts nothing twice. */
+/**
+ * The command that recovers a wait killed after its words landed. The command
+ * as typed, which the server answers as a re-run and posts nothing twice — or,
+ * when some word cannot be printed so it pastes as shown, re-attaching, which
+ * waits for the same Send and quotes nothing.
+ */
 export function replyRerun(target: string, notes: readonly { to: string; text: string }[]): string {
+  if (!notes.every((note) => pastesAsPrinted(note.text))) return reattachCall(target);
   return ["lightspeed reply", ...toPairs(notes), target].join(" ");
 }
 
@@ -83,7 +94,9 @@ export function publishRerun(
   intents: readonly string[],
   notes: readonly { to: string; text: string }[],
 ): string {
-  const flags = intents.map((intent) => `--intent ${shellWord(intent)}`);
+  const words = [...intents, ...notes.map((note) => note.text)];
+  if (!words.every(pastesAsPrinted)) return reattachCall(target);
+  const flags = intents.map((intent) => `--intent '${intent}'`);
   return ["lightspeed publish", target, ...flags, ...toPairs(notes)].join(" ");
 }
 

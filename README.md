@@ -546,7 +546,9 @@ reply or publish it already has and waits again, so nothing is posted twice.
 ignored); on a working turn `open` is refused, since nobody sends while the
 agent works. Before it waits, every waiting command prints what landed —
 `replied: [ids]`, the round it published, or `rerun: true` — closed by
-`next.if_killed`, the exact command to re-run. The newest wait wins: a second
+`next.if_killed`, the exact command to re-run (re-attaching with `open` when a
+word holds an apostrophe, quote, backslash or line break, which would not paste
+as printed). The newest wait wins: a second
 waiting command on the same review answers the first `superseded: true`, so a
 forgotten background wait never swallows a batch. Bare `lightspeed` asks the
 server whether a wait is already parked before it suggests `open`, and says how

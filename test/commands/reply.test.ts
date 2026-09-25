@@ -13,7 +13,7 @@ import { createReviewServer } from "../../src/server.ts";
 import { SessionStore } from "../../src/session-store.ts";
 import type { SessionRecord } from "../../src/session-types.ts";
 import { threadsOf } from "../../src/threads.ts";
-import type { StructuredOutput } from "../../src/output.ts";
+import { renderToon, type StructuredOutput } from "../../src/output.ts";
 
 const BRANCH = "feature-auth";
 const BASE = "main";
@@ -217,7 +217,7 @@ test("before it waits, a reply says what landed and the exact command that recov
     async ({ port, repoRoot }) => {
       const announced: StructuredOutput[] = [];
       const notes = [
-        { to: "t1", text: "it's one already" },
+        { to: "t1", text: "it is one already" },
         { to: "main", text: "all else clear" },
       ];
       await reply(port, repoRoot, notes, announced);
@@ -229,8 +229,29 @@ test("before it waits, a reply says what landed and the exact command that recov
       assert.equal(Object.keys(shown!).at(-1), "next");
       assert.match(
         (shown?.next as { if_killed: string }).if_killed,
-        /lightspeed reply --to t1 'it'\\''s one already' --to main 'all else clear' feature-auth main$/,
+        /lightspeed reply --to t1 'it is one already' --to main 'all else clear' feature-auth main$/,
       );
+    },
+  );
+});
+
+/**
+ * The printed line is pasted as it reads on screen, TOON escapes and all: an
+ * apostrophe cannot be shell-quoted without a backslash or a double quote, and
+ * the printer escapes both. The words have landed, so re-attaching recovers the
+ * wait just the same, and it quotes nothing.
+ */
+test("a reply whose text has an apostrophe prints a kill recovery that pastes as shown", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, repoRoot }) => {
+      const announced: StructuredOutput[] = [];
+      await reply(port, repoRoot, [{ to: "t1", text: "I'll use y" }], announced);
+
+      const printed = renderToon(announced[0]!);
+      const line = printed.split("\n").find((one) => one.includes("if_killed"))!;
+      assert.doesNotMatch(line.slice(line.indexOf("lightspeed"), -1), /[\\"']/);
+      assert.match(line, /: lightspeed open feature-auth main"$/);
     },
   );
 });

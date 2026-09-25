@@ -30,7 +30,7 @@ that hands the turn back waits for the reviewer's next Send itself.
   the machine got in the way. Every refusal names the one right command.
 - Every waiting command prints what landed before it waits (`replied: [ids]`,
   the round, or `rerun: true`), closed by `next.if_killed` — the exact command to
-  re-run. The newest wait wins: an older one on the same review exits
+  re-run, or `open` to re-attach when a word would not paste as printed. The newest wait wins: an older one on the same review exits
   `superseded: true`.
 - A batch holding resolves carries a `resolved:` line saying what they mean, and
   every suggested `--to` names an open thread, never a resolved one. The working
