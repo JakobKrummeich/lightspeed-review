@@ -2,7 +2,7 @@ import { escapeHtml } from "../escape-html.ts";
 import { currentRound, roundSegments, type RoundSegment } from "./conversation-rounds.ts";
 import { agentTurnText } from "./turn-words.ts";
 import { stalePillRound, type QueuedPill } from "./queued-pill.ts";
-import { threadsOf, type Thread, type ThreadMessage } from "../threads.ts";
+import { MAIN_THREAD, threadsOf, type Thread, type ThreadMessage } from "../threads.ts";
 import type {
   ConversationEntry,
   AnnotationPrompt,
@@ -214,18 +214,71 @@ function renderTurnLine(state: PanelState): string {
  * label over everything is furniture.
  */
 function renderConversation(state: PanelState): string {
-  const threads = threadsOf(state.conversation);
-  const segments = roundSegments(threads, state.rounds);
+  const segments = roundSegments(cardsOf(state), state.rounds);
   const ruled = segments.length > 1;
   const pending = pendingResolves(state.pending);
   const parts: string[] = [];
   for (const segment of segments) {
     if (ruled) parts.push(renderRoundMark(segment));
-    for (const thread of segment.entries) {
-      parts.push(renderThread(thread, segment, pending.get(thread.id)));
+    for (const card of segment.entries) {
+      parts.push(renderThread(card, segment, pending.get(card.id)));
     }
   }
   return parts.join("\n  ");
+}
+
+/** A thread as the panel draws it: `main` split into one card per post. */
+interface Card extends Thread {
+  /** The agent has spoken in it since the reviewer's last Send. */
+  fresh: boolean;
+  main: boolean;
+}
+
+/**
+ * Threads stay where they opened, but a thread the agent spoke in since the
+ * reviewer's last Send is news: left in place, an answer in an old thread sat
+ * rounds above the fold. Those move to the foot of the current round, latest
+ * activity last, as a chat reads. Each `main` post is its own card — one
+ * ever-growing card read as one old thread.
+ */
+function cardsOf(state: PanelState): Card[] {
+  const lastSend = state.conversation.findLast((entry) => entry.role === "reviewer")?.at ?? "";
+  const cards = threadsOf(state.conversation)
+    .flatMap(splitMain)
+    .map((thread) => ({
+      ...thread,
+      // Legacy words are history from before 3.0: never news, whatever their stamp.
+      fresh:
+        thread.legacy !== true &&
+        thread.messages.some((said) => said.role === "agent" && said.at > lastSend),
+    }));
+  // Stable, so threads opened in one moment keep the order they were sent in.
+  const settled = cards.filter((card) => !card.fresh).sort((a, b) => order(a.at, b.at));
+  const current = currentRound(state.rounds);
+  const news = cards
+    .filter((card) => card.fresh)
+    .map((card) => ({ ...card, at: latestOf(card), roundIndex: current }))
+    .sort((a, b) => order(a.at, b.at));
+  return [...settled, ...news];
+}
+
+function splitMain(thread: Thread): Omit<Card, "fresh">[] {
+  if (thread.id !== MAIN_THREAD) return [{ ...thread, main: false }];
+  return thread.messages.map((said) => ({
+    ...thread,
+    messages: [said],
+    at: said.at,
+    ...(said.roundIndex === undefined ? {} : { roundIndex: said.roundIndex }),
+    main: true,
+  }));
+}
+
+function latestOf(thread: Thread): string {
+  return thread.messages.reduce((latest, said) => (said.at > latest ? said.at : latest), thread.at);
+}
+
+function order(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /**
@@ -239,7 +292,7 @@ function pendingResolves(pending: readonly QueuedPill[]): Map<string, boolean> {
   return resolves;
 }
 
-function renderRoundMark(segment: RoundSegment<Thread>): string {
+function renderRoundMark(segment: RoundSegment<Card>): string {
   // Escaped: comes from a session file, which may be hand-edited.
   const name = escapeHtml(`Round ${segment.round + 1}`);
   const note = segment.current ? "reviewing now" : "earlier round";
@@ -250,7 +303,7 @@ function renderRoundMark(segment: RoundSegment<Thread>): string {
 }
 
 /** The two states the stylesheet knows, as a type rather than a convention. */
-function roundState(segment: RoundSegment<Thread>): "current" | "earlier" {
+function roundState(segment: RoundSegment<Card>): "current" | "earlier" {
   return segment.current ? "current" : "earlier";
 }
 
@@ -259,28 +312,39 @@ function roundState(segment: RoundSegment<Thread>): "current" | "earlier" {
  * a one-line summary so the fold still says which thread it is.
  */
 function renderThread(
-  thread: Thread,
-  segment: RoundSegment<Thread>,
+  card: Card,
+  segment: RoundSegment<Card>,
   queued: boolean | undefined,
 ): string {
-  const resolved = queued ?? thread.resolved;
-  const body = resolved ? "" : `\n    ${renderThreadBody(thread)}`;
-  return `<article class="lsr-thread" data-round-state="${roundState(segment)}" data-resolved="${resolved}"${thread.legacy ? ` data-legacy="true"` : ""}>
-    ${renderThreadHead(thread, resolved, queued !== undefined)}${body}
+  const resolved = queued ?? card.resolved;
+  const body = resolved ? "" : `\n    ${renderThreadBody(card)}`;
+  return `<article class="lsr-thread" data-round-state="${roundState(segment)}" data-resolved="${resolved}"${card.fresh ? ` data-new="true"` : ""}${card.legacy ? ` data-legacy="true"` : ""}>
+    ${renderThreadHead(card, resolved, queued !== undefined)}${body}
   </article>`;
 }
 
-function renderThreadHead(thread: Thread, resolved: boolean, queued: boolean): string {
-  const file = thread.item?.type === "annotation" ? renderFilePress(thread.item) : "";
+function renderThreadHead(card: Card, resolved: boolean, queued: boolean): string {
+  const file = card.item?.type === "annotation" ? renderFilePress(card.item) : "";
   const summary = resolved
-    ? `<p class="lsr-thread-summary">${escapeHtml(threadSummary(thread))}</p>`
+    ? `<p class="lsr-thread-summary">${escapeHtml(threadSummary(card))}</p>`
     : "";
-  const state = queued
-    ? `<span class="lsr-thread-queued">${resolved ? "resolves" : "reopens"} on your next Send</span>`
-    : "";
-  if (thread.legacy) return `<header class="lsr-thread-head">${file}</header>${summary}`;
-  const id = escapeHtml(thread.id);
-  return `<header class="lsr-thread-head"><span class="lsr-thread-id">${id}</span>${file}${state}${renderToggle(id, resolved)}</header>${summary}`;
+  if (card.legacy) return `<header class="lsr-thread-head">${file}</header>${summary}`;
+  const id = escapeHtml(card.id);
+  return `<header class="lsr-thread-head"><span class="lsr-thread-id">${id}</span>${newMark(card)}${file}${queuedMark(resolved, queued)}${toggleFor(card, id, resolved)}</header>${summary}`;
+}
+
+function newMark(card: Card): string {
+  return card.fresh ? `<span class="lsr-thread-new">new</span>` : "";
+}
+
+function queuedMark(resolved: boolean, queued: boolean): string {
+  if (!queued) return "";
+  return `<span class="lsr-thread-queued">${resolved ? "resolves" : "reopens"} on your next Send</span>`;
+}
+
+/** `main` is answered from the general comment box: nothing there to resolve. */
+function toggleFor(card: Card, id: string, resolved: boolean): string {
+  return card.main ? "" : renderToggle(id, resolved);
 }
 
 function renderToggle(id: string, resolved: boolean): string {
@@ -296,13 +360,14 @@ function threadSummary(thread: Thread): string {
  * many turns as it takes. Legacy threads (said before items had ids) are read
  * only — there is no id to reply in.
  */
-function renderThreadBody(thread: Thread): string {
+function renderThreadBody(card: Card): string {
   const selection =
-    thread.item?.type === "annotation"
-      ? `<pre class="lsr-prompt-selection">${escapeHtml(thread.item.selected_text)}</pre>\n    `
+    card.item?.type === "annotation"
+      ? `<pre class="lsr-prompt-selection">${escapeHtml(card.item.selected_text)}</pre>\n    `
       : "";
-  const messages = thread.messages.map(renderMessage).join("\n    ");
-  return `${selection}${messages}${thread.legacy ? "" : `\n    ${renderReplyBox(thread.id)}`}`;
+  const messages = card.messages.map(renderMessage).join("\n    ");
+  const readOnly = card.legacy === true || card.main;
+  return `${selection}${messages}${readOnly ? "" : `\n    ${renderReplyBox(card.id)}`}`;
 }
 
 function renderMessage(message: ThreadMessage): string {

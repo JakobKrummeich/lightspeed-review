@@ -588,20 +588,82 @@ test("a queued reply names its thread in the tray", () => {
   assert.match(html, /ok, go/);
 });
 
-test("the agent's --to main is a thread of its own with nothing that opened it", () => {
+/**
+ * `main` is the agent speaking unprompted: each post is news on its own, and
+ * one ever-growing card read as one old thread. The reviewer answers it from
+ * the general comment box, so there is nothing to resolve and no reply box.
+ */
+test("each --to main post is its own card, with no resolve toggle and no reply box", () => {
   const html = renderScroll(
     panelState({
       conversation: [
         entry("agent", "2025-01-01T00:05:00.000Z", [
           { type: "reply", thread: "main", comment: "rebased on main first" },
         ]),
+        entry("agent", "2025-01-01T00:09:00.000Z", [
+          { type: "reply", thread: "main", comment: "and dropped the flag" },
+        ]),
       ],
     }),
   );
 
-  assert.match(html, /<span class="lsr-thread-id">main<\/span>/);
-  assert.match(html, /rebased on main first/);
-  assert.match(html, /data-thread="main"/);
+  assert.equal(html.match(/<span class="lsr-thread-id">main<\/span>/g)?.length, 2);
+  assert.ok(html.indexOf("rebased on main first") < html.indexOf("and dropped the flag"));
+  assert.doesNotMatch(html, /data-thread="main"/);
+});
+
+/** The last Send, then the agent's words since: the part of the panel that is news. */
+function sinceLastSend(): ConversationEntry[] {
+  return [
+    { role: "reviewer", at: "2025-01-01T00:00:00.000Z", roundIndex: 0, prompts: [t1, t2] },
+    {
+      role: "reviewer",
+      at: "2025-01-01T00:06:00.000Z",
+      roundIndex: 0,
+      prompts: [{ type: "resolve", thread: "t1", resolved: true }],
+    },
+    {
+      role: "agent",
+      at: "2025-01-02T00:03:00.000Z",
+      roundIndex: 1,
+      prompts: [{ type: "reply", thread: "main", comment: "pushed the retry change" }],
+    },
+    {
+      role: "agent",
+      at: "2025-01-02T00:05:00.000Z",
+      roundIndex: 1,
+      prompts: [{ type: "reply", thread: "t1", comment: "one more thing on this" }],
+    },
+  ];
+}
+
+test("the agent answering in a resolved thread unfolds it, marked new", () => {
+  const html = renderScroll(panelState({ conversation: sinceLastSend(), rounds: twoRounds }));
+
+  const t1Card = html.slice(html.indexOf("t1</span>"));
+  assert.match(
+    html,
+    /<article class="lsr-thread" data-round-state="current" data-resolved="false" data-new="true">\s*<header class="lsr-thread-head"><span class="lsr-thread-id">t1/,
+  );
+  assert.match(t1Card, /one more thing on this/);
+  assert.match(t1Card, /<span class="lsr-thread-new">new<\/span>/);
+});
+
+/**
+ * Left where the thread opened, an answer in an old thread sat rounds above
+ * the fold. Surfaced at the foot, latest activity last, as a chat reads.
+ */
+test("threads the agent spoke in since the last Send move to the current round, latest last", () => {
+  const html = renderScroll(panelState({ conversation: sinceLastSend(), rounds: twoRounds }));
+
+  const current = html.indexOf('data-round-state="current" role="separator"');
+  const order = ["why a new table?", "pushed the retry change", "one more thing on this"].map(
+    (said) => html.indexOf(said),
+  );
+  assert.ok(order[0]! < current, "t2 has nothing new and stays in round 1");
+  assert.ok(current < order[1]! && order[1]! < order[2]!, "main, then t1, by latest activity");
+  const t2Card = html.slice(html.indexOf("t2</span>"), html.indexOf("t2</span>") + 300);
+  assert.doesNotMatch(t2Card, /lsr-thread-new/);
 });
 
 /** 2.x said things before items had ids: readable, but there is no id to answer in. */

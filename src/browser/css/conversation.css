@@ -189,6 +189,15 @@
   color: var(--lsr-amber);
 }
 
+/* The agent spoke here since your last Send: the one word that says so. */
+.lsr-thread-new {
+  font-size: var(--lsr-size-label);
+  font-weight: 600;
+  color: var(--lsr-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .lsr-thread-resolve {
   margin-left: auto;
   background: transparent;
