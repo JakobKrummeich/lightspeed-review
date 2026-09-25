@@ -23,9 +23,27 @@ that hands the turn back waits for the reviewer's next Send itself.
   (`new`, `reply`, `resolved`, `reopened`), `at`, `selected`, `you` and
   `reviewer` — closed by a `next:` decision rule, instead of `prompts[]` and
   `help[]`.
-- Refusals exit 2 and name the one right command: `turn_not_yours`,
-  `turn_still_yours`, `nothing_to_publish`, `feedback_item_unknown`.
-- Bare `lightspeed` names the one next command for the session it shows.
+- One exit-code rule: exit 2 when re-running the same command cannot help — a
+  wrong command line or a move wrong for the review's state (`turn_not_yours`,
+  `turn_still_yours`, `nothing_to_publish`, `feedback_item_unknown`,
+  `session_ended`, `session_not_found`, `ambiguous_session`) — and exit 1 when
+  the machine got in the way. Every refusal names the one right command.
+- Every waiting command prints what landed before it waits (`replied: [ids]`,
+  the round, or `rerun: true`), closed by `next.if_killed` — the exact command to
+  re-run. The newest wait wins: an older one on the same review exits
+  `superseded: true`.
+- A batch holding resolves carries a `resolved:` line saying what they mean, and
+  every suggested `--to` names an open thread, never a resolved one. The working
+  rule's second key is `stuck`.
+- `reply` from working is measured against the tree `work` found, and the
+  refusal names which condition failed. `publish` checks the turn, the review
+  and the tip before any model call. `open` on a working turn is refused, and an
+  `--intent` on a live review is reported as ignored.
+- A branchless command on a repository whose latest review ended is refused
+  `session_ended`, naming who ended it. Server-gone failures name
+  `lightspeed open <branch> [base]`, which restarts the server and re-attaches.
+- Bare `lightspeed` names the one next command for the session it shows, and
+  asks the server whether a wait is already parked before it suggests `open`.
 - Installed skills are stamped 3.0.0 and refreshed (machine-wide) or reported
   (project) on the next command.
 
@@ -40,4 +58,11 @@ that hands the turn back waits for the reviewer's next Send itself.
   everything queues for the next round. End is always available.
 - The header says "Agent is reading your N items", "Working on: <plan>",
   "Agent is listening" or "Agent isn't listening", and a "Connection lost —
-  reconnecting…" chip shows while the live update stream is down.
+  reconnecting…" chip shows while the live update stream is down, with the
+  header presence greyed to "Connection lost".
+- The server enforces the lock: a Send while the agent holds the turn is refused
+  `agent_holds_turn` and the page says "Not sent — …"; Send & End always goes.
+- Each `--to main` post is its own card, with no Resolve toggle or reply box.
+  The agent answering in a resolved thread reopens it, and every thread the
+  agent spoke in since the last Send is marked new and moved to the foot of the
+  current round.

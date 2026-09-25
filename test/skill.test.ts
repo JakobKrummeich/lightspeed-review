@@ -80,3 +80,11 @@ test("the checked-in SKILL.md is current — run `pnpm run build:skill`", () => 
 
   assert.equal(onDisk, skill);
 });
+
+/** A rule key renamed under the skill once printed `undefined` into every agent's instructions. */
+test("the skill quotes every working rule the CLI prints, and nothing unfilled", () => {
+  const working = nextRule("agent working", "<branch>", ["t4"]);
+
+  for (const line of Object.values(working)) assert.ok(skill.includes(line), line);
+  assert.doesNotMatch(skill, /\bundefined\b/);
+});

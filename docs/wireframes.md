@@ -76,7 +76,9 @@ One baseline-aligned flex row:
   `title`, a hover-only convenience.
 - Connection chip `#lsr-connection.lsr-connection` (`role="status"`, hidden
   by default): "Connection lost — reconnecting…", shown on any EventSource
-  error and hidden again when the stream reopens.
+  error and hidden again when the stream reopens. While it shows, the presence
+  line greys to "Connection lost" (`data-connection="lost"`, last known label
+  in its `title`).
 - `#lsr-replay-reopen` and `#lsr-round-offer` are hidden until relevant.
 - Round-offer states: plain → **glow** (`lsr-offer-glow`, after the round
   popup folds into it) → **beckon** (orbiting spark via `::after` +
@@ -307,6 +309,16 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ │ t1  [file.ts]           [Reopen]   │ │ │  + .lsr-thread-summary (first
 │ │ │ first comment, one line            │ │ │  comment, one line)
 │ │ └────────────────────────────────────┘ │ │
+│ │ ── Round 2 · reviewing now ──          │ │
+│ │ ┌ article.lsr-thread ────────────────┐ │ │ one card per --to main post:
+│ │ │ main NEW                           │ │ │  no toggle, no reply box
+│ │ │ agent                              │ │ │
+│ │ │   pushed the retry change          │ │ │
+│ │ └────────────────────────────────────┘ │ │
+│ │ ┌ article.lsr-thread[data-new] ──────┐ │ │ agent spoke since your last
+│ │ │ t2 NEW  [file.ts]       [Resolve]  │ │ │  Send: .lsr-thread-new, moved
+│ │ │ …exchange, agent's newest last     │ │ │  here, latest activity last
+│ │ └────────────────────────────────────┘ │ │
 │ │ ●●● Agent is reading your 3 items      │ │ .lsr-working (animated dots;
 │ │                                        │ │  agent's turn only, gone once
 │ │                                        │ │  review ends; "Working on:
@@ -350,7 +362,12 @@ travel with the next Send, so answering three threads is still one batch for
 the agent. The fold happens at the press (`data-resolved`, with "resolves on
 your next Send" in `.lsr-thread-queued`); pressing again removes the queued
 toggle. Items from a v2 session, which carry no id, render as read-only
-legacy threads (`data-legacy`, no id, toggle or reply box).
+legacy threads (`data-legacy`, no id, toggle or reply box). Each `--to main`
+post is its own card with no toggle and no reply box (the general comment box
+answers it). The agent answering in a resolved thread reopens it. A thread the
+agent spoke in since the reviewer's last Send carries `data-new="true"` and a
+`.lsr-thread-new` "new" mark, and moves to the foot of the current round,
+latest activity last.
 
 The lock follows the turn (`composeMode`): reviewer's turn — everything is
 live; agent working — the box and the popup queue, pills are removable;

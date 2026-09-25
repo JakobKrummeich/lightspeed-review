@@ -122,6 +122,20 @@ nothing is posted twice; the command simply waits again. `open` on a live review
 is the same re-attach: no new round, no `--intent` required, just the wait — and
 if the agent is digesting, it is handed the same batch again.
 
+**Before it waits, every waiting command says what landed.** `reply` prints
+`replied: [ids]` (or `rerun: true` when the server recognised a re-run),
+`publish` prints the round it published (or `rerun: true`), `open` prints the
+round or the re-attach — each closed by `next.if_killed`: the exact command to
+re-run if the wait is killed (`lightspeed open <branch> [base]`, no `--intent`,
+for `open`). `open` on a working turn is refused `turn_still_yours` before any
+wait is announced, since nobody sends while the agent works; an `--intent` given
+to `open` on a live review is reported as ignored in a `note`.
+
+**The newest wait wins.** A session has at most one parked waiting command: a
+new poll answers every older one `superseded: true` (exit 0, "another lightspeed
+command took over listening"), so an orphaned wait left in a background job can
+never take the next batch into a terminal nobody reads.
+
 **A delivery is not finished until the agent says it arrived.** The server
 cannot see this for itself: the answer's bytes reach the client's kernel whether
 anything reads them or not, so a command killed mid-delivery is
@@ -133,9 +147,13 @@ It is persisted rather than held in memory because a `serve` restart in that
 window would otherwise lose the feedback for good.
 
 **Reply from working** is refused unless nothing has changed since `work` — HEAD
-is still the one `work` recorded and the tree is clean — because then there is
-nothing half-written to protect and talking loses nothing. Otherwise the agent
-publishes what it has and asks in the new round.
+is still the one `work` recorded and the tree still hashes (`git status
+--porcelain`) to the snapshot `work` took — because then there is nothing
+half-written to protect and talking loses nothing. A tree already dirty at
+`work` is fine; a change since is not. The refusal names which condition failed:
+`HEAD moved since work`, `the working tree changed since work`, or `no HEAD was
+recorded at work`. Otherwise the agent publishes what it has and asks in the new
+round.
 
 There is **no timer, no staleness unlock and no override**. A reload changes
 nothing: the page reads the turn off the record it is served with. An agent that
@@ -150,8 +168,9 @@ line comments, thread replies and resolves pile up as pills in the order they
 were made, removable, and all of it goes out with the next round, on the
 reviewer's next Send. The end button reads `End without Sending` on the agent's
 turn, because the queue is not the reviewer's to send onto somebody else's turn.
-The server does not enforce the page's lock: feedback posted on any turn is
-accepted and queued.
+The server enforces the lock too: a Send posted while the agent holds the turn
+is refused 409 `agent_holds_turn` (the page shows "Not sent — …" in the compose
+note), except a Send & End, which is always accepted.
 
 | command   | legal from                                    | turn after               | waits for the Send |
 | --------- | --------------------------------------------- | ------------------------ | ------------------ |
@@ -165,13 +184,30 @@ Every answer the CLI prints carries `turn` and `round`, and a batch closes with
 `next:` — a decision rule, not a menu: anything that needs the reviewer goes in
 one `reply`; nothing left to discuss and something to change means `work`;
 anything ambiguous in a change request is worth asking now; the agent may leave
-items unanswered, and ends the turn with `reply` or `work`, never both. Every
-refusal names the one right command and exits 2 — read the help, do not retry:
+items unanswered, and ends the turn with `reply` or `work`, never both. When the
+batch holds resolves, a `resolved:` line spells out what they mean. Every
+suggested `--to` names an open thread of the session — never a resolved one, and
+`main` when none is open. Every refusal names the one right command and exits 2
+— read the help, do not retry:
 `work` or `reply` on the reviewer's turn answer `turn_not_yours`; `publish` while
 digesting answers `turn_still_yours`; `publish` on an unmoved HEAD answers
 `nothing_to_publish`, naming `reply`; `--to` naming no thread of the session
 answers `feedback_item_unknown`. On an ended review every command that speaks
-into it is refused `session_ended` (exit 1); `open --reopen` starts a new round.
+into it is refused `session_ended`, and a branchless command on a repository
+whose latest review ended is refused the same way, naming who ended it; only
+when the reviewer asks does `open --reopen` start a new round. `publish` checks
+the turn, the review and the tip against the session file before it extracts or
+groups anything, so a refused publish costs no model call.
+
+**One exit-code rule.** Exit 2 when re-running the same command cannot help:
+the command line is wrong, or the move is wrong for the review's state
+(`turn_not_yours`, `turn_still_yours`, `nothing_to_publish`,
+`feedback_item_unknown`, `session_ended`, `session_not_found`,
+`ambiguous_session`). Exit 1 when the machine got in the way — the server, git,
+the model, the config — and the same command may work once that is fixed. Every
+server-gone failure (`server_not_running`, `server_unreachable`, a 503 mid-wait)
+names `lightspeed open <branch> [base]`, which restarts the server and
+re-attaches.
 
 ### Threads and items
 
@@ -188,7 +224,8 @@ per thread the batch touched:
 A thread reply and a Resolve/Reopen toggle are items in the batch like any
 other (`{type: "reply" | "resolve", thread, …}`) and travel with the next Send.
 `t4 resolved` means, for a question, "no further questions", and for a change
-request "I agree with what you last said" — not a withdrawn request. Items from
+request "I agree with what you last said" — not a withdrawn request. The agent
+answering in a resolved thread reopens it. Items from
 a v2 session carry no id; the page shows them as read-only legacy threads.
 
 ### Removed verbs
@@ -230,7 +267,7 @@ lightspeed reply --to <id> "<text>" [--to <id> "<text>"…] [branch] [base]
   # Every answer of a discussion turn in one call, each under its thread
   #   (`main` = the main chat). Hands the turn back and waits for the next Send.
   # Legal while digesting; from working only while HEAD is unmoved and the
-  #   tree clean. Unknown id → `feedback_item_unknown`, exit 2.
+  #   tree unchanged since work. Unknown id → `feedback_item_unknown`, exit 2.
 
 lightspeed work "<plan>" [branch] [base]
   # Ends the discussion: the reviewer's header names the plan, and they can
@@ -242,7 +279,8 @@ lightspeed publish --intent "<what>" [--to <id> "done: …"] [branch] [base]
   #   `--to` notes land in their threads, the reviewer's queue drops into the
   #   round. Waits for the next Send.
   # Refused while digesting (`turn_still_yours`) and on an unmoved HEAD
-  #   (`nothing_to_publish`, naming `reply`), both exit 2.
+  #   (`nothing_to_publish`, naming `reply`), both exit 2 — checked against the
+  #   session file before any extraction or model call.
   # Flags: --intent (required, repeatable), --to, --model <name>
 
 lightspeed approvals [branch] [base]
@@ -363,6 +401,13 @@ Every row states the turn, because the turn is what decides which command is
 legal next, and home closes with the one next step for the session it names — so
 an agent that lost its place (or ran a removed verb) finds it here.
 
+On the reviewer's turn home asks the server whether a waiting command is parked
+on the session (`GET /api/session/:key/presence` → `{waiting}`; no server means
+nobody). Only when nobody is listening does it say to run `open`: with a wait
+already parked it says `listening:` — leave it running, since a second `open`
+would supersede it — and with a Send nobody received it says `receive: the
+reviewer sent N items — \`lightspeed open <branch> <base>\` receives them`.
+
 ### Empty state (definitive)
 
 ```
@@ -404,6 +449,8 @@ groups[4]{name,files}:
   Auth Middleware,5
   Tests,7
 message: the review is open — give the reviewer the url; waiting for their first Send
+next:
+  if_killed: "Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: lightspeed open feature-auth main"
 round: 1
 turn: agent digesting
 items[2]:
@@ -422,17 +469,26 @@ next:
   rule: "You may leave items unanswered. End this turn with reply or with work, never both."
 ```
 
-### reply (the next batch)
+### reply (what landed, then the next batch)
 
-Items the batch touched, one per thread: `you` is the agent's own last words
-there, `reviewer` the reviewer's new ones. A uniform list prints as a table.
+Before the wait, what landed and the exact command that recovers a kill. Then
+the items the batch touched, one per thread: `you` is the agent's own last words
+there, `reviewer` the reviewer's new ones. A uniform list prints as a table. A
+batch holding resolves spells out what they mean on a `resolved:` line.
 
 ```
+round: 1
+turn: reviewer
+replied[2]: t1,t2
+message: replied; waiting for the reviewer's Send
+next:
+  if_killed: "Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: lightspeed reply --to t1 'one transaction already' --to t2 'billing moved to v2 last sprint, nothing calls it' feature-auth main"
 round: 1
 turn: agent digesting
 items[1]{id,status,at,selected,you,reviewer}:
   t2,resolved,"src/billing/legacy.ts:12",const oldFunction = (x) => x * 2;,"billing moved to v2 last sprint, nothing calls it","fine, keep it removed"
 next:
+  resolved: "t2: the reviewer agrees with your last words there — if that was a change, implement it (work); it is not withdrawn"
   talk: …
   work: …
   ambiguity: …
@@ -448,7 +504,7 @@ plan: wrap the user writes in one transaction
 message: "the reviewer's header names this plan; they can queue, not send, until you publish"
 next:
   publish: "Edit, test and commit, then → lightspeed publish feature-auth main --intent '<what this round changed>' --to t1 'done: <what you did>' — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice"
-  blocked: Stuck on a question for the reviewer? Publish what you have and ask in the new round. reply works from here only while nothing has changed since work.
+  stuck: A question for the reviewer? Publish what you have and ask in the new round. reply works from here only while nothing has changed since work.
 ```
 
 ### publish (ended by the reviewer)
@@ -478,12 +534,13 @@ next:
 
 Every refusal is answered with the one move that is legal instead. The agent
 reads failures the way it reads results, so the refusal is structured and the
-fixing command names this session.
+fixing command names this session. `session_ended`, `session_not_found` and
+`ambiguous_session` exit 2 too: re-running the same command cannot help.
 
 ```
 error:
   code: turn_not_yours
-  message: "work ends a turn you do not hold (turn: reviewer)"
+  message: "work is not yours to run: the reviewer holds the turn (turn: reviewer)"
   detail: "the turn moves to you when the reviewer's Send is delivered to a waiting `lightspeed open`, `reply` or `publish`, and never before"
 help[1]: "Run `lightspeed open feature-auth main` to listen for the reviewer's next Send — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice"
 ```
@@ -838,11 +895,11 @@ Selection popup:
 
 **The arrival is announced once.** The header's offer alone was missable — it appears in a corner nobody is reading — so a round that has to wait is also announced by a card over the review (`renderRoundPopup` in `round-offer.ts`, mounted by `dom/round-popup.ts`): the round by the number the reviewer counts, its size, the promise that their queue survives it (`Your 2 comments stay queued — they go out on your next send.`, said only when there is a queue to reassure anyone about), and two honest answers — `Open round N`, or `Keep reading`, which is also what Esc says. Dismissing is not declining: the card folds itself into the header's offer — shrinking away toward the corner the offer lives in — the offer glows once in answer, and then a spark rides the button's border (`offset-path: border-box`) until it is pressed. That orbit is the page's one ongoing animation, allowed because it tells the reviewer nothing new — it holds the place they said they would come back to — and it ends with the offer, however the offer ends: taken from either mouth, or overtaken by the round going on screen. Each round is announced once — a dismissed card never returns for the same round, a newer round is fresh news even over the last card's fold — and taking from card or header clears both, so neither goes on standing for a round already on screen. Under `prefers-reduced-motion` the card is simply there and simply gone, and the spark does not exist.
 
-**The turn is visible, and it is the only thing that decides what the compose box does.** The presence frame carries separate facts: `waiting` — an agent's command is parked on the long poll right now — `turn`, the review's own record of whose move it is, and, while the agent digests, `items`, the number of threads in the batch it holds. The header states a short label off them, and the turn wins: "Agent is reading your 5 items" while it digests, "Working on: _plan_" while it works (the plan `work` declared; "Working on your feedback" without one), and on the reviewer's turn "Agent is listening" or "Agent isn't listening" — a fact about a live connection, never a timer. The label rides in `title` too, with the send-anyway advice on the reviewer's turn ("no agent is listening — Send anyway, it is handed over when the agent next listens"), because a plan in the header's corner runs long and gets cut off. The tooltip is a hover-only convenience — keyboard and touch never reach a `title` — and not where the status is kept: the conversation panel is. The wording lives once, in `browser/turn-words.ts`, because the foot of the conversation says it in full: a line with three breathing dots in the place the answer will be written, shown on the agent's turn only. The served page states the turn as well — it is on the record, so a reload mid-silence is right in the first paint rather than one SSE frame later. A presence frame with a mode this page does not know reads as digesting, the strictest lock. A reviewer who asked for less motion keeps the line, its dots up and still. When the SSE stream drops, a small "Connection lost — reconnecting…" chip (`#lsr-connection`) shows until it reopens, because a page that silently stopped hearing the agent reads as an agent that stopped talking.
+**The turn is visible, and it is the only thing that decides what the compose box does.** The presence frame carries separate facts: `waiting` — an agent's command is parked on the long poll right now — `turn`, the review's own record of whose move it is, and, while the agent digests, `items`, the number of threads in the batch it holds. The header states a short label off them, and the turn wins: "Agent is reading your 5 items" while it digests, "Working on: _plan_" while it works (the plan `work` declared; "Working on your feedback" without one), and on the reviewer's turn "Agent is listening" or "Agent isn't listening" — a fact about a live connection, never a timer. The label rides in `title` too, with the send-anyway advice on the reviewer's turn ("no agent is listening — Send anyway, it is handed over when the agent next listens"), because a plan in the header's corner runs long and gets cut off. The tooltip is a hover-only convenience — keyboard and touch never reach a `title` — and not where the status is kept: the conversation panel is. The wording lives once, in `browser/turn-words.ts`, because the foot of the conversation says it in full: a line with three breathing dots in the place the answer will be written, shown on the agent's turn only. The served page states the turn as well — it is on the record, so a reload mid-turn is right in the first paint rather than one SSE frame later. A presence frame with a mode this page does not know reads as digesting, the strictest lock. A reviewer who asked for less motion keeps the line, its dots up and still. When the SSE stream drops, a small "Connection lost — reconnecting…" chip (`#lsr-connection`) shows until it reopens, because a page that silently stopped hearing the agent reads as an agent that stopped talking — and the header presence greys to "Connection lost" (`data-connection="lost"`, the last known label in its `title`), since it can no longer vouch for who is listening.
 
-**The lock follows the phase; End is never taken away.** While the agent _works_, the primary button reads `Queue` and stays live: a press — or Enter in the box — turns the general comment into a pill in the tray the line comments, thread replies and resolves already queue into (`queueComment` in `src/browser/dom/panel-mount.ts`), empties the box, and can be repeated as often as the reviewer likes; the compose note says "Queued items go into the next round." It is one tray, not several queues: one order, one × to take a pill back, one localStorage record, and the reviewer's next Send on their own turn carries all of it in the order queued, with whatever is in the box last. Each press puts the caret back in the box and says `Queued — N waiting for your next Send` into a visually-hidden polite live region, because the box emptying and a pill appearing above it are nothing a screen reader following the box would notice. A general comment's pill wears no round badge — the badge warns that lines may not line up, and a message has none. While the agent _digests_, the batch must not change under it: the box, Send, thread replies, resolve toggles, the line popup and pill removal are locked ("Locked while the agent reads your feedback — you can still read and approve."), and the Send button still counts what is queued, disabled. With the turn back, the button reads `Send to Agent` again — `Send 3 to Agent` while three pills wait, because the queue does not go out by itself. So does it when no agent is listening: that press leaves the page, handed to the agent's next waiting command, so `Queue`, which promises a pill that can still be taken back, would be the wrong word. The end button changes its words rather than going away — `End without Sending` on the agent's turn — because the queue is not the reviewer's to send onto somebody else's turn, and finding that out from the conversation afterwards is how a reviewer loses six comments. The done card and the round card make the same promise in the other direction: what is queued stays queued. The server does not enforce this lock: it is the page's promise to the agent, and a feedback POST on any turn is accepted and queued.
+**The lock follows the phase; End is never taken away.** While the agent _works_, the primary button reads `Queue` and stays live: a press — or Enter in the box — turns the general comment into a pill in the tray the line comments, thread replies and resolves already queue into (`queueComment` in `src/browser/dom/panel-mount.ts`), empties the box, and can be repeated as often as the reviewer likes; the compose note says "Queued items go into the next round." It is one tray, not several queues: one order, one × to take a pill back, one localStorage record, and the reviewer's next Send on their own turn carries all of it in the order queued, with whatever is in the box last. Each press puts the caret back in the box and says `Queued — N waiting for your next Send` into a visually-hidden polite live region, because the box emptying and a pill appearing above it are nothing a screen reader following the box would notice. A general comment's pill wears no round badge — the badge warns that lines may not line up, and a message has none. While the agent _digests_, the batch must not change under it: the box, Send, thread replies, resolve toggles, the line popup and pill removal are locked ("Locked while the agent reads your feedback — you can still read and approve."), and the Send button still counts what is queued, disabled. With the turn back, the button reads `Send to Agent` again — `Send 3 to Agent` while three pills wait, because the queue does not go out by itself. So does it when no agent is listening: that press leaves the page, handed to the agent's next waiting command, so `Queue`, which promises a pill that can still be taken back, would be the wrong word. The end button changes its words rather than going away — `End without Sending` on the agent's turn — because the queue is not the reviewer's to send onto somebody else's turn, and finding that out from the conversation afterwards is how a reviewer loses six comments. The done card and the round card make the same promise in the other direction: what is queued stays queued. The server enforces the same lock: a Send while the agent holds the turn is refused 409 `agent_holds_turn` and the compose note says "Not sent — …"; Send & End is always accepted.
 
-**The conversation is threads.** Every item the reviewer sent is an `article.lsr-thread` with its whole exchange stacked under it — reviewer, agent, reviewer…, one flat block per message, oldest first — headed by its id (`t3`), its file caption for a line thread, and a **Resolve** toggle, with a reply box at its foot. Threads are read off the conversation (`src/threads.ts`), never stored beside it, and placed in the round segment the item opened in, so a thread stays where it was read. A reply typed in a thread box is a pill naming its thread (`reply in t3`), and so is a resolve: both travel with the next Send, so answering three threads is still one batch for the agent. The fold happens at the press — a resolved thread shrinks to its head plus its first comment as a one-line summary, marked "resolves on your next Send" until it goes — and pressing again takes the queued toggle back out of the tray. The agent's `reply --to t3` and `publish --to t3 'done: …'` land in the thread they name; `--to main` lands in the main chat. Items from a v2 session carry no id: they render as read-only legacy threads, with nothing to reply to or resolve.
+**The conversation is threads.** Every item the reviewer sent is an `article.lsr-thread` with its whole exchange stacked under it — reviewer, agent, reviewer…, one flat block per message, oldest first — headed by its id (`t3`), its file caption for a line thread, and a **Resolve** toggle, with a reply box at its foot. Threads are read off the conversation (`src/threads.ts`), never stored beside it, and placed in the round segment the item opened in, so a thread stays where it was read. A reply typed in a thread box is a pill naming its thread (`reply in t3`), and so is a resolve: both travel with the next Send, so answering three threads is still one batch for the agent. The fold happens at the press — a resolved thread shrinks to its head plus its first comment as a one-line summary, marked "resolves on your next Send" until it goes — and pressing again takes the queued toggle back out of the tray. The agent's `reply --to t3` and `publish --to t3 'done: …'` land in the thread they name; `--to main` lands in the main chat, and each `--to main` post is its own card: no Resolve toggle and no reply box, since the reviewer answers it from the general comment box. The agent answering in a resolved thread reopens it. Every thread the agent spoke in since the reviewer's last Send is marked **new** and moves to the foot of the current round, latest activity last, so an answer in an old or resolved thread is never left rounds above the fold. Items from a v2 session carry no id: they render as read-only legacy threads, with nothing to reply to or resolve.
 
 **A comment leads back to its lines.** In the panel, an anchored comment is captioned by its file's basename alone — the full path waits in the tooltip, and the chapter name that used to trail it is gone: the chapter heading is on the diff, and repeating it under every comment glued a round's card into one unreadable block. The caption is a press: it enters the chapter holding the file as a real focus press (reported, remembered — a reload after a jump opens where it landed), unfolds the file if its own approval had shut it, and scrolls to the very line the anchor names, in either layout, falling back to the file when the diff on screen no longer prints that line and doing nothing at all for a file the round does not carry. The panel only says which file and where (`onJump`); getting there is the diff's craft (`reveal` in `dom/diff-mount.ts`, `findLine` in `dom/line-numbers.ts` — the inverse of the numbers a selection is anchored by).
 

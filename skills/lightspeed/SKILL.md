@@ -52,7 +52,7 @@ and the one command to run next.
    - work — Nothing left to discuss and something to change (clear change requests go straight here) → lightspeed work '<plan>' <branch>, then edit, test, commit and publish
 
    Anything ambiguous in a change request? Ask now with reply: asking is cheaper than redoing a round built on a guess. You may leave items unanswered. End this turn with reply or with work, never both.
-3. **Work.** Edit, test, commit. undefined
+3. **Work.** Edit, test, commit. A question for the reviewer? Publish what you have and ask in the new round. reply works from here only while nothing has changed since work.
 4. **Publish.** Edit, test and commit, then → lightspeed publish <branch> --intent '<what this round changed>' --to t4 'done: <what you did>' — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice
    Files the reviewer already approved come back ticked unless you touched them.
 5. **Close it** when the reviewer is done.
@@ -75,12 +75,15 @@ items[2]:
 ```
 
 - `id` is what `--to` takes; `main` is the main chat, where your own
-  top-level remarks go.
+  top-level remarks go — each `--to main` is its own card on the page.
 - `status`: `new` (a new item), `reply` (the reviewer answered in a
   thread; `you` is what you said last there), `resolved` or
   `reopened`. Resolving a question means "no further questions"; resolving
   a change request means "I agree with what you last said" — implement that
-  agreed version, it is not withdrawn.
+  agreed version, it is not withdrawn. A batch holding resolves says so on a
+  `resolved:` line of `next:`. Every `--to` a line suggests names an
+  open thread; never answer into one the reviewer resolved unless you must —
+  doing so reopens it.
 - `at` is `file:line` (or `file:start-end`) in your branch; `(base)`
   marks lines numbered in the base. `selected` quotes the reviewer's
   selection, cut at 200 characters with a pointer to the rest.
@@ -91,6 +94,10 @@ items[2]:
 - Run `open`, `reply` and `publish` in the foreground, never under a
   timeout. If one is killed anyway, re-run the same command: the server
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
+  Before it waits, each prints what landed (`replied`, the round, or
+  `rerun: true`) closed by `next.if_killed` — that exact command. Only
+  one wait per review: a newer one makes the older exit `superseded: true`,
+  which asks nothing of you.
 - Every refusal of a move — out of turn, an ended, unknown or ambiguous
   review — names the one right command in its `help[]` and exits 2: read
   it rather than retrying. `turn_not_yours`: the reviewer holds the turn.

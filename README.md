@@ -528,8 +528,11 @@ the agent's side. Delivery of a Send to a listening agent is what moves the turn
 to digesting; `reply` hands it back; `work` moves it to working; `publish` opens
 the next round and hands it back, and the reviewer's queue drops into that round.
 `reply` from working is refused unless nothing has changed since `work` — HEAD
-has not moved and the tree is clean — because there is then nothing half-written
-to protect; otherwise the agent publishes what exists and asks in the new round.
+has not moved and the tree is as `work` found it (a tree already dirty then is
+fine) — because there is then nothing half-written to protect; the refusal says
+which of the two changed. Otherwise the agent publishes what exists and asks in
+the new round. The server holds the page to the same lock: a Send while the agent
+holds the turn is refused `agent_holds_turn`, and the page says "Not sent".
 
 `open`, `reply` and `publish` **wait for the reviewer's Send**: they do not
 return until the next batch arrives (or the review ends), so one call is one
@@ -538,7 +541,15 @@ for nothing. If a waiting command is killed — a harness timeout, a server
 restart — re-running the _same_ command re-attaches: the server recognises the
 reply or publish it already has and waits again, so nothing is posted twice.
 `open` on a live review is the same re-attach: no new round, just the wait, and
-`--intent` is only required when opening fresh.
+`--intent` is only required when opening fresh (given anyway, it is reported as
+ignored); on a working turn `open` is refused, since nobody sends while the
+agent works. Before it waits, every waiting command prints what landed —
+`replied: [ids]`, the round it published, or `rerun: true` — closed by
+`next.if_killed`, the exact command to re-run. The newest wait wins: a second
+waiting command on the same review answers the first `superseded: true`, so a
+forgotten background wait never swallows a batch. Bare `lightspeed` asks the
+server whether a wait is already parked before it suggests `open`, and says how
+many items a Send nobody received is holding.
 
 A delivery is not finished until the agent's client confirms it arrived. The
 server cannot see that for itself: the answer's bytes reach the client's kernel
@@ -555,7 +566,14 @@ something to change means `work`; anything ambiguous in a change request is
 worth asking now. Every refusal names the one right command: `work` or `reply`
 on the reviewer's turn answer `turn_not_yours`, `publish` while digesting answers
 `turn_still_yours`, `publish` on an unmoved HEAD answers `nothing_to_publish`
-naming `reply`. Refusals exit 2 — read the help, do not retry. There is no timer
+naming `reply` — checked before any model call. A resolve in the batch comes
+with a `resolved:` line saying what it means, and every suggested `--to` names
+an open thread, never a resolved one. One exit-code rule: exit 2 when re-running
+the same command cannot help — a wrong command line, or a move wrong for the
+review's state, `session_ended`, `session_not_found` and `ambiguous_session`
+included — so read the help, do not retry; exit 1 when the machine got in the
+way (server, git, model, config). A branchless command on a repository whose
+latest review ended is refused `session_ended`, naming who ended it. There is no timer
 and no override: an agent that died holding the turn is recovered by re-running
 the command it died in.
 
@@ -567,7 +585,12 @@ thread's jump to its lines. **Resolve** folds a thread; it sends nothing by
 itself and travels with the next Send, where the agent reads `t4 resolved` — for
 a question "no further questions", for a change request "I agree with what you
 last said", not a withdrawn request. Thread replies and resolves queue like any
-other item and go out together on Send.
+other item and go out together on Send. The agent answering in a resolved thread
+reopens it. Each `--to main` post is its own card, with no Resolve toggle and no
+reply box — answer it from the general comment box. Every thread the agent spoke
+in since your last Send is marked **new** and moves to the foot of the current
+round, latest activity last. While the live update stream is down the header
+presence greys to "Connection lost" beside the reconnecting chip.
 
 ## Intent
 
