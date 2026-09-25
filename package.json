@@ -51,7 +51,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "dup": "jscpd"
+    "dup": "jscpd",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run build:skill --check && pnpm run dup"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.87.1",
