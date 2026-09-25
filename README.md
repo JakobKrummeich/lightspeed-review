@@ -57,7 +57,9 @@ that builds `dist/` needs them (so nothing built is checked in); the global
 command it leaves behind is a link into the clone, so keep the clone where it
 is; and it falls back to a `~/.local` prefix when npm's global one is
 root-owned, rather than asking for a sudo. To upgrade: `git pull &&
-./install.sh`.
+./install.sh --agent <id>` — the same command, which rewrites the skill too.
+Without `--agent`, the upgraded CLI refreshes the skills it wrote itself the
+first time it runs (see [Keeping the skill current](#keeping-the-skill-current)).
 
 (`npm i -g github:…` fails on npm 11 — it runs `prepare` before it installs the
 dev dependency that builds the bundle. Install from a clone, or from a tarball
@@ -338,7 +340,37 @@ default, a config has exactly one place to go. `lightspeed init --config` on its
 own is the right command in a repository whose agent already has the skill.
 
 pi and Claude Code get the SKILL.md format, frontmatter and all — the same
-document `pnpm run build:skill` checks in; the other three get plain markdown.
+document `pnpm run build:skill` checks in, plus the stamp line described below;
+the other three get plain markdown.
+
+### Keeping the skill current
+
+Every skill `init` or `skill` writes carries a stamp: the lightspeed version that
+wrote it and a hash of what it wrote.
+
+```
+<!-- written by lightspeed 2.2.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+```
+
+Every command but `init` (the explicit install) then checks the places `init`
+writes to. A machine-wide skill (under your home directory) that lightspeed
+stamped, that nobody has edited since, and that an older (or the same) version
+wrote is brought up to date in place, without a word. A skill in a repository
+is never rewritten behind your back — that would leave a tracked file dirty — so
+a behind one there is reported instead. So is anything else it recognises as a
+lightspeed skill — no stamp, edited by hand, written by a newer lightspeed,
+pasted into a shared instructions file outside the lightspeed markers, or not
+writable. It leaves those alone, and every answer, help included, carries a
+notice until it is fixed:
+
+```
+skill_stale[1]{path,problem,fix}:
+  /home/you/.pi/agent/skills/lightspeed/SKILL.md,"no lightspeed version stamp: written by hand or by an older lightspeed, so it may teach commands this CLI no longer has","lightspeed init --agent pi, then restart your agent"
+```
+
+A skill written before stamps existed is one of those: run the `fix` once and
+it refreshes itself from then on. Either way the agent only reads the new skill
+after a restart; until then the CLI's own `help[]` is current.
 
 ### Writing the file yourself
 
@@ -353,8 +385,11 @@ mkdir -p ~/.config/opencode && lightspeed skill --agent opencode >> ~/.config/op
 mkdir -p .github && lightspeed skill --agent vscode > .github/copilot-instructions.md
 ```
 
-The `>>` rows append with no markers around them, so re-running one of those
-appends a second copy — which is what `init` exists to stop.
+codex, opencode and vscode get the skill between the same
+`<!-- lightspeed:start -->` / `<!-- lightspeed:end -->` markers `init` writes, so
+a copy written with `>` or `>>` is kept current exactly like one `init` wrote.
+Re-running a `>>` row still appends a second copy, which is then reported —
+`init` replaces its block in place instead.
 
 ## For agents
 
@@ -462,8 +497,10 @@ pulling the tests out of it would leave the group behind them empty.
 | `lightspeed logout <provider>`                      | Drop lightspeed's stored credential for one provider                                                              |
 
 Every command prints TOON on stdout — failures included, as
-`error: {code, message, detail}` plus `help[]`. The one exception is `skill`,
-whose stdout is the markdown document itself; its failures are still TOON.
+`error: {code, message, detail}` plus `help[]`, and `skill_stale` (help pages
+too) when an installed skill is behind (see [Keeping the skill current](#keeping-the-skill-current)).
+The one exception is `skill`, whose stdout is the markdown document itself; its
+failures are still TOON.
 
 ## The turn
 

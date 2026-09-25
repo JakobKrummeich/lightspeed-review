@@ -92,6 +92,12 @@ past that is one the reader has to hold in their head instead of read.
 Tests go under `test/`, mirroring `src/`. Write the failing test first: a test
 that never failed has not been shown to test anything.
 
+A test that spawns the CLI sets `HOME` to a temporary directory. Every command
+refreshes the lightspeed skills it finds under `HOME`, so a spawn with your real
+one can rewrite the skill your own agent reads — and one from a branch that
+bumped the version would leave it ahead of the CLI you have installed. Run the
+branch's CLI by hand with a throwaway `HOME` for the same reason.
+
 ## Commits
 
 One descriptive sentence saying what the change is _for_. No

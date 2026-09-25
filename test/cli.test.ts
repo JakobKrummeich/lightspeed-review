@@ -15,10 +15,16 @@ import { SessionStore } from "../src/session-store.ts";
 const execFileAsync = promisify(execFile);
 const cliPath = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 
+/**
+ * Every command checks the skills under HOME and may rewrite one, so no run of
+ * the suite may point it at the home of the developer running it.
+ */
+const isolatedHome = mkdtempSync(join(tmpdir(), "lsr-cli-isolated-home-"));
+
 async function runCli(
   args: string[],
   cwd?: string,
-  env?: NodeJS.ProcessEnv,
+  env: NodeJS.ProcessEnv = { ...process.env, HOME: isolatedHome },
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   try {
     const { stdout, stderr } = await execFileAsync(process.execPath, [cliPath, ...args], {

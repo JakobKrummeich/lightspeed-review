@@ -12,7 +12,9 @@ import {
   type InstallReport,
   type SkillTarget,
 } from "../skill-install.ts";
-import { isSkillAgent, renderSkillFor, SKILL_AGENTS, type SkillAgent } from "../skill.ts";
+import { isSkillAgent, SKILL_AGENTS, type SkillAgent } from "../skill.ts";
+import { stampedSkillFor } from "../skill-stamp.ts";
+import { CLI_VERSION } from "../version.ts";
 import { HELP_START } from "../turn-help.ts";
 import { hasFlag, lastValue, scanArgs } from "./args.ts";
 
@@ -66,7 +68,9 @@ export function runInit(input: InitInput): StructuredOutput {
 function installSkillFor(agent: SkillAgent, input: InitInput): SkillOutcome {
   const scope = requireScope(input.scope ?? "global");
   const target = requireTarget(agent, scope, input);
-  return { agent, scope, report: installSkill(target, renderSkillFor(agent), input.dryRun) };
+  // Stamped, so the CLI of a later upgrade can refresh it without another `init`.
+  const rendered = stampedSkillFor(agent, CLI_VERSION);
+  return { agent, scope, report: installSkill(target, rendered, input.dryRun) };
 }
 
 export function parseInitArgs(args: string[]): InitArgs {

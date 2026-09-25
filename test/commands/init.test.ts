@@ -13,7 +13,14 @@ import { dirname, join } from "node:path";
 import { parseInitArgs, runInit, type InitInput } from "../../src/commands/init.ts";
 import { ReviewError } from "../../src/errors.ts";
 import type { StructuredOutput } from "../../src/output.ts";
-import { renderSkill, renderSkillFor, SKILL_AGENTS } from "../../src/skill.ts";
+import { SKILL_AGENTS, type SkillAgent } from "../../src/skill.ts";
+import { stampedSkillFor } from "../../src/skill-stamp.ts";
+import { CLI_VERSION } from "../../src/version.ts";
+
+/** What `init` writes: the dialect, stamped so a later CLI can refresh it. */
+function installed(agent: SkillAgent): string {
+  return stampedSkillFor(agent, CLI_VERSION);
+}
 
 interface Roots {
   home: string;
@@ -168,7 +175,7 @@ test("pi writes the SKILL.md form where pi scans for skills", () => {
   const target = join(place.home, ".pi/agent/skills/lightspeed/SKILL.md");
   assert.equal(skill(output).path, target);
   assert.equal(skill(output).status, "written");
-  assert.equal(readFileSync(target, "utf8"), renderSkill());
+  assert.equal(readFileSync(target, "utf8"), installed("pi"));
 });
 
 test("--scope project writes into the repository pi reads it from", () => {
@@ -177,7 +184,7 @@ test("--scope project writes into the repository pi reads it from", () => {
   const output = run(place, { agent: "pi", scope: "project" });
 
   assert.equal(skill(output).path, join(place.cwd, ".pi/skills/lightspeed/SKILL.md"));
-  assert.equal(readFileSync(skill(output).path, "utf8"), renderSkill());
+  assert.equal(readFileSync(skill(output).path, "utf8"), installed("pi"));
 });
 
 test("claude-code gets its own skills directory, global and project", () => {
@@ -189,7 +196,7 @@ test("claude-code gets its own skills directory, global and project", () => {
 
   assert.equal(skill(globalOutput).path, join(global.home, ".claude/skills/lightspeed/SKILL.md"));
   assert.equal(skill(projectOutput).path, join(project.cwd, ".claude/skills/lightspeed/SKILL.md"));
-  assert.equal(readFileSync(skill(globalOutput).path, "utf8"), renderSkill());
+  assert.equal(readFileSync(skill(globalOutput).path, "utf8"), installed("claude-code"));
 });
 
 test("the block agents write to the instructions file each of them reads", () => {
@@ -238,7 +245,7 @@ test("a whole-file target is rewritten only when it differs", () => {
   assert.equal(skill(first).status, "written");
   assert.equal(skill(second).status, "unchanged");
   assert.equal(skill(third).status, "updated");
-  assert.equal(readFileSync(skill(third).path, "utf8"), renderSkill());
+  assert.equal(readFileSync(skill(third).path, "utf8"), installed("pi"));
 });
 
 test("a marked block is replaced in place, never appended twice", () => {
@@ -291,7 +298,7 @@ test("the block carries the plain dialect, frontmatter and all removed", () => {
   const output = run(place, { agent: "codex", scope: "project" });
   const contents = readFileSync(skill(output).path, "utf8");
 
-  assert.ok(contents.includes(renderSkillFor("codex").trimEnd()));
+  assert.ok(contents.includes(installed("codex").trimEnd()));
   assert.ok(!contents.includes("name: lightspeed"));
 });
 

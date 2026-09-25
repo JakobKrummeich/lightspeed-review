@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -22,10 +23,17 @@ const cliPath = fileURLToPath(new URL("../../src/cli.ts", import.meta.url));
  */
 const CLI_TIMEOUT_MS = 30_000;
 
+/**
+ * Every command checks the skills under HOME and may rewrite one, so no run of
+ * the suite may point it at the home of the developer running it.
+ */
+const isolatedHome = mkdtempSync(join(tmpdir(), "lsr-e2e-home-"));
+
 async function runCli(args: string[], cwd: string): Promise<{ stdout: string; code: number }> {
   try {
     const { stdout } = await execFileAsync(process.execPath, [cliPath, ...args], {
       cwd,
+      env: { ...process.env, HOME: isolatedHome },
       timeout: CLI_TIMEOUT_MS,
     });
     return { stdout, code: 0 };

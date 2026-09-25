@@ -186,7 +186,11 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
     destinations: destinationHelp(),
     behaviour:
       "Safe to re-run: a whole-file target is rewritten only when it differs, and a" +
-      " shared AGENTS.md keeps its own content with lightspeed's block replaced in place",
+      " shared AGENTS.md keeps its own content with lightspeed's block replaced in place." +
+      " The skill is stamped with this CLI's version, so any later lightspeed command" +
+      " refreshes a machine-wide one after an upgrade unless it was edited by hand;" +
+      " a project one is reported as skill_stale instead, so your repo is never" +
+      " changed behind your back",
     examples: [
       "lightspeed init --agent pi",
       "lightspeed init --config",
@@ -200,7 +204,9 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
     description:
       "Print the integration instructions for one coding agent as raw markdown —" +
       " redirect stdout into the file that agent reads. `lightspeed init` does the" +
-      " redirecting for you; this is the escape hatch for a path of your own",
+      " redirecting for you; this is the escape hatch for a path of your own. codex," +
+      " opencode and vscode get it between lightspeed:start/end markers, so a copy" +
+      " appended to a shared file is refreshed like the block `init` writes",
     flags: {
       "--agent <id>": `one of ${SKILL_AGENTS.join(", ")}; defaults to pi`,
     },
@@ -222,9 +228,11 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
   },
 };
 
-export function commandHelp(command: string): string | undefined {
+/** `notice` rides along after the page, so a stale skill is reported on the
+ * help an agent reads most. */
+export function commandHelp(command: string, notice: StructuredOutput = {}): string | undefined {
   const help = COMMAND_HELP[command];
-  return help === undefined ? undefined : `${renderToon(help)}\n`;
+  return help === undefined ? undefined : `${renderToon({ ...help, ...notice })}\n`;
 }
 
 /**
