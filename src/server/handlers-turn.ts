@@ -4,8 +4,8 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionRecord } from "../session-store.ts";
-import { turnHelp } from "../commands/home.ts";
 import { agentWorking, budgetHelp, helpFormFor, turnFacts, turnLabel } from "../turn.ts";
+import { turnHelp } from "../turn-help.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
 import { readWork } from "./validate.ts";

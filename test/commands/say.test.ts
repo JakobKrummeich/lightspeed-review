@@ -11,7 +11,7 @@ import {
   helpSay,
   helpWork,
   nextMoves,
-} from "../../src/commands/home.ts";
+} from "../../src/turn-help.ts";
 import { parseSayArgs, runSay } from "../../src/commands/say.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";

@@ -9,11 +9,11 @@ import {
 import { sessionKey } from "../paths.ts";
 import type { AnnotationPrompt, FeedbackPrompt, ReviewCloser } from "../session-store.ts";
 import { turnBlock, type TurnLabel } from "../turn.ts";
+import { legalMoves, turnHelp } from "../turn-help.ts";
 import { hasFlag, scanArgs } from "./args.ts";
 import { longPoll } from "./long-poll.ts";
 import { serverOrigin } from "./server-address.ts";
 import { assertServerCurrent } from "./server-lifecycle.ts";
-import { legalMoves, turnHelp } from "./home.ts";
 
 export interface WaitArgs {
   /** Unset when the agent left it to `resolveSession` to work out. */

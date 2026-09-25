@@ -6,7 +6,7 @@ import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
-import { legalMoves, nextMoves } from "../src/commands/home.ts";
+import { legalMoves, nextMoves } from "../src/turn-help.ts";
 import { CLI_VERSION } from "../src/version.ts";
 import { SessionStore } from "../src/session-store.ts";
 import { LedgerStore } from "../src/ledger/store.ts";

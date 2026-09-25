@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { runAxiCli } from "axi-sdk-js";
 import { CLI_DESCRIPTION, CLI_VERSION } from "./version.ts";
-import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE, homeOutput } from "./commands/home.ts";
+import { homeOutput } from "./commands/home.ts";
 import { homeInput } from "./commands/home-input.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
 import { parseAskArgs, runAsk } from "./commands/ask.ts";
@@ -32,6 +32,7 @@ import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
 import { missingSession, resolveSession, type ResolvedSession } from "./session-resolve.ts";
 import { SessionStore } from "./session-store.ts";
+import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./turn-help.ts";
 
 const version = CLI_VERSION;
 const description = CLI_DESCRIPTION;

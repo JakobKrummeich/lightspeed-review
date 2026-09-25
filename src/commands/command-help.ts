@@ -1,10 +1,9 @@
 import { LOGIN_PROVIDERS } from "../llm/pi-auth.ts";
-import { DEFAULT_PATH_LIMIT } from "./approvals.ts";
 import { destinationHelp, INIT_SCOPES } from "../skill-install.ts";
 import { SKILL_AGENTS } from "../skill.ts";
-import { renderToon, type StructuredOutput } from "../output.ts";
+import { DEFAULT_PATH_LIMIT, renderToon, type StructuredOutput } from "../output.ts";
+import { BLOCKS_IN_FOREGROUND, TURN_RULE } from "../turn-help.ts";
 import { HELP_RESTART_AGENT } from "./init.ts";
-import { BLOCKS_IN_FOREGROUND, TURN_RULE } from "./home.ts";
 
 const SESSION_ARGUMENTS = {
   "[branch]": "branch under review; omit it when the repo has one live session",

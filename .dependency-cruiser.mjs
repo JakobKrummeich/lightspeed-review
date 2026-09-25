@@ -3,22 +3,6 @@
 // any `error` below. Only production code is cruised — tests may import
 // anything — so a rule's `from` never has to exempt test/.
 
-/**
- * Modules outside src/commands/ that still import from it, from before the
- * rule existed. Listed so the rule blocks the next one; an entry is retired
- * by moving what it imports below commands/ (as start-call.ts was) and then
- * deleting it here — never by adding to this list.
- */
-const COMMANDS_KNOWN_EXCEPTIONS = [
-  // HELP_START, HELP_WAIT, HELP_END and TURN_RULE from home.ts,
-  // DEFAULT_PATH_LIMIT from approvals.ts — the skill quotes the CLI's own text.
-  "^src/skill\\.ts$",
-  // turnHelp from home.ts: a refused move answers with the same help the
-  // commands print.
-  "^src/server/handlers-turn\\.ts$",
-  "^src/server/handlers-stream\\.ts$",
-];
-
 /** @type {import('dependency-cruiser').IConfiguration} */
 export default {
   forbidden: [
@@ -49,9 +33,9 @@ export default {
     {
       name: "commands-only-from-cli",
       comment:
-        "src/commands/ is the CLI's top layer; core code that imports it inverts the layering and is how the old import cycles formed.",
+        "src/commands/ is the CLI's top layer; core code that imports it inverts the layering and is how the old import cycles formed. What core code and a command both need lives below commands/, as start-call.ts and turn-help.ts do.",
       severity: "error",
-      from: { pathNot: ["^src/cli\\.ts$", "^src/commands/", ...COMMANDS_KNOWN_EXCEPTIONS] },
+      from: { pathNot: ["^src/cli\\.ts$", "^src/commands/"] },
       to: { path: "^src/commands/" },
     },
   ],

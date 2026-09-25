@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { drainPending, type PollPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import type { Delivery, FeedbackPrompt, SessionRecord } from "../session-store.ts";
-import { turnHelp } from "../commands/home.ts";
 import {
   agentReading,
   budgetHelp,
@@ -13,6 +12,7 @@ import {
   turnLabel,
   type HelpForm,
 } from "../turn.ts";
+import { turnHelp } from "../turn-help.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
 import type { Waker } from "./streams.ts";

@@ -1,6 +1,6 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import { startCall } from "../start-call.ts";
-import { helpReopen } from "./home.ts";
+import { helpReopen } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /**

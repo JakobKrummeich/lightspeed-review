@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { HELP_START, BLOCKS_IN_FOREGROUND, TURN_RULE } from "../src/commands/home.ts";
+import { HELP_START, BLOCKS_IN_FOREGROUND, TURN_RULE } from "../src/turn-help.ts";
 import { REACHABLE_MODELS } from "../src/config.ts";
 import { renderSkill, SKILL_PATH } from "../src/skill.ts";
 

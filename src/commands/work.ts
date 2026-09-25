@@ -1,8 +1,8 @@
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
+import { turnHelp } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
-import { turnHelp } from "./home.ts";
 import { parseVerb, type VerbArgs } from "./verb-args.ts";
 import { serverOrigin } from "./server-address.ts";
 

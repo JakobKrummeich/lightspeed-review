@@ -1,9 +1,9 @@
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
+import { legalMoves } from "../turn-help.ts";
 import { apiRequest } from "./api-client.ts";
 import { serverOrigin } from "./server-address.ts";
-import { legalMoves } from "./home.ts";
 
 export interface EndInput {
   repoRoot: string;

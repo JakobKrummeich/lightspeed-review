@@ -408,6 +408,7 @@ src/
     schema.ts           → Typebox schema for grouping output + validator
     grouping.ts         → diff → LLM → validate → repair loop → DiffGroup[]
   turn.ts               → The turn: who holds it, and how every answer states it
+  turn-help.ts          → The turn rule and every help line naming a move
   server.ts             → node:http: UI, feedback API, long poll, SSE
   router.ts             → Tiny method+path router (~60 lines)
   session-store.ts      → JSON state (~/.lightspeed/)
