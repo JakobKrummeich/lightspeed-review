@@ -81,17 +81,6 @@ no-mistakes axi run --intent "what the change is for"
 git push no-mistakes <branch>
 ```
 
-The pipeline writes a signature and an attestation bound to the head commit
-into the PR body. The `PR must be raised via no-mistakes` check
-(`.github/workflows/no-mistakes-required.yml`) fails any PR whose body lacks
-them, or whose attestation names an older head than the one pushed. That
-includes the owner and the maintenance agent's bot. Only `dependabot[bot]` and
-`github-actions[bot]` are exempt: automation that cannot run the pipeline.
-
-The check is a guardrail against raising a PR by accident outside the
-pipeline, not a forgery-proof boundary. The attestation is plain text in the
-PR body, and anyone who can edit that body can write one by hand.
-
 ## Style
 
 Comments say **why**, not what. The code already states what it does; a comment
