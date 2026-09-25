@@ -156,6 +156,23 @@ test("the reviewer's own answers end the poll at once, without a retry", async (
   await harness.close();
 });
 
+/** A server that answered is there: reconnecting after its 500 would repeat the
+ * crash forever, and returning the body would hand it to the agent as feedback. */
+test("a server error ends the poll at once as a lightspeed bug, not as feedback", async () => {
+  const harness = await pollServer();
+
+  const polling = pollFor(harness);
+  await untilPolled(harness, 1);
+  harness.answer(500, JSON.stringify({ status: "feedback", prompts: [] }));
+
+  await assert.rejects(
+    () => polling,
+    (error: ReviewError) => error.code === "internal_error",
+  );
+  assert.equal(harness.polls.length, 1);
+  await harness.close();
+});
+
 test("nothing listening is reported as server_not_running once the probes are spent", async () => {
   // Port 1 is privileged and never listening in the test environment.
   await assert.rejects(

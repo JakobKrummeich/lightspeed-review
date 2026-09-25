@@ -131,6 +131,37 @@ test("a 422 without a readable error is a lightspeed bug, not a silent success",
   }
 });
 
+/**
+ * The long poll resolves whatever this returns that is not a ReviewError, so a
+ * 500 read as an answer would end `wait` with the server's crash for feedback.
+ */
+test("a status outside 2xx is a lightspeed bug even when its body is JSON", () => {
+  const body = JSON.stringify({ status: "feedback", prompts: [], trace: "x".repeat(300) });
+
+  for (const status of [500, 302, 400]) {
+    const parsed = parseBody(status, body);
+
+    assert.ok(parsed instanceof ReviewError, String(status));
+    assert.equal(parsed.code, "internal_error", String(status));
+    assert.equal(parsed.message, `the review server answered ${status}`);
+    // The body is quoted, not dumped: a stack trace must not flood the agent's turn.
+    assert.equal(parsed.detail, body.slice(0, 200));
+  }
+});
+
+test("a 2xx body that is not JSON is a lightspeed bug, never an answer", () => {
+  const body = `<html>${"proxy page ".repeat(30)}</html>`;
+
+  for (const status of [200, 204]) {
+    const parsed = parseBody(status, body);
+
+    assert.ok(parsed instanceof ReviewError, String(status));
+    assert.equal(parsed.code, "internal_error", String(status));
+    assert.match(parsed.message, /not JSON/);
+    assert.equal(parsed.detail, body.slice(0, 200));
+  }
+});
+
 test("nothing listening is still reported as no server, once retried", async () => {
   await assert.rejects(
     () => apiRequest("http://127.0.0.1:1/health"),
