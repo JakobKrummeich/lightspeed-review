@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AxiError } from "axi-sdk-js";
-import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { commandHelp } from "../../src/commands/command-help.ts";
@@ -608,6 +608,45 @@ test("a prune that matches nothing says so instead of reporting a silent zero", 
     { month: "2026-01", removed: 0, kept: 1, file: "kept" },
     { month: "2026-02", removed: 0, kept: 6, file: "kept" },
   ]);
+});
+
+test("a corrupt line a prune drops is reported on its own, never counted as pruned", () => {
+  const stateDir = seededState();
+  appendFileSync(join(feedbackDirPath(stateDir), "2026-02.jsonl"), "{not json\n");
+
+  const dry = asRecord(
+    asRecord(feedback(["prune", "--before", "2026-02-01", "--dry-run"], stateDir)).pruned,
+  );
+  const wet = asRecord(asRecord(feedback(["prune", "--before", "2026-02-01"], stateDir)).pruned);
+
+  // A dry run rewrites nothing, so it has dropped nothing to report.
+  assert.equal(dry.corrupt_dropped, undefined);
+  assert.equal(wet.corrupt_dropped, 1);
+  assert.equal(wet.removed, 1, "the corrupt line is not one of the records pruned");
+  assert.equal(wet.kept, 6);
+});
+
+test("a prune that cannot rewrite the ledger fails loudly and leaves every record", () => {
+  const stateDir = seededState();
+  const dir = feedbackDirPath(stateDir);
+  // A directory where the rewrite's temp file goes: the write fails even for
+  // root, which a read-only chmod would not guarantee.
+  mkdirSync(join(dir, "2026-02.jsonl.tmp"));
+  const before = readFileSync(join(dir, "2026-02.jsonl"), "utf8");
+
+  assert.throws(
+    () => feedback(["prune", "--before", "2027-01-01", "--repo", other.root], stateDir),
+    (error: unknown) =>
+      error instanceof ReviewError &&
+      error.code === "ledger_unwritable" &&
+      error.message.includes(dir) &&
+      /nothing was lost/.test(error.suggestions.join(" ")),
+  );
+  assert.equal(readFileSync(join(dir, "2026-02.jsonl"), "utf8"), before);
+  assert.deepEqual(
+    (asRecord(feedback(["list"], stateDir)).items as { id: string }[]).map((item) => item.id),
+    ["evt_1", "evt_2", "evt_3"],
+  );
 });
 
 test("prune without --before refuses instead of guessing a date", () => {
