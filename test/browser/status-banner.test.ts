@@ -181,3 +181,22 @@ test("does not claim an agent is working on an ended review", () => {
   assert.doesNotMatch(html, /agent is reading/i);
   assert.doesNotMatch(html, /working on/i);
 });
+
+/**
+ * The chip says the stream is down; a header still reading "Agent is
+ * listening" beside it is a claim the page can no longer back.
+ */
+test("while the connection is lost the header says so instead of a presence it cannot know", () => {
+  const html = renderStatusBanner(banner({ agentWaiting: true, connected: false }));
+
+  assert.equal(presenceText(html), "Connection lost");
+  assert.match(html, /data-connection="lost"/);
+  assert.match(presenceTitle(html) ?? "", /last known: Agent is listening/);
+});
+
+test("a live connection draws no connection mark at all", () => {
+  const html = renderStatusBanner(banner({ agentWaiting: true, connected: true }));
+
+  assert.doesNotMatch(html, /data-connection/);
+  assert.equal(presenceText(html), "Agent is listening");
+});

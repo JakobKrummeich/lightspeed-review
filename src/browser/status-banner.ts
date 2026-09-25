@@ -9,6 +9,8 @@ export interface StatusState {
   turn: Turn;
   /** How many items the agent is reading; only while it digests. */
   items?: number;
+  /** False while the page's event stream is down: presence is then unknown. Absent is connected. */
+  connected?: boolean;
   /** Carried whatever the status: a page loaded on a long-ended review must show the same summary as the tab open at closing. */
   review: ClosedReview;
 }
@@ -43,7 +45,14 @@ function presenceLine(state: StatusState): string {
   // quote matters as much as the angle brackets.
   const turn = state.turn.holder;
   const { label, detail } = presenceWords(state);
-  return `<p class="lsr-presence" data-waiting="${state.agentWaiting}" data-turn="${turn}" title="${escapeHtml(detail)}">${escapeHtml(label)}</p>`;
+  const attributes = `data-waiting="${state.agentWaiting}" data-turn="${turn}"`;
+  if (state.connected === false) {
+    // Greyed, and said: beside the "connection lost" chip, a header still
+    // reading "Agent is listening" is a claim the page can no longer back.
+    const why = `the page lost the review server; last known: ${label}`;
+    return `<p class="lsr-presence" ${attributes} data-connection="lost" title="${escapeHtml(why)}">Connection lost</p>`;
+  }
+  return `<p class="lsr-presence" ${attributes} title="${escapeHtml(detail)}">${escapeHtml(label)}</p>`;
 }
 
 function presenceWords(state: StatusState): { label: string; detail: string } {

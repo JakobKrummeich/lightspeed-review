@@ -9,6 +9,8 @@ export interface MountedStatusBanner {
   setSession(session: SessionData): void;
   /** Closes on what the page already knows, not on the server's next word. */
   setEndedByReviewer(sent: FeedbackPrompt[]): void;
+  /** The event stream dropped or came back: presence is unknown while it is down. */
+  setConnected(connected: boolean): void;
 }
 
 /**
@@ -42,6 +44,7 @@ export function mountStatusBanner(session: SessionData): MountedStatusBanner {
       draw(next);
     },
     setSession: (fresh) => draw({ ...state, status: fresh.status, review: fresh }),
+    setConnected: (connected) => draw({ ...state, connected }),
     setEndedByReviewer: (sent) =>
       draw({
         ...state,

@@ -359,6 +359,12 @@
   font-weight: 600;
 }
 
+/* Unknown while the stream is down: grey whatever the last frame said. */
+.lsr-presence[data-connection="lost"] {
+  color: var(--lsr-muted);
+  font-weight: 400;
+}
+
 .lsr-ended-overlay {
   position: fixed;
   inset: 0;

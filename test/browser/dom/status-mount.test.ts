@@ -159,3 +159,16 @@ test("an end that carried no words counts none, and says none were delivered", (
   assert.doesNotMatch(root.innerHTML, /has left this page/);
   assert.match(root.innerHTML, /You ended this review\./);
 });
+
+test("the header greys to connection lost while the stream is down, and comes back on reconnect", (t) => {
+  const root = stubDocument(t);
+  const banner = mountStatusBanner(session());
+  banner.setPresence({ waiting: true, turn: REVIEWERS_TURN });
+
+  banner.setConnected(false);
+  assert.match(root.innerHTML, /data-connection="lost"[^>]*>Connection lost</);
+
+  banner.setConnected(true);
+  assert.doesNotMatch(root.innerHTML, /Connection lost/);
+  assert.match(root.innerHTML, /Agent is listening/);
+});

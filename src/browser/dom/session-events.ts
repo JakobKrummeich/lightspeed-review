@@ -131,6 +131,7 @@ function openStream(
   // and `applyRound` never touches it.
   events.addEventListener("open", () => {
     page.connection.hidden = true;
+    banner.setConnected(true);
     reopen.delay = REOPEN_MS;
     syncSession("opened");
   });
@@ -164,6 +165,7 @@ function openStream(
   // as an agent that has nothing to say.
   events.addEventListener("error", () => {
     page.connection.hidden = false;
+    banner.setConnected(false);
     if (events.readyState !== EventSource.CLOSED) return;
     setTimeout(() => openStream(wired, syncSession, reopen), reopen.delay);
     reopen.delay = nextReopenDelay(reopen.delay);
