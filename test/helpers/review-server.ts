@@ -278,3 +278,44 @@ export async function deliverIntoTheVoid(url: string, key: string): Promise<void
     socket.on("error", () => resolve());
   });
 }
+
+/**
+ * A POST whose headers arrive now and whose body arrives when the test says:
+ * the window in which a handler that read the session before its body would
+ * save a stale copy over whatever landed meanwhile.
+ */
+export async function slowPost(
+  url: string,
+  path: string,
+  body: unknown,
+): Promise<{ finish: () => Promise<{ status: number; json: unknown }> }> {
+  const target = new URL(url);
+  const payload = Buffer.from(JSON.stringify(body));
+  const request = httpRequest({
+    host: target.hostname,
+    port: target.port,
+    path,
+    method: "POST",
+    agent: false,
+    headers: { "content-type": "application/json", "content-length": payload.length },
+  });
+  const answered = new Promise<{ status: number; json: unknown }>((resolve, reject) => {
+    request.on("response", (response) => {
+      let text = "";
+      response.on("data", (chunk: Buffer) => (text += chunk.toString()));
+      response.on("end", () =>
+        resolve({ status: response.statusCode ?? 0, json: JSON.parse(text) }),
+      );
+    });
+    request.on("error", reject);
+  });
+  request.flushHeaders();
+  // Headers first, so the handler is already waiting on the body when the test acts.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  return {
+    finish: () => {
+      request.end(payload);
+      return answered;
+    },
+  };
+}

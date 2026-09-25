@@ -17,9 +17,9 @@ export async function handleWork(
   response: ServerResponse,
   params: Record<string, string>,
 ) {
+  const work = await readWork(request);
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  const work = await readWork(request);
   if (work === undefined) {
     badRequest(response, "expected JSON {plan: string, head?: string}");
     return;

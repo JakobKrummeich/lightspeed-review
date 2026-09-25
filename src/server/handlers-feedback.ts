@@ -24,9 +24,9 @@ export async function handleApproved(
   response: ServerResponse,
   params: Record<string, string>,
 ) {
+  const posted = await parseApproved(request);
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  const posted = await parseApproved(request);
   if (!posted) {
     badRequest(response, "expected JSON {approved: string[]}");
     return;
@@ -54,9 +54,9 @@ export async function handleFeedback(
   response: ServerResponse,
   params: Record<string, string>,
 ) {
+  const feedback = await readFeedback(request);
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  const feedback = await readFeedback(request);
   if (!feedback) {
     badRequest(response, "expected JSON {prompts: [{type, comment, ...}], ended: bool}");
     return;
@@ -112,9 +112,9 @@ export async function handleAgentReply(
   response: ServerResponse,
   params: Record<string, string>,
 ) {
+  const reply = await readReply(request);
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  const reply = await readReply(request);
   if (reply === undefined) {
     badRequest(
       response,

@@ -33,6 +33,12 @@ export type ContextHandler = (
   params: Record<string, string>,
 ) => void | Promise<void>;
 
+/**
+ * Called only after the request body is read, never before: a handler that
+ * holds a session across an `await` saves a stale copy over whatever another
+ * request wrote meanwhile. The store is synchronous, so read → decide → save
+ * with no `await` between them is atomic.
+ */
 export function requireSession(
   store: SessionStore,
   response: ServerResponse,

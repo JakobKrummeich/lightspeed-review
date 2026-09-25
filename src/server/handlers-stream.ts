@@ -132,9 +132,9 @@ export async function handleDelivered(
   response: ServerResponse,
   params: Record<string, string>,
 ) {
+  const delivery = await readDelivered(request);
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  const delivery = await readDelivered(request);
   if (delivery === undefined) {
     badRequest(response, "expected JSON {delivery: string}");
     return;
