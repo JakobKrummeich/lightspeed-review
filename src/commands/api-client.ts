@@ -1,4 +1,5 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
+import type { DomainErrorBody } from "../server.ts";
 import { openCall } from "../start-call.ts";
 import { helpReopen } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
@@ -33,6 +34,11 @@ export async function apiRequest(
 
 function target(about: SessionRef | undefined): string {
   return about?.target ?? "<branch> [base]";
+}
+
+/** What a missing or ended session is answered with — raised by a command that saw it first. */
+export function sessionGone(status: 404 | 409, about: SessionRef): ReviewError {
+  return errorForStatus(status, about)!;
 }
 
 function errorForStatus(status: number, about?: SessionRef): ReviewError | undefined {
@@ -122,15 +128,15 @@ function domainError(body: string): ReviewError {
   const help = Array.isArray(parsed.help)
     ? parsed.help.filter((line): line is string => typeof line === "string")
     : [];
-  return new ReviewError({
-    code,
-    message,
-    ...(typeof detail === "string" ? { detail } : {}),
-    suggestions: [
-      help[0] ?? "Fix what the message names and run the command again",
-      ...help.slice(1),
-    ],
+  return refusalError({
+    error: { code, message, ...(typeof detail === "string" ? { detail } : {}) },
+    help: [help[0] ?? "Fix what the message names and run the command again", ...help.slice(1)],
   });
+}
+
+/** A refused move as the agent reads it, whichever side refused it first. */
+export function refusalError({ error, help }: DomainErrorBody): ReviewError {
+  return new ReviewError({ ...error, suggestions: help });
 }
 
 type ErrorBody = {

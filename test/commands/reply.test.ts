@@ -82,13 +82,19 @@ async function withServer(
   }
 }
 
-function reply(port: number, repoRoot: string, notes: { to: string; text: string }[]) {
+function reply(
+  port: number,
+  repoRoot: string,
+  notes: { to: string; text: string }[],
+  announced: StructuredOutput[] = [],
+) {
   return runReply({
     repoRoot,
     branch: BRANCH,
     base: BASE,
     port,
     notes,
+    announce: (block) => void announced.push(block),
     listen: async () => LISTENED,
   });
 }
@@ -196,6 +202,50 @@ test("a re-run reply posts nothing twice", async () => {
       assert.equal(again, LISTENED);
       const agentSaid = store.get(key)!.conversation.filter((entry) => entry.role === "agent");
       assert.equal(agentSaid.length, 1);
+    },
+  );
+});
+
+/**
+ * The wait may outlive the agent's shell: what landed, and the one command that
+ * recovers a killed wait, are on screen before it begins.
+ */
+test("before it waits, a reply says what landed and the exact command that recovers a kill", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, repoRoot }) => {
+      const announced: StructuredOutput[] = [];
+      const notes = [
+        { to: "t1", text: "it's one already" },
+        { to: "main", text: "all else clear" },
+      ];
+      await reply(port, repoRoot, notes, announced);
+
+      const [shown] = announced;
+      assert.equal(shown?.turn, "reviewer");
+      assert.deepEqual(shown?.replied, ["t1", "main"]);
+      assert.equal("rerun" in shown!, false);
+      assert.equal(Object.keys(shown!).at(-1), "next");
+      assert.match(
+        (shown?.next as { if_killed: string }).if_killed,
+        /lightspeed reply --to t1 'it'\\''s one already' --to main 'all else clear' feature-auth main$/,
+      );
+    },
+  );
+});
+
+test("a re-run reply says it landed nothing new before it waits again", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, repoRoot }) => {
+      const notes = [{ to: "t1", text: "it is one already" }];
+      await reply(port, repoRoot, notes);
+      const announced: StructuredOutput[] = [];
+
+      await reply(port, repoRoot, notes, announced);
+
+      assert.equal(announced[0]?.rerun, true);
+      assert.equal("replied" in announced[0]!, false);
     },
   );
 });

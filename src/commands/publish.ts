@@ -7,7 +7,9 @@ import { sessionKey } from "../paths.ts";
 import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { turnFacts, turnLabel } from "../turn.ts";
-import { publishCall } from "../turn-help.ts";
+import { ifKilled, publishCall, publishRerun } from "../turn-help.ts";
+import { publishRefusal } from "../server.ts";
+import { refusalError, sessionGone, type SessionRef } from "./api-client.ts";
 import { allValues, lastValue, scanArgs } from "./args.ts";
 import {
   helpLedgerDegraded,
@@ -80,31 +82,61 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
   }
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const existing = new SessionStore(input.config.stateDir).get(key);
-  if (existing !== undefined && alreadyPublished(existing, input)) {
+  const head = branchState(input.repoRoot, input.branch).head;
+  const rerun = ifKilled(publishRerun(target, input.intents, input.notes));
+  if (existing !== undefined && alreadyPublished(existing, head)) {
     await run.ensureServerRunning({ port: input.config.port });
     run.announce({
       ...turnFacts(existing),
+      rerun: true,
       message: "this round is already published; waiting for the reviewer's Send",
+      ...rerun,
     });
     return await run.listen({ ...input, port: input.config.port });
   }
+  refuseLocally(existing, input, { key, target }, head);
   const outcome = await makeRound({ ...input, verb: "publish" }, run);
   const ledger = ledgerReport(outcome.created);
   run.announce({
     ...publishedRound(outcome),
+    ...(outcome.created.rerun === true ? { rerun: true } : {}),
     message: "published; waiting for the reviewer's next Send",
     ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
+    ...rerun,
   });
   return await run.listen({ ...input, port: input.config.port });
+}
+
+/**
+ * The server's own rules, read off the same session file before any extraction
+ * or model call: a grouping paid for and then refused is minutes and money for
+ * nothing. The server still checks — this only answers first.
+ */
+function refuseLocally(
+  existing: SessionRecord | undefined,
+  input: PublishInput,
+  about: SessionRef,
+  head: string | undefined,
+): void {
+  if (existing === undefined) throw sessionGone(404, about);
+  if (existing.status === "ended") throw sessionGone(409, about);
+  // No tip read, no telling a re-run from a refusal: the server compares the
+  // extracted HEAD and decides.
+  if (head === undefined) return;
+  const refusal = publishRefusal(
+    existing,
+    head === existing.rounds.at(-1)?.headCommit,
+    input.notes,
+  );
+  if (refusal !== undefined) throw refusalError(refusal);
 }
 
 /**
  * The last hand-back was a publish, the round it opened is still HEAD, and the
  * agent is not working on a new one: this is that publish, re-run.
  */
-function alreadyPublished(session: SessionRecord, input: PublishInput): boolean {
+function alreadyPublished(session: SessionRecord, head: string | undefined): boolean {
   if (session.status === "ended" || session.lastHandback?.verb !== "publish") return false;
   if (turnLabel(session) === "agent working") return false;
-  const head = branchState(input.repoRoot, input.branch).head;
   return head !== undefined && head === session.rounds.at(-1)?.headCommit;
 }

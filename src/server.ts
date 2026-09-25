@@ -33,6 +33,10 @@ import { CLI_VERSION } from "./version.ts";
 
 export type { CreateSessionRequest };
 export type { LedgerReport };
+export type { DomainErrorBody } from "./server/http.ts";
+/** The rules a CLI checks before paying for a model call the server would refuse. */
+export { publishRefusal } from "./server/publish-rules.ts";
+export { stillWorking } from "./server/turn-refusals.ts";
 
 export interface ReviewServerOptions {
   store: SessionStore;

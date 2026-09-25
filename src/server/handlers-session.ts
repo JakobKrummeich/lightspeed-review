@@ -14,11 +14,11 @@ import type { SessionRecord } from "../session-types.ts";
 import { reviewerTurn, turnFacts } from "../turn.ts";
 import { handbackOf, isRerun, withHandback } from "../turn-moves.ts";
 import { loadAssets } from "../static-assets.ts";
-import { logReplies, unknownNotes } from "./agent-notes.ts";
+import { logReplies } from "./agent-notes.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
+import { badRequest, sendJson } from "./http.ts";
 import { logOutcomes, logRound, logRoundEnd, type LedgerReport } from "./ledger-log.ts";
-import { nothingToPublish, reviewerHolds, stillDigesting } from "./turn-refusals.ts";
+import { publishRefusal } from "./publish-rules.ts";
 import { parseCreateSession } from "./validate.ts";
 
 /**
@@ -87,7 +87,7 @@ function publishLive(
     sendJson(response, 200, { ...answerFor(context, existing), rerun: true });
     return;
   }
-  const refusal = publishRefusal(existing, sameHead) ?? unknownNotes(existing, notes);
+  const refusal = publishRefusal(existing, sameHead, notes);
   if (refusal !== undefined) {
     sendJson(response, 422, refusal);
     return;
@@ -116,14 +116,6 @@ function publishRound(
   );
   logReplies(context.log, opened.session, notes, now);
   sendJson(response, 200, { ...answerFor(context, opened.session), ledger: opened.ledger });
-}
-
-/** Publish ends a working turn with new commits, and nothing else. */
-function publishRefusal(session: SessionRecord, sameHead: boolean): DomainErrorBody | undefined {
-  const turn = session.turn;
-  if (turn.holder === "reviewer") return reviewerHolds(session, "publish");
-  if (turn.mode === "digesting") return stillDigesting(session);
-  return sameHead ? nothingToPublish(session) : undefined;
 }
 
 /**

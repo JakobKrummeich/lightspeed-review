@@ -4,7 +4,7 @@ import type { AgentNote } from "../feedback.ts";
 import { groupDiff as groupDiffWithModel, type GroupDiffInput } from "../llm/grouping.ts";
 import type { GroupingResult } from "../llm/grouping.ts";
 import type { PreviousGroup } from "../llm/prompts.ts";
-import { renderToon, type StructuredOutput } from "../output.ts";
+import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { currentGroupingMode } from "../rounds/session-round.ts";
 import type { LedgerReport } from "../server.ts";
@@ -33,7 +33,7 @@ const DEFAULT_DEPS: Required<RoundDeps> = {
   groupDiff: groupDiffWithModel,
   ensureServerRunning,
   openBrowser,
-  announce: (block) => void process.stdout.write(`${renderToon(block)}\n`),
+  announce: printBlock,
   listen,
 };
 

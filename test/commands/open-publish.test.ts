@@ -119,6 +119,7 @@ async function withHarness(
 }
 
 const KEY = sessionKey(REPO, BRANCH, BASE);
+const AT_START = "2025-01-01T00:00:00Z";
 
 function open(harness: Harness, extra: Partial<Parameters<typeof runOpen>[0]> = {}) {
   const { config, deps } = harness;
@@ -282,6 +283,51 @@ test("open on a live review re-attaches: no grouping, no round, straight to the 
     const shown = harness.announced[1]!;
     assert.equal(shown.turn, "agent digesting");
     assert.match(String(shown.message), /re-attached/);
+  });
+});
+
+function ifKilled(block: StructuredOutput | undefined): string {
+  return (block?.next as { if_killed: string }).if_killed;
+}
+
+/** Re-attaching needs no --intent, so the recovery line spells none. */
+test("before it waits, open names the command that recovers a kill: open, no intent", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    await open(harness, { intents: [] });
+
+    const [fresh, again] = harness.announced;
+    assert.match(ifKilled(fresh), /`?lightspeed open feature-auth main`?$/);
+    assert.match(ifKilled(again), /`?lightspeed open feature-auth main`?$/);
+    assert.equal(Object.keys(fresh!).at(-1), "next");
+  });
+});
+
+/** Working: nobody will send, so a wait would hang on edits only the agent can finish. */
+test("open on a working turn is refused before it announces a wait, naming publish", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    toWorking(harness.store);
+    harness.announced.length = 0;
+
+    const error = await refusal(open(harness, { intents: [] }));
+
+    assert.equal(error.code, "turn_still_yours");
+    assert.match(error.suggestions.join(" "), /lightspeed publish feature-auth main --intent/);
+    assert.equal(harness.announced.length, 0);
+  });
+});
+
+/** A live review keeps the intents it opened with; one typed now goes nowhere. */
+test("an --intent on a live review is said to be ignored, not silently dropped", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+
+    await open(harness, { intents: ["something new"] });
+
+    const shown = harness.announced[1]!;
+    assert.match(String(shown.note), /--intent is ignored/);
+    assert.match(String(shown.note), /lightspeed publish feature-auth main --intent/);
   });
 });
 
@@ -560,6 +606,39 @@ test("publish naming an item that does not exist posts nothing", async () => {
   });
 });
 
+/** A refusal the session file already shows costs no extraction and no model call. */
+test("publish checks the turn, the review and the tip before it groups anything", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = newRepo("lsr-publish-");
+    git(repoRoot, "commit", "--allow-empty", "-m", "base");
+    git(repoRoot, "checkout", "-b", BRANCH);
+    git(repoRoot, "commit", "--allow-empty", "-m", "tip");
+    const tip = git(repoRoot, "rev-parse", "HEAD");
+    const deps: RoundDeps = {
+      ...harness.deps,
+      extractDiff: () => ({ ...extractedAt(1), headCommit: tip }),
+    };
+    const key = sessionKey(repoRoot, BRANCH, BASE);
+    await open(harness, { repoRoot, deps });
+    const grouped = harness.grouped.length;
+    const tryPublish = () => refusal(publish(harness, { repoRoot, deps }));
+
+    const reviewers = await tryPublish();
+    harness.store.save({ ...harness.store.get(key)!, turn: agentDigesting(AT_START) });
+    const digesting = await tryPublish();
+    harness.store.save({ ...harness.store.get(key)!, turn: agentWorking(AT_START, "plan") });
+    const unmoved = await tryPublish();
+    harness.store.save({ ...harness.store.get(key)!, status: "ended" });
+    const ended = await tryPublish();
+
+    assert.deepEqual(
+      [reviewers, digesting, unmoved, ended].map((error) => error.code),
+      ["turn_not_yours", "turn_still_yours", "nothing_to_publish", "session_ended"],
+    );
+    assert.equal(harness.grouped.length, grouped, "no model call for a publish refused anyway");
+  });
+});
+
 /** Killed mid-wait, re-run: the server knows the round and posts nothing twice. */
 test("a re-run publish opens no second round and goes back to the wait", async () => {
   await withHarness(async (harness) => {
@@ -574,6 +653,40 @@ test("a re-run publish opens no second round and goes back to the wait", async (
     const stored = harness.store.get(KEY)!;
     assert.equal(stored.rounds.length, 2);
     assert.equal(stored.conversation.flatMap((entry) => entry.prompts).length, 1);
+  });
+});
+
+test("before it waits, publish says the round is out and the exact command that recovers a kill", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.announced.length = 0;
+
+    await publishNext(harness, {
+      intents: ["sign the tokens", "drop the cookie"],
+      notes: [{ to: "main", text: "done: it's signed" }],
+    });
+
+    const [shown] = harness.announced;
+    assert.equal(shown?.round, 2);
+    assert.equal(Object.keys(shown!).at(-1), "next");
+    assert.match(
+      ifKilled(shown),
+      /lightspeed publish feature-auth main --intent 'sign the tokens' --intent 'drop the cookie' --to main 'done: it'\\''s signed'$/,
+    );
+  });
+});
+
+test("a publish the server recognises as a re-run says so before it waits again", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    const deps: RoundDeps = { ...harness.deps, extractDiff: () => extractedAt(2) };
+    await publishNext(harness, { deps });
+    harness.announced.length = 0;
+
+    await publish(harness, { deps });
+
+    assert.equal(harness.announced[0]?.rerun, true);
+    assert.match(ifKilled(harness.announced[0]), /lightspeed publish feature-auth main/);
   });
 });
 
@@ -615,6 +728,8 @@ test("a re-run publish on a tip the last round already shows goes straight back 
     assert.equal(extractions, 2);
     assert.equal(harness.store.get(key)?.rounds.length, 2);
     assert.match(String(harness.announced[0]?.message), /already published/);
+    assert.equal(harness.announced[0]?.rerun, true);
+    assert.match(ifKilled(harness.announced[0]), /lightspeed publish feature-auth main/);
   });
 });
 

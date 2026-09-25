@@ -29,13 +29,14 @@ export const TURN_RULES = [
   "Every command that hands the turn back also waits for the next Send, so one call is one turn.",
 ] as const;
 
-export function helpOpen(target: string): string {
-  return `Run \`lightspeed open ${target} --intent '<why this branch exists>'\` to open the review — ${WAITS_FOR_SEND}`;
+/** No --intent: a live session keeps its own, and re-attaching opens no round. */
+/** `open` on a live review: no --intent, since re-attaching opens no round. */
+export function reattachCall(target: string): string {
+  return `lightspeed open ${target}`;
 }
 
-/** No --intent: a live session keeps its own, and re-attaching opens no round. */
 export function helpReattach(target: string): string {
-  return `Run \`lightspeed open ${target}\` to listen for the reviewer's next Send — ${WAITS_FOR_SEND}`;
+  return `Run \`${reattachCall(target)}\` to listen for the reviewer's next Send — ${WAITS_FOR_SEND}`;
 }
 
 /**
@@ -53,6 +54,41 @@ export function workCall(target: string): string {
 
 export function publishCall(target: string, id = "<id>"): string {
   return `lightspeed publish ${target} --intent '<what this round changed>' --to ${id} 'done: <what you did>'`;
+}
+
+/** Single-quoted for a POSIX shell, where the quote itself is the one character to escape. */
+export function shellWord(text: string): string {
+  return `'${text.replaceAll("'", "'\\''")}'`;
+}
+
+function toPairs(notes: readonly { to: string; text: string }[]): string[] {
+  return notes.map((note) => `--to ${note.to} ${shellWord(note.text)}`);
+}
+
+/** The reply as typed, so a killed wait is recovered by the command itself: it posts nothing twice. */
+export function replyRerun(target: string, notes: readonly { to: string; text: string }[]): string {
+  return ["lightspeed reply", ...toPairs(notes), target].join(" ");
+}
+
+export function publishRerun(
+  target: string,
+  intents: readonly string[],
+  notes: readonly { to: string; text: string }[],
+): string {
+  const flags = intents.map((intent) => `--intent ${shellWord(intent)}`);
+  return ["lightspeed publish", target, ...flags, ...toPairs(notes)].join(" ");
+}
+
+/**
+ * Closes every block shown before a wait: the wait may outlive the agent's
+ * shell, and the way back must be on screen before it begins, not after.
+ */
+export function ifKilled(command: string): { next: { if_killed: string } } {
+  return {
+    next: {
+      if_killed: `Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: ${command}`,
+    },
+  };
 }
 
 export function endCall(target: string): string {

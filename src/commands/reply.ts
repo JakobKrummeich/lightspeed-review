@@ -1,8 +1,10 @@
 import { invocationError } from "../errors.ts";
 import type { AgentNote } from "../feedback.ts";
 import { branchState } from "../git-state.ts";
-import type { StructuredOutput } from "../output.ts";
+import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
+import { turnBlock, type TurnFacts } from "../turn.ts";
+import { ifKilled, replyRerun } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { scanArgs } from "./args.ts";
 import { listen, type ListenInput } from "./listen.ts";
@@ -21,6 +23,8 @@ export interface ReplyInput {
   base: string;
   port: number;
   notes: AgentNote[];
+  /** Where what landed is shown before the wait begins. */
+  announce?: (block: StructuredOutput) => void;
   /** The wait; tests stub it so a reply can be posted without a reviewer. */
   listen?: (input: ListenInput) => Promise<StructuredOutput>;
 }
@@ -54,10 +58,30 @@ export async function runReply(input: ReplyInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const target = `${input.branch} ${input.base}`;
   const state = branchState(input.repoRoot, input.branch);
-  await apiRequest(
+  const answer = (await apiRequest(
     `${serverOrigin(input.port)}/api/session/${key}/reply`,
     jsonPost({ replies: input.notes, ...state }),
     { key, target },
-  );
+  )) as Partial<TurnFacts> & { rerun?: boolean };
+  const announce = input.announce ?? printBlock;
+  announce(landed(answer, input.notes, target));
   return await (input.listen ?? listen)(input);
+}
+
+function landed(
+  answer: Partial<TurnFacts> & { rerun?: boolean },
+  notes: AgentNote[],
+  target: string,
+): StructuredOutput {
+  const said =
+    answer.rerun === true
+      ? {
+          rerun: true,
+          message: "already replied; nothing posted twice — waiting for the reviewer's Send",
+        }
+      : {
+          replied: [...new Set(notes.map((note) => note.to))],
+          message: "replied; waiting for the reviewer's Send",
+        };
+  return { ...turnBlock(answer), ...said, ...ifKilled(replyRerun(target, notes)) };
 }

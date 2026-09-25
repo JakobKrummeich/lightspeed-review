@@ -4,8 +4,10 @@ import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
-import { turnFacts } from "../turn.ts";
-import { helpReopen } from "../turn-help.ts";
+import { stillWorking } from "../server.ts";
+import { turnFacts, turnLabel } from "../turn.ts";
+import { helpReopen, ifKilled, publishCall, reattachCall } from "../turn-help.ts";
+import { refusalError } from "./api-client.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
 import {
   helpLedgerDegraded,
@@ -79,6 +81,13 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
   const existing = new SessionStore(input.config.stateDir).get(key);
   const target = `${input.branch} ${input.base}`;
   if (existing !== undefined && existing.status !== "ended") {
+    // Before the wait is announced: a working agent owes the round nobody else
+    // can make, so a wait would never end — and the server refuses it anyway.
+    if (turnLabel(existing) === "agent working") {
+      throw refusalError(
+        stillWorking(existing, "nobody sends while you work; publish ends the turn"),
+      );
+    }
     await run.ensureServerRunning({ port: input.config.port });
     run.announce(reattached(existing, input));
     return await run.listen({ ...input, port: input.config.port });
@@ -93,6 +102,7 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
     ...publishedRound(outcome),
     message: "the review is open — give the reviewer the url; waiting for their first Send",
     ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
+    ...ifKilled(reattachCall(target)),
   });
   return await run.listen({ ...input, port: input.config.port });
 }
@@ -107,7 +117,17 @@ function reattached(session: SessionRecord, input: OpenInput): StructuredOutput 
       url: `${serverOrigin(input.config.port)}/session/${session.key}`,
     },
     message: "re-attached to the live review; waiting for the reviewer's Send",
+    ...(input.intents.length === 0 ? {} : { note: intentIgnored(input) }),
+    ...ifKilled(reattachCall(`${input.branch} ${input.base}`)),
   };
+}
+
+/** Said, not dropped: an agent that typed a reason believes the reviewer reads it. */
+function intentIgnored(input: OpenInput): string {
+  return (
+    "--intent is ignored: a live review keeps the intents it opened with; say what a round" +
+    ` changed with \`${publishCall(`${input.branch} ${input.base}`)}\``
+  );
 }
 
 /**

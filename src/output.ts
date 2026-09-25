@@ -9,6 +9,11 @@ export function renderToon(output: StructuredOutput): string {
   return encode(output);
 }
 
+/** A block shown before a wait: written at once, since the answer may be hours off. */
+export function printBlock(block: StructuredOutput): void {
+  process.stdout.write(`${renderToon(block)}\n`);
+}
+
 /**
  * In characters — about fifty tokens. At 2000 a single selection cost 372
  * tokens of a delivered batch: the selection is a pointer to code the agent has
