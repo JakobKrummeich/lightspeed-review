@@ -29,8 +29,7 @@ export const TURN_RULES = [
   "Every command that hands the turn back also waits for the next Send, so one call is one turn.",
 ] as const;
 
-/** No --intent: a live session keeps its own, and re-attaching opens no round. */
-/** `open` on a live review: no --intent, since re-attaching opens no round. */
+/** `open` on a live review: no --intent — a live session keeps its own, and re-attaching opens no round. */
 export function reattachCall(target: string): string {
   return `lightspeed open ${target}`;
 }
