@@ -103,6 +103,48 @@ function storeSession(stateDir: string, repoRoot: string, branch: string): void 
 }
 
 /**
+ * A server that takes the connection and never answers: a review server hung
+ * mid-request, the case a presence check must not wait out.
+ */
+async function serveSilence(): Promise<number> {
+  const server = createServer(() => {});
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  test.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  return (server.address() as AddressInfo).port;
+}
+
+/**
+ * Bare `lightspeed` asks the server whether a wait is parked. A server that
+ * never answers is nobody listening, and home answers at once rather than hang.
+ */
+test("a presence check the server never answers reads as nobody listening, answered at once", async () => {
+  const repoRoot = emptyRepo();
+  const port = await serveSilence();
+  writeFileSync(
+    join(repoRoot, ".lightspeed.conf.json"),
+    JSON.stringify({
+      model: "anthropic/claude-haiku-4-5",
+      thinking: "off",
+      stateDir: join(repoRoot, "state"),
+      port,
+    }),
+  );
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+  const started = Date.now();
+
+  const { stdout, code } = await runCli([], repoRoot);
+
+  assert.equal(code, 0);
+  assert.match(stdout, /^ {2}listen: /m);
+  assert.match(stdout, /lightspeed open feature\/greeting main/);
+  assert.doesNotMatch(stdout, /already waiting/);
+  assert.ok(Date.now() - started < 5_000, "home did not wait out a hung server");
+});
+
+/**
  * Regression: the home view caught `config_missing` and reported `sessions: 0`
  * with `start` as the next step — false twice over.
  */
