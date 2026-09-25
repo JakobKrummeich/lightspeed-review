@@ -1,6 +1,6 @@
 import { ReviewError } from "./errors.ts";
 import type { SessionRecord } from "./session-types.ts";
-import { openCall } from "./start-call.ts";
+import { openCall } from "./open-call.ts";
 import { helpReopen, replyCall, workCall } from "./turn-help.ts";
 
 export interface ResolvedSession {

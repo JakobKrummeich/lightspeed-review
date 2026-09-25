@@ -1,6 +1,6 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import type { DomainErrorBody } from "../server.ts";
-import { openCall } from "../start-call.ts";
+import { openCall } from "../open-call.ts";
 import { helpReopen, helpRestart, reattachCall } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
 

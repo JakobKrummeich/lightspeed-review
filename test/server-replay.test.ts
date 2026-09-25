@@ -162,7 +162,7 @@ test("the replay endpoint serves an answered comment with its note and real hunk
     assert.equal(card?.id, id);
     assert.equal(card?.file, USERS);
     assert.deepEqual(card?.anchor, { side: "new", line_start: 1, line_end: 1 });
-    assert.equal(card?.declared, true);
+    assert.notEqual(card?.note, undefined);
     assert.equal(card?.note, "now it counts users");
     assert.equal(card?.state, "ok");
     assert.equal(card?.status, "addressed");
@@ -188,7 +188,6 @@ test("an unanswered comment gets its anchor-matched hunks, without a note", asyn
     const { comments } = await readReplay(harness);
 
     const [card] = comments;
-    assert.equal(card?.declared, false);
     assert.equal(card?.note, undefined);
     assert.equal(card?.status, "addressed");
     assert.equal(card?.answers.length, 1);

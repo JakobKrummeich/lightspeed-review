@@ -62,8 +62,6 @@ export interface ReplayComment {
   comment: string;
   context?: string;
   status: ReplayStatus;
-  /** Whether the agent answered in the comment's thread (`note`). */
-  declared: boolean;
   state: ReplayState;
   /** Always read off the anchor (the mechanical answer); the agent's words are `note`. */
   answers: ReplayAnswer[];
@@ -141,7 +139,7 @@ function agentAnswers(conversation: ConversationEntry[]): Map<string, string> {
 
 /**
  * The same question is put to git once per replay rather than once per card:
- * every undeclared comment on one file asks for the same patch.
+ * every unanswered comment on one file asks for the same patch.
  */
 function askOnce(readBetween: ReadBetween): ReadBetween {
   const answers = new Map<string, DiffBetween>();
@@ -165,7 +163,6 @@ function replayComment(review: Review, prompt: AnnotationPrompt): ReplayComment 
     selected_text: prompt.selected_text,
     comment: prompt.comment,
     ...contextOf(review, prompt),
-    declared: note !== undefined,
     ...(note === undefined ? {} : { note }),
     ...outcomeOf(review, prompt),
   };

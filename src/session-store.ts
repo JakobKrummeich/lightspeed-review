@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { trailSweeps } from "./group-tier.ts";
 import { ReviewError } from "./errors.ts";
-import { openCall } from "./start-call.ts";
+import { openCall } from "./open-call.ts";
 import { sessionFilePath, sessionsDirPath } from "./paths.ts";
 
 export type * from "./session-types.ts";

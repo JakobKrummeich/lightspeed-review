@@ -5,7 +5,7 @@
  * quotes them into SKILL.md and the server answers a refused move with them —
  * and core code importing `commands/` is how the old import cycles formed.
  */
-import { openCall } from "./start-call.ts";
+import { openCall } from "./open-call.ts";
 import { MAIN_THREAD } from "./threads.ts";
 import type { TurnLabel } from "./turn.ts";
 

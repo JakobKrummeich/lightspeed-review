@@ -23,7 +23,7 @@ export function reviewerHolds(session: SessionRecord, verb: string): DomainError
   return {
     error: {
       code: "turn_not_yours",
-      message: `${verb} ends a turn you do not hold (turn: ${turnLabel(session)})`,
+      message: `${verb} is not yours to run: the reviewer holds the turn (turn: ${turnLabel(session)})`,
       detail:
         "the turn moves to you when the reviewer's Send is delivered to a waiting" +
         " `lightspeed open`, `reply` or `publish`, and never before",

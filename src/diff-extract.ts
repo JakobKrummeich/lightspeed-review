@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { ReviewError } from "./errors.ts";
-import { openCall } from "./start-call.ts";
+import { openCall } from "./open-call.ts";
 import type { GroupTier } from "./group-tier.ts";
 
 export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "binary";

@@ -1,7 +1,7 @@
 import { REACHABLE_MODELS } from "../config.ts";
 import type { StructuredOutput } from "../output.ts";
 import type { SessionRecord } from "../session-types.ts";
-import { openCall } from "../start-call.ts";
+import { openCall } from "../open-call.ts";
 import { batchItems, batchSize, openIds } from "../threads.ts";
 import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
 import {

@@ -39,7 +39,7 @@ export function renderReviewPage(session: SessionRecord): string {
            only the browser knows whether they are somewhere in this round. -->
       <button id="lsr-round-offer" class="lsr-round-offer" type="button" hidden></button>
       <!-- The turn is on the record, so the served page states it: a reviewer
-           reloading mid-silence reads that the agent is working in the first
+           reloading mid-turn reads that the agent is working in the first
            paint, not one SSE frame later. Nobody is waiting until a live wait
            says so, which only the running server knows. -->
       <p id="lsr-connection" class="lsr-connection" role="status" hidden>Connection lost — reconnecting…</p>

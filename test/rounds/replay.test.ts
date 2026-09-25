@@ -208,7 +208,7 @@ test("a comment the agent answered carries its last words as the note, beside th
   const { comments } = replay(record, answersWith(patchFor("src/a.ts")));
 
   const [card] = comments;
-  assert.equal(card?.declared, true);
+  assert.notEqual(card?.note, undefined);
   assert.equal(card?.note, "done: moved the guard");
   assert.equal(card?.state, "ok");
   assert.equal(card?.answers.length, 1);
@@ -230,15 +230,15 @@ test("the reviewer's own replies in the thread are never read as the agent's not
 
   const { comments } = replay(record, answersWith(patchFor("src/a.ts")));
 
-  assert.equal(comments[0]?.declared, false);
+  assert.equal(comments[0]?.note, undefined);
   assert.equal(comments[0]?.note, undefined);
 });
 
-test("an undeclared comment falls back to the hunks its anchor overlaps", () => {
+test("an unanswered comment falls back to the hunks its anchor overlaps", () => {
   const { comments } = replay(session(), answersWith(patchFor("src/a.ts")));
 
   const [card] = comments;
-  assert.equal(card?.declared, false);
+  assert.equal(card?.note, undefined);
   assert.equal(
     card?.note,
     undefined,
@@ -351,7 +351,7 @@ test("a comment from before ids existed is served with a null id and mechanical 
 
   const [card] = comments;
   assert.equal(card?.id, null);
-  assert.equal(card?.declared, false, "no id can never match a thread");
+  assert.equal(card?.note, undefined, "no id can never match a thread");
   assert.equal(card?.note, undefined);
   assert.equal(card?.answers[0]?.hunks.length, 1);
 });
@@ -470,7 +470,7 @@ test("a commit a rebase took away degrades to a status-only card marked unreacha
   assert.equal(card?.state, "unreachable");
   assert.equal(card?.status, "unknown");
   assert.deepEqual(card?.answers, []);
-  assert.equal(card?.declared, true);
+  assert.notEqual(card?.note, undefined);
 });
 
 test("a between-round diff too big for git's buffer degrades to a status-only card", () => {

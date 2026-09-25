@@ -269,7 +269,7 @@ const allRepos = argv.length === 1 && argv[0] === "--all";
 
 /**
  * Translated into the flag rather than registered as a command, so there is
- * one help text and `help start` is `start --help` exactly — including the
+ * one help text and `help open` is `open --help` exactly — including the
  * unknown-command error a name that is not a command still earns.
  */
 function withHelpAlias(given: string[]): string[] {

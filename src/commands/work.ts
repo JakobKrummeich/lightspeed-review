@@ -1,10 +1,11 @@
+import { invocationError } from "../errors.ts";
 import { branchState } from "../git-state.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
 import { nextRule } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
-import { parseVerb, type VerbArgs } from "./verb-args.ts";
+import { scanArgs } from "./args.ts";
 import { serverOrigin } from "./server-address.ts";
 
 export interface WorkInput {
@@ -15,12 +16,36 @@ export interface WorkInput {
   plan: string;
 }
 
-export function parseWorkArgs(args: string[]): VerbArgs {
-  return parseVerb(
-    args,
-    { verb: "work", placeholder: "plan" },
-    "the plan you are about to carry out",
-  );
+export interface WorkArgs {
+  message: string;
+  /** Unset when the agent left it to `resolveSession` to work out. */
+  branch: string | undefined;
+  base: string | undefined;
+}
+
+/**
+ * `lightspeed work '<plan>' [branch] [base]`. The plan is a positional, never a
+ * flag: a subject behind `--something` reads as optional. Unknown flags are
+ * loud: one read as the plan would put `--flu` in the reviewer's header, and one
+ * read as a branch would declare work on the wrong review — or none.
+ */
+export function parseWorkArgs(args: string[]): WorkArgs {
+  const { positional } = scanArgs(args, {
+    onUnknown: (flag) =>
+      invocationError("unknown_flag", `unknown flag ${flag}`, [
+        "`lightspeed work` takes no flags",
+        "Run `lightspeed work --help` for what it takes",
+      ]),
+  });
+  const [message, branch, base] = positional;
+  // A blank plan is the same mistake as a missing one: the header would name nothing.
+  if (message === undefined || message.trim() === "") {
+    throw invocationError("argument_missing", "work needs the plan you are about to carry out", [
+      `Run \`lightspeed work "<plan>" [branch] [base]\``,
+      "Run `lightspeed work --help` for two examples",
+    ]);
+  }
+  return { message, branch, base };
 }
 
 /**

@@ -86,7 +86,7 @@ test("the presence frame decides what the banner says", (t) => {
 
 /** `work` publishes a presence frame and nothing else — no session event, no
  * round — so the banner has to hear the plan off that frame. */
-test("a plan declared mid-silence reaches the header without a reload", (t) => {
+test("a plan declared mid-turn reaches the header without a reload", (t) => {
   const root = stubDocument(t);
   const banner = mountStatusBanner(session());
 

@@ -17,8 +17,8 @@ const COMMAND_HELP: Record<string, StructuredOutput> = {
     command: "open",
     description:
       "Open the review — extract the branch diff, group it, open the reviewer's page —" +
-      ` and wait for their first Send. On a live review it re-attaches instead: no new` +
-      ` round, it just waits — ${WAITS_FOR_SEND}`,
+      ` and wait for their first Send. On a live review it re-attaches instead, with no` +
+      ` new round — ${WAITS_FOR_SEND}`,
     arguments: {
       "<branch>": "branch under review; omit it to re-attach to the repo's one live review",
       "[base]": "base branch, defaults to main",

@@ -59,6 +59,29 @@ test("the plan comes first, then the session it is about", () => {
   assert.equal(parsed.base, "develop");
 });
 
+test("branch and base are left unset so the session can be resolved from the repository", () => {
+  const parsed = parseWorkArgs(["splitting the helper out"]);
+
+  assert.equal(parsed.branch, undefined);
+  assert.equal(parsed.base, undefined);
+});
+
+test("a plan that looks like a flag value is still the plan", () => {
+  assert.equal(parseWorkArgs(["-1 helper, see notes"]).message, "-1 helper, see notes");
+});
+
+/** The example in the error names the argument `--help` names: one name for one thing. */
+test("a missing plan is refused with an example naming the plan", () => {
+  assert.throws(
+    () => parseWorkArgs([]),
+    (error: unknown) => {
+      assert.match((error as Error).message, /work needs the plan you are about to carry out/);
+      assert.match((error as { suggestions: string[] }).suggestions[0]!, /work "<plan>"/);
+      return true;
+    },
+  );
+});
+
 test("work takes no flags, and says so rather than listing none", () => {
   assert.throws(
     () => parseWorkArgs(["splitting", "--quietly"]),

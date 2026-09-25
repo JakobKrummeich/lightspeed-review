@@ -20,7 +20,6 @@ function comment(over: Partial<ReplayComment> = {}): ReplayComment {
     selected_text: "+const x = 1;",
     comment: "this name says nothing",
     status: "addressed",
-    declared: true,
     state: "ok",
     answers: [
       {
@@ -112,7 +111,7 @@ test("an oversized answer file says so instead of pretending nothing changed", (
 
 test("a comment the agent did not map is marked, and answered by the round reply as such", () => {
   const html = render({
-    data: { comments: [comment({ declared: false, note: undefined })] },
+    data: { comments: [comment({ note: undefined })] },
     roundReply: "Round summary: renamed things.",
   });
 
@@ -120,17 +119,6 @@ test("a comment the agent did not map is marked, and answered by the round reply
   assert.match(html, /The agent's round reply/);
   assert.match(html, /lsr-replay-note">Round summary: renamed things\.</);
   assert.doesNotMatch(html, /The agent's answer</);
-});
-
-test("a declared card never borrows the round reply, even without a note of its own", () => {
-  const html = render({
-    data: { comments: [comment({ declared: true, note: undefined })] },
-    roundReply: "Round summary: renamed things.",
-  });
-
-  assert.doesNotMatch(html, /Round summary/);
-  assert.doesNotMatch(html, /lsr-replay-unmapped/);
-  assert.doesNotMatch(html, /lsr-replay-answer"/, "no empty answer frame either");
 });
 
 test("rewritten history is a status-only card that says what a rebase did", () => {

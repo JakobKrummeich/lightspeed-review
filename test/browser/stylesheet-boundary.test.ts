@@ -122,7 +122,6 @@ const REPLAY_CARD: ReplayComment = {
   selected_text: "+const x = 1;",
   comment: "rename this",
   status: "addressed",
-  declared: true,
   state: "ok",
   answers: [
     {
@@ -136,8 +135,8 @@ const REPLAY_CARD: ReplayComment = {
 };
 
 /**
- * The overlay in the three shapes that draw different elements: a declared card
- * with hunks and dots, an undeclared one falling back to the round reply, and a
+ * The overlay in the three shapes that draw different elements: an answered card
+ * with hunks and dots, an unanswered one falling back to the round reply, and a
  * card whose commits a rebase took away. One shape leaves the others unguarded.
  */
 function replayOverlay(): string {
@@ -146,7 +145,7 @@ function replayOverlay(): string {
     renderReplayOverlay({ data: { comments: [REPLAY_CARD, REPLAY_CARD] }, current: 0 }, renderer),
     renderReplayOverlay(
       {
-        data: { comments: [{ ...REPLAY_CARD, declared: false, note: undefined, answers: [] }] },
+        data: { comments: [{ ...REPLAY_CARD, note: undefined, answers: [] }] },
         roundReply: "the round reply",
         current: 0,
       },
