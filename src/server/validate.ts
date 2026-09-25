@@ -64,14 +64,13 @@ export async function readFeedback(request: IncomingMessage) {
 
 /**
  * `reply`: every answer of the turn at once, each under the item it concerns.
- * `head`/`clean` are the CLI's account of the working tree, which only a reply
+ * `head`/`tree` are the CLI's account of the working tree, which only a reply
  * from `working` needs (W2: nothing half-written to protect).
  */
 export interface ReplyRequest {
   replies: AgentNote[];
   head?: string;
   tree?: string;
-  clean?: boolean;
 }
 
 export async function readReply(request: IncomingMessage): Promise<ReplyRequest | undefined> {
@@ -79,17 +78,12 @@ export async function readReply(request: IncomingMessage): Promise<ReplyRequest 
     replies?: unknown;
     head?: unknown;
     tree?: unknown;
-    clean?: unknown;
   }>(request);
   if (body === undefined) return undefined;
   const replies = parseNotes(body.replies);
   // A reply with nothing to say is not a reply (D1).
   if (replies === undefined || replies.length === 0) return undefined;
-  return {
-    replies,
-    ...stringFields(body, ["head", "tree"]),
-    ...(typeof body.clean === "boolean" ? { clean: body.clean } : {}),
-  };
+  return { replies, ...stringFields(body, ["head", "tree"]) };
 }
 
 /** All or nothing: one malformed note fails the list, since a partial post cannot be re-run safely. */

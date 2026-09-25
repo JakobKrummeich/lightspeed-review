@@ -36,15 +36,15 @@ export interface AgentTurn {
   note?: string;
   /**
    * HEAD when `work` was declared. A `reply` from `working` is allowed only
-   * while HEAD is still this and the tree is clean: nothing half-written to
-   * protect, so talking instead of publishing loses nothing.
+   * while HEAD is still this and the tree still matches `tree`: nothing
+   * half-written to protect, so talking instead of publishing loses nothing.
    */
   head?: string;
   /**
    * The tree's content hashed when `work` was declared — `git diff HEAD
    * --binary` plus each untracked file's name and bytes: the tree a
-   * `reply` from `working` must still match. Absent on turns declared before
-   * it was recorded, which fall back to requiring a clean tree.
+   * `reply` from `working` must still match. Absent when git could not be
+   * read at `work`, which refuses any reply from `working`.
    */
   tree?: string;
 }

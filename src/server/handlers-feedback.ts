@@ -162,7 +162,7 @@ export async function handleAgentReply(
   if (reply === undefined) {
     badRequest(
       response,
-      "expected JSON {replies: [{to, text}, ...], head?, clean?} with at least one reply",
+      "expected JSON {replies: [{to, text}, ...], head?, tree?} with at least one reply",
     );
     return;
   }
@@ -198,7 +198,7 @@ export async function handleAgentReply(
 
 /**
  * Legal while digesting; from working only while there is nothing to lose by
- * talking (W2): HEAD where `work` found it and a clean tree.
+ * talking (W2): HEAD and the tree where `work` found them.
  */
 function replyRefusal(session: SessionRecord, reply: ReplyRequest): DomainErrorBody | undefined {
   const turn = session.turn;
@@ -218,7 +218,6 @@ function replyRefusal(session: SessionRecord, reply: ReplyRequest): DomainErrorB
 function changedSinceWork(turn: AgentTurn, reply: ReplyRequest): string | undefined {
   if (turn.head === undefined) return "no HEAD was recorded at work, so nothing vouches for it";
   if (reply.head !== turn.head) return "HEAD moved since work";
-  // A turn declared before the tree was recorded can only ask for a clean one.
-  if (turn.tree === undefined) return reply.clean === true ? undefined : "the tree is dirty";
+  if (turn.tree === undefined) return "no tree was recorded at work, so nothing vouches for it";
   return reply.tree === turn.tree ? undefined : "the working tree changed since work";
 }

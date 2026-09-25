@@ -39,9 +39,14 @@ async function digesting(running: RunningServer): Promise<string> {
   return key;
 }
 
-async function working(running: RunningServer, head = "head-1"): Promise<string> {
+async function working(
+  running: RunningServer,
+  head = "head-1",
+  recorded: { tree?: string } = { tree: "tree-1" },
+): Promise<string> {
   const key = await digesting(running);
-  assert.equal((await postWork(running.url, key, { plan: "one transaction", head })).status, 200);
+  const body = { plan: "one transaction", head, ...recorded };
+  assert.equal((await postWork(running.url, key, body)).status, 200);
   return key;
 }
 
@@ -55,9 +60,14 @@ function publish(url: string, body: Record<string, unknown> = {}): Promise<Respo
   });
 }
 
-async function errorOf(response: Response): Promise<{ code: string; help: string[] }> {
-  const body = (await response.json()) as { error: { code: string }; help: string[] };
-  return { code: body.error.code, help: body.help };
+async function errorOf(
+  response: Response,
+): Promise<{ code: string; detail?: string; help: string[] }> {
+  const body = (await response.json()) as {
+    error: { code: string; detail?: string };
+    help: string[];
+  };
+  return { code: body.error.code, detail: body.error.detail, help: body.help };
 }
 
 function agentSaid(session: SessionRecord): unknown[] {
@@ -430,28 +440,47 @@ test("a reply with nothing to say, or to an item that does not exist, is refused
 test("reply from working is legal only while nothing changed since work", async () => {
   await withServer(async (running) => {
     const { url, store } = running;
-    const key = await working(running, "head-1");
+    const key = await working(running, "head-1", { tree: "tree-1" });
 
     const moved = await postReply(url, key, {
       replies: [{ to: "t1", text: "stuck" }],
       head: "head-2",
-      clean: true,
+      tree: "tree-1",
     });
-    const dirty = await postReply(url, key, {
+    const edited = await postReply(url, key, {
       replies: [{ to: "t1", text: "stuck" }],
       head: "head-1",
-      clean: false,
+      tree: "tree-2",
     });
 
-    assert.equal((await errorOf(moved)).code, "turn_still_yours");
-    assert.equal((await errorOf(dirty)).code, "turn_still_yours");
+    assert.match((await errorOf(moved)).detail ?? "", /HEAD moved since work/);
+    assert.match((await errorOf(edited)).detail ?? "", /the working tree changed since work/);
     const untouched = await postReply(url, key, {
       replies: [{ to: "t1", text: "stuck: which table?" }],
       head: "head-1",
-      clean: true,
+      tree: "tree-1",
     });
     assert.equal(untouched.status, 200);
     assert.equal(store.get(key)!.turn.holder, "reviewer");
+  });
+});
+
+/** Nothing on record to measure against is nothing that vouches for the tree. */
+test("reply from a working turn that recorded no tree is refused, naming it", async () => {
+  await withServer(async (running) => {
+    const { url, store } = running;
+    const key = await working(running, "head-1", {});
+
+    const refused = await postReply(url, key, {
+      replies: [{ to: "t1", text: "stuck" }],
+      head: "head-1",
+      tree: "tree-1",
+    });
+
+    const error = await errorOf(refused);
+    assert.equal(error.code, "turn_still_yours");
+    assert.match(error.detail ?? "", /no tree was recorded at work/);
+    assert.equal(store.get(key)!.turn.holder, "agent");
   });
 });
 

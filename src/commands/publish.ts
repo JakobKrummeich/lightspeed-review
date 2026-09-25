@@ -7,6 +7,7 @@ import { sessionKey } from "../paths.ts";
 import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { turnFacts, turnLabel } from "../turn.ts";
+import { handbackOf, isRerun } from "../turn-moves.ts";
 import { ifKilled, publishCall, publishRerun } from "../turn-help.ts";
 import { publishRefusal } from "../server.ts";
 import { refusalError, sessionGone, type SessionRef } from "./api-client.ts";
@@ -84,7 +85,7 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
   const existing = new SessionStore(input.config.stateDir).get(key);
   const head = branchState(input.repoRoot, input.branch).head;
   const rerun = ifKilled(publishRerun(target, input.intents, input.notes));
-  if (existing !== undefined && alreadyPublished(existing, head)) {
+  if (existing !== undefined && alreadyPublished(existing, head, input)) {
     await run.ensureServerRunning({ port: input.config.port });
     run.announce({
       ...turnFacts(existing),
@@ -132,11 +133,18 @@ function refuseLocally(
 }
 
 /**
- * The last hand-back was a publish, the round it opened is still HEAD, and the
- * agent is not working on a new one: this is that publish, re-run.
+ * The round the last publish opened is still HEAD, the agent is not working on
+ * a new one, and the server would call these words a re-run of that publish.
  */
-function alreadyPublished(session: SessionRecord, head: string | undefined): boolean {
-  if (session.status === "ended" || session.lastHandback?.verb !== "publish") return false;
-  if (turnLabel(session) === "agent working") return false;
-  return head !== undefined && head === session.rounds.at(-1)?.headCommit;
+function alreadyPublished(
+  session: SessionRecord,
+  head: string | undefined,
+  input: PublishInput,
+): boolean {
+  if (session.status === "ended" || turnLabel(session) === "agent working") return false;
+  if (head === undefined || head !== session.rounds.at(-1)?.headCommit) return false;
+  return isRerun(
+    session,
+    handbackOf(session, "publish", { intents: input.intents, notes: input.notes }),
+  );
 }

@@ -9,23 +9,20 @@ import { join } from "node:path";
  * every tracked change against HEAD plus each untracked file's name and bytes —
  * so a tree already dirty at `work` (a scratch file, an unrelated edit) is not
  * read as half-written code, while any edit since is, even to a file that was
- * dirty already. Unreadable reads as "cannot vouch" — no head, no tree, not
- * clean — so a broken git refuses the reply rather than waving it through.
+ * dirty already. Unreadable reads as "cannot vouch" — no head, no tree — so a
+ * broken git refuses the reply rather than waving it through.
  */
 export interface BranchState {
   head?: string;
   tree?: string;
-  clean: boolean;
 }
 
 export function branchState(repoRoot: string, branch: string): BranchState {
   const head = quietGit(repoRoot, ["rev-parse", `${branch}^{commit}`])?.trim();
-  const status = quietGit(repoRoot, ["status", "--porcelain"]);
   const tree = treeHash(repoRoot);
   return {
     ...(head ? { head } : {}),
     ...(tree === undefined ? {} : { tree }),
-    clean: status !== undefined && status.trim() === "",
   };
 }
 

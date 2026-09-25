@@ -297,11 +297,12 @@ test("a reply while the reviewer holds the turn is refused with the way to liste
 });
 
 /** W2: from working, talk only while nothing has changed since `work`. */
-test("a reply from working is legal while the branch is where work found it", async () => {
+test("a reply from working is legal while the branch and tree are where work found them", async () => {
   await withServer(
-    (repoRoot, head) =>
-      session(repoRoot, { turn: { holder: "agent", mode: "working", at: AT, note: "p", head } }),
+    (repoRoot) => session(repoRoot),
     async ({ port, store, repoRoot, key }) => {
+      await work(port, repoRoot);
+
       await reply(port, repoRoot, [{ to: "t1", text: "one question before I go on" }]);
 
       assert.equal(store.get(key)!.turn.holder, "reviewer");
@@ -309,16 +310,16 @@ test("a reply from working is legal while the branch is where work found it", as
   );
 });
 
-test("a reply from working over a dirty tree is refused with publish named", async () => {
+/** A clean tree is no stand-in for the snapshot: without one, nothing vouches. */
+test("a reply from a working turn that recorded no tree is refused, even on a clean tree", async () => {
   await withServer(
     (repoRoot, head) =>
       session(repoRoot, { turn: { holder: "agent", mode: "working", at: AT, note: "p", head } }),
     async ({ port, store, repoRoot, key }) => {
-      writeFileSync(join(repoRoot, "a.txt"), "half-written\n");
-
       const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "?" }]));
 
       assert.equal(error.code, "turn_still_yours");
+      assert.match(error.detail ?? "", /no tree was recorded at work/);
       assert.match(error.suggestions.join(" "), /lightspeed publish/);
       assert.equal(store.get(key)!.turn.holder, "agent");
     },
@@ -373,6 +374,7 @@ test("a reply from working after an edit names the tree as what changed", async 
       assert.equal(error.code, "turn_still_yours");
       assert.match(error.detail ?? "", /the working tree changed since work/);
       assert.doesNotMatch(error.detail ?? "", /HEAD/);
+      assert.match(error.suggestions.join(" "), /lightspeed publish/);
     },
   );
 });

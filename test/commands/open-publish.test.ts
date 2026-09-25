@@ -286,6 +286,26 @@ test("open on a live review re-attaches: no grouping, no round, straight to the 
   });
 });
 
+/** Digesting, open does not wait: it hands the held batch straight back, and says so. */
+test("a re-attach says whether it hands back the batch being digested or waits for a Send", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    await open(harness, { intents: [] });
+    harness.store.save({
+      ...harness.store.get(KEY)!,
+      turn: agentDigesting("2025-01-01T00:00:00Z"),
+    });
+    await open(harness, { intents: [] });
+
+    const [, onReviewers, onDigesting] = harness.announced;
+    assert.equal(onReviewers?.turn, "reviewer");
+    assert.match(String(onReviewers?.message), /waiting for the reviewer's Send/);
+    assert.equal(onDigesting?.turn, "agent digesting");
+    assert.match(String(onDigesting?.message), /handing back the batch you are digesting/);
+    assert.doesNotMatch(String(onDigesting?.message), /waiting for the reviewer's Send/);
+  });
+});
+
 function ifKilled(block: StructuredOutput | undefined): string {
   return (block?.next as { if_killed: string }).if_killed;
 }
@@ -709,6 +729,42 @@ test("a publish the server recognises as a re-run says so before it waits again"
   });
 });
 
+interface PublishedAtTip {
+  repoRoot: string;
+  key: string;
+  deps: RoundDeps;
+  extractions: () => number;
+}
+
+/** A real branch whose tip is the round the last publish opened. */
+async function publishedAtTip(harness: Harness): Promise<PublishedAtTip> {
+  const repoRoot = newRepo("lsr-publish-");
+  git(repoRoot, "commit", "--allow-empty", "-m", "base");
+  git(repoRoot, "checkout", "-b", BRANCH);
+  git(repoRoot, "commit", "--allow-empty", "-m", "tip");
+  const tip = git(repoRoot, "rev-parse", "HEAD");
+  let extractions = 0;
+  const deps: RoundDeps = {
+    ...harness.deps,
+    extractDiff: () => {
+      extractions += 1;
+      return {
+        ...extractedAt(extractions),
+        headCommit: extractions === 1 ? "1".repeat(40) : tip,
+      };
+    },
+  };
+  const key = sessionKey(repoRoot, BRANCH, BASE);
+  await open(harness, { repoRoot, deps });
+  harness.store.save({
+    ...harness.store.get(key)!,
+    turn: agentWorking(new Date().toISOString(), "the plan"),
+  });
+  await publish(harness, { repoRoot, deps });
+  harness.announced.length = 0;
+  return { repoRoot, key, deps, extractions: () => extractions };
+}
+
 /**
  * Re-run after the round opened and the turn went back to the reviewer: the
  * branch tip is still the round's HEAD, so the CLI waits without asking the
@@ -716,39 +772,55 @@ test("a publish the server recognises as a re-run says so before it waits again"
  */
 test("a re-run publish on a tip the last round already shows goes straight back to the wait", async () => {
   await withHarness(async (harness) => {
-    const repoRoot = newRepo("lsr-publish-");
-    git(repoRoot, "commit", "--allow-empty", "-m", "base");
-    git(repoRoot, "checkout", "-b", BRANCH);
-    git(repoRoot, "commit", "--allow-empty", "-m", "tip");
-    const tip = git(repoRoot, "rev-parse", "HEAD");
-    let extractions = 0;
-    const deps: RoundDeps = {
-      ...harness.deps,
-      extractDiff: () => {
-        extractions += 1;
-        return {
-          ...extractedAt(extractions),
-          headCommit: extractions === 1 ? "1".repeat(40) : tip,
-        };
-      },
-    };
-    const key = sessionKey(repoRoot, BRANCH, BASE);
-    await open(harness, { repoRoot, deps });
-    harness.store.save({
-      ...harness.store.get(key)!,
-      turn: agentWorking(new Date().toISOString(), "the plan"),
-    });
-    await publish(harness, { repoRoot, deps });
-    harness.announced.length = 0;
+    const { repoRoot, key, deps, extractions } = await publishedAtTip(harness);
 
     const output = await publish(harness, { repoRoot, deps });
 
     assert.equal(output, LISTENED);
-    assert.equal(extractions, 2);
+    assert.equal(extractions(), 2);
     assert.equal(harness.store.get(key)?.rounds.length, 2);
     assert.match(String(harness.announced[0]?.message), /already published/);
     assert.equal(harness.announced[0]?.rerun, true);
     assert.match(ifKilled(harness.announced[0]), /lightspeed publish feature-auth main/);
+  });
+});
+
+/**
+ * A batch delivered and read since the last publish, and new words: not that
+ * publish re-run, so the notes are not dropped behind "already published".
+ */
+test("a publish on an unmoved tip after a newer batch was read is refused, naming reply", async () => {
+  await withHarness(async (harness) => {
+    const { repoRoot, key, deps, extractions } = await publishedAtTip(harness);
+    harness.store.save({
+      ...harness.store.get(key)!,
+      batch: { id: "b2", prompts: [], at: AT_START, acked: true },
+      turn: agentDigesting(AT_START),
+    });
+
+    const error = await refusal(
+      publish(harness, {
+        repoRoot,
+        deps,
+        notes: [{ to: "main", text: "done: in the last round" }],
+      }),
+    );
+
+    assert.equal(error.code, "turn_still_yours");
+    assert.match(error.suggestions.join(" "), /lightspeed reply/);
+    assert.equal(harness.announced.length, 0);
+    assert.equal(extractions(), 2);
+  });
+});
+
+test("a publish with new words on the reviewer's turn is refused, not taken for a re-run", async () => {
+  await withHarness(async (harness) => {
+    const { repoRoot, deps } = await publishedAtTip(harness);
+
+    const error = await refusal(publish(harness, { repoRoot, deps, intents: ["something else"] }));
+
+    assert.equal(error.code, "turn_not_yours");
+    assert.equal(harness.announced.length, 0);
   });
 });
 

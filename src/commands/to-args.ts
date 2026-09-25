@@ -64,8 +64,9 @@ function textIsAFlag(verb: string, to: string, flag: string): ReviewError {
 
 /**
  * What is left after the pairs and the flags is the session: at most a branch
- * and a base. More means words the shell split — an unquoted `--to` text —
- * and reading them as a branch would post half a sentence to the wrong review.
+ * and a base. More means words the shell split — an unquoted `--to` text or
+ * plan — and reading them as a branch would post half a sentence to the wrong
+ * review.
  */
 export function branchAndBase(
   positional: string[],
@@ -75,11 +76,15 @@ export function branchAndBase(
     throw new ReviewError({
       code: "invalid_arguments",
       message: `${verb} got more than a branch and a base: ${positional.join(" ")}`,
-      detail: "an unquoted --to text is split by the shell into words that read as extra arguments",
-      suggestions: [
-        `Quote each text: \`lightspeed ${verb} --to <id> '<several words>' [branch] [base]\``,
-      ],
+      detail: "an unquoted text is split by the shell into words that read as extra arguments",
+      suggestions: [`Quote each text: \`${quotedCall(verb)}\``],
     });
   }
   return { branch: positional[0], base: positional[1] };
+}
+
+function quotedCall(verb: string): string {
+  return verb === "work"
+    ? "lightspeed work '<the whole plan>' [branch] [base]"
+    : `lightspeed ${verb} --to <id> '<several words>' [branch] [base]`;
 }

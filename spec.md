@@ -155,8 +155,8 @@ HEAD --binary` plus each untracked file's name and bytes) to the snapshot `work`
 took — because then there is nothing
 half-written to protect and talking loses nothing. A tree already dirty at
 `work` is fine; a change since is not, even more edits to a file already dirty. The refusal names which condition failed:
-`HEAD moved since work`, `the working tree changed since work`, or `no HEAD was
-recorded at work`. Otherwise the agent publishes what it has and asks in the new
+`HEAD moved since work`, `the working tree changed since work`, `no HEAD was
+recorded at work`, or `no tree was recorded at work`. Otherwise the agent publishes what it has and asks in the new
 round.
 
 There is **no timer, no staleness unlock and no override**. A reload changes

@@ -122,7 +122,6 @@ export function reopenCall(target: string): string {
 
 export const HELP_END = `Run \`${endCall("<branch> [base]")}\` to close the review from your side`;
 
-/** Only ever at the reviewer's request: an ended review is their decision. */
 /**
  * An ended review still answers what it ended on: the ticks are on disk, read
  * without a server, and they are the verdict the agent's refused command never
@@ -132,6 +131,7 @@ export function helpEndedOn(target: string): string {
   return `Run \`lightspeed approvals ${target}\` for the verdict the review ended on`;
 }
 
+/** Only ever at the reviewer's request: an ended review is their decision. */
 export function helpReopen(target: string): string {
   return `Only if the reviewer asks for another round: \`${reopenCall(target)}\``;
 }

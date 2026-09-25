@@ -7,6 +7,7 @@ import { nextRule } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { scanArgs } from "./args.ts";
 import { serverOrigin } from "./server-address.ts";
+import { branchAndBase } from "./to-args.ts";
 
 export interface WorkInput {
   repoRoot: string;
@@ -37,7 +38,7 @@ export function parseWorkArgs(args: string[]): WorkArgs {
         "Run `lightspeed work --help` for what it takes",
       ]),
   });
-  const [message, branch, base] = positional;
+  const [message, ...session] = positional;
   // A blank plan is the same mistake as a missing one: the header would name nothing.
   if (message === undefined || message.trim() === "") {
     throw invocationError("argument_missing", "work needs the plan you are about to carry out", [
@@ -45,7 +46,7 @@ export function parseWorkArgs(args: string[]): WorkArgs {
       "Run `lightspeed work --help` for two examples",
     ]);
   }
-  return { message, branch, base };
+  return { message, ...branchAndBase(session, "work") };
 }
 
 /**

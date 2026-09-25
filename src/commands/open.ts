@@ -116,7 +116,10 @@ function reattached(session: SessionRecord, input: OpenInput): StructuredOutput 
       base: input.base,
       url: `${serverOrigin(input.config.port)}/session/${session.key}`,
     },
-    message: "re-attached to the live review; waiting for the reviewer's Send",
+    message:
+      turnLabel(session) === "agent digesting"
+        ? "re-attached to the live review; handing back the batch you are digesting"
+        : "re-attached to the live review; waiting for the reviewer's Send",
     ...(input.intents.length === 0 ? {} : { note: intentIgnored(input) }),
     ...ifKilled(reattachCall(`${input.branch} ${input.base}`)),
   };

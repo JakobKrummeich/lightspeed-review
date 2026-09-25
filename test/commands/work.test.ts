@@ -66,6 +66,22 @@ test("branch and base are left unset so the session can be resolved from the rep
   assert.equal(parsed.base, undefined);
 });
 
+/** A second real ref would otherwise hide the words the shell split off an unquoted plan. */
+test("words past the plan, the branch and the base are refused, naming the quoted plan", () => {
+  assert.throws(
+    () => parseWorkArgs(["splitting", "feature-auth", "main", "stray"]),
+    (error: unknown) => {
+      assert.equal((error as { code: string }).code, "invalid_arguments");
+      assert.match((error as Error).message, /work got more than a branch and a base/);
+      assert.match(
+        (error as { suggestions: string[] }).suggestions.join("\n"),
+        /lightspeed work '<the whole plan>' \[branch\] \[base\]/,
+      );
+      return true;
+    },
+  );
+});
+
 test("a plan that looks like a flag value is still the plan", () => {
   assert.equal(parseWorkArgs(["-1 helper, see notes"]).message, "-1 helper, see notes");
 });
