@@ -105,13 +105,6 @@ export class SessionTransport {
     return (this.pollers.get(key)?.size ?? 0) > 0;
   }
 
-  watcherCount(): number {
-    return [...this.streams.values(), ...this.pollers.values()].reduce(
-      (total, set) => total + set.size,
-      0,
-    );
-  }
-
   closeAll(): void {
     for (const waiting of this.pollers.values()) {
       for (const wake of [...waiting]) wake("shutdown");
