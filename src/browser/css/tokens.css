@@ -52,6 +52,10 @@
   /* Text and glyphs on accent-filled controls: near-white on the deep light
    * cobalt, deep night ink on the brighter dark one. */
   --lsr-on-accent: light-dark(oklch(0.98 0.005 262), oklch(0.2 0.03 262));
+  /* Pure white, the one mixing partner that lightens without tinting: the lift
+   * on an accent fill under the pointer, and the lamp's core in the paper room.
+   * Never a surface — paper is `--lsr-bg`. */
+  --lsr-white: white;
   /*
    * The few hues beside the accent, one duty each: green for approved and
    * addressed, amber for "time moved on" warnings, violet for where the

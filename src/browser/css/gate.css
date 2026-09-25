@@ -170,8 +170,8 @@
   margin: auto 0;
   width: 0.55rem;
   height: 0.55rem;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentcolor;
+  border-bottom: 2px solid currentcolor;
   transform: rotate(-45deg);
   transition: transform 120ms ease;
 }

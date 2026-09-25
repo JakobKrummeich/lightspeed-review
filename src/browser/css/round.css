@@ -19,7 +19,7 @@
 }
 
 .lsr-round-offer:hover {
-  background: color-mix(in oklab, var(--lsr-accent) 82%, white);
+  background: color-mix(in oklab, var(--lsr-accent) 82%, var(--lsr-white));
 }
 
 /*
