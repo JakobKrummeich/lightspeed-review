@@ -143,3 +143,44 @@ test("several live sessions list the candidates instead of guessing", () => {
     },
   );
 });
+
+/**
+ * No live session, and the last one here is ended: "no live session" read as
+ * "open one", and agents reopened reviews the reviewer had closed.
+ */
+test("a repository whose latest review ended says who ended it and reopens only on request", () => {
+  const sessions = [
+    session({ branch: "older", status: "ended", updatedAt: "2025-01-01T00:00:00.000Z" }),
+    session({
+      branch: "feature-auth",
+      status: "ended",
+      endedBy: "reviewer",
+      updatedAt: "2025-01-03T00:00:00.000Z",
+    }),
+  ];
+
+  assert.throws(
+    () => resolveSession(sessions, "/repo", undefined, undefined),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "session_ended");
+      assert.match(error.message, /the reviewer ended the review of feature-auth against main/);
+      assert.match(error.suggestions[0]!, /Only if the reviewer asks/);
+      assert.match(error.suggestions[0]!, /lightspeed open feature-auth main --reopen/);
+      return true;
+    },
+  );
+});
+
+test("a review the agent ended is said to be the agent's doing", () => {
+  const sessions = [session({ status: "ended", endedBy: "agent" })];
+
+  assert.throws(
+    () => resolveSession(sessions, "/repo", undefined, undefined),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.match(error.message, /you ended the review of feature-auth against main/);
+      return true;
+    },
+  );
+});

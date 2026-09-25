@@ -1,7 +1,7 @@
 import { ReviewError } from "./errors.ts";
 import type { SessionRecord } from "./session-types.ts";
 import { openCall } from "./start-call.ts";
-import { replyCall, workCall } from "./turn-help.ts";
+import { helpReopen, replyCall, workCall } from "./turn-help.ts";
 
 export interface ResolvedSession {
   branch: string;
@@ -76,17 +76,49 @@ export function resolveSession(
   );
   const only = candidates[0];
   if (candidates.length === 1 && only) return { branch: only.branch, base: only.base };
-  if (candidates.length === 0) {
-    throw new ReviewError({
-      code: "ambiguous_session",
-      message: `no live review session for ${repoRoot}`,
-      suggestions: [NAME_THE_BRANCH, `Run \`${openCall("<branch> [base]")}\` to open one`],
-    });
-  }
+  if (candidates.length === 0) throw noneLive(sessions, repoRoot);
   throw new ReviewError({
     code: "ambiguous_session",
     message: `${candidates.length} live review sessions for ${repoRoot}`,
     detail: candidates.map((session) => `${session.branch} ${session.base}`).join(", "),
     suggestions: [NAME_THE_BRANCH],
+  });
+}
+
+function noneLive(sessions: SessionRecord[], repoRoot: string): ReviewError {
+  const latest = latestHere(sessions, repoRoot);
+  if (latest?.status === "ended") return endedHere(latest);
+  return new ReviewError({
+    code: "ambiguous_session",
+    message: `no live review session for ${repoRoot}`,
+    suggestions: [NAME_THE_BRANCH, `Run \`${openCall("<branch> [base]")}\` to open one`],
+  });
+}
+
+function latestHere(sessions: SessionRecord[], repoRoot: string): SessionRecord | undefined {
+  return sessions
+    .filter((session) => session.repoRoot === repoRoot)
+    .reduce<SessionRecord | undefined>(
+      (latest, session) =>
+        latest === undefined || session.updatedAt > latest.updatedAt ? session : latest,
+      undefined,
+    );
+}
+
+const ENDED_BY = { reviewer: "the reviewer ended", agent: "you ended" } as const;
+
+/**
+ * The last review here is over: "no live session" read as "open one", and an
+ * agent reopened a review the reviewer had closed. Who closed it decides the
+ * next move, so it is named.
+ */
+function endedHere(latest: SessionRecord): ReviewError {
+  const target = `${latest.branch} ${latest.base}`;
+  const what = `the review of ${latest.branch} against ${latest.base}, the latest in this repo`;
+  return new ReviewError({
+    code: "session_ended",
+    message:
+      latest.endedBy === undefined ? `${what}, is ended` : `${ENDED_BY[latest.endedBy]} ${what}`,
+    suggestions: [helpReopen(target), `Another branch: \`${openCall("<branch> [base]")}\``],
   });
 }
