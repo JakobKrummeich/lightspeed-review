@@ -501,6 +501,55 @@ test("a press inside an open chapter's body is a press on its lines, not on its 
   assert.equal(page.root.scrolledInto, false, "and nothing scrolled: the reviewer is reading");
 });
 
+test("opening a part-approved chapter lands on its first file still to read, unfolded", (t) => {
+  // b was left shut when the reviewer was last here; landing on its lid would not be reading it.
+  const page = mount(t, [group("API", ["a.png", "b.png", "c.png"])], ["a.png"], {
+    focus: 0,
+    open: { groups: [], files: ["c.png"] },
+  });
+
+  page.open(0);
+
+  assert.equal(page.fileBlock("b.png").scrolledInto, true, "the first file still to read");
+  assert.equal(page.root.scrolledInto, false, "not the top: a.png is read already");
+  assert.equal(isOpen(page.fileHeader("b.png")), true);
+  assert.equal(isOpen(page.fileHeader("a.png")), false, "the approved file stays shut");
+  assert.deepEqual(page.opened.at(-1), { groups: [0], files: ["b.png", "c.png"] }, "written down");
+});
+
+test("opening a chapter whose first file is still to read lands at its top, as ever", (t) => {
+  const page = mount(t, [group("API", ["a.png", "b.png", "c.png"])], ["b.png"], { focus: 0 });
+
+  page.open(0);
+
+  assert.equal(page.root.scrolledInto, true);
+  assert.equal(page.fileBlock("a.png").scrolledInto, false);
+  assert.equal(page.fileBlock("c.png").scrolledInto, false);
+});
+
+test("opening a chapter with every file approved lands at its top, files shut", (t) => {
+  const page = mount(t, [group("API", ["a.png", "b.png"])], ["a.png", "b.png"], { focus: 0 });
+
+  page.open(0);
+
+  assert.equal(page.root.scrolledInto, true);
+  assert.equal(page.fileBlock("a.png").scrolledInto, false);
+  assert.equal(page.fileBlock("b.png").scrolledInto, false);
+  assert.equal(isOpen(page.fileHeader("a.png")), false);
+  assert.equal(isOpen(page.fileHeader("b.png")), false);
+});
+
+test("entering a part-approved chapter from the index still lands on its card", (t) => {
+  // Only the press through the gate resumes: every way into a chapter shows its card first.
+  const page = mount(t, [group("API", ["a.png", "b.png"])], ["a.png"]);
+
+  press(page, `.lsr-index-entry[data-group-index="0"]`);
+
+  assert.equal(isOpen(page.gatePress(0)), false, "on the card");
+  assert.equal(page.root.scrolledInto, true);
+  assert.equal(page.fileBlock("b.png").scrolledInto, false);
+});
+
 /** A needs-reapproval file, which is the only kind that carries the switch. */
 function reapproval(path: string): Record<string, Approval> {
   return { [path]: "needs-reapproval" };

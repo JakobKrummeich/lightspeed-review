@@ -38,6 +38,18 @@ export function nextChapterToRead(
 }
 
 /**
+ * Where passing a part-approved chapter's gate lands: the first file in the
+ * chapter's own order still unapproved, since the files above it were read on
+ * an earlier visit. Undefined when the chapter's top already is that place —
+ * its first file is still to read — and when nothing is left to read, where
+ * the top is as good a place as any.
+ */
+export function fileToResumeAt(group: DiffGroup, approved: string[]): string | undefined {
+  const index = group.files.findIndex((file) => !approved.includes(file.path));
+  return index > 0 ? group.files[index]!.path : undefined;
+}
+
+/**
  * The name is rendered on every draw and shown by the stylesheet only while
  * the diff is up: on the card it is right below in the title size, and once
  * the card is gone behind the diff the bar is the only place left to say

@@ -26,6 +26,7 @@ import {
   readOpenFolds,
   switchSection,
 } from "./diff-folds.ts";
+import { gateLanding, gatePressOf } from "./gate-landing.ts";
 import { findLine, type LinePlace } from "./line-numbers.ts";
 import { applyApprovedState, applyProgressState, nextApproved } from "./tick-patch.ts";
 import { persistApproved, type SessionData } from "./session-api.ts";
@@ -268,19 +269,12 @@ function answeredItself(view: DiffView, target: HTMLElement): boolean {
     // whole card takes it. Once the diff is up the section is just the room
     // the lines are read in, and a press there is a press on nothing.
     if (isExpanded(press)) return true;
+    const landing = gateLanding(view.options.root, view.state);
     openGate(view, press);
-    // Top of the chapter, as entering one does: the press was answered with a
-    // screen of diff, and its first line is where reading starts.
-    view.options.root.scrollIntoView({ block: "start" });
+    landing.scrollIntoView({ block: "start" });
     return true;
   }
   return false;
-}
-
-function gatePressOf(target: HTMLElement): HTMLElement | undefined {
-  if (target.classList.contains("lsr-gate-press")) return target;
-  if (!target.classList.contains("lsr-group")) return undefined;
-  return target.querySelector<HTMLElement>(".lsr-gate-press") ?? undefined;
 }
 
 function handleSegmentClick(view: DiffView, event: Event): void {
