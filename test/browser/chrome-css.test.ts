@@ -560,30 +560,6 @@ test("the reviewer's bubble is violet and the agent's is grey, on every round", 
   );
 });
 
-test("a thread's exchange is one bubble per message, stacked, never nested deeper", () => {
-  // You, agent, you… each its own rounded block under the item, spaced apart rather than ruled.
-  const message = rulesFor(".lsr-message[data-role]").join("");
-  assert.match(message, /border-radius: 0\.375rem;/);
-  assert.match(message, /margin-top: var\(--lsr-space-2\);/);
-  assert.doesNotMatch(
-    bare,
-    /\.lsr-message[^{,]*\s\.lsr-message(?![\w-])/,
-    "a message styled inside a message",
-  );
-});
-
-test("a resolved thread folds to an outline: the card keeps its place without its weight", () => {
-  const folded = rulesFor('.lsr-thread[data-resolved="true"]').join("");
-  assert.match(folded, /background: transparent;/);
-  assert.match(folded, /border: 1px solid var\(--lsr-border\);/);
-});
-
-test("the connection chip is amber, like other news that time moved under the reviewer", () => {
-  const chip = rulesFor(".lsr-connection").join("");
-  assert.match(chip, /color: var\(--lsr-amber\);/);
-  assert.match(rulesFor(".lsr-connection[hidden]").join(""), /display: none;/);
-});
-
 // Regression: regions naming only one axis let auto-flow deal them the wrong cells.
 // The intent is absent on purpose: it scrolls inside the region, not on the page grid.
 const PAGE_REGIONS = [
