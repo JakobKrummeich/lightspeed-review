@@ -167,7 +167,10 @@ diff rendered but shut behind one press.
 ```
 
 Pressed — the button or anywhere on the card — the card goes and the room it
-held is the diff's:
+held is the diff's. The view lands at the chapter's top, unless files above
+are approved already: then it lands on the first file still unapproved, in the
+chapter's own order, unfolded if it was shut (`gateLanding` in
+`dom/gate-landing.ts`, `fileToResumeAt` in `focus-mode.ts`):
 
 ```
 ┌─ main#lsr-review ─────────────────────────────────────────────────┐

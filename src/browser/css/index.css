@@ -165,6 +165,13 @@
   background: var(--lsr-surface);
 }
 
+/* A press through a part-approved gate scrolls the file to `start`; without
+ * the margin its top lands under the bar and the sticky row, pushed down by
+ * the bar, hides the first lines of the diff. */
+.lsr-focus-bar ~ .lsr-group .lsr-file {
+  scroll-margin-top: var(--lsr-focus-bar);
+}
+
 /* Three surfaces, one per level: the page, a group card on it, and each diff
  * darker again inside its card. Depth does the grouping, not borders. */
 .lsr-group {

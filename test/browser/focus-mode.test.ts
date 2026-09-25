@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { DiffFile, DiffGroup } from "../../src/diff-extract.ts";
 import {
   clampFocus,
+  fileToResumeAt,
   nextChapterToRead,
   renderChapterGate,
   renderFocusBar,
@@ -288,4 +289,24 @@ test("a chapter with no files has nothing to read and is passed over", () => {
     ...chapters("c"),
   ];
   assert.equal(nextChapterToRead(groups, approvedIn("a"), 0), 2);
+});
+
+function chapterOf(...names: string[]): DiffGroup {
+  return { name: "API", rationale: "why API", files: names.map((name) => file(name)) };
+}
+
+test("a part-approved chapter resumes at its first file still to read, in the chapter's order", () => {
+  // The approved list is in tick order, not chapter order: c was ticked before a.
+  assert.equal(fileToResumeAt(chapterOf("a", "b", "c", "d"), ["c", "a"]), "b");
+  assert.equal(fileToResumeAt(chapterOf("a", "b", "c", "d"), ["a", "b"]), "c");
+});
+
+test("a chapter whose first file is still to read resumes nowhere: its top is that file", () => {
+  assert.equal(fileToResumeAt(chapterOf("a", "b", "c"), ["b", "c"]), undefined);
+  assert.equal(fileToResumeAt(chapterOf("a", "b"), []), undefined);
+});
+
+test("a chapter with every file approved resumes nowhere and opens at its top", () => {
+  assert.equal(fileToResumeAt(chapterOf("a", "b"), ["a", "b"]), undefined);
+  assert.equal(fileToResumeAt(chapterOf(), []), undefined);
 });
