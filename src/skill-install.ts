@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { expandHome } from "./paths.ts";
-import type { SkillAgent } from "./skill.ts";
+import { SKILL_AGENTS, type SkillAgent } from "./skill.ts";
 
 /** Global is the default because an agent is installed once per machine and
  * then used on every checkout. */
@@ -79,6 +79,30 @@ export function skillTarget(
   return { path: expandHome(destination.global, roots.home), mode: destination.mode };
 }
 
+export interface KnownTarget {
+  agent: SkillAgent;
+  scope: InitScope;
+  target: SkillTarget;
+}
+
+/**
+ * Every file `init` could have written for this home and this directory, each
+ * once: codex and opencode share `AGENTS.md` in a repository, and one file is
+ * one thing to check and at most one thing to report.
+ */
+export function knownSkillTargets(roots: InitRoots): KnownTarget[] {
+  const known = new Map<string, KnownTarget>();
+  for (const scope of INIT_SCOPES) {
+    for (const agent of SKILL_AGENTS) {
+      const target = skillTarget(agent, scope, roots);
+      if (target !== undefined && !known.has(target.path)) {
+        known.set(target.path, { agent, scope, target });
+      }
+    }
+  }
+  return [...known.values()];
+}
+
 /** The same table as `--help` prose, so the path the help documents and the
  * path the command writes cannot drift apart. Worded without flag names because
  * both `init` and `skill` show it, and only one of them has a `--scope`. */
@@ -117,6 +141,18 @@ export function installSkill(
     status: writeChange(target.path, existing, desired, dryRun),
     mode: target.mode,
   };
+}
+
+/**
+ * What lightspeed owns in a target: the whole file, or only what sits between
+ * its markers — a shared instructions file without them holds nothing of ours.
+ */
+export function ownedSkillText(target: SkillTarget): string | undefined {
+  const existing = readIfAny(target.path);
+  if (existing === undefined || target.mode === "file") return existing;
+  const bounds = blockBounds(existing);
+  if (bounds === undefined) return undefined;
+  return existing.slice(bounds.start + BLOCK_START.length, bounds.end - BLOCK_END.length);
 }
 
 function block(rendered: string): string {

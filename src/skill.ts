@@ -264,7 +264,9 @@ ${SECTIONS}
 
 /**
  * pi and Claude Code read SKILL.md format, so they get exactly `renderSkill()`
- * (also the checked-in artifact). Codex, opencode and VS Code read plain
+ * (also the checked-in artifact, which stays unstamped: the stamp is added by
+ * `stampedSkillFor` on the way into an agent's file, so a version bump does not
+ * make the artifact stale). Codex, opencode and VS Code read plain
  * markdown: frontmatter goes, and the description's use-when guidance moves
  * into the intro prose so it is not lost with it.
  */

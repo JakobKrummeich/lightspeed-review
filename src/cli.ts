@@ -32,13 +32,16 @@ import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
 import { missingSession, resolveSession, type ResolvedSession } from "./session-resolve.ts";
 import { SessionStore } from "./session-store.ts";
+import { refreshSkills, skillNoticeOutput, type StaleSkill } from "./skill-freshness.ts";
 import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./turn-help.ts";
 
 const version = CLI_VERSION;
 const description = CLI_DESCRIPTION;
 
+type Answer = StructuredOutput | string;
+
 /** The one list: top-level help and the unknown-command error are both built from it. */
-const commands = {
+const commands: Record<string, (args: string[]) => Answer | Promise<Answer>> = {
   start: startCommand,
   wait: waitCommand,
   ask: askCommand,
@@ -275,7 +278,7 @@ function unknownCommandOutput(command: string): string {
     `Known commands: ${COMMAND_NAMES.join(", ")}`,
     "Run `lightspeed --help` for what each one does",
   ]);
-  return `${renderToon(errorOutput(error))}\n`;
+  return renderFailure(error);
 }
 
 /**
@@ -323,10 +326,44 @@ function leadingFlagProblem(given: string[]): ReviewError | undefined {
 
 const LEADING_FLAGS = ["--all", "--help", "--version"];
 
+/**
+ * Worked out once, before the command runs, and carried by every TOON answer
+ * this process prints — failures most of all, since the verb a stale skill
+ * teaches is the one that fails. `init` is left out: it is the explicit
+ * install, and its `--dry-run` promises to write nothing at all.
+ */
+const skillNotice = argv[0] === "init" ? {} : skillNoticeOutput(staleSkills());
+
+/** Nothing about a skill is worth failing the command the agent came for. */
+function staleSkills(): StaleSkill[] {
+  try {
+    return refreshSkills({ home: homedir(), cwd: process.cwd() });
+  } catch {
+    return [];
+  }
+}
+
+/** A string answer is a document on its way into a file (`skill`, a feedback
+ * export), where a TOON notice would be a stray line in someone's file. */
+function withSkillNotice(output: Answer): Answer {
+  return typeof output === "string" ? output : { ...output, ...skillNotice };
+}
+
+function renderFailure(error: unknown): string {
+  return `${renderToon({ ...errorOutput(error), ...skillNotice })}\n`;
+}
+
+const noticedCommands = Object.fromEntries(
+  Object.entries(commands).map(([name, run]) => [
+    name,
+    async (args: string[]) => withSkillNotice(await run(args)),
+  ]),
+);
+
 exitQuietlyWhenReaderCloses();
 const leadingProblem = leadingFlagProblem(argv);
 if (leadingProblem !== undefined) {
-  process.stdout.write(`${renderToon(errorOutput(leadingProblem))}\n`);
+  process.stdout.write(renderFailure(leadingProblem));
   process.exitCode = 2;
 } else {
   await runAxiCli({
@@ -334,14 +371,14 @@ if (leadingProblem !== undefined) {
     description,
     // TOON errors on stdout so an agent parses failures like results, not prose off stderr.
     formatError: (error) => ({
-      output: `${renderToon(errorOutput(error))}\n`,
+      output: renderFailure(error),
       exitCode: exitCodeFor(error),
     }),
     version,
     topLevelHelp,
     getCommandHelp: commandHelp,
     renderUnknownCommand: unknownCommandOutput,
-    commands,
-    home: () => homeOutput(homeInput(allRepos)),
+    commands: noticedCommands,
+    home: () => withSkillNotice(homeOutput(homeInput(allRepos))),
   });
 }
