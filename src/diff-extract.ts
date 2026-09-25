@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { ReviewError } from "./errors.ts";
-import { startCall } from "./commands/home.ts";
+import { startCall } from "./start-call.ts";
 import type { GroupTier } from "./group-tier.ts";
 
 export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "binary";

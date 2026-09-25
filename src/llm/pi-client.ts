@@ -17,7 +17,7 @@ import {
 import { loadPiProviders } from "./pi-models.ts";
 import { applyConfiguredProviders, applyPiProviders } from "./providers.ts";
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
-import { startCall } from "../commands/home.ts";
+import { startCall } from "../start-call.ts";
 
 export interface GroupingCallInput {
   /** `provider/model-id`, exactly as written in `.lightspeed.conf.json`. */
