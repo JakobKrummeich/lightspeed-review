@@ -27,19 +27,40 @@ test("digesting: the rule is talk or work, never both, with ambiguity asked firs
   assert.match(rule.rule!, /never both/);
 });
 
-test("the reply line names at most three items, and t1 when it holds none", () => {
+test("the reply line names at most three items, and the main chat when none is open", () => {
   const many = nextRule("agent digesting", TARGET, ["t1", "t2", "t3", "t4"]);
   assert.doesNotMatch(many.talk!, /t4/);
-  assert.match(nextRule("agent digesting", TARGET).talk!, /--to t1 '<answer>'/);
+  assert.match(nextRule("agent digesting", TARGET).talk!, /--to main '<answer>'/);
+  assert.doesNotMatch(nextRule("agent digesting", TARGET).talk!, /t1/);
+});
+
+test("a line with no session to read names a placeholder id, never a made-up one", () => {
+  assert.match(replyCall(TARGET), /--to <id> '<answer>'/);
+  assert.match(publishCall(TARGET), /--to <id> 'done: /);
+});
+
+test("resolved items get their meaning spelled out: agreement, not a withdrawn request", () => {
+  const rule = nextRule("agent digesting", TARGET, ["t2"], ["t1", "t3"]);
+
+  assert.match(rule.resolved!, /^t1, t3: the reviewer agrees with your last words there/);
+  assert.match(rule.resolved!, /if that was a change, implement it \(work\)/);
+  assert.match(rule.resolved!, /not withdrawn/);
+  assert.deepEqual(Object.keys(nextRule("agent digesting", TARGET, ["t2"])), [
+    "talk",
+    "work",
+    "ambiguity",
+    "rule",
+  ]);
 });
 
 test("working: publish, waiting in the foreground; a question goes in the new round", () => {
   const rule = nextRule("agent working", TARGET, ["t5"]);
 
-  assert.deepEqual(Object.keys(rule), ["publish", "blocked"]);
+  assert.deepEqual(Object.keys(rule), ["publish", "stuck"]);
   assert.match(rule.publish!, /lightspeed publish feat\/tokens main --intent .* --to t5 'done: /);
   assert.ok(rule.publish!.endsWith(WAITS_FOR_SEND));
-  assert.match(rule.blocked!, /while nothing has changed since work/);
+  assert.match(rule.stuck!, /while nothing has changed since work/);
+  assert.match(nextRule("agent working", TARGET).publish!, /--to main 'done: /);
 });
 
 test("the reviewer's turn: the only move is to listen by re-running open", () => {

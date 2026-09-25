@@ -60,8 +60,14 @@ function addToThreads(
   }
   const thread = threadNamed(threads, prompt.thread, entry);
   if (thread === undefined) return;
-  if (prompt.type === "resolve") thread.resolved = prompt.resolved;
-  else thread.messages.push(said);
+  if (prompt.type === "resolve") {
+    thread.resolved = prompt.resolved;
+    return;
+  }
+  thread.messages.push(said);
+  // The agent speaking into a folded thread is news the reviewer must see: a
+  // reply nobody unfolds is a reply nobody reads.
+  if (entry.role === "agent") thread.resolved = false;
 }
 
 /** `main` opens on first use; any other unknown thread is a reply to nothing. */
@@ -119,6 +125,21 @@ export function threadIds(prompts: FeedbackPrompt[]): Set<string> {
     }
   }
   return ids;
+}
+
+/**
+ * The threads worth naming in a suggested `--to`: those of the held batch that
+ * are still open, else every open thread. Never a resolved one — the reviewer
+ * closed it — and never `main`, which the caller names itself when this is empty.
+ */
+export function openIds(conversation: ConversationEntry[], held: FeedbackPrompt[] = []): string[] {
+  const open = threadsOf(conversation)
+    .filter((thread) => !thread.resolved && thread.legacy !== true && thread.id !== MAIN_THREAD)
+    .map((thread) => thread.id);
+  const inBatch = batchItems(held, conversation)
+    .map((item) => item.id)
+    .filter((id) => open.includes(id));
+  return inBatch.length > 0 ? inBatch : open;
 }
 
 /**

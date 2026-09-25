@@ -123,6 +123,20 @@ test("the answer after work closes with the rule for a working turn", async () =
   });
 });
 
+/** The publish line names what the agent is holding, so its `--to` is copied, not guessed. */
+test("the publish line after work names the batch's open item", async () => {
+  const asked = { type: "message" as const, id: "t3", comment: "why a new table?" };
+  const record = session({
+    conversation: [{ role: "reviewer", at: AT, prompts: [asked] }],
+    batch: { id: "dlv_1", at: AT, prompts: [asked], acked: true },
+  });
+  await withServer(record, async ({ port }) => {
+    const output = await runWork({ repoRoot: REPO, branch: BRANCH, base: BASE, port, plan: "fix" });
+
+    assert.match((output.next as { publish: string }).publish, /--to t3 'done: /);
+  });
+});
+
 /** An agent that re-runs `work` after a crash must not be told it announced
  * something new; one that refines its plan must be told it did. */
 test("redeclaring the same plan says so, and refining it does not", async () => {

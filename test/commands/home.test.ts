@@ -290,6 +290,13 @@ test("a digesting agent is told how to get the batch it lost, then the rule", ()
     sessions: [
       record({
         turn: { holder: "agent", mode: "digesting", at: "2025-01-02T00:00:00.000Z" },
+        conversation: [
+          {
+            role: "reviewer",
+            at: "2025-01-02T00:00:00.000Z",
+            prompts: [{ type: "message", id: "t3", comment: "why?" }],
+          },
+        ],
         batch: {
           id: "dlv_1",
           at: "2025-01-02T00:00:00.000Z",
@@ -304,6 +311,35 @@ test("a digesting agent is told how to get the batch it lost, then the rule", ()
   assert.equal(Object.keys(next)[0], "reread");
   assert.match(next.reread!, /lightspeed open feature-auth main/);
   assert.match(next.talk!, /--to t3 '<answer>'/);
+});
+
+/** A thread the reviewer resolved is closed: home never suggests answering in it. */
+test("a digesting agent is never pointed at a thread the reviewer resolved", () => {
+  const said = { type: "message" as const, id: "t3", comment: "why?" };
+  const done = { type: "message" as const, id: "t4", comment: "fixed, thanks" };
+  const resolve = { type: "resolve" as const, thread: "t4", resolved: true };
+  const output = homeOutput({
+    repoRoot: "/repo",
+    sessions: [
+      record({
+        turn: { holder: "agent", mode: "digesting", at: "2025-01-02T00:00:00.000Z" },
+        conversation: [
+          { role: "reviewer", at: "2025-01-02T00:00:00.000Z", prompts: [said, done, resolve] },
+        ],
+        batch: {
+          id: "dlv_1",
+          at: "2025-01-02T00:00:00.000Z",
+          prompts: [said, done, resolve],
+          acked: true,
+        },
+      }),
+    ],
+  });
+
+  const next = output.next as Record<string, string>;
+  assert.match(next.talk!, /--to t3 '<answer>'/);
+  assert.doesNotMatch(JSON.stringify(next), /--to t4/);
+  assert.match(next.resolved!, /t4/);
 });
 
 /** Two sessions, two turns: no single rule is the answer. */

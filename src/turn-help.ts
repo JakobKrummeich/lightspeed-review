@@ -6,6 +6,7 @@
  * and core code importing `commands/` is how the old import cycles formed.
  */
 import { openCall } from "./start-call.ts";
+import { MAIN_THREAD } from "./threads.ts";
 import type { TurnLabel } from "./turn.ts";
 
 /** Placeholders in single quotes: an agent copies these into a shell, where
@@ -37,7 +38,11 @@ export function helpReattach(target: string): string {
   return `Run \`lightspeed open ${target}\` to listen for the reviewer's next Send — ${WAITS_FOR_SEND}`;
 }
 
-export function replyCall(target: string, ids: readonly string[] = ["t1"]): string {
+/**
+ * `<id>` where nothing says which: a made-up `t1` is an id the agent would copy
+ * into a thread it never saw — or one the reviewer resolved.
+ */
+export function replyCall(target: string, ids: readonly string[] = ["<id>"]): string {
   const tos = ids.map((id) => `--to ${id} '<answer>'`).join(" ");
   return `lightspeed reply ${tos} ${target}`.trimEnd();
 }
@@ -46,7 +51,7 @@ export function workCall(target: string): string {
   return `lightspeed work '<plan>' ${target}`.trimEnd();
 }
 
-export function publishCall(target: string, id = "t1"): string {
+export function publishCall(target: string, id = "<id>"): string {
   return `lightspeed publish ${target} --intent '<what this round changed>' --to ${id} 'done: <what you did>'`;
 }
 
@@ -66,30 +71,44 @@ export function helpReopen(target: string): string {
 }
 
 /**
+ * The ids a line may name, read off what the session knows: its open ones, at
+ * most three, and the main chat when none is open.
+ */
+export function shownIds(ids: readonly string[]): string[] {
+  return ids.length === 0 ? [MAIN_THREAD] : ids.slice(0, 3);
+}
+
+/**
  * The decision rule every answer ends in: not a menu of what is legal, but
  * what to do next, keyed by what the agent has decided. Weaker models follow
  * the last lines they read, so those lines carry the protocol. `ids` makes
- * the reply line concrete: the items the agent is holding right now.
+ * the reply line concrete: the open items the agent is holding right now;
+ * `resolved`, the ones the reviewer just closed, whose meaning is spelled out.
  */
 export function nextRule(
   turn: TurnLabel,
   target: string,
   ids: readonly string[] = [],
+  resolved: readonly string[] = [],
 ): Record<string, string> {
-  if (turn === "agent digesting") return digestingRule(target, ids);
-  if (turn === "agent working") return workingRule(target, ids[0]);
+  if (turn === "agent digesting") return digestingRule(target, ids, resolved);
+  if (turn === "agent working") return workingRule(target, shownIds(ids)[0]!);
   if (turn === "ended") {
     return { done: `The review is over. ${helpReopen(target)}` };
   }
   return { listen: `The reviewer holds the turn → ${helpReattach(target)}` };
 }
 
-function digestingRule(target: string, ids: readonly string[]): Record<string, string> {
-  const shown = ids.length === 0 ? ["t1"] : ids.slice(0, 3);
+function digestingRule(
+  target: string,
+  ids: readonly string[],
+  resolved: readonly string[],
+): Record<string, string> {
   return {
+    ...(resolved.length === 0 ? {} : { resolved: resolvedMeaning(resolved) }),
     talk:
       "Anything that needs the reviewer — an answer, a doubt about a change request, a question" +
-      ` of your own → one call, every reply in it: ${replyCall(target, shown)}`,
+      ` of your own → one call, every reply in it: ${replyCall(target, shownIds(ids))}`,
     work:
       "Nothing left to discuss and something to change (clear change requests go straight here)" +
       ` → ${workCall(target)}, then edit, test, commit and publish`,
@@ -100,11 +119,19 @@ function digestingRule(target: string, ids: readonly string[]): Record<string, s
   };
 }
 
-function workingRule(target: string, id: string | undefined): Record<string, string> {
+/** Said in the batch itself: the skill is read once, and a resolve read as "dropped" costs a round. */
+function resolvedMeaning(resolved: readonly string[]): string {
+  return (
+    `${resolved.join(", ")}: the reviewer agrees with your last words there — if that was a` +
+    " change, implement it (work); it is not withdrawn"
+  );
+}
+
+function workingRule(target: string, id: string): Record<string, string> {
   return {
     publish: `Edit, test and commit, then → ${publishCall(target, id)} — ${WAITS_FOR_SEND}`,
-    blocked:
-      "Stuck on a question for the reviewer? Publish what you have and ask in the new round." +
+    stuck:
+      "A question for the reviewer? Publish what you have and ask in the new round." +
       " reply works from here only while nothing has changed since work.",
   };
 }

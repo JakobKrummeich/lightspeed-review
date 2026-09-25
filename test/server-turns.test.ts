@@ -553,6 +553,23 @@ test("publish is refused from every state but working with new commits", async (
   });
 });
 
+/** A resolved thread is closed: a refusal that suggests answering in it undoes the reviewer. */
+test("a refusal names an open thread to answer in, never one the reviewer resolved", async () => {
+  await withServer(async (running) => {
+    const { url } = running;
+    const key = await digesting(running);
+    await postReply(url, key, { replies: [{ to: "t1", text: "done" }] });
+    await send(url, key, [{ type: "resolve", thread: "t1", resolved: true }]);
+    await pollAndAck(url, key);
+
+    const refused = await errorOf(await publish(url));
+
+    assert.equal(refused.code, "turn_still_yours");
+    assert.match(refused.help.join("\n"), /--to t2 '<answer>'/);
+    assert.doesNotMatch(refused.help.join("\n"), /--to t1/);
+  });
+});
+
 test("publish on the HEAD of the last round is refused, naming reply", async () => {
   await withServer(async (running) => {
     const { url, store } = running;

@@ -57,11 +57,12 @@ export function batchOutput(result: PollPayload, target: string): StructuredOutp
       next: nextRule("ended", target),
     };
   }
-  const ids = result.items.filter((item) => item.status !== "resolved").map((item) => item.id);
+  const open = result.items.filter((item) => item.status !== "resolved").map((item) => item.id);
+  const resolved = result.items.filter((item) => item.status === "resolved").map((item) => item.id);
   return {
     ...turnBlock({ ...result, turn: turnOf(result) }),
     items,
-    next: nextRule(turnOf(result), target, ids),
+    next: nextRule(turnOf(result), target, open, resolved),
   };
 }
 

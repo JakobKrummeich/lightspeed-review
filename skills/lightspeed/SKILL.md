@@ -52,7 +52,7 @@ and the one command to run next.
    - work — Nothing left to discuss and something to change (clear change requests go straight here) → lightspeed work '<plan>' <branch>, then edit, test, commit and publish
 
    Anything ambiguous in a change request? Ask now with reply: asking is cheaper than redoing a round built on a guess. You may leave items unanswered. End this turn with reply or with work, never both.
-3. **Work.** Edit, test, commit. Stuck on a question for the reviewer? Publish what you have and ask in the new round. reply works from here only while nothing has changed since work.
+3. **Work.** Edit, test, commit. undefined
 4. **Publish.** Edit, test and commit, then → lightspeed publish <branch> --intent '<what this round changed>' --to t4 'done: <what you did>' — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice
    Files the reviewer already approved come back ticked unless you touched them.
 5. **Close it** when the reviewer is done.

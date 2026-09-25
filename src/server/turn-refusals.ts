@@ -5,11 +5,17 @@
  */
 import type { SessionRecord } from "../session-types.ts";
 import { turnLabel } from "../turn.ts";
-import { helpReattach, publishCall, replyCall, workCall } from "../turn-help.ts";
+import { openIds } from "../threads.ts";
+import { helpReattach, publishCall, replyCall, shownIds, workCall } from "../turn-help.ts";
 import type { DomainErrorBody } from "./http.ts";
 
 function targetOf(session: SessionRecord): string {
   return `${session.branch} ${session.base}`;
+}
+
+/** The ids a fixing command may name: the session's open ones, or the main chat. */
+function idsOf(session: SessionRecord): string[] {
+  return shownIds(openIds(session.conversation, session.batch?.prompts));
 }
 
 /** The reviewer holds the turn: the only move is to listen for their Send. */
@@ -35,7 +41,7 @@ export function stillWorking(session: SessionRecord, why: string): DomainErrorBo
       detail: why,
     },
     help: [
-      `Commit, then run \`${publishCall(targetOf(session))}\` — the reviewer can answer in the new round`,
+      `Commit, then run \`${publishCall(targetOf(session), idsOf(session)[0])}\` — the reviewer can answer in the new round`,
     ],
   };
 }
@@ -51,7 +57,7 @@ export function stillDigesting(session: SessionRecord): DomainErrorBody {
     },
     help: [
       `Something to change: \`${workCall(target)}\` first, then commit and publish`,
-      `Something to say: \`${replyCall(target)}\``,
+      `Something to say: \`${replyCall(target, idsOf(session))}\``,
     ],
   };
 }
@@ -64,7 +70,7 @@ export function nothingToPublish(session: SessionRecord): DomainErrorBody {
       detail: "publish opens a round on new commits; with nothing committed there is only talk",
     },
     help: [
-      `Commit your changes and publish again, or say why not: \`${replyCall(targetOf(session))}\``,
+      `Commit your changes and publish again, or say why not: \`${replyCall(targetOf(session), idsOf(session))}\``,
     ],
   };
 }
@@ -80,6 +86,6 @@ export function unknownThreads(
       message: `no such item: ${unknown.join(", ")} — nothing was posted`,
       detail: `items in this review: ${[...known].join(", ")}`,
     },
-    help: [`Re-run with ids from the list: \`${replyCall(targetOf(session))}\``],
+    help: [`Re-run with ids from the list: \`${replyCall(targetOf(session), idsOf(session))}\``],
   };
 }

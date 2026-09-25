@@ -35,7 +35,7 @@ export async function runWork(input: WorkInput): Promise<StructuredOutput> {
     `${serverOrigin(input.port)}/api/session/${key}/work`,
     jsonPost({ plan: input.plan, ...(head === undefined ? {} : { head }) }),
     { key, target },
-  )) as Partial<TurnFacts> & { changed?: boolean };
+  )) as Partial<TurnFacts> & { changed?: boolean; open?: string[] };
   return {
     ...turnBlock(declared),
     plan: input.plan,
@@ -45,6 +45,6 @@ export async function runWork(input: WorkInput): Promise<StructuredOutput> {
       declared.changed === false
         ? "the reviewer's header already names this plan (no-op)"
         : "the reviewer's header names this plan; they can queue, not send, until you publish",
-    next: nextRule(declared.turn ?? "agent working", target),
+    next: nextRule(declared.turn ?? "agent working", target, declared.open ?? []),
   };
 }

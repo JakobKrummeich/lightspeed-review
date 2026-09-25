@@ -2,7 +2,7 @@ import { REACHABLE_MODELS } from "../config.ts";
 import type { StructuredOutput } from "../output.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { openCall } from "../start-call.ts";
-import { batchItems } from "../threads.ts";
+import { batchItems, openIds } from "../threads.ts";
 import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
 import { HELP_END, HELP_OPEN, TURN_RULES, helpReattach, nextRule } from "../turn-help.ts";
 
@@ -159,12 +159,12 @@ function homeNext(mine: SessionRecord[], all: boolean): StructuredOutput {
   if (only === undefined) return { help: [...TURN_RULES, HELP_OPEN, HELP_END] };
   const target = `${only.branch} ${only.base}`;
   const label = turnLabel(only);
-  const ids = only.batch === undefined ? [] : batchItems(only.batch.prompts, only.conversation);
-  const rule = nextRule(
-    label,
-    target,
-    ids.map((item) => item.id),
-  );
+  const held = only.batch?.prompts ?? [];
+  const resolved = batchItems(held, only.conversation)
+    .filter((item) => item.status === "resolved")
+    .map((item) => item.id);
+  // The same ids the batch itself offered: open ones only, never a resolved one.
+  const rule = nextRule(label, target, openIds(only.conversation, held), resolved);
   // An agent resumed after compaction no longer holds the batch it is digesting.
   if (label !== "agent digesting") return { next: rule };
   return {
