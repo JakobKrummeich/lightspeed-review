@@ -362,6 +362,6 @@ if (leadingProblem !== undefined) {
     getCommandHelp: (command) => commandHelp(command, skillNotice),
     renderUnknownCommand: unknownCommandOutput,
     commands: noticedCommands,
-    home: () => withSkillNotice(homeOutput(homeInput(allRepos))),
+    home: async () => withSkillNotice(homeOutput(await homeInput(allRepos))),
   });
 }

@@ -95,9 +95,14 @@ export class SessionTransport {
    */
   private presenceFrame(key: string): string {
     return sseFrame("presence", {
-      waiting: (this.pollers.get(key)?.size ?? 0) > 0,
+      waiting: this.isWaiting(key),
       ...this.presenceOf(key),
     });
+  }
+
+  /** A waiting command is parked on the session: its next Send has a receiver. */
+  isWaiting(key: string): boolean {
+    return (this.pollers.get(key)?.size ?? 0) > 0;
   }
 
   watcherCount(): number {

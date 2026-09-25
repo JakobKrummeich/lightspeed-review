@@ -283,6 +283,43 @@ test("a reviewer's turn is the one turn home offers to listen from", () => {
   assert.match((output.next as { listen: string }).listen, /foreground/);
 });
 
+/** Telling an agent to start a wait that is already running supersedes its own command. */
+test("a reviewer's turn someone is listening on says to leave the wait running, not to open", () => {
+  const output = homeOutput({
+    repoRoot: "/repo",
+    sessions: [record({ branch: "feat/tokens" })],
+    listening: true,
+  });
+
+  const next = output.next as Record<string, string>;
+  assert.deepEqual(Object.keys(next), ["listening"]);
+  assert.match(next.listening!, /already waiting/);
+  assert.doesNotMatch(next.listening!, /lightspeed open/);
+});
+
+/** Sent, and nobody there to receive it: the one command that takes the batch. */
+test("a Send nobody received says how many items are waiting and what receives them", () => {
+  const output = homeOutput({
+    repoRoot: "/repo",
+    sessions: [
+      record({
+        branch: "feat/tokens",
+        pending: [
+          { type: "message", id: "t1", comment: "why?" },
+          { type: "message", id: "t2", comment: "and this?" },
+        ],
+      }),
+    ],
+    listening: false,
+  });
+
+  const next = output.next as Record<string, string>;
+  assert.match(
+    next.receive!,
+    /the reviewer sent 2 items — `lightspeed open feat\/tokens main` receives them/,
+  );
+});
+
 /** Compaction loses the batch; `open` hands the same one back. */
 test("a digesting agent is told how to get the batch it lost, then the rule", () => {
   const output = homeOutput({

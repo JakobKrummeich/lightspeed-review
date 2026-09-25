@@ -29,6 +29,21 @@ export function handleEvents(
 }
 
 /**
+ * Whether anyone will receive the reviewer's Send: what bare `lightspeed` asks
+ * before it tells an agent to start a wait that may already be running.
+ */
+export function handlePresence(
+  context: ServerContext,
+  _request: IncomingMessage,
+  response: ServerResponse,
+  params: Record<string, string>,
+) {
+  const session = requireSession(context.store, response, params.key);
+  if (!session) return;
+  sendJson(response, 200, { waiting: context.transport.isWaiting(session.key) });
+}
+
+/**
  * Waiting for the reviewer's Send — what `open`, `reply` and `publish` do once
  * they have posted. No timeout and no heartbeat: the agent runs them in the
  * foreground and waits. Parking moves no turn; only a delivery does.

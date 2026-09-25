@@ -2,9 +2,17 @@ import { REACHABLE_MODELS } from "../config.ts";
 import type { StructuredOutput } from "../output.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { openCall } from "../start-call.ts";
-import { batchItems, openIds } from "../threads.ts";
+import { batchItems, batchSize, openIds } from "../threads.ts";
 import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
-import { HELP_END, HELP_OPEN, TURN_RULES, helpReattach, nextRule } from "../turn-help.ts";
+import {
+  HELP_END,
+  HELP_OPEN,
+  TURN_RULES,
+  WAITS_FOR_SEND,
+  helpReattach,
+  nextRule,
+  reattachCall,
+} from "../turn-help.ts";
 
 export interface SessionSummary {
   /** `--all` only, where rows come from many. */
@@ -57,6 +65,11 @@ export interface HomeInput {
   config?: HomeBlocker;
   sessions: SessionRecord[];
   all?: boolean;
+  /**
+   * A waiting command is parked on this repo's one live session — read off the
+   * server, the only side that knows. Absent means nobody asked: nobody listening.
+   */
+  listening?: boolean;
 }
 
 /**
@@ -97,7 +110,7 @@ function listing(input: HomeInput, live: SessionRecord[], mine: SessionRecord[])
   if (rows.length === 0) {
     return { sessions: 0, message: "no active review sessions", ...other, help: [HELP_OPEN] };
   }
-  return { sessions: rows, ...other, ...homeNext(mine, all) };
+  return { sessions: rows, ...other, ...homeNext(mine, input) };
 }
 
 /**
@@ -154,11 +167,16 @@ function livingElsewhere(away: number): string {
  * command ends in, so home cannot offer a move the server refuses. With
  * several, no one rule is the answer, and the general rules stand.
  */
-function homeNext(mine: SessionRecord[], all: boolean): StructuredOutput {
-  const only = mine.length === 1 && !all ? mine[0] : undefined;
+function homeNext(mine: SessionRecord[], input: HomeInput): StructuredOutput {
+  const only = mine.length === 1 && input.all !== true ? mine[0] : undefined;
   if (only === undefined) return { help: [...TURN_RULES, HELP_OPEN, HELP_END] };
   const target = `${only.branch} ${only.base}`;
   const label = turnLabel(only);
+  if (label === "reviewer") return { next: reviewersNext(only, target, input.listening === true) };
+  return agentsNext(only, target, label);
+}
+
+function agentsNext(only: SessionRecord, target: string, label: TurnLabel): StructuredOutput {
   const held = only.batch?.prompts ?? [];
   const resolved = batchItems(held, only.conversation)
     .filter((item) => item.status === "resolved")
@@ -172,5 +190,28 @@ function homeNext(mine: SessionRecord[], all: boolean): StructuredOutput {
       reread: `Lost the batch? ${helpReattach(target)} — it hands you the same batch`,
       ...rule,
     },
+  };
+}
+
+/**
+ * "Run open" only when nobody is listening: re-attaching beside a running wait
+ * supersedes it, and the agent's own command exits with nothing.
+ */
+function reviewersNext(
+  session: SessionRecord,
+  target: string,
+  listening: boolean,
+): Record<string, string> {
+  if (listening) {
+    return {
+      listening:
+        "A waiting command is already waiting for the reviewer's Send on this review — leave it" +
+        " running; it receives the batch",
+    };
+  }
+  const sent = batchSize(session.pending);
+  if (sent === 0) return nextRule("reviewer", target);
+  return {
+    receive: `the reviewer sent ${plural(sent, "item")} — \`${reattachCall(target)}\` receives them; ${WAITS_FOR_SEND}`,
   };
 }
