@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { renderAnnotationPopup } from "../../src/browser/annotation.ts";
 import {
   FORM_PENDING,
   FORM_UNAVAILABLE,
@@ -193,10 +194,9 @@ function approvedForms(): string {
  *
  * The emitters not listed here are guarded by nothing; adding one is an entry
  * plus a fixture, where every class the module draws is painted in one area.
- * Measured 2026-09-25, one of the remaining nine qualifies: annotation.ts
- * (popup.css). The rest want a
- * decision about where an area's edge runs that this table has no shape for:
- * diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts,
+ * Measured 2026-09-25, none of the remaining eight qualifies as it stands:
+ * each wants a decision about where an area's edge runs that this table has
+ * no shape for. diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts,
  * status-banner.ts and full-file.ts each draw across two or more areas by
  * design (the `.lsr-switch*` pair sits in code.css and is shared by two
  * modules), and several emit a class no area paints at all
@@ -250,6 +250,15 @@ const AREA_OWNERS: AreaOwner[] = [
     // draws the count alone, so this one shape reaches every class.
     render: () => renderProgressBar(CLOSED_REVIEW.groups, []),
     marker: "lsr-progress-segment",
+  },
+  {
+    module: "src/browser/annotation.ts",
+    area: "popup.css",
+    // The popup has one shape: the file list and the quoted selection are drawn
+    // for any selection. The textarea and button carry no class: bare element
+    // rules paint every one on the page, so there is nothing here to own.
+    render: () => renderAnnotationPopup([{ file: "src/db.ts", group: "Schema", text: "+x" }]),
+    marker: "lsr-popup-preview",
   },
 ];
 
