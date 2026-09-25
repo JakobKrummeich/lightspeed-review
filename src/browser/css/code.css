@@ -238,6 +238,7 @@
   color: var(--lsr-code-meta);
 }
 
+/* stylelint-disable-next-line selector-class-pattern -- highlight.js names the class, not us */
 .hljs-built_in,
 .hljs-class .hljs-title {
   color: var(--lsr-code-builtin);

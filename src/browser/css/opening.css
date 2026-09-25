@@ -13,10 +13,12 @@
 .lsr-opening-overlay {
   /* Darker than the page's own dark, because a room is not a surface: the
      room has to read as unlit space with a lamp over it. */
+  /* stylelint-disable function-disallowed-list -- the room's one dark, mixed into nothing else, so not a token */
   --lsr-opening-room: light-dark(
     var(--lsr-bg),
     color-mix(in oklab, var(--lsr-bg) 52%, oklch(0.09 0.01 280))
   );
+  /* stylelint-enable function-disallowed-list */
   /* The four parts of the light, always all painted and each transparent in
      the scheme it is not for. */
   --lsr-opening-lamp: light-dark(
@@ -44,11 +46,12 @@
     color-mix(in oklab, var(--lsr-accent) 20%, transparent),
     color-mix(in oklab, var(--lsr-accent) 45%, transparent)
   );
-  --lsr-opening-bloom-core: light-dark(white, var(--lsr-strong));
+  --lsr-opening-bloom-core: light-dark(var(--lsr-white), var(--lsr-strong));
   --lsr-opening-bloom-edge: light-dark(
-    color-mix(in oklab, var(--lsr-accent) 22%, white),
+    color-mix(in oklab, var(--lsr-accent) 22%, var(--lsr-white)),
     var(--lsr-strong)
   );
+
   position: fixed;
   inset: 0;
   display: flex;

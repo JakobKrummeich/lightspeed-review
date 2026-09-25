@@ -517,8 +517,8 @@ Topmost (z20). Scrim over the still-visible diff, one summary card.
   `color-mix(…)` of tokens: semantics `--lsr-bg --lsr-surface --lsr-raised
 --lsr-border --lsr-selected --lsr-code-quiet --lsr-text --lsr-strong
 --lsr-muted --lsr-accent --lsr-on-accent --lsr-shadow-lift --lsr-shadow-flat
---lsr-scrim`, hues `--lsr-green/red/amber/violet/pink/cyan`, diff
-  `--lsr-add-bg/tx/hl --lsr-del-bg/tx/hl`.
+--lsr-scrim --lsr-white`, hues `--lsr-green/red/amber/violet/pink/cyan`,
+  diff `--lsr-add-bg/tx/hl --lsr-del-bg/tx/hl`.
 - **Both schemes at once.** Every color pair is a `light-dark()`; the page
   declares `color-scheme: light dark` and the header switch writes
   `:root[data-color-scheme="light|dark"]`. Never a `prefers-color-scheme`

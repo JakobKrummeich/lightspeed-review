@@ -14,6 +14,7 @@ churn_paths: [src, scripts, bin, test]
 protected_paths:
   - .github
   - eslint.config.js
+  - stylelint.config.mjs
   - tsconfig*.json
   - .prettierrc
   - .prettierignore
@@ -35,6 +36,8 @@ gates:
     run: pnpm typecheck
   - name: lint
     run: pnpm lint
+  - name: css
+    run: pnpm lint:css
   - name: format
     run: pnpm format:check
   - name: skill
