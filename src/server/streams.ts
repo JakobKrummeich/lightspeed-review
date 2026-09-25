@@ -4,7 +4,7 @@
  * the other half is read off the stored turn.
  */
 import type { ServerResponse } from "node:http";
-import type { Turn } from "../session-store.ts";
+import type { PresenceFacts } from "../turn.ts";
 import { sseFrame } from "./http.ts";
 
 export type WakeReason = "feedback" | "shutdown";
@@ -15,7 +15,7 @@ export type WakeReason = "feedback" | "shutdown";
  */
 export type Waker = (reason: WakeReason) => boolean;
 
-export type TurnReader = (key: string) => Turn | undefined;
+export type PresenceReader = (key: string) => PresenceFacts | undefined;
 
 export class SessionTransport {
   private readonly streams = new Map<string, Set<ServerResponse>>();
@@ -26,10 +26,10 @@ export class SessionTransport {
    * held here so a `serve` restart publishes the lock the last run left, and so
    * no handler has to remember to announce a turn it just wrote.
    */
-  private readonly turnOf: TurnReader;
+  private readonly presenceOf: PresenceReader;
 
-  constructor(turnOf: TurnReader) {
-    this.turnOf = turnOf;
+  constructor(presenceOf: PresenceReader) {
+    this.presenceOf = presenceOf;
   }
 
   subscribe(key: string, response: ServerResponse): void {
@@ -78,17 +78,17 @@ export class SessionTransport {
   }
 
   /**
-   * Two facts, and no third derived from them: `waiting` is a live connection
-   * and can only be counted here, `turn` is read off the record so the banner
-   * and the gate on Send cannot disagree about who holds the review. A dead
+   * Two facts, and nothing derived from them: `waiting` is a live connection
+   * and can only be counted here, `turn` (with the batch size while the agent
+   * digests) is read off the record so the banner and the lock on Send cannot
+   * disagree about who holds the review. A dead
    * agent leaves the turn standing — indistinguishable from thinking hard, and
    * there is no heartbeat to tell them apart; recovery is out of band.
    */
   private presenceFrame(key: string): string {
-    const turn = this.turnOf(key);
     return sseFrame("presence", {
       waiting: (this.pollers.get(key)?.size ?? 0) > 0,
-      ...(turn === undefined ? {} : { turn }),
+      ...this.presenceOf(key),
     });
   }
 

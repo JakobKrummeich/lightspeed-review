@@ -2,6 +2,7 @@ import { escapeHtml } from "../escape-html.ts";
 import { currentRound, roundSegments, type RoundSegment } from "./conversation-rounds.ts";
 import { agentTurnText } from "./turn-words.ts";
 import { stalePillRound, type QueuedPill } from "./queued-pill.ts";
+import { threadsOf, type Thread, type ThreadMessage } from "../threads.ts";
 import type {
   ConversationEntry,
   AnnotationPrompt,
@@ -20,12 +21,39 @@ export interface PanelState {
   status: SessionStatus;
   allApproved: boolean;
   turn: Turn;
+  /** How many items the agent is reading; only while it digests. */
+  items?: number;
 }
 
 export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
 
+/**
+ * The lock matrix, one word per state. `send`: the reviewer's turn, Send sends
+ * and the queued pills go with it. `locked`: the agent digests — short, and its
+ * replies should answer exactly what the reviewer saw, so nothing that writes
+ * is live (compose, thread replies, resolve, the line popup, the queue); the
+ * diff can still be read and files approved. `queue`: the agent works, and
+ * everything the reviewer writes queues for the next round. End is never
+ * locked but by the review being over.
+ */
+export type ComposeMode = "send" | "locked" | "queue" | "ended";
+
+export function composeMode(state: ComposeState): ComposeMode {
+  if (state.status === "ended") return "ended";
+  if (state.turn.holder === "reviewer") return "send";
+  return state.turn.mode === "working" ? "queue" : "locked";
+}
+
+/** Nothing may be written — not sent, not queued. */
+export function writesLocked(state: ComposeState): boolean {
+  const mode = composeMode(state);
+  return mode === "locked" || mode === "ended";
+}
+
 /** Holds even with feedback still queued: `Send & End` sends the queue on its way out. */
 const APPROVED_EVERYTHING = "Every file is approved — Send & End when you are ready.";
+const QUEUE_NOTE = "Queued items go into the next round.";
+const LOCKED_NOTE = "Locked while the agent reads your feedback — you can still read and approve.";
 
 /**
  * Named rather than spelled out twice: the mount patches these onto the very
@@ -37,33 +65,29 @@ export const QUEUE_LABEL = "Queue";
 export const SENDING_LABEL = "Sending…";
 export const SEND_END_LABEL = "Send & End";
 export const END_ONLY_LABEL = "End without Sending";
-export const ANSWER_LABEL = "Answer";
+export const REPLY_LABEL = "Reply";
+export const RESOLVE_LABEL = "Resolve";
+export const REOPEN_LABEL = "Reopen";
 
-/**
- * Whether words may reach the agent now. It takes no button away: the primary
- * button queues instead while it holds on an open review (`queuesInstead`),
- * and the question card's Answer is refused. An ended review is locked by its
- * own status, and everything else only while the agent holds the turn.
- */
+/** Whether words may reach the agent now: only on the reviewer's own turn. */
 export function sendIsLocked(state: ComposeState): boolean {
-  return state.status === "ended" || state.turn.holder === "agent";
+  return composeMode(state) !== "send";
 }
 
 /**
- * Queue always: on the agent's turn the primary button is not taken away but
- * turned into the tray's own verb, so a general comment can wait out the turn
- * beside the line comments instead of being held in the box, one at a time.
- * An ended review queues nothing — there is no next send to queue for.
+ * While the agent works the primary button is not taken away but turned into
+ * the tray's own verb, so a general comment can wait out the turn beside the
+ * line comments instead of being held in the box, one at a time.
  */
 export function queuesInstead(state: ComposeState): boolean {
-  return sendIsLocked(state) && state.status !== "ended";
+  return composeMode(state) === "queue";
 }
 
 /**
- * "No agent is waiting" still reads `Send to Agent`: that press goes to the
+ * "Agent isn't listening" still reads `Send to Agent`: that press goes to the
  * server, into the conversation, and out of the reviewer's hands — the agent's
- * next `wait` is handed it. `Queue` promises a pill the reviewer can still take
- * back, and only the agent's turn keeps that promise.
+ * next listening command is handed it. `Queue` promises a pill the reviewer can
+ * still take back, and only the agent's working turn keeps that promise.
  *
  * On the reviewer's turn the label counts the tray: pills queued through the
  * agent's turn do not go out by themselves, and once the turn is back nothing
@@ -81,9 +105,10 @@ export function queuedAnnouncement(queued: number): string {
 }
 
 export function composePlaceholder(state: ComposeState): string {
-  return queuesInstead(state)
-    ? "General comment — Enter queues…"
-    : "General comment — Enter sends…";
+  const mode = composeMode(state);
+  if (mode === "queue") return "General comment — Enter queues…";
+  if (mode === "locked") return "Locked while the agent reads your feedback";
+  return "General comment — Enter sends…";
 }
 
 /**
@@ -112,33 +137,41 @@ export function renderScroll(state: PanelState): string {
 }
 
 /**
- * Only the agent's turn points at the box: on the reviewer's own the box sends,
+ * Only the working turn points at the box: on the reviewer's own the box sends,
  * and pointing at it from the tray would promise a pill that never appears.
  */
 function emptyTray(state: PanelState): string {
-  return queuesInstead(state)
-    ? "Nothing queued — select diff text, or type below, to add feedback."
-    : "Nothing queued — select diff text to add feedback.";
+  const mode = composeMode(state);
+  if (mode === "queue") {
+    return "Nothing queued — select diff text, reply in a thread, or type below.";
+  }
+  if (mode === "send")
+    return "Nothing queued — select diff text or reply in a thread to add feedback.";
+  return "Nothing queued.";
 }
 
 export function composeNote(state: ComposeState): string {
-  return state.status !== "ended" && state.allApproved ? APPROVED_EVERYTHING : "";
+  const mode = composeMode(state);
+  if (mode === "queue") return QUEUE_NOTE;
+  if (mode === "locked") return LOCKED_NOTE;
+  return mode === "send" && state.allApproved ? APPROVED_EVERYTHING : "";
 }
 
 /**
  * Ending is never gated — not by the turn, not by anything but the review
- * already being over — and neither is the primary button, which queues on the
- * agent's turn; both say what they will do instead of being taken away. Both
+ * already being over. The primary button and the box are, while the agent
+ * digests; while it works they queue, and say so. Both
  * `role="status"` regions are always in the markup, only filled/emptied: a
  * region added on demand is announced by no screen reader reliably.
  */
 export function renderCompose(state: ComposeState, queued = 0): string {
   const ended = state.status === "ended";
+  const locked = writesLocked(state);
   return `
   <p class="lsr-complete" role="status">${escapeHtml(composeNote(state))}</p>
-  <textarea id="lsr-general-comment" placeholder="${escapeHtml(composePlaceholder(state))}"${ended ? " disabled" : ""}></textarea>
+  <textarea id="lsr-general-comment" placeholder="${escapeHtml(composePlaceholder(state))}"${locked ? " disabled" : ""}></textarea>
   <div class="lsr-compose-actions">
-    <button type="button" id="lsr-send" class="lsr-primary"${ended ? " disabled" : ""}>${escapeHtml(sendLabel(state, queued))}</button>
+    <button type="button" id="lsr-send" class="lsr-primary"${locked ? " disabled" : ""}>${escapeHtml(sendLabel(state, queued))}</button>
     <button type="button" id="lsr-send-end" class="lsr-secondary"${ended ? " disabled" : ""}>${escapeHtml(endLabel(state))}</button>
   </div>
   <p id="lsr-queue-status" class="lsr-visually-hidden" role="status"></p>
@@ -169,47 +202,44 @@ function renderTurnLine(state: PanelState): string {
   return `
   <p class="lsr-working">
     <span class="lsr-working-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-    ${escapeHtml(agentTurnText(state.turn))}
+    ${escapeHtml(agentTurnText(state.turn, state.items))}
   </p>`;
 }
 
 /**
- * A question is open while nothing has been said after it: the agent asked and
- * then blocked, so the next words in the conversation are the answer, whatever
- * else they are about. Identity, not a flag — the renderer below asks "is this
- * that prompt?" and two questions with the same words are still two questions.
- */
-function openQuestion(state: PanelState): FeedbackPrompt | undefined {
-  if (state.status === "ended") return undefined;
-  const last = state.conversation.at(-1);
-  if (last?.role !== "agent") return undefined;
-  const asked = last.prompts.at(-1);
-  return asked?.type === "message" && asked.kind === "question" ? asked : undefined;
-}
-
-interface EntryContext {
-  open?: FeedbackPrompt;
-}
-
-/**
- * A conversation that never crossed a round boundary stays a plain stream: one
+ * Threads, not a stream: every item the reviewer sent is a card with its whole
+ * exchange stacked under it, oldest first, and a reply box at the foot. Placed
+ * by the round the item opened in, so a thread stays where it was read. A
+ * conversation that never crossed a round boundary gets no round rule: one
  * label over everything is furniture.
  */
 function renderConversation(state: PanelState): string {
-  const segments = roundSegments(state.conversation, state.rounds);
+  const threads = threadsOf(state.conversation);
+  const segments = roundSegments(threads, state.rounds);
   const ruled = segments.length > 1;
-  const context: EntryContext = { open: openQuestion(state) };
+  const pending = pendingResolves(state.pending);
   const parts: string[] = [];
   for (const segment of segments) {
     if (ruled) parts.push(renderRoundMark(segment));
-    for (const entry of segment.entries) {
-      parts.push(renderEntry(entry, segment, context));
+    for (const thread of segment.entries) {
+      parts.push(renderThread(thread, segment, pending.get(thread.id)));
     }
   }
   return parts.join("\n  ");
 }
 
-function renderRoundMark(segment: RoundSegment): string {
+/**
+ * A resolve is queued like any pill and travels with the next Send, but the
+ * thread folds at the press: tidying the overview is what the toggle is for.
+ * The last queued toggle per thread wins.
+ */
+function pendingResolves(pending: readonly QueuedPill[]): Map<string, boolean> {
+  const resolves = new Map<string, boolean>();
+  for (const pill of pending) if (pill.type === "resolve") resolves.set(pill.thread, pill.resolved);
+  return resolves;
+}
+
+function renderRoundMark(segment: RoundSegment<Thread>): string {
   // Escaped: comes from a session file, which may be hand-edited.
   const name = escapeHtml(`Round ${segment.round + 1}`);
   const note = segment.current ? "reviewing now" : "earlier round";
@@ -220,68 +250,93 @@ function renderRoundMark(segment: RoundSegment): string {
 }
 
 /** The two states the stylesheet knows, as a type rather than a convention. */
-function roundState(segment: RoundSegment): "current" | "earlier" {
+function roundState(segment: RoundSegment<Thread>): "current" | "earlier" {
   return segment.current ? "current" : "earlier";
 }
 
-function renderEntry(
-  entry: ConversationEntry,
-  segment: RoundSegment,
-  context: EntryContext,
+/**
+ * Resolved folds the whole thread to its head, which keeps the item's words as
+ * a one-line summary so the fold still says which thread it is.
+ */
+function renderThread(
+  thread: Thread,
+  segment: RoundSegment<Thread>,
+  queued: boolean | undefined,
 ): string {
-  return `<article class="lsr-entry" data-round-state="${roundState(segment)}" data-role="${entry.role}">
-    ${renderRoleLabel(entry)}${entry.prompts.map((prompt) => renderPrompt(prompt, context)).join("\n    ")}
+  const resolved = queued ?? thread.resolved;
+  const body = resolved ? "" : `\n    ${renderThreadBody(thread)}`;
+  return `<article class="lsr-thread" data-round-state="${roundState(segment)}" data-resolved="${resolved}"${thread.legacy ? ` data-legacy="true"` : ""}>
+    ${renderThreadHead(thread, resolved, queued !== undefined)}${body}
   </article>`;
 }
 
-/**
- * A card that opens with a question is headed by the question's own label,
- * "the agent is asking", which already says who speaks: the role label over it
- * stacked two headers of one voice, in one colour.
- */
-function renderRoleLabel(entry: ConversationEntry): string {
-  const first = entry.prompts[0];
-  if (first !== undefined && isQuestion(first)) return "";
-  return `<header class="lsr-entry-role">${entry.role}</header>\n    `;
+function renderThreadHead(thread: Thread, resolved: boolean, queued: boolean): string {
+  const file = thread.item?.type === "annotation" ? renderFilePress(thread.item) : "";
+  const summary = resolved
+    ? `<p class="lsr-thread-summary">${escapeHtml(threadSummary(thread))}</p>`
+    : "";
+  const state = queued
+    ? `<span class="lsr-thread-queued">${resolved ? "resolves" : "reopens"} on your next Send</span>`
+    : "";
+  if (thread.legacy) return `<header class="lsr-thread-head">${file}</header>${summary}`;
+  const id = escapeHtml(thread.id);
+  return `<header class="lsr-thread-head"><span class="lsr-thread-id">${id}</span>${file}${state}${renderToggle(id, resolved)}</header>${summary}`;
 }
 
-function renderPrompt(prompt: FeedbackPrompt, context: EntryContext): string {
-  const asked = isQuestion(prompt);
-  return `<div class="lsr-prompt"${asked ? ` data-kind="question"` : ""}>${renderQuestionLabel(asked)}${renderPromptBody(prompt)}${renderAnswerBox(prompt === context.open)}</div>`;
+function renderToggle(id: string, resolved: boolean): string {
+  return `<button type="button" class="lsr-thread-resolve" data-thread="${id}" aria-expanded="${!resolved}">${resolved ? REOPEN_LABEL : RESOLVE_LABEL}</button>`;
 }
 
-function isQuestion(prompt: FeedbackPrompt): boolean {
-  return prompt.type === "message" && prompt.kind === "question";
-}
-
-/**
- * A question wears its label even once answered: a card that lost its label on
- * being answered would make the history read as if nobody had ever asked anything.
- */
-function renderQuestionLabel(asked: boolean): string {
-  return asked ? `<p class="lsr-question-label">the agent is asking</p>\n    ` : "";
+function threadSummary(thread: Thread): string {
+  return thread.messages[0]?.comment ?? "the agent's own messages";
 }
 
 /**
- * The reviewer answers in one press and the queue they have been building
- * stays queued: sending it along would make answering a question cost them
- * six half-finished comments. Only the open question gets a box — one under
- * an answered question would invite an answer to a question the agent has
- * stopped waiting on.
+ * Each message its own block, never nested deeper: you → agent → you… for as
+ * many turns as it takes. Legacy threads (said before items had ids) are read
+ * only — there is no id to reply in.
  */
-function renderAnswerBox(open: boolean): string {
-  if (!open) return "";
-  return `\n    <div class="lsr-answer">
-    <textarea class="lsr-answer-box" placeholder="Answer — sends this alone…" aria-label="Answer the agent's question"></textarea>
-    <button type="button" class="lsr-answer-send">${ANSWER_LABEL}</button>
+function renderThreadBody(thread: Thread): string {
+  const selection =
+    thread.item?.type === "annotation"
+      ? `<pre class="lsr-prompt-selection">${escapeHtml(thread.item.selected_text)}</pre>\n    `
+      : "";
+  const messages = thread.messages.map(renderMessage).join("\n    ");
+  return `${selection}${messages}${thread.legacy ? "" : `\n    ${renderReplyBox(thread.id)}`}`;
+}
+
+function renderMessage(message: ThreadMessage): string {
+  const who = message.role === "reviewer" ? "you" : "agent";
+  return `<div class="lsr-message" data-role="${message.role}">
+      <p class="lsr-message-role">${who}</p>
+      <p class="lsr-prompt-comment">${escapeHtml(message.comment)}</p>
+    </div>`;
+}
+
+/**
+ * A reply is one more pill: it goes out with the rest of the batch on the next
+ * Send, as the resolve toggle does, so replying in three threads is still one
+ * turn for the agent.
+ */
+function renderReplyBox(id: string): string {
+  const thread = escapeHtml(id);
+  return `<div class="lsr-thread-reply">
+      <textarea class="lsr-thread-reply-box" data-thread="${thread}" placeholder="Reply — Enter adds it to your next Send…" aria-label="Reply in ${thread}"></textarea>
+      <button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="${thread}">${REPLY_LABEL}</button>
     </div>`;
 }
 
 function renderPill(pill: QueuedPill, index: number, current: number): string {
   return `<div class="lsr-pill">
-    ${renderStaleBadge(pill, current)}${renderPromptBody(pill)}
+    ${renderStaleBadge(pill, current)}${renderPillThread(pill)}${renderPromptBody(pill)}
     <button type="button" class="lsr-pill-remove" data-index="${index}" title="Remove">×</button>
   </div>`;
+}
+
+/** A reply in the tray names the thread it goes to; the card it will land under is elsewhere. */
+function renderPillThread(pill: QueuedPill): string {
+  if (pill.type !== "reply") return "";
+  return `<span class="lsr-pill-thread">${escapeHtml(`reply in ${pill.thread}`)}</span>\n    `;
 }
 
 /** No stamp, no badge: absence is not a claim. */
@@ -298,7 +353,7 @@ function renderStaleBadge(pill: QueuedPill, current: number): string {
 
 function renderPromptBody(prompt: FeedbackPrompt): string {
   if (prompt.type === "resolve") {
-    return `<p class="lsr-prompt-comment">${escapeHtml(`${prompt.resolved ? "resolved" : "reopened"} ${prompt.thread}`)}</p>`;
+    return `<p class="lsr-prompt-comment">${escapeHtml(`${prompt.resolved ? "resolve" : "reopen"} ${prompt.thread}`)}</p>`;
   }
   const comment = `<p class="lsr-prompt-comment">${escapeHtml(prompt.comment)}</p>`;
   if (prompt.type !== "annotation") return comment;

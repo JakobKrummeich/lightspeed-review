@@ -134,7 +134,7 @@ function agentAnswers(conversation: ConversationEntry[]): Map<string, string> {
   const answers = new Map<string, string>();
   for (const thread of threadsOf(conversation)) {
     const last = thread.messages.findLast((message) => message.role === "agent");
-    if (last !== undefined) answers.set(thread.id, last.comment);
+    if (last !== undefined && thread.legacy !== true) answers.set(thread.id, last.comment);
   }
   return answers;
 }

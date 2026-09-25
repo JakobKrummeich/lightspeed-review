@@ -52,19 +52,35 @@ export function generalCommentBox(root: HTMLElement): HTMLTextAreaElement | null
   return root.querySelector<HTMLTextAreaElement>("#lsr-general-comment");
 }
 
-/** There is at most one open question. */
-export function answerBox(root: HTMLElement): HTMLTextAreaElement | null {
-  return root.querySelector<HTMLTextAreaElement>(".lsr-answer-box");
+/** Every thread's reply box, each naming its thread in `data-thread`. */
+export function replyBoxes(root: HTMLElement): HTMLTextAreaElement[] {
+  return [...root.querySelectorAll<HTMLTextAreaElement>(".lsr-thread-reply-box")];
+}
+
+export function replyBox(root: HTMLElement, thread: string): HTMLTextAreaElement | undefined {
+  return replyBoxes(root).find((box) => box.dataset.thread === thread);
 }
 
 /**
- * Written back rather than rendered in, for the reason the compose draft is:
- * text ending in whitespace or looking like a tag does not survive markup.
+ * The reply boxes live inside the scroll, so every redraw replaces them — and
+ * a pill queued mid-reply is the ordinary way that happens. What was typed is
+ * read before and written back after, rather than rendered in: text ending in
+ * whitespace or looking like a tag does not survive markup.
  */
-export function restoreAnswer(root: HTMLElement, said: string): void {
-  if (said === "") return;
-  const box = answerBox(root);
-  if (box) box.value = said;
+export function typedReplies(root: HTMLElement): Map<string, string> {
+  const typed = new Map<string, string>();
+  for (const box of replyBoxes(root)) {
+    if (box.value !== "" && box.dataset.thread !== undefined)
+      typed.set(box.dataset.thread, box.value);
+  }
+  return typed;
+}
+
+export function restoreReplies(root: HTMLElement, typed: Map<string, string>): void {
+  for (const [thread, said] of typed) {
+    const box = replyBox(root, thread);
+    if (box) box.value = said;
+  }
 }
 
 /**

@@ -285,3 +285,25 @@ test("a first round has no round reply, and neither does a silent agent", () => 
   );
   assert.equal(agentRoundReply([entry("reviewer", "fix this", 0)], rounds), undefined);
 });
+
+test("the round reply is the agent's --to main; a note in an item's thread stays on that card", () => {
+  const said = (prompts: ConversationEntry["prompts"]): ConversationEntry => ({
+    role: "agent",
+    at: "2025-01-01T00:05:00.000Z",
+    roundIndex: 1,
+    prompts,
+  });
+  const reply = agentRoundReply(
+    [
+      entry("reviewer", "fix this", 0),
+      said([
+        { type: "reply", thread: "t1", comment: "done: fixed" },
+        { type: "reply", thread: "main", comment: "also rebased" },
+        { type: "resolve", thread: "t1", resolved: true },
+      ]),
+    ],
+    rounds,
+  );
+
+  assert.equal(reply, "also rebased");
+});

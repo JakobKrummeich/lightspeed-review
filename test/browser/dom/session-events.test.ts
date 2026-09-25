@@ -139,6 +139,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     reopen: new FakeNode("button"),
     offer: new FakeNode("button", 'id="lsr-round-offer" hidden'),
     popup: new FakeNode("div", 'id="lsr-round-popup" hidden'),
+    connection: new FakeNode("p", 'id="lsr-connection" hidden'),
   };
   roots.review.scrollTop = 500;
   roots.intent.innerHTML = "as the reviewer left it";
@@ -152,6 +153,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       replayReopen: asPanelRoot(roots.reopen),
       roundOffer: asPanelRoot(roots.offer),
       roundPopup: asPanelRoot(roots.popup),
+      connection: asPanelRoot(roots.connection),
     },
     live,
     diff: {
@@ -164,6 +166,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       update: (fresh) => log.push(`panel ${fresh.conversation.length} said`),
       setAllApproved: () => {},
       setTurn: (turn) => log.push(`panel turn ${turn.holder}`),
+      writesLocked: () => false,
       end: () => {},
     },
     banner: {
@@ -374,6 +377,27 @@ test("a stream the browser gave up on is opened again, and a dropped one is left
   stream().emit("open");
   await settled();
   assert.equal(server.fetched, 1);
+});
+
+test("a dropped stream shows the connection chip until it opens again", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { stream, roots } = world(t).page();
+  stream().emit("open");
+  assert.equal(roots.connection.hidden, true);
+
+  // Dropped and retrying by itself: said all the same.
+  stream().emit("error");
+  assert.equal(roots.connection.hidden, false);
+  stream().emit("open");
+  assert.equal(roots.connection.hidden, true);
+
+  // Refused and reopened by the page: said until the new stream opens.
+  stream().readyState = FakeEventSource.CLOSED;
+  stream().emit("error");
+  assert.equal(roots.connection.hidden, false);
+  t.mock.timers.tick(REOPEN_MS);
+  stream().emit("open");
+  assert.equal(roots.connection.hidden, true);
 });
 
 test("a server that keeps refusing is asked ever more slowly, and an open resets the wait", (t) => {

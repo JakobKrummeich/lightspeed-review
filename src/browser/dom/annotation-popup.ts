@@ -7,6 +7,8 @@ import type { AnnotationPrompt } from "../../session-store.ts";
 export interface AnnotationPopupOptions {
   /** Selections outside it are ignored. */
   diffRoot: HTMLElement;
+  /** While the agent digests nothing is written, a line comment included. */
+  locked(): boolean;
   onQueue(prompts: AnnotationPrompt[]): void;
 }
 
@@ -33,12 +35,13 @@ export function mountAnnotationPopup(options: AnnotationPopupOptions): void {
         popup.hidden = true;
         return;
       }
-      popup.innerHTML = renderAnnotationPopup(fragments);
+      popup.innerHTML = renderAnnotationPopup(fragments, options.locked());
       showAt(popup, selection.getRangeAt(0).getBoundingClientRect());
     }, 0);
   });
 
   function queue(): boolean {
+    if (options.locked()) return false;
     const box = commentBox(popup);
     const prompts = annotationsFrom(fragments, box?.value ?? "");
     if (prompts.length === 0) return false;

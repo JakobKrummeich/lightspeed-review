@@ -45,6 +45,7 @@ interface Page {
   roundOffer: HTMLElement;
   roundPopup: HTMLElement;
   donePopup: HTMLElement;
+  connection: HTMLElement;
 }
 
 /**
@@ -69,6 +70,7 @@ function readPage(): Page | undefined {
       roundOffer: present(document.querySelector<HTMLElement>("#lsr-round-offer")),
       roundPopup: present(document.querySelector<HTMLElement>("#lsr-round-popup")),
       donePopup: present(document.querySelector<HTMLElement>("#lsr-done-popup")),
+      connection: present(document.querySelector<HTMLElement>("#lsr-connection")),
     };
   } catch {
     return undefined;
@@ -142,7 +144,11 @@ async function main(): Promise<void> {
   const { panel } = side;
   // Queueing leaves a shut panel shut: the popup already showed the words,
   // and the rail counts them.
-  mountAnnotationPopup({ diffRoot: page.diffRoot, onQueue: (prompts) => panel.queue(prompts) });
+  mountAnnotationPopup({
+    diffRoot: page.diffRoot,
+    locked: () => panel.writesLocked(),
+    onQueue: (prompts) => panel.queue(prompts),
+  });
   lockSelectionToColumn(page.diffRoot);
 
   const refreshReplay = wireOverlays(page, live, session);
@@ -244,7 +250,7 @@ function mountPanelSide(
     onEnd: (sent) => {
       // Closed on what the page already knows, without the network: ending a
       // review is the moment the server is most likely to go away (the agent's
-      // `wait` returns "ended" and shuts it down).
+      // listening command returns "ended" and shuts it down).
       banner.setEndedByReviewer(sent);
       // Refined by the server's account when there is one: other-tab ticks, a
       // reply that landed mid-send.

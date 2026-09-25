@@ -1,15 +1,17 @@
 /**
  * Which of the panel's controls are live and what they say, worked out from
  * the panel's state and whether a send is on the wire — and patched onto the
- * elements already there, never redrawn. One module so the button, Enter and
- * the question card's Answer read the same two gates and cannot come apart.
+ * elements already there, never redrawn. One module so the button, Enter, the
+ * thread replies and the resolve toggles read the same gates and cannot come
+ * apart.
  */
 import {
+  composeNote,
   composePlaceholder,
   endLabel,
-  sendIsLocked,
   sendLabel,
   SENDING_LABEL,
+  writesLocked,
   type PanelState,
 } from "../conversation-panel.ts";
 
@@ -30,43 +32,53 @@ export interface ComposeView {
 }
 
 /**
- * Answer's `disabled` and Enter's own guard read this one answer, so the
- * two cannot come apart.
- */
-export function sendRefused(view: ComposeView): boolean {
-  return view.sending || sendIsLocked(view.state);
-}
-
-/**
- * The compose row's own lock: the primary button's `disabled` and `press`
- * (which the box's Enter goes through) read it, so the one that queues on the
- * agent's turn cannot stay live where the other has stopped.
+ * Everything that writes — the compose row, a thread reply, a resolve toggle,
+ * taking a pill back — reads this one answer: frozen while a send is on the
+ * wire, while the agent digests, and on an ended review.
  */
 export function composeFrozen(view: ComposeView): boolean {
-  return view.sending || view.state.status === "ended";
+  return view.sending || writesLocked(view.state);
 }
 
 /**
  * Patched into existing elements: re-rendering would replace the textarea and
- * lose a comment typed mid-flight — the very thing the lock prevents.
- *
- * No control is taken away by the turn: the primary button queues on the
- * agent's turn, ending stays pressable (both say so on themselves), and typing
- * is never gated. The placeholder follows, since it names what Enter does.
+ * lose a comment typed mid-flight — the very thing the lock prevents. A
+ * disabled textarea keeps its words, so a draft outlives the agent's
+ * digesting turn. Ending stays pressable whatever the turn.
  */
 export function lockControls(view: ComposeView): void {
   const frozen = composeFrozen(view);
   const label = view.sending ? SENDING_LABEL : sendLabel(view.state, view.state.pending.length);
   patch(view, "#lsr-send", frozen, label);
-  patch(view, "#lsr-send-end", frozen, endLabel(view.state));
+  patch(view, "#lsr-send-end", view.sending || view.state.status === "ended", endLabel(view.state));
   patch(view, "#lsr-general-comment", frozen);
+  sayMode(view);
+  lockThreads(view, frozen);
+}
+
+/** The placeholder names what Enter does; the note what the lock means. */
+function sayMode(view: ComposeView): void {
   const box = view.composeHost?.querySelector<HTMLTextAreaElement>("#lsr-general-comment");
   if (box) box.placeholder = composePlaceholder(view.state);
-  // The question card is in the scroll, not the compose row, but it sends, so it
-  // answers to the same one gate rather than to a rule of its own.
-  const answering = view.scrollHost?.querySelector<HTMLButtonElement>(".lsr-answer-send");
-  if (answering) answering.disabled = sendRefused(view);
+  const note = view.composeHost?.querySelector(".lsr-complete");
+  if (note) note.textContent = composeNote(view.state);
 }
+
+function lockThreads(view: ComposeView, frozen: boolean): void {
+  for (const selector of THREAD_CONTROLS) {
+    for (const control of view.scrollHost?.querySelectorAll<HTMLButtonElement>(selector) ?? []) {
+      control.disabled = frozen;
+    }
+  }
+}
+
+/** In the scroll, redrawn with it: every draw re-locks them. */
+const THREAD_CONTROLS = [
+  ".lsr-thread-reply-box",
+  ".lsr-thread-reply-add",
+  ".lsr-thread-resolve",
+  ".lsr-pill-remove",
+];
 
 function patch(view: ComposeView, id: string, disabled: boolean, label?: string): void {
   const control = composeControl(view, id);

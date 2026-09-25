@@ -60,7 +60,7 @@ function figure(count: number, singular: string, many?: string): ClosingFigure {
 
 /**
  * Same readings as `EndApproval.verdict` in `src/feedback.ts` — everything,
- * nothing, a fraction, or no files at all — so the page and the `wait` payload
+ * nothing, a fraction, or no files at all — so the page and the agent's ended payload
  * cannot disagree about how a review closed.
  */
 function verdict(paths: Set<string>, approved: string[]): string {

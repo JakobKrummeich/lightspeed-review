@@ -52,3 +52,11 @@ test("a frame from a server that knows nothing of turns still says who waits", (
     turn: { holder: "reviewer", at: "" },
   });
 });
+
+test("the count of items being read comes through only as a positive whole number", () => {
+  const digesting = `"turn":{"holder":"agent","mode":"digesting","at":"T3"}`;
+  assert.equal(readPresence(`{${digesting},"items":5}`).items, 5);
+  for (const items of ["0", "-1", "2.5", '"5"', "null"]) {
+    assert.equal("items" in readPresence(`{${digesting},"items":${items}}`), false, items);
+  }
+});

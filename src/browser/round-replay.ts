@@ -1,5 +1,6 @@
 import { roundOf } from "./conversation-rounds.ts";
 import type { DiffRenderer } from "./diff-renderer.ts";
+import { MAIN_THREAD } from "../threads.ts";
 import { escapeHtml } from "../escape-html.ts";
 import type {
   ReplayAnswer,
@@ -185,8 +186,10 @@ function withNewline(text: string): string {
 
 /**
  * Read by position, not stamp alone — replies land on both sides of the round
- * boundary (a `say` carries the old stamp, one after `start` the new); what
- * they share is coming after the comments they answer.
+ * boundary (a `reply` carries the old stamp, a `publish --to` note the new);
+ * what they share is coming after the comments they answer. Only the agent's
+ * top-level words count here (`--to main`, or a 2.x message): a note in an
+ * item's thread is shown on that item's own card.
  */
 export function agentRoundReply(
   conversation: readonly ConversationEntry[],
@@ -201,8 +204,11 @@ export function agentRoundReply(
     .slice(lastComment + 1)
     .filter((entry) => entry.role === "agent" && roundOf(entry, rounds) >= made)
     .flatMap((entry) => entry.prompts)
-    .filter((prompt) => prompt.type === "message")
-    .map((prompt) => prompt.comment.trim())
+    .filter(
+      (prompt) =>
+        prompt.type === "message" || (prompt.type === "reply" && prompt.thread === MAIN_THREAD),
+    )
+    .map((prompt) => (prompt.type === "resolve" ? "" : prompt.comment.trim()))
     .filter((text) => text !== "");
   return said.length === 0 ? undefined : said.join("\n\n");
 }

@@ -34,7 +34,7 @@ export function showIntentFor(block: Pick<HTMLElement, "hidden">, focus: number 
   block.hidden = focus !== undefined;
 }
 
-/** `start` requires `--intent`, so this is a round from before it did — silence is not the same as no reason. */
+/** `open` and `publish` require `--intent`, so this is a round from before it did — silence is not the same as no reason. */
 function renderIntents(intents: string[]): string {
   if (intents.length === 0) {
     return `<p class="lsr-intent-none">This round was opened without a stated intent.</p>`;

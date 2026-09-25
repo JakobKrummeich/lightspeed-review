@@ -1,9 +1,15 @@
 import type { ConversationEntry, RoundMark } from "../session-store.ts";
 
-export interface RoundSegment {
+/** Anything said at a moment, possibly stamped with the round it was said in. */
+export interface Placed {
+  at: string;
+  roundIndex?: number;
+}
+
+export interface RoundSegment<T extends Placed = ConversationEntry> {
   round: number;
   current: boolean;
-  entries: ConversationEntry[];
+  entries: T[];
 }
 
 /**
@@ -11,10 +17,10 @@ export interface RoundSegment {
  * there is exactly the news that everything above it is older than what the
  * reviewer sees.
  */
-export function roundSegments(
-  conversation: readonly ConversationEntry[],
+export function roundSegments<T extends Placed>(
+  conversation: readonly T[],
   rounds: readonly RoundMark[],
-): RoundSegment[] {
+): RoundSegment<T>[] {
   if (conversation.length === 0) return [];
   const current = currentRound(rounds);
   const segments = grouped(conversation, rounds, current);
@@ -36,12 +42,12 @@ export function currentRound(rounds: readonly RoundMark[]): number {
  * Grouped by adjacency, not by key: shown in said order, and a clock that
  * stepped backwards must not reorder it.
  */
-function grouped(
-  conversation: readonly ConversationEntry[],
+function grouped<T extends Placed>(
+  conversation: readonly T[],
   rounds: readonly RoundMark[],
   current: number,
-): RoundSegment[] {
-  const segments: RoundSegment[] = [];
+): RoundSegment<T>[] {
+  const segments: RoundSegment<T>[] = [];
   for (const entry of conversation) {
     const round = roundOf(entry, rounds);
     const open = segments.at(-1);
@@ -58,7 +64,7 @@ function grouped(
  * the feedback the agent acted on, which belongs with the diff it was about.
  * Exported: `commented-files.ts` asks the same question and must get the same answer.
  */
-export function roundOf(entry: ConversationEntry, rounds: readonly RoundMark[]): number {
+export function roundOf(entry: Placed, rounds: readonly RoundMark[]): number {
   if (entry.roundIndex !== undefined) return entry.roundIndex;
   const opened = rounds.findLast((round) => round.at < entry.at);
   // Older than every round, or no rounds at all: first round, index 0 by construction.

@@ -3,6 +3,7 @@ import type { ApprovedFormData } from "../../rounds/approved-form.ts";
 import type { ReplayData } from "../../rounds/replay.ts";
 import type { Approval } from "../../rounds/history.ts";
 import type {
+  Batch,
   ConversationEntry,
   FeedbackPrompt,
   ReviewCloser,
@@ -30,6 +31,8 @@ export interface SessionData {
   pending: FeedbackPrompt[];
   status: SessionStatus;
   turn: Turn;
+  /** What the agent holds or last held; the page counts it while the agent digests. */
+  batch?: Batch;
   /**
    * Absent reads as "not written down", not as either party — the closing
    * summary says so in words.

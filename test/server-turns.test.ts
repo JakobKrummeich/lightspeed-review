@@ -432,7 +432,10 @@ test("the reviewer's page is told when the agent takes the turn and when it star
     await send(url, key, [annotation]);
 
     await pollAndAck(url, key);
-    assert.match(await stream.until(/"mode":"digesting"/), /"holder":"agent"/);
+    const taken = await stream.until(/"mode":"digesting"/);
+    assert.match(taken, /"holder":"agent"/);
+    // The page says how many items the agent is reading.
+    assert.match(taken, /"items":1/);
     await postWork(url, key, { plan: "splitting the helper out" });
     assert.match(await stream.until(/"mode":"working"/), /splitting the helper out/);
     stream.close();

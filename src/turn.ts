@@ -9,6 +9,7 @@
  */
 import type { StructuredOutput } from "./output.ts";
 import type { SessionRecord, Turn } from "./session-types.ts";
+import { batchSize } from "./threads.ts";
 
 export function reviewerTurn(now: string): Turn {
   return { holder: "reviewer", at: now };
@@ -64,4 +65,20 @@ export function turnLabel(session: Pick<SessionRecord, "status" | "turn">): Turn
 export function roundNumber(session: Pick<SessionRecord, "rounds">): number {
   const index = session.rounds.at(-1)?.index;
   return index === undefined ? 0 : index + 1;
+}
+
+/**
+ * What the page says about the agent off the record: whose turn, and — while
+ * the agent digests — how many items it is reading. Browser-safe: the served
+ * page, the presence frame and the bundle's first paint all read it here.
+ */
+export interface PresenceFacts {
+  turn: Turn;
+  items?: number;
+}
+
+export function presenceOf(session: Pick<SessionRecord, "turn" | "batch">): PresenceFacts {
+  const { turn, batch } = session;
+  const digesting = turn.holder === "agent" && turn.mode === "digesting";
+  return digesting && batch !== undefined ? { turn, items: batchSize(batch.prompts) } : { turn };
 }

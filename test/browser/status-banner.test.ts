@@ -42,7 +42,7 @@ test("says no status word beside the presence label, in any status", () => {
 
     assert.doesNotMatch(html, /lsr-status|data-status/, `a ${status} session shows a status line`);
     assert.doesNotMatch(html, new RegExp(`>${status}<`), `a ${status} session says its status`);
-    assert.equal(presenceText(html), "Waiting for your feedback");
+    assert.equal(presenceText(html), "Agent is listening");
   }
   const ended = renderStatusBanner(banner({ status: "ended" }));
   assert.doesNotMatch(ended, /lsr-status|>ended</, "an ended review says so only in its overlay");
@@ -50,39 +50,36 @@ test("says no status word beside the presence label, in any status", () => {
 
 /** What the header shows, as opposed to what its tooltip carries. */
 function presenceText(html: string): string | undefined {
-  return /<p class="lsr-presence"[^>]*>([^<]*)<\/p>/.exec(html)?.[1];
+  return /<p class="lsr-presence"[^>]*>([^<]*)<\/p>/.exec(html)?.[1]?.replaceAll("&#39;", "'");
 }
 
 function presenceTitle(html: string): string | undefined {
   return /<p class="lsr-presence"[^>]*title="([^"]*)"/.exec(html)?.[1];
 }
 
-/** Not "Agent is waiting": beside "Agent is working" that read as the same
- * news, when one is the reviewer's move and the other is not. */
-test("says the move is the reviewer's while an agent polls", () => {
+/** A fact about a live connection, never a timer. */
+test("says the agent is listening while an agent polls on the reviewer's turn", () => {
   const html = renderStatusBanner(banner({ agentWaiting: true }));
 
   assert.match(html, /data-waiting="true"/);
-  assert.equal(presenceText(html), "Waiting for your feedback");
-  assert.equal(presenceTitle(html), "an agent is waiting for your feedback");
+  assert.equal(presenceText(html), "Agent is listening");
+  assert.equal(presenceTitle(html), "an agent is listening: your next Send reaches it at once");
 });
 
-test("says nobody is waiting when no agent polls, rather than hiding the fact", () => {
+test("says the agent isn't listening when no agent polls, rather than hiding the fact", () => {
   const html = renderStatusBanner(banner({ agentWaiting: false }));
 
   assert.match(html, /data-waiting="false"/);
-  assert.equal(presenceText(html), "No agent is waiting");
+  assert.equal(presenceText(html), "Agent isn't listening");
 });
 
-/** The send-anyway advice is said nowhere else on the page, so the short
- * label keeps it one hover away rather than dropping it. It does not say
- * "queued": that is the Queue button's word, and this Send leaves the page. */
-test("keeps the send-anyway advice in the tooltip when nobody is waiting", () => {
+/** It does not say "queued": that is the Queue button's word, and this Send leaves the page. */
+test("keeps the send-anyway advice in the tooltip when nobody is listening", () => {
   const html = renderStatusBanner(banner({ agentWaiting: false }));
 
   assert.equal(
     presenceTitle(html),
-    "no agent is waiting — send anyway, it is handed over when the agent next waits",
+    "no agent is listening — Send anyway, it is handed over when the agent next listens",
   );
 });
 
@@ -102,22 +99,31 @@ test("shows no overlay while the review is still open", () => {
   assert.doesNotMatch(html, /lsr-ended-overlay/);
 });
 
-test("does not claim an agent is waiting on an ended review", () => {
+test("does not claim an agent is listening on an ended review", () => {
   const html = renderStatusBanner(banner({ status: "ended", agentWaiting: true }));
 
-  assert.doesNotMatch(html, /waiting for your feedback/i);
+  assert.doesNotMatch(html, /listening/i);
 });
 
-/** The header is a corner, not a sentence: the detail is written at the foot
- * of the conversation, and a long plan in the header only got cut off there. */
-test("says only that the agent is working once the turn is the agent's", () => {
-  const html = renderStatusBanner(banner({ turn: READING }));
+test("says how many items the agent is reading while it digests", () => {
+  const html = renderStatusBanner(banner({ turn: READING, items: 5 }));
 
   assert.match(html, /data-turn="agent"/);
-  assert.equal(presenceText(html), "Agent is working");
+  assert.equal(presenceText(html), "Agent is reading your 5 items");
+  assert.equal(
+    presenceText(renderStatusBanner(banner({ turn: READING, items: 1 }))),
+    "Agent is reading your 1 item",
+  );
 });
 
-test("a declared plan stays out of the header text, one hover away in the tooltip", () => {
+test("a digesting turn with no count said reads as your feedback", () => {
+  const html = renderStatusBanner(banner({ turn: READING }));
+
+  assert.equal(presenceText(html), "Agent is reading your feedback");
+});
+
+/** The whole sentence in the header; the corner cuts it with an ellipsis, the tooltip has it all. */
+test("a declared plan is what the header says it is working on", () => {
   const html = renderStatusBanner(
     banner({
       turn: {
@@ -129,17 +135,16 @@ test("a declared plan stays out of the header text, one hover away in the toolti
     }),
   );
 
-  assert.equal(presenceText(html), "Agent is working");
-  assert.equal(presenceTitle(html), "splitting the helper out");
+  assert.equal(presenceText(html), "Working on: splitting the helper out");
+  assert.equal(presenceTitle(html), "Working on: splitting the helper out");
 });
 
-test("work with no plan says the same short thing", () => {
+test("work with no plan says it is working on your feedback", () => {
   const html = renderStatusBanner(
     banner({ turn: { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" } }),
   );
 
-  assert.equal(presenceText(html), "Agent is working");
-  assert.equal(presenceTitle(html), "the agent is working on your feedback");
+  assert.equal(presenceText(html), "Working on your feedback");
 });
 
 test("a plan cannot inject markup into the header", () => {
@@ -161,18 +166,18 @@ test("a plan cannot inject markup into the header", () => {
   assert.match(html, /&quot;&gt;&lt;script&gt;/);
 });
 
-test("the turn beats waiting, since what became of the feedback is the news", () => {
-  // A second agent parked on the wait while the first is off working says
+test("the turn beats listening, since what became of the feedback is the news", () => {
+  // A second agent parked listening while the first is off digesting says
   // nothing the reviewer can act on; what became of their feedback does.
-  const html = renderStatusBanner(banner({ agentWaiting: true, turn: READING }));
+  const html = renderStatusBanner(banner({ agentWaiting: true, turn: READING, items: 2 }));
 
-  assert.equal(presenceText(html), "Agent is working");
-  assert.doesNotMatch(html, /waiting for your feedback/i);
+  assert.equal(presenceText(html), "Agent is reading your 2 items");
+  assert.doesNotMatch(html, /listening/i);
 });
 
 test("does not claim an agent is working on an ended review", () => {
   const html = renderStatusBanner(banner({ status: "ended", turn: READING }));
 
-  assert.doesNotMatch(html, /agent is working/i);
-  assert.doesNotMatch(html, /has your feedback/i);
+  assert.doesNotMatch(html, /agent is reading/i);
+  assert.doesNotMatch(html, /working on/i);
 });

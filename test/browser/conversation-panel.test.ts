@@ -30,6 +30,7 @@ const delivered: ConversationEntry[] = [
 
 const REVIEWERS_TURN: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
 const AGENTS_TURN: Turn = { holder: "agent", mode: "digesting", at: "2025-01-01T00:06:00.000Z" };
+const WORKING: Turn = { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" };
 
 const oneRound = [{ index: 0, at: "2025-01-01T00:00:00.000Z" }];
 const twoRounds = [...oneRound, { index: 1, at: "2025-01-02T00:00:00.000Z" }];
@@ -180,13 +181,28 @@ test("the label in the compose markup is the constant the panel patches back", (
   assert.match(html, new RegExp(`id="lsr-send"[^>]*>${SEND_LABEL}<`));
 });
 
-test("on the agent's turn the primary button queues, and says so", () => {
-  const html = renderCompose({ status: "open", allApproved: false, turn: AGENTS_TURN });
+test("while the agent works the primary button queues, and says so", () => {
+  const html = renderCompose({ status: "open", allApproved: false, turn: WORKING });
 
-  // Queue always: the press parks the comment in the tray instead of being taken away.
+  // The press parks the comment in the tray instead of being taken away.
   assert.match(html, new RegExp(`id="lsr-send"[^>]*>${QUEUE_LABEL}<`));
   assert.doesNotMatch(html, /id="lsr-send"[^>]*disabled/);
   assert.match(html, /placeholder="General comment — Enter queues…"/);
+  assert.match(html, /Queued items go into the next round\./);
+});
+
+test("while the agent digests the compose row is locked, not queued, and says why", () => {
+  const html = renderCompose({ status: "open", allApproved: false, turn: AGENTS_TURN });
+
+  assert.match(html, /id="lsr-send"[^>]*disabled/);
+  assert.match(html, /<textarea id="lsr-general-comment"[^>]*disabled/);
+  assert.match(html, /placeholder="Locked while the agent reads your feedback"/);
+  assert.match(
+    html,
+    /Locked while the agent reads your feedback — you can still read and approve\./,
+  );
+  // Ending is never locked but by the review being over.
+  assert.doesNotMatch(html, /id="lsr-send-end"[^>]*disabled/);
 });
 
 test("on the reviewer's turn the primary button sends, and Enter says it sends", () => {
@@ -224,10 +240,15 @@ test("on the reviewer's turn the button counts the queue it is about to send", (
   assert.match(renderPanel(panelState({ pending: [annotation] })), />Send 1 to Agent</);
 });
 
-test("the count is the reviewer's to send, so the agent's turn and an ended review show none", () => {
+test("the count is the reviewer's to send: a working turn queues and an ended review shows none", () => {
+  assert.match(
+    renderCompose({ status: "open", allApproved: false, turn: WORKING }, 3),
+    new RegExp(`id="lsr-send"[^>]*>${QUEUE_LABEL}<`),
+  );
+  // Locked, still counted: the number is what goes out once the turn is back.
   assert.match(
     renderCompose({ status: "open", allApproved: false, turn: AGENTS_TURN }, 3),
-    new RegExp(`id="lsr-send"[^>]*>${QUEUE_LABEL}<`),
+    /id="lsr-send"[^>]*disabled[^>]*>Send 3 to Agent</,
   );
   assert.match(
     renderCompose({ status: "ended", allApproved: false, turn: REVIEWERS_TURN }, 3),
@@ -241,14 +262,20 @@ test("the compose row carries a polite, hidden region for what a Queue press did
   assert.match(html, /<p id="lsr-queue-status" class="lsr-visually-hidden" role="status"><\/p>/);
 });
 
-test("an empty tray on the agent's turn points at the box as well as the diff", () => {
-  const agents = renderScroll(panelState({ turn: AGENTS_TURN }));
+test("an empty tray while the agent works points at the box as well as the diff", () => {
+  const working = renderScroll(panelState({ turn: WORKING }));
   const reviewers = renderScroll(panelState());
+  const digesting = renderScroll(panelState({ turn: AGENTS_TURN }));
 
-  assert.match(agents, /Nothing queued — select diff text, or type below, to add feedback\./);
+  assert.match(working, /Nothing queued — select diff text, reply in a thread, or type below\./);
   // On the reviewer's turn the box sends rather than queues: pointing at it
   // from the queue would promise a pill that never appears.
-  assert.match(reviewers, /Nothing queued — select diff text to add feedback\./);
+  assert.match(
+    reviewers,
+    /Nothing queued — select diff text or reply in a thread to add feedback\./,
+  );
+  // Locked: nothing to point at.
+  assert.match(digesting, /<p class="lsr-empty">Nothing queued\.<\/p>/);
 });
 
 test("an approved review says so above the button that finishes it", () => {
@@ -355,9 +382,9 @@ test("the round line is a separator to a screen reader, named as one", () => {
 });
 
 test("an agent away with the feedback is said at the foot of the conversation", () => {
-  const html = renderScroll(panelState({ conversation: delivered, turn: AGENTS_TURN }));
+  const html = renderScroll(panelState({ conversation: delivered, turn: AGENTS_TURN, items: 3 }));
 
-  assert.match(html, /the agent has your feedback/);
+  assert.match(html, /Agent is reading your 3 items/);
   assert.ok(
     html.indexOf("lsr-working") > html.indexOf("done, wrapped it"),
     "it waits where the next answer will be written, under everything said so far",
@@ -368,9 +395,7 @@ test("an agent away with the feedback is said at the foot of the conversation", 
   );
 });
 
-test("an agent at work on a plan says the plan alone at the foot, not what kind of work it is", () => {
-  // A plan is as often "answering your question" as "writing the code"; a prefix
-  // naming one of them misreads the other.
+test("an agent at work on a plan says what it is working on at the foot", () => {
   const html = renderScroll(
     panelState({
       turn: {
@@ -382,8 +407,7 @@ test("an agent at work on a plan says the plan alone at the foot, not what kind 
     }),
   );
 
-  assert.match(html, /<\/span>\s*answering your question about the cache\s*<\/p>/);
-  assert.doesNotMatch(html, /implementing/);
+  assert.match(html, /<\/span>\s*Working on: answering your question about the cache\s*<\/p>/);
 });
 
 test("an agent at work with no plan says it is working on your feedback", () => {
@@ -391,8 +415,7 @@ test("an agent at work with no plan says it is working on your feedback", () => 
     panelState({ turn: { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" } }),
   );
 
-  assert.match(html, /the agent is working on your feedback/);
-  assert.doesNotMatch(html, /implementing/);
+  assert.match(html, /Working on your feedback/);
 });
 
 test("the breathing dots are hidden from a reader the sentence already tells", () => {
@@ -452,117 +475,161 @@ test("the chapter name is not repeated under every comment", () => {
   assert.doesNotMatch(html, /class="lsr-prompt-file"[^>]*>API/);
 });
 
-test("comments in one card stand apart: each prompt is its own block", () => {
-  const html = renderPanel(panelState({ conversation: delivered }));
-
-  assert.match(html, /<div class="lsr-prompt">/);
-});
-
-const question: FeedbackPrompt = {
-  type: "message",
-  comment: "should the retry be per-request or per-batch?",
-  kind: "question",
-};
-
-function asked(...after: ConversationEntry[]): ConversationEntry[] {
-  return [
-    { role: "agent", at: "2025-01-01T00:05:00.000Z", roundIndex: 0, prompts: [question] },
-    ...after,
-  ];
+function entry(
+  role: "reviewer" | "agent",
+  at: string,
+  prompts: FeedbackPrompt[],
+): ConversationEntry {
+  return { role, at, roundIndex: 0, prompts };
 }
 
-test("a question the agent asked is drawn as a card, not as one more remark", () => {
-  const html = renderScroll(panelState({ conversation: asked() }));
+const t1: FeedbackPrompt = { ...annotation, id: "t1", side: "new", line_start: 3, line_end: 3 };
+const t2: FeedbackPrompt = { type: "message", id: "t2", comment: "why a new table?" };
 
-  assert.match(html, /<div class="lsr-prompt" data-kind="question">/);
-  assert.match(html, /the agent is asking/);
-  assert.match(html, /per-request or per-batch/);
+const exchange: ConversationEntry[] = [
+  entry("reviewer", "2025-01-01T00:00:00.000Z", [t1, t2]),
+  entry("agent", "2025-01-01T00:05:00.000Z", [
+    { type: "reply", thread: "t2", comment: "to keep the old reads cheap" },
+  ]),
+  entry("reviewer", "2025-01-01T00:06:00.000Z", [
+    { type: "reply", thread: "t2", comment: "and the writes?" },
+  ]),
+  entry("agent", "2025-01-01T00:07:00.000Z", [{ type: "reply", thread: "t2", comment: "batched" }]),
+];
+
+test("every item is a thread card named by its id, with its exchange stacked in time order", () => {
+  const html = renderScroll(panelState({ conversation: exchange }));
+
+  assert.equal(html.match(/<article class="lsr-thread"/g)?.length, 2);
+  assert.match(html, /<span class="lsr-thread-id">t1<\/span>/);
+  assert.match(html, /<span class="lsr-thread-id">t2<\/span>/);
+  const order = ["why a new table?", "to keep the old reads cheap", "and the writes?", "batched"];
+  const at = order.map((said) => html.indexOf(said));
+  assert.deepEqual(
+    [...at].sort((a, b) => a - b),
+    at,
+    "the exchange reads top to bottom",
+  );
+  assert.ok(at.every((index) => index > html.indexOf("t2</span>")));
 });
 
-/** "AGENT" stacked on "THE AGENT IS ASKING" read as one header said twice. */
-test("a card that opens with a question is headed by the question, not by the role too", () => {
-  const html = renderScroll(panelState({ conversation: asked() }));
+test("each message is its own block, never nested, and says who spoke", () => {
+  const html = renderScroll(panelState({ conversation: exchange }));
 
-  assert.doesNotMatch(html, /lsr-entry-role/);
+  assert.equal(html.match(/<div class="lsr-message" data-role="agent">/g)?.length, 2);
+  assert.equal(html.match(/<div class="lsr-message" data-role="reviewer">/g)?.length, 3);
+  assert.match(html, /<p class="lsr-message-role">you<\/p>/);
+  assert.match(html, /<p class="lsr-message-role">agent<\/p>/);
+  assert.doesNotMatch(html, /lsr-message"[^]*?<div class="lsr-message"[^]*?<\/div>\s*<\/div>/);
+});
+
+test("a line thread keeps its jump to the lines and its quoted selection", () => {
+  const html = renderScroll(panelState({ conversation: exchange }));
+
   assert.match(
     html,
-    /<article[^>]*data-role="agent">\s*<div class="lsr-prompt" data-kind="question">/,
+    /class="lsr-prompt-file" data-file="src\/api\/users.ts" data-side="new" data-line="3"/,
   );
+  assert.match(html, /<pre class="lsr-prompt-selection">\+const user = 1;<\/pre>/);
 });
 
-test("a question after a remark keeps the card's role label over the remark", () => {
+test("the reply box sits at the bottom of each thread, named for it", () => {
+  const html = renderScroll(panelState({ conversation: exchange }));
+
+  assert.match(
+    html,
+    /<textarea class="lsr-thread-reply-box" data-thread="t2"[^>]*aria-label="Reply in t2"/,
+  );
+  assert.match(
+    html,
+    /<button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="t2">Reply<\/button>/,
+  );
+  const thread = html.slice(html.indexOf("t2</span>"));
+  assert.ok(thread.indexOf("batched") < thread.indexOf("lsr-thread-reply-box"));
+});
+
+test("a resolve toggle folds the whole thread to its head and a one-line summary", () => {
+  const resolved = [
+    ...exchange,
+    entry("reviewer", "2025-01-01T00:08:00.000Z", [
+      { type: "resolve", thread: "t2", resolved: true },
+    ]),
+  ];
+  const html = renderScroll(panelState({ conversation: resolved }));
+
+  assert.match(html, /data-resolved="true"/);
+  assert.match(html, /<p class="lsr-thread-summary">why a new table\?<\/p>/);
+  assert.match(html, /class="lsr-thread-resolve" data-thread="t2" aria-expanded="false">Reopen</);
+  assert.doesNotMatch(html, /batched/, "the exchange is folded away");
+  assert.doesNotMatch(html, /data-thread="t2" placeholder/, "and its reply box with it");
+  assert.match(html, /class="lsr-thread-resolve" data-thread="t1" aria-expanded="true">Resolve</);
+});
+
+test("a queued resolve folds the thread at once and says it goes with the next Send", () => {
+  const html = renderScroll(
+    panelState({
+      conversation: exchange,
+      pending: [{ type: "resolve", thread: "t2", resolved: true }],
+    }),
+  );
+
+  assert.match(html, /resolves on your next Send/);
+  assert.match(html, /<p class="lsr-thread-summary">why a new table\?<\/p>/);
+  // The pill in the tray says the same, so it can be taken back.
+  assert.match(html, /<p class="lsr-prompt-comment">resolve t2<\/p>/);
+});
+
+test("a queued reply names its thread in the tray", () => {
+  const html = renderScroll(
+    panelState({ pending: [{ type: "reply", thread: "t2", comment: "ok, go" }] }),
+  );
+
+  assert.match(html, /<span class="lsr-pill-thread">reply in t2<\/span>/);
+  assert.match(html, /ok, go/);
+});
+
+test("the agent's --to main is a thread of its own with nothing that opened it", () => {
   const html = renderScroll(
     panelState({
       conversation: [
-        {
-          role: "agent",
-          at: "2025-01-01T00:05:00.000Z",
-          roundIndex: 0,
-          prompts: [{ type: "message", comment: "done with the retry" }, question],
-        },
+        entry("agent", "2025-01-01T00:05:00.000Z", [
+          { type: "reply", thread: "main", comment: "rebased on main first" },
+        ]),
       ],
     }),
   );
 
-  assert.match(html, /<header class="lsr-entry-role">agent<\/header>\s*<div class="lsr-prompt">/);
-  assert.match(html, /the agent is asking/);
+  assert.match(html, /<span class="lsr-thread-id">main<\/span>/);
+  assert.match(html, /rebased on main first/);
+  assert.match(html, /data-thread="main"/);
 });
 
-test("the open question carries its own answer box and its own press", () => {
-  const html = renderScroll(panelState({ conversation: asked() }));
-
-  assert.match(html, /class="lsr-answer-box"/);
-  assert.match(html, /class="lsr-answer-send"/);
-  // The box says what the press does, because it is not the button beneath it:
-  // it sends this text and leaves the queue alone.
-  assert.match(html, /sends this alone/);
-});
-
-/** A question is open while nothing has been said after it. Once the reviewer
- * answers, the agent has stopped waiting, and a box still sitting there would
- * invite an answer to a question nobody is listening for. */
-test("an answered question keeps its card and loses its box", () => {
+/** 2.x said things before items had ids: readable, but there is no id to answer in. */
+test("words from before items had ids are shown read-only", () => {
+  const legacy: FeedbackPrompt = {
+    type: "message",
+    comment: "should the retry be per-request or per-batch?",
+    kind: "question",
+  };
   const html = renderScroll(
-    panelState({
-      conversation: asked({
-        role: "reviewer",
-        at: "2025-01-01T00:06:00.000Z",
-        roundIndex: 0,
-        prompts: [{ type: "message", comment: "per-batch" }],
-      }),
-    }),
+    panelState({ conversation: [entry("agent", "2025-01-01T00:05:00.000Z", [legacy])] }),
   );
 
-  assert.match(html, /data-kind="question"/);
-  assert.match(html, /the agent is asking/);
-  assert.doesNotMatch(html, /lsr-answer-box/);
+  assert.match(html, /data-legacy="true"/);
+  assert.match(html, /per-request or per-batch/);
+  assert.doesNotMatch(html, /lsr-thread-reply-box|lsr-thread-resolve|lsr-thread-id/);
 });
 
-test("an ended review answers nothing, whatever was left hanging", () => {
-  const html = renderScroll(panelState({ status: "ended", conversation: asked() }));
-
-  assert.doesNotMatch(html, /lsr-answer-box/);
-});
-
-/** Only questions are cards. An ordinary `say` is the agent reporting, and a
- * card around every sentence would make the one that blocks it unfindable. */
-test("what the agent merely said is not drawn as a question", () => {
-  const html = renderScroll(panelState({ conversation: delivered }));
-
-  assert.doesNotMatch(html, /data-kind="question"/);
-  assert.doesNotMatch(html, /lsr-answer-box/);
-});
-
-test("a question escapes like everything else the agent writes", () => {
+test("a thread escapes like everything else either side writes", () => {
   const html = renderScroll(
     panelState({
       conversation: [
-        {
-          role: "agent",
-          at: "2025-01-01T00:05:00.000Z",
-          roundIndex: 0,
-          prompts: [{ type: "message", comment: "<script>alert(1)</script>", kind: "question" }],
-        },
+        entry("reviewer", "2025-01-01T00:00:00.000Z", [
+          { type: "message", id: "t1", comment: "<script>alert(1)</script>" },
+        ]),
+        entry("agent", "2025-01-01T00:05:00.000Z", [
+          { type: "reply", thread: "t1", comment: "<SCRIPT src=x>" },
+        ]),
       ],
     }),
   );
@@ -571,4 +638,24 @@ test("a question escapes like everything else the agent writes", () => {
   // tag would pass while the panel served `<SCRIPT>` or `<script src=x>`.
   assert.doesNotMatch(html, /<script/i);
   assert.match(html, /&lt;script&gt;/);
+});
+
+test("threads are placed by the round they opened in", () => {
+  const html = renderScroll(
+    panelState({
+      rounds: twoRounds,
+      conversation: [
+        ...exchange,
+        {
+          role: "reviewer",
+          at: "2025-01-02T00:01:00.000Z",
+          roundIndex: 1,
+          prompts: [{ type: "message", id: "t3", comment: "one more" }],
+        },
+      ],
+    }),
+  );
+
+  const round2 = html.indexOf("Round 2");
+  assert.ok(html.indexOf("t2</span>") < round2 && round2 < html.indexOf("t3</span>"));
 });

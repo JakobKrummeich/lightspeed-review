@@ -111,3 +111,10 @@ button[disabled] {
   color: var(--lsr-text);
   font-weight: 500;
 }
+
+/* Said in the popup, where the reviewer reached for a comment box. */
+.lsr-popup-locked {
+  margin: 0;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-meta);
+}

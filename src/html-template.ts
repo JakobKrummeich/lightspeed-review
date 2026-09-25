@@ -5,6 +5,7 @@ import { currentCommits, currentIntents } from "./rounds/session-round.ts";
 import { COLOR_SCHEME_OPTIONS, DEFAULT_SCHEME } from "./browser/color-scheme.ts";
 import { DEFAULT_FORMAT, VIEW_FORMAT_OPTIONS } from "./browser/view-format.ts";
 import type { SessionRecord } from "./session-store.ts";
+import { presenceOf } from "./turn.ts";
 
 /**
  * Groups and diffs are fetched from `/api/session/:key/data` by the browser
@@ -41,7 +42,8 @@ export function renderReviewPage(session: SessionRecord): string {
            reloading mid-silence reads that the agent is working in the first
            paint, not one SSE frame later. Nobody is waiting until a live wait
            says so, which only the running server knows. -->
-      <div id="lsr-status-banner">${renderStatusBanner({ status: session.status, agentWaiting: false, turn: session.turn, review: session })}</div>
+      <p id="lsr-connection" class="lsr-connection" role="status" hidden>Connection lost — reconnecting…</p>
+      <div id="lsr-status-banner">${renderStatusBanner({ status: session.status, agentWaiting: false, ...presenceOf(session), review: session })}</div>
     </header>
     <main id="lsr-review" class="lsr-review">
       <section id="lsr-intent" class="lsr-intent">${renderIntent({

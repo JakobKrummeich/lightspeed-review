@@ -30,6 +30,8 @@ export interface RoundHosts {
   replayReopen: HTMLElement;
   roundOffer: HTMLElement;
   roundPopup: HTMLElement;
+  /** The "connection lost, reconnecting" chip: shown while the stream is down. */
+  connection: HTMLElement;
 }
 
 export interface LiveSession {
@@ -120,7 +122,7 @@ function openStream(
 ): void {
   const { page, live, panel, banner } = wired;
   const events = new EventSource(`/api/session/${page.key}/events`);
-  // The server keeps no backlog (streams.ts is an in-memory map): a `start`
+  // The server keeps no backlog (streams.ts is an in-memory map): an `open`
   // right after `stop` publishes its round before this tab has reconnected,
   // and a round can land between the page's `/data` load and its first
   // subscribe. So every open, the first included, asks for the session;
@@ -128,6 +130,7 @@ function openStream(
   // path's business: the presence frame written on subscribe carries it,
   // and `applyRound` never touches it.
   events.addEventListener("open", () => {
+    page.connection.hidden = true;
     reopen.delay = REOPEN_MS;
     syncSession("opened");
   });
@@ -152,12 +155,15 @@ function openStream(
   events.addEventListener("presence", (event: MessageEvent<string>) => {
     const presence = readPresence(event.data);
     banner.setPresence(presence);
-    panel.setTurn(presence.turn);
+    panel.setTurn(presence.turn, presence.items);
     wired.finish.setTurn(presence.turn);
   });
   // A dropped stream reconnects by itself; a refused one never does. The
   // wait doubles while the server keeps refusing, and resets on an open.
+  // Said whichever way it dropped: a page that goes quiet with no word reads
+  // as an agent that has nothing to say.
   events.addEventListener("error", () => {
+    page.connection.hidden = false;
     if (events.readyState !== EventSource.CLOSED) return;
     setTimeout(() => openStream(wired, syncSession, reopen), reopen.delay);
     reopen.delay = nextReopenDelay(reopen.delay);

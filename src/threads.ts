@@ -23,7 +23,13 @@ export interface ThreadMessage {
 }
 
 export interface Thread {
+  /** Empty on a legacy thread. */
   id: string;
+  /**
+   * Said before 3.0 gave items ids: shown so the old conversation stays
+   * readable, but there is no thread id to reply in or resolve.
+   */
+  legacy?: true;
   /** What opened it; absent on `main`. */
   item?: AnnotationPrompt | MessagePrompt;
   /** Oldest first, the item's own comment included. */
@@ -49,6 +55,7 @@ function addToThreads(
   const said = messageOf(entry, prompt);
   if (prompt.type === "annotation" || prompt.type === "message") {
     if (prompt.id !== undefined) threads.set(prompt.id, opened(entry, prompt, said));
+    else threads.set(`legacy ${threads.size}`, { ...opened(entry, prompt, said), legacy: true });
     return;
   }
   const thread = threadNamed(threads, prompt.thread, entry);
@@ -73,7 +80,7 @@ function opened(
   item: AnnotationPrompt | MessagePrompt,
   said: ThreadMessage,
 ): Thread {
-  return { id: item.id!, item, messages: [said], resolved: false, ...placed(entry) };
+  return { id: item.id ?? "", item, messages: [said], resolved: false, ...placed(entry) };
 }
 
 function main(entry: ConversationEntry): Thread {
@@ -112,6 +119,17 @@ export function threadIds(prompts: FeedbackPrompt[]): Set<string> {
     }
   }
   return ids;
+}
+
+/**
+ * How many items a batch holds, as the agent is handed them: one per thread it
+ * touches, however many words went into that thread.
+ */
+export function batchSize(prompts: FeedbackPrompt[]): number {
+  const touched = prompts.map((prompt) =>
+    prompt.type === "reply" || prompt.type === "resolve" ? prompt.thread : prompt.id,
+  );
+  return new Set(touched.filter((id) => id !== undefined)).size;
 }
 
 export type BatchItemStatus = "new" | "reply" | "resolved" | "reopened";

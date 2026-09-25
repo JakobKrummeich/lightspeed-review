@@ -26,6 +26,7 @@ import { messageOf, sendJson } from "./server/http.ts";
 import type { LedgerReport } from "./server/ledger-log.ts";
 import { hostIsAllowed, originIsAllowed } from "./server/security.ts";
 import { SessionTransport } from "./server/streams.ts";
+import { presenceOf } from "./turn.ts";
 import type { SessionStore } from "./session-store.ts";
 import { DEFAULT_STATIC_DIR, loadAssets } from "./static-assets.ts";
 import { CLI_VERSION } from "./version.ts";
@@ -61,7 +62,10 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   const assets = loadAssets(staticDir);
   // Reads the turn off the store rather than holding one: the presence frame is
   // then whatever the last write said, restart or no restart.
-  const transport = new SessionTransport((key) => options.store.get(key)?.turn);
+  const transport = new SessionTransport((key) => {
+    const session = options.store.get(key);
+    return session === undefined ? undefined : presenceOf(session);
+  });
   /** One id source per server: it orders every record this run writes. */
   const nextId = createIdSource();
   let server: Server | undefined;

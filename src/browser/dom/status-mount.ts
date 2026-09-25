@@ -1,5 +1,6 @@
 import { renderStatusBanner, type StatusState } from "../status-banner.ts";
 import type { AgentPresence } from "../agent-presence.ts";
+import { presenceOf } from "../../turn.ts";
 import type { SessionData } from "./session-api.ts";
 import type { ConversationEntry, FeedbackPrompt } from "../../session-store.ts";
 
@@ -22,7 +23,7 @@ export function mountStatusBanner(session: SessionData): MountedStatusBanner {
   let state: StatusState = {
     status: session.status,
     agentWaiting: false,
-    turn: session.turn,
+    ...presenceOf(session),
     review: session,
   };
   let drawn = renderStatusBanner(state);
@@ -34,7 +35,12 @@ export function mountStatusBanner(session: SessionData): MountedStatusBanner {
     root.innerHTML = html;
   };
   return {
-    setPresence: ({ waiting, turn }) => draw({ ...state, agentWaiting: waiting, turn }),
+    setPresence: ({ waiting, turn, items }) => {
+      const next: StatusState = { ...state, agentWaiting: waiting, turn };
+      if (items === undefined) delete next.items;
+      else next.items = items;
+      draw(next);
+    },
     setSession: (fresh) => draw({ ...state, status: fresh.status, review: fresh }),
     setEndedByReviewer: (sent) =>
       draw({
