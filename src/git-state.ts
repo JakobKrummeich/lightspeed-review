@@ -51,6 +51,11 @@ function contentHash(path: string): string {
   }
 }
 
+/** Whether `name` resolves to a commit here: a branch, a tag, a sha. */
+export function isCommit(repoRoot: string, name: string): boolean {
+  return quietGit(repoRoot, ["rev-parse", "--verify", "--quiet", `${name}^{commit}`]) !== undefined;
+}
+
 function quietGit(repoRoot: string, args: string[]): string | undefined {
   try {
     return execFileSync("git", args, {

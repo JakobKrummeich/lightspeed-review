@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ReviewError } from "../src/errors.ts";
-import { missingSession, resolveSession } from "../src/session-resolve.ts";
+import { missingSession, resolveSession, textAsBranch } from "../src/session-resolve.ts";
 import type { SessionRecord } from "../src/session-store.ts";
 
 function session(overrides: Partial<SessionRecord>): SessionRecord {
@@ -183,4 +183,44 @@ test("a review the agent ended is said to be the agent's doing", () => {
       return true;
     },
   );
+});
+
+/** Only a word that could be nothing but text is called text: every other case keeps its own answer. */
+test("a would-be branch is read as spilled text only when nothing else explains it", () => {
+  const live = session({ branch: "feature/greeting" });
+  const ask = (overrides: Partial<Parameters<typeof textAsBranch>[0]>) =>
+    textAsBranch({
+      verb: "reply",
+      repoRoot: "/repo",
+      branch: "it",
+      sessions: [live],
+      isRef: () => false,
+      ...overrides,
+    })?.code;
+
+  assert.equal(ask({}), "invalid_arguments");
+  assert.equal(ask({ verb: "approvals" }), undefined, "a verb that takes no text");
+  assert.equal(ask({ branch: undefined }), undefined, "left to the store");
+  assert.equal(ask({ isRef: () => true }), undefined, "a real branch with no review");
+  assert.equal(ask({ sessions: [session({ status: "ended" })] }), undefined, "no live review");
+  assert.equal(
+    ask({ sessions: [live, session({ branch: "it", status: "ended" })] }),
+    undefined,
+    "a review of that name exists",
+  );
+});
+
+test("with several live reviews, spilled text is answered with the general form", () => {
+  const error = textAsBranch({
+    verb: "work",
+    repoRoot: "/repo",
+    branch: "the",
+    sessions: [session({ branch: "a" }), session({ branch: "b" })],
+    isRef: () => false,
+  });
+
+  assert.equal(error?.message, "'the' is not a branch — quote the whole plan");
+  assert.deepEqual(error?.suggestions, [
+    "Run `lightspeed work '<plan>' <branch> [base]`, each text in one pair of quotes",
+  ]);
 });

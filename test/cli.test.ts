@@ -176,6 +176,8 @@ test("a session the server does not know is named the same way as one on disk", 
     }),
   );
 
+  git(repoRoot, "branch", "other/branch");
+
   const { stdout, code } = await runCli(["work", "the plan", "other/branch", "main"], repoRoot);
 
   assert.equal(code, 2);
@@ -184,6 +186,46 @@ test("a session the server does not know is named the same way as one on disk", 
   assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
   // The way out keeps the argument the verb needs, so it runs as printed.
   assert.match(stdout, /lightspeed work '<plan>' feature\/greeting main/);
+});
+
+/**
+ * `reply --to main fixed it`: the shell split the text, and its last word reads
+ * as a branch. No such branch and a live review here means the words were text.
+ */
+test("a word after an unquoted --to text that is no branch is named as text to quote", async () => {
+  const repoRoot = emptyRepo();
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+
+  const { stdout, code } = await runCli(["reply", "--to", "main", "fixed", "it"], repoRoot);
+
+  assert.equal(code, 2);
+  assert.match(stdout, /^ {2}code: invalid_arguments$/m);
+  assert.match(stdout, /message: 'it' is not a branch — quote the whole text after --to$/m);
+  assert.match(stdout, /lightspeed reply --to <id> '<answer>' feature\/greeting main/);
+});
+
+test("a word after an unquoted plan that is no branch is named as part of the plan", async () => {
+  const repoRoot = emptyRepo();
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+
+  const { stdout, code } = await runCli(["work", "split", "the", "handler"], repoRoot);
+
+  assert.equal(code, 2);
+  assert.match(stdout, /message: 'the' is not a branch — quote the whole plan$/m);
+  assert.match(stdout, /lightspeed work '<plan>' feature\/greeting main/);
+});
+
+test("a publish whose --to text spilled into the branch is refused before any git work", async () => {
+  const repoRoot = emptyRepo();
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+
+  const { stdout, code } = await runCli(
+    ["publish", "--intent", "why", "--to", "main", "done:", "signed"],
+    repoRoot,
+  );
+
+  assert.equal(code, 2);
+  assert.match(stdout, /message: 'signed' is not a branch — quote the whole text after --to$/m);
 });
 
 /** Regression: the strict config load gated `approvals` on a `model` it never uses. */

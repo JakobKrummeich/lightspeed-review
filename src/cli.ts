@@ -30,7 +30,14 @@ import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
 import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
-import { missingSession, resolveSession, type ResolvedSession } from "./session-resolve.ts";
+import {
+  missingSession,
+  resolveSession,
+  textAsBranch,
+  type ResolvedSession,
+  type TextAsBranchInput,
+} from "./session-resolve.ts";
+import { isCommit } from "./git-state.ts";
 import { SessionStore } from "./session-store.ts";
 import { refreshSkills, skillNoticeOutput, type StaleSkill } from "./skill-freshness.ts";
 import { HELP_END, HELP_OPEN, TURN_RULES } from "./turn-help.ts";
@@ -100,6 +107,11 @@ interface SessionContext extends ResolvedSession {
   config: ServiceConfig;
 }
 
+function refuseTextAsBranch(input: Omit<TextAsBranchInput, "isRef">): void {
+  const refusal = textAsBranch({ ...input, isRef: (name) => isCommit(input.repoRoot, name) });
+  if (refusal !== undefined) throw refusal;
+}
+
 /**
  * The `session_not_found` catch lives here because this is the only layer that
  * has both halves: the store knows what is open in this repository, and the
@@ -114,6 +126,7 @@ async function onSession<T>(
 ): Promise<T> {
   const { repoRoot, config } = repoContext();
   const sessions = new SessionStore(config.stateDir).list();
+  refuseTextAsBranch({ verb, repoRoot, branch, sessions });
   const target = resolveSession(sessions, repoRoot, branch, base);
   try {
     return await run({ repoRoot, config, ...target });
@@ -152,6 +165,7 @@ async function publishCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, model, intents, notes } = parsePublishArgs(args);
   const { repoRoot, config } = groupingContext();
   const sessions = new SessionStore(config.stateDir).list();
+  refuseTextAsBranch({ verb: "publish", repoRoot, branch, sessions });
   const target = resolveSession(sessions, repoRoot, branch, base);
   return await runPublish({
     repoRoot,
