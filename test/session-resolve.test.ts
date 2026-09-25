@@ -115,12 +115,14 @@ test("with one live session in this repository the branch may be omitted", () =>
   });
 });
 
-test("no session in this repository is an ambiguous_session error", () => {
+/** Nothing to choose between is not a choice: the code says what the message says. */
+test("no session in this repository is a session_not_found error", () => {
   assert.throws(
     () => resolveSession([session({ repoRoot: "/elsewhere" })], "/repo", undefined, undefined),
     (error: unknown) => {
       assert.ok(error instanceof ReviewError);
-      assert.equal(error.code, "ambiguous_session");
+      assert.equal(error.code, "session_not_found");
+      assert.equal(error.message, "no live review session for /repo");
       return true;
     },
   );

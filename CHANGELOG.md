@@ -44,7 +44,9 @@ quote the whole text after --to`).
   and the tip before any model call. `open` on a working turn is refused, and an
   `--intent` on a live review is reported as ignored.
 - A branchless command on a repository whose latest review ended is refused
-  `session_ended`, naming who ended it. Server-gone failures name
+  `session_ended`, naming who ended it; with no review here at all it is
+  `session_not_found` (was `ambiguous_session`, which now means several live
+  reviews). Server-gone failures name
   `lightspeed open <branch> [base]`, which restarts the server and re-attaches.
 - Bare `lightspeed` names the one next command for the session it shows, and
   asks the server whether a wait is already parked before it suggests `open`.

@@ -282,7 +282,7 @@ test("open without a branch and no live review names the branch it needs", async
   const { stdout, code } = await runCli(["open"], emptyRepo());
 
   assert.equal(code, 2);
-  assert.match(stdout, /^ {2}code: ambiguous_session$/m);
+  assert.match(stdout, /^ {2}code: session_not_found$/m);
   assert.match(stdout, /lightspeed open <branch> \[base\] --intent/);
 });
 

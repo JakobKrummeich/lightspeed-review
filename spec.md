@@ -202,7 +202,9 @@ digesting answers `turn_still_yours`; `publish` on an unmoved HEAD answers
 answers `feedback_item_unknown`. On an ended review every command that speaks
 into it is refused `session_ended`, pointing at `lightspeed approvals <branch>
 <base>` for the verdict it ended on, and a branchless command on a repository
-whose latest review ended is refused the same way, naming who ended it; only
+whose latest review ended is refused the same way, naming who ended it (with no
+review here at all, `session_not_found`; with several live ones,
+`ambiguous_session`); only
 when the reviewer asks does `open --reopen` start a new round. `publish` checks
 the turn, the review and the tip against the session file before it extracts or
 groups anything, so a refused publish costs no model call.

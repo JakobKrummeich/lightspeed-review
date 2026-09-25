@@ -144,7 +144,7 @@ function noneLive(sessions: SessionRecord[], repoRoot: string): ReviewError {
   const latest = latestHere(sessions, repoRoot);
   if (latest?.status === "ended") return endedHere(latest);
   return new ReviewError({
-    code: "ambiguous_session",
+    code: "session_not_found",
     message: `no live review session for ${repoRoot}`,
     suggestions: [NAME_THE_BRANCH, `Run \`${openCall("<branch> [base]")}\` to open one`],
   });

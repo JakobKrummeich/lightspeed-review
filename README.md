@@ -576,7 +576,9 @@ the same command cannot help — a wrong command line, or a move wrong for the
 review's state, `session_ended`, `session_not_found` and `ambiguous_session`
 included — so read the help, do not retry; exit 1 when the machine got in the
 way (server, git, model, config). A branchless command on a repository whose
-latest review ended is refused `session_ended`, naming who ended it. There is no timer
+latest review ended is refused `session_ended`, naming who ended it; with no
+review here at all it is refused `session_not_found`, and with several live ones
+`ambiguous_session`. There is no timer
 and no override: an agent that died holding the turn is recovered by re-running
 the command it died in.
 
