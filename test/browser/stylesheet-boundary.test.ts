@@ -9,6 +9,7 @@ import {
 import { renderClosingSummary, type ClosedReview } from "../../src/browser/closing-summary.ts";
 import { renderIntent } from "../../src/browser/intent-view.ts";
 import { renderOpening } from "../../src/browser/opening-view.ts";
+import { renderProgressBar } from "../../src/browser/progress-bar.ts";
 import { renderReplayOverlay } from "../../src/browser/round-replay.ts";
 import type { ApprovedFormData } from "../../src/rounds/approved-form.ts";
 import type { ReplayComment } from "../../src/rounds/replay.ts";
@@ -192,8 +193,8 @@ function approvedForms(): string {
  *
  * The emitters not listed here are guarded by nothing; adding one is an entry
  * plus a fixture, where every class the module draws is painted in one area.
- * Measured 2026-09-25, two of the remaining ten qualify: progress-bar.ts
- * (page.css) and annotation.ts (popup.css). The rest want a
+ * Measured 2026-09-25, one of the remaining nine qualifies: annotation.ts
+ * (popup.css). The rest want a
  * decision about where an area's edge runs that this table has no shape for:
  * diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts,
  * status-banner.ts and full-file.ts each draw across two or more areas by
@@ -241,6 +242,14 @@ const AREA_OWNERS: AreaOwner[] = [
       renderIntent({ intents: ["sign the tokens"], commits: [] }) +
       renderIntent({ intents: [], commits: ["some commit"] }),
     marker: "lsr-intent-press",
+  },
+  {
+    module: "src/browser/progress-bar.ts",
+    area: "page.css",
+    // A review with a file draws the bar as well as the count; an empty one
+    // draws the count alone, so this one shape reaches every class.
+    render: () => renderProgressBar(CLOSED_REVIEW.groups, []),
+    marker: "lsr-progress-segment",
   },
 ];
 
