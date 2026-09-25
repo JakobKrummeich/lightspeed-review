@@ -1,13 +1,16 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * What a `reply` from `working` is measured against (W2): the branch tip and
- * the working tree where `work` found them. `tree` is a hash of `git status
- * --porcelain`, so a tree already dirty at `work` — a scratch file, an
- * unrelated edit — is not read as half-written code; only a change since is.
- * Unreadable reads as "cannot vouch" — no head, no tree, not clean — so a
- * broken git refuses the reply rather than waving it through.
+ * the working tree where `work` found them. `tree` hashes the tree's content —
+ * every tracked change against HEAD plus each untracked file's name and bytes —
+ * so a tree already dirty at `work` (a scratch file, an unrelated edit) is not
+ * read as half-written code, while any edit since is, even to a file that was
+ * dirty already. Unreadable reads as "cannot vouch" — no head, no tree, not
+ * clean — so a broken git refuses the reply rather than waving it through.
  */
 export interface BranchState {
   head?: string;
@@ -18,11 +21,34 @@ export interface BranchState {
 export function branchState(repoRoot: string, branch: string): BranchState {
   const head = quietGit(repoRoot, ["rev-parse", `${branch}^{commit}`])?.trim();
   const status = quietGit(repoRoot, ["status", "--porcelain"]);
+  const tree = treeHash(repoRoot);
   return {
     ...(head ? { head } : {}),
-    ...(status === undefined ? {} : { tree: createHash("sha256").update(status).digest("hex") }),
+    ...(tree === undefined ? {} : { tree }),
     clean: status !== undefined && status.trim() === "",
   };
+}
+
+const DIFF = ["diff", "HEAD", "--binary", "--no-color", "--no-ext-diff", "--no-textconv"];
+
+function treeHash(repoRoot: string): string | undefined {
+  const tracked = quietGit(repoRoot, DIFF);
+  const untracked = quietGit(repoRoot, ["ls-files", "-z", "--others", "--exclude-standard"]);
+  if (tracked === undefined || untracked === undefined) return undefined;
+  const hash = createHash("sha256").update(tracked);
+  for (const path of untracked.split("\0").filter(Boolean)) {
+    hash.update(`\0${path}\0${contentHash(join(repoRoot, path))}`);
+  }
+  return hash.digest("hex");
+}
+
+/** A file that cannot be read still counts as there: its name is in the hash. */
+function contentHash(path: string): string {
+  try {
+    return createHash("sha256").update(readFileSync(path)).digest("hex");
+  } catch {
+    return "unreadable";
+  }
 }
 
 function quietGit(repoRoot: string, args: string[]): string | undefined {

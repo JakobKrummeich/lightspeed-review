@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parsePublishArgs } from "../../src/commands/publish.ts";
@@ -352,6 +352,42 @@ test("a reply from working after an edit names the tree as what changed", async 
       assert.equal(error.code, "turn_still_yours");
       assert.match(error.detail ?? "", /the working tree changed since work/);
       assert.doesNotMatch(error.detail ?? "", /HEAD/);
+    },
+  );
+});
+
+/**
+ * The tree is measured by content, not by which paths are dirty: more edits to
+ * a file already dirty at `work` are half-written code all the same.
+ */
+test("a reply from working after more edits to a file already dirty at work is refused", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, store, repoRoot, key }) => {
+      writeFileSync(join(repoRoot, "a.txt"), "dirty before work\n");
+      await work(port, repoRoot);
+      appendFileSync(join(repoRoot, "a.txt"), "and edited after\n");
+
+      const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "?" }]));
+
+      assert.equal(error.code, "turn_still_yours");
+      assert.match(error.detail ?? "", /the working tree changed since work/);
+      assert.equal(store.get(key)!.turn.holder, "agent");
+    },
+  );
+});
+
+test("a reply from working after an untracked file present at work was rewritten is refused", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, repoRoot }) => {
+      writeFileSync(join(repoRoot, "draft.ts"), "export const a = 1;\n");
+      await work(port, repoRoot);
+      writeFileSync(join(repoRoot, "draft.ts"), "export const a = 2;\n");
+
+      const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "?" }]));
+
+      assert.match(error.detail ?? "", /the working tree changed since work/);
     },
   );
 });

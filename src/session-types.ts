@@ -41,7 +41,8 @@ export interface AgentTurn {
    */
   head?: string;
   /**
-   * `git status --porcelain` hashed when `work` was declared: the tree a
+   * The tree's content hashed when `work` was declared — `git diff HEAD
+   * --binary` plus each untracked file's name and bytes: the tree a
    * `reply` from `working` must still match. Absent on turns declared before
    * it was recorded, which fall back to requiring a clean tree.
    */

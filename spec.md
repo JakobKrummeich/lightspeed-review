@@ -147,10 +147,11 @@ It is persisted rather than held in memory because a `serve` restart in that
 window would otherwise lose the feedback for good.
 
 **Reply from working** is refused unless nothing has changed since `work` — HEAD
-is still the one `work` recorded and the tree still hashes (`git status
---porcelain`) to the snapshot `work` took — because then there is nothing
+is still the one `work` recorded and the tree's content still hashes (`git diff
+HEAD --binary` plus each untracked file's name and bytes) to the snapshot `work`
+took — because then there is nothing
 half-written to protect and talking loses nothing. A tree already dirty at
-`work` is fine; a change since is not. The refusal names which condition failed:
+`work` is fine; a change since is not, even more edits to a file already dirty. The refusal names which condition failed:
 `HEAD moved since work`, `the working tree changed since work`, or `no HEAD was
 recorded at work`. Otherwise the agent publishes what it has and asks in the new
 round.
