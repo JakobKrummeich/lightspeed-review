@@ -352,16 +352,16 @@ wrote it and a hash of what it wrote.
 <!-- written by lightspeed 2.2.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
-Every command then checks the places `init` writes to. A machine-wide skill
-(under your home directory) that lightspeed stamped, that nobody has edited
-since, and that an older (or the same) version wrote is brought up to date in
-place, without a word. A skill in a repository is never rewritten behind your
-back — that would leave a tracked file dirty — so a behind one there is reported
-instead. So is anything else it recognises as a lightspeed skill — no stamp,
-edited by hand, written by a newer lightspeed, pasted into a shared
-instructions file outside the lightspeed markers, or not writable. It leaves
-those alone, and every answer, help included, carries a notice until it is
-fixed:
+Every command but `init` (the explicit install) then checks the places `init`
+writes to. A machine-wide skill (under your home directory) that lightspeed
+stamped, that nobody has edited since, and that an older (or the same) version
+wrote is brought up to date in place, without a word. A skill in a repository
+is never rewritten behind your back — that would leave a tracked file dirty — so
+a behind one there is reported instead. So is anything else it recognises as a
+lightspeed skill — no stamp, edited by hand, written by a newer lightspeed,
+pasted into a shared instructions file outside the lightspeed markers, or not
+writable. It leaves those alone, and every answer, help included, carries a
+notice until it is fixed:
 
 ```
 skill_stale[1]{path,problem,fix}:
