@@ -61,7 +61,7 @@ test("the page renders the status banner so it is right before the bundle loads"
 });
 
 /** The turn is on the record, unlike presence — so a reviewer who reloads while
- * the agent is off implementing something reads that it is working — plan in
+ * the agent is off working on something reads that it is working — plan in
  * the tooltip — in the first paint, rather than "No agent is waiting" until the
  * first SSE frame arrives. */
 test("the served page already says what the agent is doing", () => {
@@ -76,7 +76,7 @@ test("the served page already says what the agent is doing", () => {
   });
 
   assert.match(html, /data-turn="agent"/);
-  assert.match(html, /title="implementing: splitting the helper out">Agent is working</);
+  assert.match(html, /title="splitting the helper out">Agent is working</);
 });
 
 test("the round offer waits in the header, empty until the bundle has news", () => {

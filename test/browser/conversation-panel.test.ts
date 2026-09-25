@@ -395,6 +395,33 @@ test("an agent away with the feedback is said at the foot of the conversation", 
   );
 });
 
+test("an agent at work on a plan says the plan alone at the foot, not what kind of work it is", () => {
+  // A plan is as often "answering your question" as "writing the code"; a prefix
+  // naming one of them misreads the other.
+  const html = renderScroll(
+    panelState({
+      turn: {
+        holder: "agent",
+        mode: "working",
+        at: "2025-01-01T00:07:00.000Z",
+        note: "answering your question about the cache",
+      },
+    }),
+  );
+
+  assert.match(html, /<\/span>\s*answering your question about the cache\s*<\/p>/);
+  assert.doesNotMatch(html, /implementing/);
+});
+
+test("an agent at work with no plan says it is working on your feedback", () => {
+  const html = renderScroll(
+    panelState({ turn: { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" } }),
+  );
+
+  assert.match(html, /the agent is working on your feedback/);
+  assert.doesNotMatch(html, /implementing/);
+});
+
 test("the breathing dots are hidden from a reader the sentence already tells", () => {
   const html = renderScroll(panelState({ turn: AGENTS_TURN }));
 

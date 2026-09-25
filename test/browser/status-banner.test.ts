@@ -130,7 +130,7 @@ test("a declared plan stays out of the header text, one hover away in the toolti
   );
 
   assert.equal(presenceText(html), "Agent is working");
-  assert.equal(presenceTitle(html), "implementing: splitting the helper out");
+  assert.equal(presenceTitle(html), "splitting the helper out");
 });
 
 test("work with no plan says the same short thing", () => {
@@ -139,7 +139,7 @@ test("work with no plan says the same short thing", () => {
   );
 
   assert.equal(presenceText(html), "Agent is working");
-  assert.equal(presenceTitle(html), "the agent is implementing your feedback");
+  assert.equal(presenceTitle(html), "the agent is working on your feedback");
 });
 
 test("a plan cannot inject markup into the header", () => {

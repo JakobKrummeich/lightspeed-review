@@ -296,10 +296,10 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ └────────────────────────────────────┘ │ │
 │ │ agent                                  │ │
 │ │   reply text                           │ │
-│ │ ●●● the agent is implementing your     │ │ .lsr-working (animated dots;
+│ │ ●●● the agent is working on your       │ │ .lsr-working (animated dots;
 │ │     feedback                           │ │  gone once review ends; or
 │ │                                        │ │  "the agent has your feedback",
-│ │                                        │ │  "implementing: <plan>")
+│ │                                        │ │  "<plan>" alone, no prefix)
 │ │                                        │ │
 │ │ ┌ section.lsr-queue ─────────────────┐ │ │
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │
