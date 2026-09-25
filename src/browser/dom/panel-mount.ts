@@ -371,8 +371,10 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // still the one it was written for.
   const before = state.conversation;
   setSending(view, true);
-  if (!(await deliver(options.key, prompts, ended))) {
+  const delivery = await deliver(options.key, prompts, ended);
+  if (!delivery.sent) {
     setSending(view, false);
+    sayNotSent(view, delivery.why);
     return;
   }
   // Not a duplicate of the server's copy: this half is instant and holds even
@@ -397,6 +399,15 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // Not left to the SSE round trip: every control must stop at the moment the
   // reviewer said done.
   if (ended) options.onEnd(prompts);
+}
+
+/**
+ * Everything stays where it was — pills, box, reply boxes — and the note says
+ * why, in the live region the compose row already has.
+ */
+function sayNotSent(view: PanelView, why: string): void {
+  const note = view.composeHost?.querySelector(".lsr-complete");
+  if (note) note.textContent = `Not sent — ${why}`;
 }
 
 function setSending(view: PanelView, sending: boolean): void {

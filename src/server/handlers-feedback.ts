@@ -61,6 +61,11 @@ export async function handleFeedback(
     badRequest(response, "expected JSON {prompts: [{type, comment, ...}], ended: bool}");
     return;
   }
+  const locked = lockedOut(session, feedback.ended);
+  if (locked !== undefined) {
+    sendJson(response, 409, locked);
+    return;
+  }
   // Ids minted here, where the whole conversation is known: they must be
   // short and unique for the session's life, and exist with the ledger off.
   const prompts = withThreadIds(session, feedback.prompts);
@@ -78,6 +83,28 @@ export async function handleFeedback(
   // "Send & End" is the reviewer closing the round, so it closes like one.
   if (feedback.ended) announceRoundEnd(context, session, now);
   sendJson(response, 200, { queued: prompts.length });
+}
+
+/**
+ * The page's lock, enforced where it cannot be raced: a tab that missed the
+ * presence frame, or a second tab, must not change the batch under an agent
+ * reading it, nor slip words into a round the agent is building. Ending is
+ * never refused — the reviewer can always walk away.
+ */
+function lockedOut(session: SessionRecord, ended: boolean): DomainErrorBody | undefined {
+  if (ended || session.status === "ended" || session.turn.holder !== "agent") return undefined;
+  const message =
+    session.turn.mode === "working"
+      ? "the agent is working on your feedback; queue this for the next round"
+      : "the agent is reading your last batch; wait for its answer";
+  return {
+    error: {
+      code: "agent_holds_turn",
+      message,
+      detail: "nothing was sent; your words are still on the page",
+    },
+    help: ["End the review at any time; everything else waits for the agent to hand back"],
+  };
 }
 
 /** Every new item opens a thread: `t1`, `t2`… in the order they were sent. */

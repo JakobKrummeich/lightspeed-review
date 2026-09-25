@@ -23,6 +23,7 @@ export type ReviewErrorCode =
   | "removed_verb"
   | "turn_not_yours"
   | "turn_still_yours"
+  | "agent_holds_turn"
   | "ambiguous_session"
   | "unknown_command"
   | "unknown_flag"

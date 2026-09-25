@@ -976,6 +976,36 @@ test("feedback the server refused is still queued for the next try", async (t) =
   );
 });
 
+test("a Send the server refuses because the agent took the turn keeps everything and says why", async (t) => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        error: {
+          code: "agent_holds_turn",
+          message: "the agent is reading your last batch; wait for its answer",
+        },
+      },
+      { status: 409 },
+    );
+  t.after(() => {
+    globalThis.fetch = real;
+  });
+  const { root, panel, box, storage } = mount(t);
+  panel.queue(queued);
+  type(root, box()!, "and one more thing");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+
+  assert.equal(box()!.value, "and one more thing");
+  assert.equal(readMemory(storage, "key").pending.length, queued.length);
+  assert.match(
+    root.querySelector(".lsr-complete")?.textContent ?? "",
+    /Not sent — the agent is reading your last batch; wait for its answer/,
+  );
+});
+
 function shown(root: FakeNode): string {
   return root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "";
 }

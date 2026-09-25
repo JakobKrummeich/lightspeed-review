@@ -231,6 +231,41 @@ test("the newest poll takes over listening: the older one is told it was superse
   });
 });
 
+test("the reviewer's Send is refused while the agent holds the turn; ending never is", async () => {
+  await withServer(async ({ url, store }) => {
+    const reading = await digesting({ url, store, server: undefined as never });
+    const refused = await postFeedback(url, reading, { prompts: [message], ended: false });
+    assert.equal(refused.status, 409);
+    assert.equal((refused.json as { error: { code: string } }).error.code, "agent_holds_turn");
+    assert.match(
+      (refused.json as { error: { message: string } }).error.message,
+      /reading your last batch/,
+    );
+    assert.equal(store.get(reading)!.pending.length, 0, "nothing was queued");
+
+    assert.equal((await postWork(url, reading, { plan: "split it", head: "h" })).status, 200);
+    const whileWorking = await postFeedback(url, reading, { prompts: [message], ended: false });
+    assert.equal(whileWorking.status, 409);
+    assert.match(
+      (whileWorking.json as { error: { message: string } }).error.message,
+      /working on your feedback/,
+    );
+
+    const ending = await postFeedback(url, reading, { prompts: [], ended: true });
+    assert.equal(ending.status, 200);
+    assert.equal(store.get(reading)!.status, "ended");
+  });
+});
+
+test("End without Sending ends a review the agent is still reading", async () => {
+  await withServer(async (running) => {
+    const key = await digesting(running);
+    const ending = await postFeedback(running.url, key, { prompts: [], ended: true });
+    assert.equal(ending.status, 200);
+    assert.equal(running.store.get(key)!.status, "ended");
+  });
+});
+
 test("ending releases a parked poll with the review's account of itself", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);

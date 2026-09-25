@@ -33,18 +33,19 @@ export function echoSent(
   ];
 }
 
-/** False means the prompts never left the page, so nothing may be cleared. */
+export type Delivery = { sent: true } | { sent: false; why: string };
+
+/** Not sent means the prompts never left the page, so nothing may be cleared. */
 export async function deliver(
   key: string,
   prompts: FeedbackPrompt[],
   ended: boolean,
-): Promise<boolean> {
+): Promise<Delivery> {
   try {
-    await sendFeedback(key, prompts, ended);
-    return true;
+    const refused = await sendFeedback(key, prompts, ended);
+    return refused === undefined ? { sent: true } : { sent: false, why: refused };
   } catch {
-    console.error("lightspeed: feedback was not delivered — nothing was cleared");
-    return false;
+    return { sent: false, why: "the review server did not answer; try again" };
   }
 }
 
