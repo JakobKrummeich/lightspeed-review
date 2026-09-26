@@ -2,6 +2,7 @@ import { renderRoundPopup } from "../round-offer.ts";
 import { currentRound } from "../conversation-rounds.ts";
 import { filesIn } from "./round-offer-mount.ts";
 import type { SessionData } from "./session-api.ts";
+import type { QueueTally } from "../queued-pill.ts";
 
 /**
  * Card fold duration, matching the stylesheet's animation. The timer is what
@@ -10,8 +11,8 @@ import type { SessionData } from "./session-api.ts";
 export const FOLD_MS = 260;
 
 export interface MountedRoundPopup {
-  /** `queued` is the unsent comment count, which the card promises to keep. */
-  offer(fresh: SessionData, queued: number): void;
+  /** `queued` is the unsent tally, which the card promises to keep. */
+  offer(fresh: SessionData, queued: QueueTally): void;
   clear(): void;
 }
 
@@ -59,7 +60,7 @@ function pressed(view: PopupView, event: Event): void {
   if (target.classList.contains("lsr-round-stay")) dismiss(view);
 }
 
-function offerRound(view: PopupView, fresh: SessionData, queued: number): void {
+function offerRound(view: PopupView, fresh: SessionData, queued: QueueTally): void {
   const round = currentRound(fresh.rounds);
   if (round === view.announced) {
     // Not news twice — but a card still up keeps the newest copy, so its take

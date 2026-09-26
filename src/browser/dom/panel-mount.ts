@@ -26,7 +26,7 @@ import {
   typedReplies,
   withGeneralComment,
 } from "./panel-wire.ts";
-import { stampPills } from "../queued-pill.ts";
+import { stampPills, tallyOf, type QueueTally } from "../queued-pill.ts";
 import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
 import { saveLater } from "./save-later.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
@@ -59,8 +59,8 @@ export interface PanelOptions {
    * asking the server again.
    */
   onEnd(sent: FeedbackPrompt[]): void;
-  /** The rail shows this while the panel is shut. */
-  onPending(count: number): void;
+  /** The rail counts this while the panel is shut; the round offer names it by kind. */
+  onPending(queued: QueueTally): void;
   /** The panel only says which file and where; opening and scrolling is the diff's craft. */
   onJump(file: string, place: LinePlace | undefined): void;
 }
@@ -220,7 +220,7 @@ function draw(view: PanelView): void {
   restoreReplies(options.root, typed);
   if (focused !== undefined) replyBox(options.root, focused)?.focus();
   if (following) toBottom(scrollHost);
-  options.onPending(state.pending.length);
+  options.onPending(tallyOf(state.pending));
   // Queue stored on every change, no delay: a pill is one gesture, and the
   // thing a reload must not lose.
   updateMemory(options.storage, options.key, { pending: state.pending });

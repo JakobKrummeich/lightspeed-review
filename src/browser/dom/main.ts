@@ -25,6 +25,7 @@ import { mountSchemeToggle } from "./scheme-toggle.ts";
 import { fetchReplay, fetchSession, type SessionData } from "./session-api.ts";
 import { mountStatusBanner, type MountedStatusBanner } from "./status-mount.ts";
 import { trackReader } from "./reader-place.ts";
+import { queuedTotal, type QueueTally } from "../queued-pill.ts";
 import { wireSessionEvents, type LiveSession } from "./session-events.ts";
 import { mountViewToggle } from "./view-toggle.ts";
 
@@ -130,9 +131,9 @@ async function main(): Promise<void> {
   const side = mountPanelSide(
     page,
     session,
-    (count) => {
-      finish.setQueued(count);
-      reader.setQueued(count);
+    (queued) => {
+      finish.setQueued(queuedTotal(queued));
+      reader.setQueued(queued);
     },
     () => {
       room.toggle();
@@ -232,7 +233,7 @@ function rememberScrollPlace(page: Page, live: LiveSession, place: ReviewPlace |
 function mountPanelSide(
   page: Page,
   session: SessionData,
-  onQueued: (count: number) => void,
+  onQueued: (queued: QueueTally) => void,
   onToggle: () => void,
   onJump: (file: string, place: LinePlace | undefined) => void,
 ): { banner: MountedStatusBanner; railControl: MountedRail; panel: MountedPanel } {
@@ -260,9 +261,9 @@ function mountPanelSide(
           // The reviewer is already reading their summary.
         });
     },
-    onPending: (count) => {
-      railControl.setQueued(count);
-      onQueued(count);
+    onPending: (queued) => {
+      railControl.setQueued(queuedTotal(queued));
+      onQueued(queued);
     },
     onJump,
   });

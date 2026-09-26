@@ -1,5 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { NOTHING_QUEUED } from "../../../src/browser/queued-pill.ts";
 import { wireSessionEvents, type Wired } from "../../../src/browser/dom/session-events.ts";
 import { REOPEN_MAX_MS, REOPEN_MS } from "../../../src/browser/dom/session-sync.ts";
 import { FOLD_MS } from "../../../src/browser/dom/round-popup.ts";
@@ -68,7 +69,7 @@ function session(round: number, conversation: ConversationEntry[] = []): Session
   };
 }
 
-const idle: ReviewerPlace = { scrolled: 0, queued: 0, focus: undefined };
+const idle: ReviewerPlace = { scrolled: 0, queued: NOTHING_QUEUED, focus: undefined };
 
 /** One page's server: answers `/data` with whatever `serving` holds when asked. */
 interface FakeServer {
@@ -244,7 +245,7 @@ test("a reconnect onto a new round draws it exactly as a session event would", a
 test("a reconnect onto a new round waits behind the offer while the reviewer is reading", async (t) => {
   const { stream, server, log, live, roots } = world(t).page({
     scrolled: 500,
-    queued: 1,
+    queued: { ...NOTHING_QUEUED, comments: 1 },
     focus: 0,
   });
   server.serving = session(1);
@@ -454,7 +455,11 @@ test("a reopened stream's events are heard once, by the new stream alone", async
 
 test("a new round held behind a waved-away card is not announced again by a reconnect", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const { stream, server, roots, live } = world(t).page({ scrolled: 500, queued: 0, focus: 0 });
+  const { stream, server, roots, live } = world(t).page({
+    scrolled: 500,
+    queued: NOTHING_QUEUED,
+    focus: 0,
+  });
   server.serving = session(1);
   stream().emit("session");
   await settled();

@@ -3,17 +3,18 @@
  * top of a re-cut review — but waits behind a header offer until taken. The
  * deciding lives here, pure: answerable without a browser.
  */
+import { NOTHING_QUEUED, queuedTotal, type QueueTally } from "./queued-pill.ts";
 
 export interface ReviewerPlace {
   /** Pixels. */
   scrolled: number;
-  queued: number;
+  queued: QueueTally;
   focus: number | undefined;
 }
 
 /** Showing none of the three signs, the reviewer has nothing to lose and the offer is not worth the press. */
 export function holdsRound(place: ReviewerPlace): boolean {
-  return place.scrolled > 0 || place.queued > 0 || place.focus !== undefined;
+  return place.scrolled > 0 || queuedTotal(place.queued) > 0 || place.focus !== undefined;
 }
 
 /**
@@ -22,8 +23,12 @@ export function holdsRound(place: ReviewerPlace): boolean {
  * is named too — the reviewer's own words are the thing they would most expect
  * a new round to cost them.
  */
-export function roundOfferLabel(round: number, files: number, queued = 0): string {
-  const kept = queued === 0 ? "" : ` · ${queuedCount(queued)} kept`;
+export function roundOfferLabel(
+  round: number,
+  files: number,
+  queued: QueueTally = NOTHING_QUEUED,
+): string {
+  const kept = queuedTotal(queued) === 0 ? "" : ` · ${queuedCount(queued)} kept`;
   return `Round ${round + 1} is ready · ${fileCount(files)}${kept}`;
 }
 
@@ -31,8 +36,20 @@ function fileCount(files: number): string {
   return files === 1 ? "1 file" : `${files} files`;
 }
 
-function queuedCount(queued: number): string {
-  return queued === 1 ? "1 comment" : `${queued} comments`;
+/** Kinds with none left out: "0 replies" is noise in a reassurance. */
+function queuedCount(queued: QueueTally): string {
+  const parts = [
+    counted(queued.comments, "comment", "comments"),
+    counted(queued.replies, "reply", "replies"),
+    counted(queued.resolves, "resolve", "resolves"),
+  ].filter((part) => part !== "");
+  const last = parts.pop() ?? "";
+  return parts.length === 0 ? last : `${parts.join(", ")} and ${last}`;
+}
+
+function counted(count: number, one: string, many: string): string {
+  if (count === 0) return "";
+  return `${count} ${count === 1 ? one : many}`;
 }
 
 /**
@@ -40,13 +57,19 @@ function queuedCount(queued: number): string {
  * unsent comments cannot know that, and the cost of guessing wrong is pressing
  * "keep reading" on a round they wanted.
  */
-function queueLine(queued: number): string {
-  if (queued === 0) return "";
-  return `\n    <p class="lsr-round-queue">Your ${queuedCount(queued)} stay queued — they go out on your next send.</p>`;
+function queueLine(queued: QueueTally): string {
+  const total = queuedTotal(queued);
+  if (total === 0) return "";
+  const rest = total === 1 ? "stays queued — it goes" : "stay queued — they go";
+  return `\n    <p class="lsr-round-queue">Your ${queuedCount(queued)} ${rest} out on your next Send.</p>`;
 }
 
 /** Dismissing is not declining — the round waits in the header. Numbers only, so nothing needs escaping. */
-export function renderRoundPopup(round: number, files: number, queued = 0): string {
+export function renderRoundPopup(
+  round: number,
+  files: number,
+  queued: QueueTally = NOTHING_QUEUED,
+): string {
   const name = `Round ${round + 1}`;
   return `<div class="lsr-round-overlay">
   <div class="lsr-round-card" role="dialog" aria-modal="true" aria-label="${roundOfferLabel(round, files, queued)}">

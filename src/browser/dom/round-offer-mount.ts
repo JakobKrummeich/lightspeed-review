@@ -1,14 +1,15 @@
 import { roundOfferLabel } from "../round-offer.ts";
 import { currentRound } from "../conversation-rounds.ts";
 import type { SessionData } from "./session-api.ts";
+import type { QueueTally } from "../queued-pill.ts";
 
 export interface MountedRoundOffer {
   /**
    * Session held whole, not refetched on take: what is offered has to be what
-   * arrives. `queued` is the unsent count the offer names — the thing a
+   * arrives. `queued` is the unsent tally the offer names — the thing a
    * reviewer would expect a new round to cost them.
    */
-  offer(fresh: SessionData, queued: number): void;
+  offer(fresh: SessionData, queued: QueueTally): void;
   clear(): void;
   /**
    * The offer is now the page's only word that a round waits, so it glows
@@ -44,7 +45,7 @@ export function mountRoundOffer(options: RoundOfferOptions): MountedRoundOffer {
     onTake(taken);
   });
   return {
-    offer(fresh: SessionData, queued: number) {
+    offer(fresh: SessionData, queued: QueueTally) {
       held = fresh;
       root.textContent = roundOfferLabel(currentRound(fresh.rounds), filesIn(fresh), queued);
       root.hidden = false;

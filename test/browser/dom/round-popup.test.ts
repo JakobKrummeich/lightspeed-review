@@ -1,5 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { NOTHING_QUEUED } from "../../../src/browser/queued-pill.ts";
 import { FOLD_MS, mountRoundPopup } from "../../../src/browser/dom/round-popup.ts";
 import type { SessionData } from "../../../src/browser/dom/session-api.ts";
 import type { DiffFile } from "../../../src/diff-extract.ts";
@@ -87,7 +88,7 @@ function mounted(t: TestContext): {
     page,
     taken,
     dismissed,
-    offer: (round, paths = ["src/a.ts"], queued = 0) => {
+    offer: (round, paths = ["src/a.ts"], queued = NOTHING_QUEUED) => {
       const fresh = session(round, paths);
       popup.offer(fresh, queued);
       return fresh;
