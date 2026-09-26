@@ -139,7 +139,9 @@ function authError(detail: string, reference: string, endpoint?: string): Review
       endpoint,
       suggestions: withLoginSuggestion(reference, [
         "Export the provider's credential, e.g. `export ANTHROPIC_OAUTH_TOKEN=…` or `export ANTHROPIC_API_KEY=…`",
-        "Then re-run the `lightspeed open` or `lightspeed publish` that fell back",
+        // Not "fell back": grouping rethrows this one error, so the command
+        // failed before any round was posted (llm/grouping.ts).
+        "Then re-run the `lightspeed open` or `lightspeed publish` that stopped on this error — it opened no round",
       ]),
     });
   }

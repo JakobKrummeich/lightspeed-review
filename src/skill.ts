@@ -150,9 +150,12 @@ Run \`lightspeed init --config\` to write one:
 reach:
 ${REACHABLE_MODELS.map((model) => `- \`${model}\``).join("\n")}
 
-A model nobody has does not fail the run: the round opens with
-\`grouping.mode: fallback\`, the whole diff as one group, and a \`fix\` line
-naming the key to change.
+A model nobody has, or a bad answer from one, does not fail the run: the
+round opens with \`grouping.mode: fallback\`, the whole diff as one group, and
+a \`fix\` line naming the key to change. Missing credentials do: a diff of more
+than one file stops with \`pi_auth_missing\` (exit 1, no round opened) until
+the human runs \`lightspeed login <provider>\` or exports the provider's key —
+ask them, then re-run the command.
 
 Optional keys: \`port\` (4388), \`stateDir\` (\`~/.lightspeed\`),
 \`feedbackLog\` (\`on\`), \`classify\` — two glob lists,

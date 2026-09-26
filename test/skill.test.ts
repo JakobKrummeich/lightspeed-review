@@ -88,3 +88,14 @@ test("the skill quotes every working rule the CLI prints, and nothing unfilled",
   for (const line of Object.values(working)) assert.ok(skill.includes(line), line);
   assert.doesNotMatch(skill, /\bundefined\b/);
 });
+
+/**
+ * A bad model degrades the round; missing credentials stop it. Worded as one
+ * rule, an agent told its user a credential-less review would "fall back".
+ */
+test("the skill tells a model that degrades apart from credentials that stop the run", () => {
+  assert.doesNotMatch(skill, /A model nobody has does not fail the run/);
+  assert.match(skill, /`grouping\.mode: fallback`/);
+  assert.match(skill, /`pi_auth_missing`/);
+  assert.match(skill, /`lightspeed login <provider>`/);
+});
