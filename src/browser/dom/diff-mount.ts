@@ -12,7 +12,8 @@ import {
   type GroupApprovalFlip,
 } from "../diff-view.ts";
 import { sweepApproved } from "../group-index.ts";
-import { renderProgressBar } from "../progress-bar.ts";
+import { progressChange, progressSegments, renderProgressBar } from "../progress-bar.ts";
+import { accelerate } from "./accelerator.ts";
 import { createApprovedFormStore, type ApprovedFormStore } from "./approved-form-store.ts";
 import {
   applyCollapsePlan,
@@ -316,16 +317,23 @@ function handleTick(view: DiffView, event: Event): void {
   // finished or undid folds; hand-opened blocks stay as left.
   const fileFlips = fileApprovalFlips(state.groups, state.approved, next);
   const groupFlips = groupApprovalFlips(state.groups, state.approved, next);
+  const change = progressChange(
+    progressSegments(state.groups, state.approved),
+    progressSegments(state.groups, next),
+  );
   state.approved = next;
   const onward = chapterToReadNext(state, groupFlips);
   if (onward !== undefined) {
-    // A whole draw, so nothing below is patched.
+    // A whole draw, so nothing below is patched; the light plays on the new bar.
     setFocus(view, onward);
+    accelerate(progress, change, input);
   } else {
     applyApprovedState(root, state.groups, state.approved);
     applyCollapsePlan(root, tickCollapsePlan(fileFlips, groupFlips));
     // A tick's folds are as much a state worth restoring as hand-opened ones.
     reportOpen(view);
+    // Lit before the patch, so the fill grows behind the particle.
+    accelerate(progress, change, input);
     applyProgressState(progress, state.groups, state.approved);
   }
   // A tick redraws nothing, so completion has to be reported from here too.

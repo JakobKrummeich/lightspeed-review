@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { DiffFile, DiffGroup } from "../../src/diff-extract.ts";
 import {
+  progressChange,
   progressSegments,
   renderProgressBar,
   segmentFillStyle,
@@ -191,4 +192,35 @@ test("a segment is a press that names its chapter, not a picture of it", () => {
 
   assert.match(html, /<button type="button" class="lsr-progress-segment" data-group-index="0"/);
   assert.doesNotMatch(html, /role="img"/);
+});
+
+/** The bar before and after one tick, as the accelerator is handed it. */
+function tick(before: string[], after: string[]): ReturnType<typeof progressChange> {
+  return progressChange(progressSegments(groups, before), progressSegments(groups, after));
+}
+
+test("a tick that leaves a chapter unfinished grows it, and says how far", () => {
+  // 12 of Schema's 16 lines: the particle stops three quarters along.
+  assert.deepEqual(tick([], ["prisma/schema.prisma"]), { kind: "partial", index: 0, share: 0.75 });
+});
+
+test("the tick that finishes a chapter is told from one that grows it", () => {
+  assert.deepEqual(tick(["prisma/schema.prisma"], ["prisma/schema.prisma", "src/db.ts"]), {
+    kind: "chapter",
+    index: 0,
+    share: 1,
+  });
+  // Finished from nothing, as a chapter's own tick does: still one chapter, not the review.
+  assert.equal(tick([], ["src/api/users.ts"])?.kind, "chapter");
+});
+
+test("the tick that finishes the last chapter finishes the review", () => {
+  const all = ["prisma/schema.prisma", "src/db.ts", "src/api/users.ts"];
+
+  assert.deepEqual(tick(all.slice(0, 2), all), { kind: "all", index: 1, share: 1 });
+});
+
+test("an untick is no news: nothing grew, so nothing lights", () => {
+  assert.equal(tick(["src/db.ts"], []), undefined);
+  assert.equal(tick(["src/db.ts"], ["src/db.ts"]), undefined);
 });
