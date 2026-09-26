@@ -85,8 +85,8 @@ test("the index singles no group out: every entry reads the same", () => {
     [...html.matchAll(/<span class="lsr-index-(\w+)"/g)].map((match) => match[1]),
     // prettier-ignore
     [
-      "name", "files", "lines", "counter", "logic",
-      "name", "files", "lines", "counter", "logic",
+      "name", "files", "lines", "counter", "logic", "open",
+      "name", "files", "lines", "counter", "logic", "open",
     ],
   );
 });
@@ -97,6 +97,50 @@ test("the index singles no group out: every entry reads the same", () => {
  * else — or they should not, and a clamped grey line of it here is a line
  * nobody reads twice.
  */
+/**
+ * A row of a name and three counts read as a heading over a diff that was not
+ * there: a reviewer facing a single "All Changes" took the review for empty.
+ * The way in has to be said in words, on every row.
+ */
+test("every entry ends on a way in said in words, its arrow hidden from a screen reader", () => {
+  const html = renderGroupIndex(groups, []);
+
+  const entries = html.match(/<button[^>]*class="lsr-index-entry"[\s\S]*?<\/button>/g)!;
+  assert.equal(entries.length, 2);
+  for (const entry of entries) {
+    assert.match(
+      entry,
+      /<span class="lsr-index-open">Open<span aria-hidden="true">→<\/span><\/span>\s*<\/button>/,
+    );
+  }
+});
+
+test("a review of several chapters puts none of them forward", () => {
+  const html = renderGroupIndex(groups, []);
+
+  assert.doesNotMatch(html, /data-sole/);
+  assert.doesNotMatch(html, /Open the chapter/);
+});
+
+test("a review of one chapter makes its one entry the call to open it", () => {
+  // With nothing to choose between, the survey is one step on the way to the
+  // diff, and the step has to look like a press rather than a heading.
+  const html = renderGroupIndex([group("All Changes", [file("src/greet.ts", 5, 1)])], []);
+
+  assert.match(
+    html,
+    /<button type="button" class="lsr-index-entry" data-group-index="0" data-sole>/,
+  );
+  assert.match(html, /<span class="lsr-index-open">Open the chapter<span aria-hidden="true">→/);
+});
+
+test("a lone swept chapter leaves the lane's approve the one call on the screen", () => {
+  const html = renderGroupIndex([swept("Docs", [file("README.md")])], []);
+
+  assert.doesNotMatch(html, /data-sole/);
+  assert.match(html, /<span class="lsr-index-open">Open</);
+});
+
 test("an entry says how big a chapter is, never what it is for", () => {
   const html = renderGroupIndex([group("Auth", [file("src/auth.ts")])], []);
 

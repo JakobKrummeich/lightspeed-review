@@ -3,47 +3,6 @@
  * the next file and 12 from the next group, each step a clear multiple of the
  * one below, so the hierarchy reads before a word does.
  */
-/* The index sits on the page surface, not in a card: a table of contents for
- * the cards below, not one more group to open. */
-.lsr-index {
-  margin-bottom: var(--lsr-space-12);
-}
-
-.lsr-index-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.lsr-index-entry {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto;
-  align-items: center;
-  gap: var(--lsr-space-3);
-  width: 100%;
-  padding: var(--lsr-space-2) var(--lsr-space-3);
-  border-radius: 0.4rem;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-
-.lsr-index-entry:hover {
-  background: var(--lsr-surface);
-}
-
-.lsr-index-name {
-  font-weight: 600;
-  font-size: var(--lsr-size-title);
-  line-height: var(--lsr-leading-tight);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Counts on a survey row and on a gate card, painted alike: sizes and lines
  * quiet, approvals in the accent, because how far a chapter got is the news. */
 .lsr-index-files,
@@ -62,28 +21,6 @@
   font-size: var(--lsr-size-meta);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-/*
- * Below 860px the counts and the badge are wider than the room the name is
- * left with: `1fr` shrinks to nothing before any `auto` column does, and the
- * name ellipsizes to a word. So the name takes the whole first row and wraps,
- * and the counts move beneath it. A flex row rather than a grid, because the
- * counts row must itself wrap when the badge joins it: grid `auto` columns
- * overflow the pane sooner than they break a line.
- */
-@media (max-width: 860px) {
-  .lsr-index-entry {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--lsr-space-1) var(--lsr-space-3);
-  }
-
-  .lsr-index-name {
-    flex: 0 0 100%;
-    white-space: normal;
-  }
 }
 
 /* The word and git's percentage only; the paths are in the row's path, which

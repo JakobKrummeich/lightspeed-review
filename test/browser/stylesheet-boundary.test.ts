@@ -26,16 +26,12 @@ const CEILING = 300; // the same ceiling eslint.config.js puts on src/**/*.ts
  * budget. The number is content lines, the unit this file measures and the
  * unit eslint's `max-lines` counts.
  *
- * `index.css` is past the ceiling by breadth rather than by depth: the chapter
- * index, the focus bar, the file cards and their tick boxes are one screen of
- * the review, read top to bottom, and several of their rules are about the
- * seam between two of those things — `.lsr-group:has(.lsr-tick-all:checked)
- * .lsr-file` is one. The cascade puts the whole run between the panel and the
- * popup, so splitting it would draw an arbitrary line through one screen
- * rather than a boundary. It stays whole, and it stays listed here so the
- * next area past the ceiling has to argue its case in this comment.
+ * `index.css` held one until the survey's rows moved out to `survey.css`
+ * (3.3.0): the chapter index, the focus bar and the file cards had been kept
+ * together as one screen, and the rows were the part of it with states of
+ * their own. The next area past the ceiling argues its case in this comment.
  */
-const REMAINDER_BUDGET: Record<string, number> = { "index.css": 328 };
+const REMAINDER_BUDGET: Record<string, number> = {};
 
 function importedNames(): string[] {
   const entry = readFileSync(ENTRY, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");

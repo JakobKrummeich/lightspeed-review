@@ -1,0 +1,143 @@
+/*
+ * The survey: the page as it opens, one row per chapter and no diff. Its own
+ * area because the rows are the page's first press and carry their own
+ * states; the counts inside them are painted with the gate card's in
+ * `index.css`, and the mechanical lane under them in `sweep.css`.
+ *
+ * Every row is a card on the surface tone, set off the page by tone alone —
+ * no border, no rule between rows — and ends on its way in said in words. A
+ * name over three counts on bare paper read as a heading over a diff that was
+ * missing: a reviewer facing one "All Changes" took the review for empty.
+ */
+.lsr-index {
+  margin-bottom: var(--lsr-space-12);
+}
+
+.lsr-index-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * One row, the name taking what the rest leave. Columns are made as items
+ * come rather than listed: the densest-logic badge is `hidden` on all rows but
+ * one, and a listed column for it would leave a gap before the label on every
+ * other row.
+ */
+.lsr-index-entry {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: 1fr;
+  grid-auto-columns: auto;
+  align-items: center;
+  gap: var(--lsr-space-4);
+  width: 100%;
+  padding: var(--lsr-space-4) var(--lsr-space-6);
+  border-radius: 0.75rem;
+  background: var(--lsr-surface);
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+/* A tint rather than a lift: `--lsr-raised` is one step of lightness off the
+ * surface, and a single step is invisible under a pointer (`tokens.css`). */
+.lsr-index-entry:hover {
+  background: color-mix(in oklab, var(--lsr-accent) 7%, var(--lsr-surface));
+}
+
+.lsr-index-entry:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 2px;
+}
+
+.lsr-index-name {
+  color: var(--lsr-strong);
+  font-weight: 600;
+  font-size: var(--lsr-size-title);
+  line-height: var(--lsr-leading-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* In the accent like every press on the page, and apart from the counts by a
+ * step more than they are from each other: they describe, this acts. */
+.lsr-index-open {
+  margin-left: var(--lsr-space-4);
+  color: var(--lsr-accent);
+  font-size: var(--lsr-size-meta);
+  font-weight: 600;
+  line-height: var(--lsr-leading-tight);
+  white-space: nowrap;
+}
+
+/* Spaced by margin, not a space in the markup: an inline-block drops the
+ * whitespace at its own edge. */
+.lsr-index-open > [aria-hidden="true"] {
+  display: inline-block;
+  margin-left: var(--lsr-space-1);
+  transition: transform 120ms ease;
+}
+
+.lsr-index-entry:is(:hover, :focus-visible) .lsr-index-open > [aria-hidden="true"] {
+  transform: translateX(0.2rem);
+}
+
+/*
+ * The one chapter of a review with nothing to choose between: the survey is
+ * a step on the way to the diff, so the row's label is the screen's primary
+ * press, painted as the gate's `Read the diff` is — accent-filled, the
+ * `button` base in `popup.css` — and the card is given the room a lone thing
+ * on a screen needs to read as the thing to do.
+ */
+.lsr-index-entry[data-sole] {
+  padding: var(--lsr-space-6);
+}
+
+.lsr-index-entry[data-sole] .lsr-index-open {
+  padding: var(--lsr-space-2) var(--lsr-space-4);
+  border-radius: 0.35rem;
+  background: var(--lsr-accent);
+  color: var(--lsr-on-accent);
+  font-size: var(--lsr-size-ui);
+  transition: background 120ms ease;
+}
+
+.lsr-index-entry[data-sole]:hover .lsr-index-open {
+  background: color-mix(in oklab, var(--lsr-accent) 82%, var(--lsr-white));
+}
+
+/*
+ * Below 860px the counts and the badge are wider than the room the name is
+ * left with: `1fr` shrinks to nothing before any `auto` column does, and the
+ * name ellipsizes to a word. So the name takes the whole first row and wraps,
+ * and the counts move beneath it, the label pushed to their far end. A flex
+ * row rather than a grid, because the counts row must itself wrap when the
+ * badge joins it: grid `auto` columns overflow the pane sooner than they
+ * break a line.
+ */
+@media (max-width: 860px) {
+  .lsr-index-entry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--lsr-space-1) var(--lsr-space-3);
+  }
+
+  .lsr-index-name {
+    flex: 0 0 100%;
+    white-space: normal;
+  }
+
+  .lsr-index-open {
+    margin-left: auto;
+  }
+}
