@@ -178,6 +178,24 @@ test("the panel's light beams only for what the agent said since the last draw",
   assert.deepEqual(beams(document), [], "drawn once is seen");
 });
 
+test("every firefly the panel draws flies on the page's one clock, not from its own start", (t) => {
+  // Regression: each presence frame redraws the panel, and the new firefly jumped back to the
+  // middle of its box.
+  const { root } = page(t);
+  const layers = [{ startTime: 1234 }, { startTime: 1234 }, { startTime: 1234 }];
+  const firefly = Object.assign(new FakeBox("span", "lsr-firefly"), {
+    getAnimations: (options: { subtree?: boolean }) => (options.subtree ? layers : []),
+  });
+  root.append(firefly);
+
+  mountPanelLight(asElement(root), []).drawn([]);
+
+  assert.deepEqual(
+    layers.map((layer) => layer.startTime),
+    [0, 0, 0],
+  );
+});
+
 test("the panel's light hands a send to Warp Send", (t) => {
   const { root } = page(t);
   const send = new FakeBox("button", "", { id: "lsr-send" });

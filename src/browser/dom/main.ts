@@ -259,6 +259,7 @@ function mountPanelSide(
     page: document.body,
     onToggle,
   });
+  const light = mountPanelLight(page.panelRoot, session.conversation);
   const panel = mountPanel({
     root: page.panelRoot,
     key: page.key,
@@ -282,8 +283,10 @@ function mountPanelSide(
       onQueued(queued);
     },
     onJump,
-    light: mountPanelLight(page.panelRoot, session.conversation),
+    light,
   });
+  // The mount's render is the panel's first draw; the talk it shows is not news.
+  light.drawn(session.conversation);
   return { banner, beacon, railControl, panel };
 }
 
