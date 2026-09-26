@@ -1,6 +1,7 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { aimAccelerator } from "../../../src/browser/dom/accelerator.ts";
+import { aimAccelerator, aimTick } from "../../../src/browser/dom/accelerator.ts";
+import type { DiffGroup } from "../../../src/diff-extract.ts";
 import type { ProgressChange } from "../../../src/browser/progress-bar.ts";
 import { asElement, FakeBox, installLightDom } from "./fake-light-dom.ts";
 
@@ -35,8 +36,9 @@ function accelerate(
   change: ProgressChange | undefined,
   tick: FakeBox,
   grow = () => {},
+  shrunk: number[] = [],
 ): void {
-  aimAccelerator(asElement(progress), change).fire(asElement(tick), grow);
+  aimAccelerator(asElement(progress), change, shrunk).fire(asElement(tick), grow);
 }
 
 const named = (box: FakeBox, name: string): FakeBox[] => box.querySelectorAll(`.${name}`);
@@ -172,13 +174,56 @@ test("an untick mid-run takes the run down before its width is written", (t) => 
   t.mock.timers.tick(100);
   const seen: (string | null)[] = [];
 
-  accelerate(progress, undefined, tick, () => seen.push(segments[1]!.getAttribute("data-light")));
+  accelerate(
+    progress,
+    undefined,
+    tick,
+    () => seen.push(segments[1]!.getAttribute("data-light")),
+    [1],
+  );
 
   assert.deepEqual(seen, [null], "no delay left for the width to wait on");
   assert.equal(segments[1]!.style.getPropertyValue("--lsr-photon-ms"), "");
   for (const name of ["lsr-light-photon", "lsr-light-edge", "lsr-light-flash", "lsr-light-glint"]) {
-    assert.deepEqual(named(progress, name), [], `${name} is gone`);
+    assert.deepEqual(named(segments[1]!, name), [], `${name} is gone`);
   }
+});
+
+test("an untick takes the lights off only the segment it narrowed", (t) => {
+  // Regression: an untick in one chapter put out the flash and the sweep's glint on every other.
+  const { progress, segments, tick } = bar(t);
+  accelerate(progress, { kind: "all", index: 1, share: 1 }, tick);
+  t.mock.timers.tick(100);
+  const [narrowed, finished] = segments;
+  assert.equal(named(narrowed!, "lsr-light-glint").length, 1, "the sweep crossed it");
+
+  accelerate(progress, undefined, tick, () => {}, [0]);
+
+  assert.deepEqual(named(narrowed!, "lsr-light-glint"), [], "the untick's own segment is put out");
+  assert.equal(finished!.getAttribute("data-light"), "run");
+  for (const name of ["lsr-light-photon", "lsr-light-edge", "lsr-light-flash", "lsr-light-glint"]) {
+    assert.notDeepEqual(named(finished!, name), [], `${name} plays on`);
+  }
+});
+
+/** Two chapters of one file each: `a.ts` is the bar's first segment, `b.ts` its second. */
+const CHAPTERS: DiffGroup[] = ["a.ts", "b.ts"].map((path) => ({
+  name: path,
+  rationale: "",
+  files: [{ path, status: "modified", diff: "", insertions: 1, deletions: 0, oversized: false }],
+}));
+
+test("a tick is told which segments an untick narrowed from the approved lists", (t) => {
+  const { progress, segments, tick } = bar(t);
+  const aim = (before: string[], after: string[]) =>
+    aimTick(asElement(progress), CHAPTERS, before, after).fire(asElement(tick), () => {});
+  aim(["a.ts"], ["a.ts", "b.ts"]);
+  t.mock.timers.tick(100);
+
+  aim(["a.ts", "b.ts"], ["b.ts"]);
+  assert.equal(segments[1]!.getAttribute("data-light"), "run", "another chapter's untick");
+  aim(["b.ts"], []);
+  assert.equal(segments[1]!.getAttribute("data-light"), null, "its own untick");
 });
 
 /**
@@ -194,7 +239,7 @@ function redrawnBar(t: TestContext) {
       fill.getAttribute("style")!,
     );
   });
-  const light = aimAccelerator(asElement(progress), { kind: "chapter", index: 0, share: 1 });
+  const light = aimAccelerator(asElement(progress), { kind: "chapter", index: 0, share: 1 }, []);
   const redrawn = segmentsAt(["100%", "0%"]);
   progress.children[0]!.children.splice(0, 2);
   progress.children[0]!.append(...redrawn);
@@ -233,7 +278,7 @@ test("a redraw that drew the ticked box again glows that one; one that did not g
   assert.equal(other.getAttribute("data-light"), null);
   assert.equal(tick.getAttribute("data-light"), null, "the detached box is not lit for nobody");
   // A sweep has no box at all, and still grows its chapter.
-  aimAccelerator(asElement(progress), { kind: "chapter", index: 0, share: 1 }).redrawn(
+  aimAccelerator(asElement(progress), { kind: "chapter", index: 0, share: 1 }, []).redrawn(
     asElement(root),
   );
 });

@@ -46,24 +46,30 @@ export function aimTick(
   before: string[],
   after: string[],
 ): Accelerator {
-  const change = progressChange(progressSegments(groups, before), progressSegments(groups, after));
-  return aimAccelerator(progress, change);
+  const was = progressSegments(groups, before);
+  const now = progressSegments(groups, after);
+  const shrunk = now.flatMap((segment, at) =>
+    segment.approvedWeight < (was[at]?.approvedWeight ?? 0) ? [at] : [],
+  );
+  return aimAccelerator(progress, progressChange(was, now), shrunk);
 }
 
 /**
  * Measures the bar now, before the tick writes anything to the page: every
  * patch and redraw after it would make this read lay the page out again.
+ * `shrunk` are the segments an untick narrowed.
  */
 export function aimAccelerator(
   progress: HTMLElement,
   change: ProgressChange | undefined,
+  shrunk: number[],
 ): Accelerator {
   const segment = change && segmentAt(progress, change.index);
   const run = segment && change && runTo(segment, change.share);
   const was = segment?.querySelector(".lsr-progress-fill")?.getAttribute("style") ?? "";
   const light = (grow: () => void): void => {
     if (change && run) launch(progress, change, run, grow);
-    else settle(progress, grow);
+    else settle(progress, shrunk, grow);
   };
   return {
     fire(tick, grow) {
@@ -137,17 +143,23 @@ function launch(progress: HTMLElement, change: ProgressChange, run: Run, grow: (
 }
 
 /**
- * An untick: nothing celebrates it, and a run still going would hold its
- * width change back behind a particle bound for an edge that is gone.
+ * An untick: nothing celebrates it, and a run still going on the segments it
+ * narrowed would hold their width back behind a particle bound for an edge
+ * that is gone. Every other segment's light plays on.
  */
-function settle(progress: HTMLElement, grow: () => void): void {
-  for (const segment of segmentsOf(progress)) {
-    if (segment.getAttribute("data-light") === "run") stop(segment);
-    for (const name of RUN_LIGHTS) {
-      for (const light of segment.querySelectorAll(`.${name}`)) light.remove();
-    }
+function settle(progress: HTMLElement, shrunk: number[], grow: () => void): void {
+  for (const index of shrunk) {
+    const segment = segmentAt(progress, index);
+    if (segment) putOut(segment);
   }
   grow();
+}
+
+function putOut(segment: HTMLElement): void {
+  if (segment.getAttribute("data-light") === "run") stop(segment);
+  for (const name of RUN_LIGHTS) {
+    for (const light of segment.querySelectorAll(`.${name}`)) light.remove();
+  }
 }
 
 function finishChapter(segment: HTMLElement, ms: number): void {
