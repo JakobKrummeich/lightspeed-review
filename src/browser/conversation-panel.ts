@@ -217,11 +217,12 @@ function renderConversation(state: PanelState): string {
   const segments = roundSegments(cardsOf(state), state.rounds);
   const ruled = segments.length > 1;
   const pending = pendingResolves(state.pending);
+  const mode = composeMode(state);
   const parts: string[] = [];
   for (const segment of segments) {
     if (ruled) parts.push(renderRoundMark(segment));
     for (const card of segment.entries) {
-      parts.push(renderThread(card, segment, pending.get(card.id)));
+      parts.push(renderThread(card, segment, pending.get(card.id), mode));
     }
   }
   return parts.join("\n  ");
@@ -315,11 +316,12 @@ function renderThread(
   card: Card,
   segment: RoundSegment<Card>,
   queued: boolean | undefined,
+  mode: ComposeMode,
 ): string {
   const resolved = queued ?? card.resolved;
   const body = resolved ? "" : `\n    ${renderThreadBody(card)}`;
   return `<article class="lsr-thread" data-round-state="${roundState(segment)}" data-resolved="${resolved}"${card.fresh ? ` data-new="true"` : ""}${card.legacy ? ` data-legacy="true"` : ""}>
-    ${renderThreadHead(card, resolved, queued !== undefined)}${body}
+    ${renderThreadHead(card, resolved, queued !== undefined)}${body}${renderThreadFoot(card, resolved, mode)}
   </article>`;
 }
 
@@ -330,7 +332,45 @@ function renderThreadHead(card: Card, resolved: boolean, queued: boolean): strin
     : "";
   if (card.legacy) return `<header class="lsr-thread-head">${file}</header>${summary}`;
   const id = escapeHtml(card.id);
-  return `<header class="lsr-thread-head"><span class="lsr-thread-id">${id}</span>${newMark(card)}${file}${queuedMark(resolved, queued)}${toggleFor(card, id, resolved)}</header>${summary}`;
+  return `<header class="lsr-thread-head"><span class="lsr-thread-id">${id}</span>${newMark(card)}${file}${queuedMark(resolved, queued)}</header>${summary}`;
+}
+
+const WAITING_LINE = `\n    <p class="lsr-thread-waiting">Waiting for the agent…</p>`;
+
+/**
+ * The card's foot offers only what the reviewer can do in it now. Reply and
+ * Resolve once the agent has had the last word and the page takes writing —
+ * their own turn, or the agent's working one, which queues. Their own last
+ * word is the agent's to answer, and says so quietly rather than inviting a
+ * second message on top. A folded thread's Reopen follows the page's lock
+ * alone: whoever spoke last, reopening is the reviewer's call. Legacy words
+ * and `main` posts have no thread to answer in.
+ */
+function renderThreadFoot(card: Card, resolved: boolean, mode: ComposeMode): string {
+  if (!answerable(card)) return "";
+  if (!resolved && !agentSpokeLast(card)) return mode === "ended" ? "" : WAITING_LINE;
+  if (!takesWriting(mode)) return "";
+  const id = escapeHtml(card.id);
+  if (resolved) return threadFoot(renderToggle(id, true));
+  return threadFoot(`${renderReplyControls(id)}\n      ${renderToggle(id, false)}`);
+}
+
+/** Legacy words and `main` posts have no thread to answer in. */
+function answerable(card: Card): boolean {
+  return card.legacy !== true && !card.main;
+}
+
+function agentSpokeLast(card: Card): boolean {
+  return card.messages.at(-1)?.role === "agent";
+}
+
+/** The reviewer's turn sends, the agent's working one queues; nothing else writes. */
+function takesWriting(mode: ComposeMode): boolean {
+  return mode === "send" || mode === "queue";
+}
+
+function threadFoot(controls: string): string {
+  return `\n    <footer class="lsr-thread-foot">\n      ${controls}\n    </footer>`;
 }
 
 function newMark(card: Card): string {
@@ -340,11 +380,6 @@ function newMark(card: Card): string {
 function queuedMark(resolved: boolean, queued: boolean): string {
   if (!queued) return "";
   return `<span class="lsr-thread-queued">${resolved ? "resolves" : "reopens"} on your next Send</span>`;
-}
-
-/** `main` is answered from the general comment box: nothing there to resolve. */
-function toggleFor(card: Card, id: string, resolved: boolean): string {
-  return card.main ? "" : renderToggle(id, resolved);
 }
 
 function renderToggle(id: string, resolved: boolean): string {
@@ -357,17 +392,14 @@ function threadSummary(thread: Thread): string {
 
 /**
  * Each message its own block, never nested deeper: you → agent → you… for as
- * many turns as it takes. Legacy threads (said before items had ids) are read
- * only — there is no id to reply in.
+ * many turns as it takes. What the reviewer can do next is the foot's.
  */
 function renderThreadBody(card: Card): string {
   const selection =
     card.item?.type === "annotation"
       ? `<pre class="lsr-prompt-selection">${escapeHtml(card.item.selected_text)}</pre>\n    `
       : "";
-  const messages = card.messages.map(renderMessage).join("\n    ");
-  const readOnly = card.legacy === true || card.main;
-  return `${selection}${messages}${readOnly ? "" : `\n    ${renderReplyBox(card.id)}`}`;
+  return `${selection}${card.messages.map(renderMessage).join("\n    ")}`;
 }
 
 function renderMessage(message: ThreadMessage): string {
@@ -381,14 +413,11 @@ function renderMessage(message: ThreadMessage): string {
 /**
  * A reply is one more pill: it goes out with the rest of the batch on the next
  * Send, as the resolve toggle does, so replying in three threads is still one
- * turn for the agent.
+ * turn for the agent. `id` is escaped by the caller.
  */
-function renderReplyBox(id: string): string {
-  const thread = escapeHtml(id);
-  return `<div class="lsr-thread-reply">
-      <textarea class="lsr-thread-reply-box" data-thread="${thread}" placeholder="Reply — Enter adds it to your next Send…" aria-label="Reply in ${thread}"></textarea>
-      <button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="${thread}">${REPLY_LABEL}</button>
-    </div>`;
+function renderReplyControls(id: string): string {
+  return `<textarea class="lsr-thread-reply-box" data-thread="${id}" placeholder="Reply — Enter adds it to your next Send…" aria-label="Reply in ${id}"></textarea>
+      <button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="${id}">${REPLY_LABEL}</button>`;
 }
 
 function renderPill(pill: QueuedPill, index: number, current: number): string {

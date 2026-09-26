@@ -72,7 +72,11 @@ function lockThreads(view: ComposeView, frozen: boolean): void {
   }
 }
 
-/** In the scroll, redrawn with it: every draw re-locks them. */
+/**
+ * In the scroll, redrawn with it: every draw re-locks them. A thread's foot is
+ * drawn only while the page takes writing, so for its controls the lock is
+ * what a send on the wire needs.
+ */
 const THREAD_CONTROLS = [
   ".lsr-thread-reply-box",
   ".lsr-thread-reply-add",

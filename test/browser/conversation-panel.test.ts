@@ -533,19 +533,54 @@ test("a line thread keeps its jump to the lines and its quoted selection", () =>
   assert.match(html, /<pre class="lsr-prompt-selection">\+const user = 1;<\/pre>/);
 });
 
-test("the reply box sits at the bottom of each thread, named for it", () => {
-  const html = renderScroll(panelState({ conversation: exchange }));
+/** One card, from its id to the end of its article. */
+function cardOf(html: string, id: string): string {
+  const start = html.lastIndexOf(
+    "<article",
+    html.indexOf(`<span class="lsr-thread-id">${id}</span>`),
+  );
+  return html.slice(start, html.indexOf("</article>", start));
+}
+
+test("a thread the agent answered last ends in a footer: reply box, Reply, Resolve, in that order", () => {
+  const card = cardOf(renderScroll(panelState({ conversation: exchange })), "t2");
 
   assert.match(
-    html,
-    /<textarea class="lsr-thread-reply-box" data-thread="t2"[^>]*aria-label="Reply in t2"/,
+    card,
+    /<footer class="lsr-thread-foot">\s*<textarea class="lsr-thread-reply-box" data-thread="t2"[^>]*aria-label="Reply in t2"><\/textarea>\s*<button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="t2">Reply<\/button>\s*<button type="button" class="lsr-thread-resolve" data-thread="t2" aria-expanded="true">Resolve<\/button>\s*<\/footer>/,
   );
-  assert.match(
-    html,
-    /<button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="t2">Reply<\/button>/,
-  );
-  const thread = html.slice(html.indexOf("t2</span>"));
-  assert.ok(thread.indexOf("batched") < thread.indexOf("lsr-thread-reply-box"));
+  assert.ok(card.indexOf("batched") < card.indexOf("lsr-thread-foot"));
+  const head = card.slice(0, card.indexOf("</header>"));
+  assert.doesNotMatch(head, /lsr-thread-resolve/, "Resolve left the header");
+});
+
+test("while the agent works the footer stays, since everything the reviewer writes queues", () => {
+  const card = cardOf(renderScroll(panelState({ conversation: exchange, turn: WORKING })), "t2");
+
+  assert.match(card, /lsr-thread-foot/);
+  assert.match(card, />Resolve<\/button>/);
+});
+
+/** Nothing the reviewer could press is drawn: the page takes no writing now. */
+test("while the agent digests, or once the review ended, an answered thread has no footer", () => {
+  for (const over of [{ turn: AGENTS_TURN }, { status: "ended" as const }]) {
+    const card = cardOf(renderScroll(panelState({ conversation: exchange, ...over })), "t2");
+
+    assert.doesNotMatch(card, /lsr-thread-foot|lsr-thread-reply-box|lsr-thread-resolve/);
+    assert.doesNotMatch(card, /Waiting for the agent/);
+  }
+});
+
+/** The reviewer's own last word is the agent's to answer; a Reply there would only pile on. */
+test("a thread the reviewer spoke in last waits quietly for the agent instead of a footer", () => {
+  for (const turn of [REVIEWERS_TURN, AGENTS_TURN, WORKING]) {
+    const card = cardOf(renderScroll(panelState({ conversation: exchange, turn })), "t1");
+
+    assert.match(card, /<p class="lsr-thread-waiting">Waiting for the agent…<\/p>/, turn.holder);
+    assert.doesNotMatch(card, /lsr-thread-foot|lsr-thread-reply-box|lsr-thread-resolve/);
+  }
+  const ended = cardOf(renderScroll(panelState({ conversation: exchange, status: "ended" })), "t1");
+  assert.doesNotMatch(ended, /Waiting for the agent/);
 });
 
 test("a resolve toggle folds the whole thread to its head and a one-line summary", () => {
@@ -559,10 +594,29 @@ test("a resolve toggle folds the whole thread to its head and a one-line summary
 
   assert.match(html, /data-resolved="true"/);
   assert.match(html, /<p class="lsr-thread-summary">why a new table\?<\/p>/);
-  assert.match(html, /class="lsr-thread-resolve" data-thread="t2" aria-expanded="false">Reopen</);
+  assert.match(
+    cardOf(html, "t2"),
+    /<footer class="lsr-thread-foot">\s*<button type="button" class="lsr-thread-resolve" data-thread="t2" aria-expanded="false">Reopen<\/button>\s*<\/footer>/,
+  );
   assert.doesNotMatch(html, /batched/, "the exchange is folded away");
   assert.doesNotMatch(html, /data-thread="t2" placeholder/, "and its reply box with it");
-  assert.match(html, /class="lsr-thread-resolve" data-thread="t1" aria-expanded="true">Resolve</);
+  assert.doesNotMatch(cardOf(html, "t2"), /Waiting for the agent/);
+});
+
+test("a resolved thread offers Reopen only while the reviewer can write", () => {
+  const resolved = [
+    ...exchange,
+    entry("reviewer", "2025-01-01T00:08:00.000Z", [
+      { type: "resolve", thread: "t2", resolved: true },
+    ]),
+  ];
+
+  const working = renderScroll(panelState({ conversation: resolved, turn: WORKING }));
+  assert.match(cardOf(working, "t2"), />Reopen<\/button>/);
+  for (const over of [{ turn: AGENTS_TURN }, { status: "ended" as const }]) {
+    const card = cardOf(renderScroll(panelState({ conversation: resolved, ...over })), "t2");
+    assert.doesNotMatch(card, /lsr-thread-foot|Reopen/);
+  }
 });
 
 test("a queued resolve folds the thread at once and says it goes with the next Send", () => {

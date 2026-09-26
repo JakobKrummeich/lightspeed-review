@@ -161,8 +161,8 @@
 }
 
 /*
- * The thread's head: its id (what the agent types in `--to`), the file it
- * jumps to, and the resolve toggle pushed to the far edge.
+ * The thread's head: its id (what the agent types in `--to`) and the file it
+ * jumps to. What the reviewer can do in the thread is at its foot.
  */
 .lsr-thread-head {
   display: flex;
@@ -199,7 +199,6 @@
 }
 
 .lsr-thread-resolve {
-  margin-left: auto;
   background: transparent;
   color: var(--lsr-muted);
   border: 1px solid var(--lsr-border);
@@ -254,13 +253,27 @@
   margin: 0;
 }
 
-/* At the thread's foot. Two lines, not the compose box's four: a tall box in
- * every card would push the threads under it off the screen. */
-.lsr-thread-reply {
+/*
+ * The thread's foot, in reading order: the box, Reply, Resolve. Drawn only
+ * when the agent spoke last and the page takes writing, so it never shows a
+ * control the reviewer cannot use. A folded thread's Reopen sits alone at the
+ * far edge. The box is two lines, not the compose box's four: a tall box in
+ * every card would push the threads under it off the screen.
+ */
+.lsr-thread-foot {
   display: flex;
   align-items: flex-end;
+  justify-content: flex-end;
   gap: var(--lsr-space-2);
   margin-top: var(--lsr-space-2);
+}
+
+/* The reviewer spoke last: the agent's move, said without asking anything. */
+.lsr-thread-waiting {
+  margin: var(--lsr-space-2) 0 0;
+  font-size: var(--lsr-size-label);
+  color: var(--lsr-muted);
+  font-style: italic;
 }
 
 .lsr-thread-reply-box {
