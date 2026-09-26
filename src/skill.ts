@@ -139,7 +139,10 @@ const RULES = `## Rules
   \`lightspeed open <branch> [base] --reopen --intent '<why>'\`.
 - Every command takes \`<branch> [base]\` explicitly, which is what makes
   concurrent reviews unambiguous. Omit the branch only when the repository has
-  exactly one live session. \`base\` defaults to \`main\`.
+  exactly one live session. \`base\` defaults to \`main\`. A fresh \`open\`
+  of a branch already live under another spelling of its base (\`origin/main\`
+  for \`main\`) or from another worktree is refused \`live_review_elsewhere\`,
+  naming the command that re-attaches to that review.
 - State the intent in the reviewer's terms — what the branch is for, not a list
   of the files you touched.`;
 

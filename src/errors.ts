@@ -25,6 +25,7 @@ export type ReviewErrorCode =
   | "turn_still_yours"
   | "agent_holds_turn"
   | "ambiguous_session"
+  | "live_review_elsewhere"
   | "unknown_command"
   | "unknown_flag"
   | "argument_missing"
@@ -111,6 +112,7 @@ const ARGUMENT_ERROR_CODES: readonly string[] = [
   "session_ended",
   "session_not_found",
   "ambiguous_session",
+  "live_review_elsewhere",
 ];
 
 export function exitCodeFor(error: unknown): number {

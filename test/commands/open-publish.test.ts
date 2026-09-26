@@ -471,6 +471,123 @@ test("a fresh open the server answers as a re-attach says re-attached and opens 
   });
 });
 
+/** A repository with `main`, a `develop` a commit ahead of it, the branch under review, and an `origin` remote tracking main. */
+function repoWithRemote(): string {
+  const repoRoot = newRepo("lsr-elsewhere-");
+  git(repoRoot, "commit", "--allow-empty", "-m", "base");
+  git(repoRoot, "remote", "add", "origin", "https://example.invalid/app.git");
+  git(repoRoot, "update-ref", "refs/remotes/origin/main", "main");
+  git(repoRoot, "branch", "develop");
+  git(repoRoot, "commit", "--allow-empty", "-m", "ahead");
+  git(repoRoot, "branch", "-f", "develop", "HEAD");
+  git(repoRoot, "reset", "--hard", "HEAD~1");
+  git(repoRoot, "checkout", "-b", BRANCH);
+  git(repoRoot, "commit", "--allow-empty", "-m", "tip");
+  return repoRoot;
+}
+
+/**
+ * Regression: `open feat origin/main` beside a live `feat main` (or the same
+ * open from another worktree) silently made a second review, and the agent
+ * waited there while the reviewer's Send sat in the first.
+ */
+test("a fresh open is refused while the branch is live against the same base spelled otherwise", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+
+    for (const base of ["origin/main", "refs/heads/main", "refs/remotes/origin/main"]) {
+      const error = await refusal(open(harness, { repoRoot, base }));
+
+      assert.equal(error.code, "live_review_elsewhere", base);
+      assert.match(error.message, new RegExp(`${BRANCH} against main is live`));
+      assert.match(
+        error.suggestions[0]!,
+        /^Run `lightspeed open feature-auth main` to re-attach to it/,
+      );
+    }
+    assert.equal(harness.grouped.length, 1);
+    assert.equal(harness.store.list().length, 1);
+  });
+});
+
+test("a remote-tracking base behind its branch still names it, and a second name at one commit is the same base", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+    git(repoRoot, "branch", "trunk", "main");
+    git(repoRoot, "update-ref", "refs/heads/main", "develop");
+
+    assert.equal(
+      (await refusal(open(harness, { repoRoot, base: "origin/main" }))).code,
+      "live_review_elsewhere",
+    );
+    git(repoRoot, "update-ref", "refs/heads/main", "trunk");
+    assert.equal(
+      (await refusal(open(harness, { repoRoot, base: "trunk" }))).code,
+      "live_review_elsewhere",
+    );
+  });
+});
+
+/** The re-run a weak model makes after a kill often drops --intent: it needs its review back, not a reason. */
+test("the duplicate is named before a missing --intent, and --reopen is not guarded", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+
+    const error = await refusal(open(harness, { repoRoot, base: "origin/main", intents: [] }));
+
+    assert.equal(error.code, "live_review_elsewhere");
+    await open(harness, { repoRoot, base: "origin/main", reopen: true });
+    assert.equal(harness.store.list().length, 2);
+  });
+});
+
+test("a fresh open from another worktree of the repository names the re-attach in the first", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    const worktree = join(mkdtempSync(join(tmpdir(), "lsr-elsewhere-wt-")), "wt");
+    git(repoRoot, "worktree", "add", "-b", "scratch", worktree, "main");
+    await open(harness, { repoRoot });
+
+    const error = await refusal(open(harness, { repoRoot: worktree }));
+
+    assert.equal(error.code, "live_review_elsewhere");
+    assert.match(error.message, new RegExp(`in ${repoRoot}`));
+    assert.equal(
+      error.suggestions[0]!.split(" to re-attach")[0],
+      `Run \`cd ${repoRoot} && lightspeed open feature-auth main\``,
+    );
+  });
+});
+
+test("an ended review, another base, or another repository's branch of the same name does not block an open", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "develop" });
+    await open(harness, { repoRoot: repoWithRemote(), base: "main" });
+    const ended = sessionKey(repoRoot, BRANCH, "develop");
+    harness.store.save({ ...harness.store.get(ended)!, status: "ended", endedBy: "agent" });
+
+    await open(harness, { repoRoot, base: "origin/main" });
+
+    assert.equal(harness.store.list().length, 3);
+  });
+});
+
+/** A live `feat main` does not stop `feat develop`: two bases are two diffs, and possibly two reviews on purpose. */
+test("the same branch against a base at another commit is a different review", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+
+    await open(harness, { repoRoot, base: "develop" });
+
+    assert.equal(harness.store.list().length, 2);
+  });
+});
+
 /** Working: nobody will send, so a wait would hang on edits only the agent can finish. */
 test("open on a working turn is refused before it announces a wait, naming publish", async () => {
   await withHarness(async (harness) => {

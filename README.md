@@ -593,7 +593,12 @@ included — so read the help, do not retry; exit 1 when the machine got in the
 way (server, git, model, config). A branchless command on a repository whose
 latest review ended is refused `session_ended`, naming who ended it; with no
 review here at all it is refused `session_not_found`, and with several live ones
-`ambiguous_session`. There is no timer
+`ambiguous_session`. A fresh `open` of a branch that is already live in this
+repository — against the same base spelled otherwise (`origin/main`,
+`refs/heads/main` or another ref at the same commit for `main`) or from another
+worktree — is refused `live_review_elsewhere` (exit 2), naming the command that
+re-attaches to the live one; an ended one does not count, and `--reopen` is not
+checked. There is no timer
 and no override: an agent that died holding the turn is recovered by re-running
 the command it died in.
 

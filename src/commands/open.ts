@@ -16,6 +16,7 @@ import {
   waitClause,
 } from "../turn-help.ts";
 import { refusalError } from "./api-client.ts";
+import { refuseLiveElsewhere } from "./live-elsewhere.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
 import {
   helpLedgerDegraded,
@@ -149,7 +150,10 @@ function intentIgnored(input: OpenInput): string {
 
 /**
  * Checked before any git or model work: nothing is worth doing on an ended
- * review, or on a fresh one nobody has said the reason for.
+ * review, on one that would duplicate a live review of the branch, or on a
+ * fresh one nobody has said the reason for. The duplicate is named before the
+ * missing --intent: an agent re-running under another base spelling needs the
+ * way back to its review, not a reason for a new one.
  */
 function refuseFreshOpen(
   existing: SessionRecord | undefined,
@@ -162,6 +166,10 @@ function refuseFreshOpen(
       message: endedMessage(existing.endedBy),
       suggestions: [helpReopen(target)],
     });
+  }
+  // `--reopen` is the reviewer's own request for a round on this review.
+  if (input.reopen !== true) {
+    refuseLiveElsewhere(new SessionStore(input.config.stateDir).list(), input);
   }
   if (input.intents.length > 0) return;
   throw new ReviewError({

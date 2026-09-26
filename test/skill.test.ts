@@ -50,6 +50,13 @@ test("the skill's rules name the shell tool's timeout and forbid a second review
   assert.doesNotMatch(skill, /foreground/);
 });
 
+test("the skill names the refusal of a second review of a live branch", () => {
+  assert.match(
+    skill.replace(/\s+/g, " "),
+    /refused `live_review_elsewhere`, naming the command that re-attaches/,
+  );
+});
+
 /** D3: "locked" is the browser's word, "waits for your Send" the CLI's. */
 test("the skill never says blocking", () => {
   assert.doesNotMatch(skill, /\bblock(s|ing|ed)?\b/i);
