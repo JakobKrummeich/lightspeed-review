@@ -253,6 +253,7 @@ function mountPanelSide(
   const banner = mountStatusBanner(session);
   // The header's word for the turn, and the tab's for a reviewer not looking at it.
   const beacon = mountTabBeacon(document, presenceOf(session).turn, reducedMotion);
+  if (session.status === "ended") beacon.setEnded();
   const railControl = mountPanelRail({
     rail: page.rail,
     page: document.body,

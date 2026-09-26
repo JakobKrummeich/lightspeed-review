@@ -1,7 +1,9 @@
 /**
  * Writes the tab beacon into the title and the favicon. Lit when the turn
  * flips to the reviewer while the tab is hidden; dark again the moment the
- * tab is looked at, or if the turn goes back to the agent first.
+ * tab is looked at, or if the turn goes back to the agent first. Dark for good
+ * once the review has ended: `lightspeed end` hands the turn back to the
+ * reviewer too, and a closed review is nobody's turn.
  */
 import { beaconState, beaconTitle, FAVICON, FAVICON_LIT, type Beacon } from "../tab-beacon.ts";
 import type { Turn } from "../../session-store.ts";
@@ -13,6 +15,8 @@ export type BeaconPage = Pick<Document, "title" | "hidden" | "addEventListener" 
 
 export interface MountedBeacon {
   setTurn(turn: Turn): void;
+  /** Terminal: the beacon goes dark and no later turn lights it. */
+  setEnded(): void;
 }
 
 interface BeaconView {
@@ -44,14 +48,19 @@ export function mountTabBeacon(
     beacon: "dark",
   };
   let holder = opening.holder;
+  let ended = false;
   page.addEventListener("visibilitychange", () => {
     if (!page.hidden) show(view, "dark");
   });
   return {
     setTurn(turn) {
-      if (turn.holder === holder) return;
+      if (ended || turn.holder === holder) return;
       holder = turn.holder;
       show(view, beaconState(turn, page.hidden));
+    },
+    setEnded() {
+      ended = true;
+      show(view, "dark");
     },
   };
 }

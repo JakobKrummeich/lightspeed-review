@@ -180,7 +180,10 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     },
     railControl: { setQueued: () => {}, expand: () => log.push("rail expand") },
     finish: { setTurn: () => {} },
-    beacon: { setTurn: (turn) => log.push(`beacon turn ${turn.holder}`) },
+    beacon: {
+      setTurn: (turn) => log.push(`beacon turn ${turn.holder}`),
+      setEnded: () => log.push("beacon ended"),
+    },
     refreshReplay: () => log.push("replay"),
     place: () => place,
   };
@@ -323,6 +326,18 @@ test("an announced session is drawn even when nothing the page compares has move
   await settled();
 
   assert.deepEqual(log, ["diff same-round", "panel 0 said", "banner"]);
+});
+
+test("a review that ends puts the tab beacon out for good, whichever frame lands first", async (t) => {
+  // Regression: `lightspeed end` hands the turn to the reviewer, and a hidden tab read that as
+  // "● Your turn" on a review nobody can act on any more.
+  const { stream, server, log } = world(t).page();
+  server.serving = { ...session(0), status: "ended" };
+
+  stream().emit("session");
+  await settled();
+
+  assert.ok(log.includes("beacon ended"));
 });
 
 test("an older answer landing last does not put the old round back", async (t) => {

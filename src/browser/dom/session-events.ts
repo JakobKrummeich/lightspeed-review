@@ -18,6 +18,7 @@ import type { MountedDiff } from "./diff-mount.ts";
 import type { MountedPanel } from "./panel-mount.ts";
 import type { MountedRail } from "./panel-rail.ts";
 import type { MountedStatusBanner } from "./status-mount.ts";
+import type { MountedBeacon } from "./tab-beacon-mount.ts";
 
 /**
  * A subset of the page: taking the whole `Page` would make this module and
@@ -52,7 +53,7 @@ export interface Wired {
   railControl: MountedRail;
   finish: TurnAware;
   /** The tab's title and favicon, for a reviewer who is looking elsewhere. */
-  beacon: TurnAware;
+  beacon: MountedBeacon;
   refreshReplay(fresh: SessionData): void;
   place(): ReviewerPlace;
 }
@@ -198,6 +199,8 @@ function applyRound(wired: Wired, fresh: SessionData): void {
   // changes its standing (takes the reopen control away).
   if (change === "regrouped") openRound(wired, fresh);
   else if (fresh.status === "ended") page.replayReopen.hidden = true;
+  // The end's own presence frame says "reviewer", and may land either side of this.
+  if (fresh.status === "ended") wired.beacon.setEnded();
   panel.update(fresh);
   // Whole session, not status alone: an ended review is summed over the page,
   // last send included.

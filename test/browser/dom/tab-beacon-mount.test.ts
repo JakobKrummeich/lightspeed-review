@@ -125,3 +125,27 @@ test("a page with no favicon still says it in the title", (t) => {
   assert.equal(page.title, `● Your turn · ${TITLE}`);
   assert.equal(page.icon.href, FAVICON);
 });
+
+test("an ended review keeps the tab dark, though its end hands the turn back", (t) => {
+  // Regression: `lightspeed end` writes a reviewer turn, which lit a hidden tab's title.
+  const { page, beacon } = mounted(t);
+  page.show(true);
+
+  beacon.setEnded();
+  beacon.setTurn(YOURS);
+
+  assert.equal(page.title, TITLE);
+  assert.equal(page.icon.href, FAVICON);
+});
+
+test("the end puts out a beacon that was already lit, and its twinkle with it", (t) => {
+  const { page, beacon } = mounted(t);
+  page.show(true);
+  beacon.setTurn(YOURS);
+
+  beacon.setEnded();
+  t.mock.timers.tick(3000);
+
+  assert.equal(page.title, TITLE);
+  assert.equal(page.icon.href, FAVICON);
+});
