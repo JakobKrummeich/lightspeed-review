@@ -124,8 +124,10 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     update(fresh: SessionData) {
       state.conversation = fresh.conversation;
       state.rounds = fresh.rounds;
-      draw(view);
+      // Status first: the thread foot is drawn from it, and a review that just
+      // ended must not keep a Reply the draw below would otherwise leave behind.
       setStatus(view, fresh.status);
+      draw(view);
     },
     setAllApproved(allApproved: boolean) {
       if (allApproved === state.allApproved) return;

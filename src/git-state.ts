@@ -79,7 +79,8 @@ export function unpublishedCommits(
   return count === undefined || count === "" ? undefined : Number(count);
 }
 
-function quietGit(repoRoot: string, args: string[]): string | undefined {
+/** git's answer, or `undefined` for any failure: callers treat unknown as "cannot vouch". */
+export function quietGit(repoRoot: string, args: string[]): string | undefined {
   try {
     return execFileSync("git", args, {
       cwd: repoRoot,

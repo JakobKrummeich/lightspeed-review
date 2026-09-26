@@ -33,6 +33,30 @@ test("the skill repeats the waits-for-your-Send rule in the words the CLI uses",
   assert.ok(skill.includes(WAITS_FOR_SEND));
 });
 
+/** The skill is read once, at startup: the kill rule has to be in it whole, not only in `help[]`. */
+test("the skill's rules name the shell tool's timeout and forbid a second review to recover", () => {
+  const rules = skill
+    .slice(skill.indexOf("## Rules"), skill.indexOf("## Setup"))
+    .replace(/\s+/g, " ");
+  assert.match(rules, /often minutes to hours/);
+  assert.match(rules, /Call your shell tool with NO timeout parameter, not via `timeout` or `&`/);
+  assert.match(rules, /only that command died: the server and the review stay live/);
+  assert.match(rules, /Re-run exactly the same command with NO timeout/);
+  assert.match(rules, /Never open another review, `end` or `--reopen` to recover/);
+  assert.match(
+    rules,
+    /on a `status:` line with its own `next.if_killed`: grouping can take minutes/,
+  );
+  assert.doesNotMatch(skill, /foreground/);
+});
+
+test("the skill names the refusal of a second review of a live branch", () => {
+  assert.match(
+    skill.replace(/\s+/g, " "),
+    /refused `live_review_elsewhere`, naming the command that re-attaches/,
+  );
+});
+
 /** D3: "locked" is the browser's word, "waits for your Send" the CLI's. */
 test("the skill never says blocking", () => {
   assert.doesNotMatch(skill, /\bblock(s|ing|ed)?\b/i);

@@ -107,14 +107,20 @@ items[2]:
 
 const RULES = `## Rules
 
-- Run \`open\`, \`reply\` and \`publish\` in the foreground, never under a
-  timeout. If one is killed anyway, re-run the same command: the server
+- \`open\`, \`reply\` and \`publish\` do not return until the reviewer
+  Sends — often minutes to hours. Call your shell tool with NO timeout
+  parameter, not via \`timeout\` or \`&\`. If one is killed anyway, only that
+  command died: the server and the review stay live and hold the reviewer's
+  Send. Re-run exactly the same command with NO timeout — the server
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
-  Before it waits, each prints what landed (\`replied\`, the round, or
+  Never open another review, \`end\` or \`--reopen\` to recover.
+- Before it waits, each of the three prints what landed (\`replied\`, the round, or
   \`rerun: true\`) closed by \`next.if_killed\` — that exact command; one
-  that hands back a batch you are digesting returns at once, without it. Only
-  one wait per review: a newer one makes the older exit \`superseded: true\`,
-  which asks nothing of you.
+  that hands back a batch you are digesting returns at once, without it. An
+  \`open\` or \`publish\` with files to group says so first, on a
+  \`status:\` line with its own \`next.if_killed\`: grouping can take
+  minutes. Only one wait per review: a newer one makes the older exit
+  \`superseded: true\`, which asks nothing of you.
 - Every refusal of a move — out of turn, an ended, unknown or ambiguous
   review — names the one right command in its \`help[]\` and exits 2: read
   it rather than retrying. \`turn_not_yours\`: the reviewer holds the turn.
@@ -133,7 +139,10 @@ const RULES = `## Rules
   \`lightspeed open <branch> [base] --reopen --intent '<why>'\`.
 - Every command takes \`<branch> [base]\` explicitly, which is what makes
   concurrent reviews unambiguous. Omit the branch only when the repository has
-  exactly one live session. \`base\` defaults to \`main\`.
+  exactly one live session. \`base\` defaults to \`main\`. A fresh \`open\`
+  of a branch already live under another spelling of its base (\`origin/main\`
+  for \`main\`) or from another worktree is refused \`live_review_elsewhere\`,
+  naming the command that re-attaches to that review.
 - State the intent in the reviewer's terms — what the branch is for, not a list
   of the files you touched.`;
 

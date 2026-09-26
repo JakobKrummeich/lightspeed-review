@@ -46,9 +46,10 @@ export async function diagnosePort(
 }
 
 /** `version` is absent from a server old enough not to state it — which is
- * itself the answer. */
+ * itself the answer. `stateDir` is absent from one older than 3.1.0. */
 export interface ServerHealth {
   version?: string;
+  stateDir?: string;
 }
 
 /**
@@ -62,16 +63,19 @@ export async function serverHealth(port: number): Promise<ServerHealth | undefin
     const response = await fetch(`${serverOrigin(port)}/health`, {
       signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
     });
-    return response.ok ? { ...statedVersion(await response.text()) } : undefined;
+    return response.ok ? statedHealth(await response.text()) : undefined;
   } catch {
     return undefined;
   }
 }
 
-function statedVersion(body: string): ServerHealth {
+function statedHealth(body: string): ServerHealth {
   try {
-    const parsed = JSON.parse(body) as { version?: unknown };
-    return typeof parsed.version === "string" ? { version: parsed.version } : {};
+    const parsed = JSON.parse(body) as { version?: unknown; stateDir?: unknown };
+    return {
+      ...(typeof parsed.version === "string" ? { version: parsed.version } : {}),
+      ...(typeof parsed.stateDir === "string" ? { stateDir: parsed.stateDir } : {}),
+    };
   } catch {
     return {};
   }

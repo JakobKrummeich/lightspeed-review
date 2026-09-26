@@ -1,7 +1,11 @@
 import type { LightspeedConfig } from "../config.ts";
 import { extractDiff as extractDiffFromGit, type ExtractedDiff } from "../diff-extract.ts";
 import type { AgentNote } from "../feedback.ts";
-import { groupDiff as groupDiffWithModel, type GroupDiffInput } from "../llm/grouping.ts";
+import {
+  groupDiff as groupDiffWithModel,
+  groupingCallsModel,
+  type GroupDiffInput,
+} from "../llm/grouping.ts";
 import type { GroupingResult } from "../llm/grouping.ts";
 import type { PreviousGroup } from "../llm/prompts.ts";
 import { printBlock, type StructuredOutput } from "../output.ts";
@@ -10,6 +14,7 @@ import { currentGroupingMode } from "../rounds/session-round.ts";
 import type { LedgerReport } from "../server.ts";
 import { SessionStore, type SessionStatus } from "../session-store.ts";
 import { turnBlock, type TurnLabel } from "../turn.ts";
+import { groupingNotice } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { listen, type ListenInput } from "./listen.ts";
 import { serverOrigin } from "./server-address.ts";
@@ -24,6 +29,8 @@ export interface RoundDeps {
   openBrowser?: (url: string) => void;
   /** Where the round (or re-attach) block is shown before the wait begins. */
   announce?: (block: StructuredOutput) => void;
+  /** Where the notice that grouping has begun is shown, before the model call. */
+  announceGrouping?: (block: StructuredOutput) => void;
   /** The wait itself; tests stub it so a round can be published without a reviewer. */
   listen?: (input: ListenInput) => Promise<StructuredOutput>;
 }
@@ -34,6 +41,7 @@ const DEFAULT_DEPS: Required<RoundDeps> = {
   ensureServerRunning,
   openBrowser,
   announce: printBlock,
+  announceGrouping: printBlock,
   listen,
 };
 
@@ -70,6 +78,8 @@ export interface RoundInput {
   /** Only ever true because the reviewer asked; the agent never decides this. */
   reopen?: boolean;
   notes?: AgentNote[];
+  /** The command that recovers this one if it is killed while grouping. */
+  rerun: string | undefined;
   deps?: RoundDeps;
 }
 
@@ -82,13 +92,16 @@ export async function makeRound(
   run: Required<RoundDeps>,
 ): Promise<RoundOutcome> {
   const extracted = run.extractDiff(input.repoRoot, input.branch, input.base);
+  if (groupingCallsModel(extracted.files)) {
+    run.announceGrouping(groupingNotice(extracted.files.length, input.rerun));
+  }
   const grouping = await run.groupDiff({
     files: extracted.files,
     config: input.config,
     intents: input.intents,
     ...previousGrouping(input),
   });
-  await run.ensureServerRunning({ port: input.config.port });
+  await run.ensureServerRunning({ port: input.config.port, stateDir: input.config.stateDir });
   const created = await publishRound(input, extracted, grouping);
   const { branch, base, intents } = input;
   return { created, extracted, grouping, branch, base, intents };

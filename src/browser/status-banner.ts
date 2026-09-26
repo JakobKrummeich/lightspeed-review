@@ -1,7 +1,7 @@
 import { renderClosingSummary, type ClosedReview } from "./closing-summary.ts";
 import { escapeHtml } from "../escape-html.ts";
 import type { SessionStatus, Turn } from "../session-store.ts";
-import { agentTurnText, listeningText } from "./turn-words.ts";
+import { agentTurnText, listeningText, presenceWord } from "./turn-words.ts";
 
 export interface StatusState {
   status: SessionStatus;
@@ -36,38 +36,37 @@ export function renderStatusBanner(state: StatusState): string {
  * The turn wins over listening when both are reported — a second parked agent
  * is nothing the reviewer can act on, and the agent holding their feedback is.
  *
- * The label is the whole sentence; the header's corner cuts a long plan off
- * with an ellipsis, so the full sentence also rides in `title`, one hover away.
+ * The header says a short word beside a dot; the whole sentence — the plan,
+ * the item count, what a Send does now — rides in `title`, one hover away.
  */
 function presenceLine(state: StatusState): string {
-  // Escaped because on the agent's turn the label carries the plan `work`
-  // declared, which is the agent's own words — inside an attribute, so the
-  // quote matters as much as the angle brackets.
-  const turn = state.turn.holder;
-  const { label, detail } = presenceWords(state);
-  const attributes = `data-waiting="${state.agentWaiting}" data-turn="${turn}"`;
+  const attributes = `data-waiting="${state.agentWaiting}" data-turn="${state.turn.holder}"`;
+  const sentence = presenceSentence(state);
   if (state.connected === false) {
-    // Greyed, and said: beside the "connection lost" chip, a header still
-    // reading "Agent is listening" is a claim the page can no longer back.
-    const why = `the page lost the review server; last known: ${label}`;
+    // Greyed, dotless, and said: beside the "connection lost" chip, a header
+    // still reading "Agent listening" is a claim the page can no longer back.
+    const why = `the page lost the review server; last known: ${sentence.said}`;
     return `<p class="lsr-presence" ${attributes} data-connection="lost" title="${escapeHtml(why)}">Connection lost</p>`;
   }
-  return `<p class="lsr-presence" ${attributes} title="${escapeHtml(detail)}">${escapeHtml(label)}</p>`;
+  // Escaped because on the agent's turn the tooltip carries the plan `work`
+  // declared, which is the agent's own words — inside an attribute, so the
+  // quote matters as much as the angle brackets.
+  const word = presenceWord(state.turn, state.agentWaiting);
+  const dot = `<span class="lsr-presence-dot" aria-hidden="true"></span>`;
+  return `<p class="lsr-presence" ${attributes} title="${escapeHtml(sentence.detail)}">${dot}${escapeHtml(word)}</p>`;
 }
 
-function presenceWords(state: StatusState): { label: string; detail: string } {
+/** `said` is the fact alone; `detail` adds what the reviewer's Send does about it. */
+function presenceSentence(state: StatusState): { said: string; detail: string } {
   if (state.turn.holder === "agent") {
     const said = agentTurnText(state.turn, state.items);
-    return { label: said, detail: said };
+    return { said, detail: said };
   }
-  const label = listeningText(state.agentWaiting);
-  return state.agentWaiting
-    ? { label, detail: "an agent is listening: your next Send reaches it at once" }
-    : {
-        label,
-        // Not "queued": on this page that is the Queue button's word, for pills the
-        // reviewer can still take back, and this Send leaves the page for good.
-        detail:
-          "no agent is listening — Send anyway, it is handed over when the agent next listens",
-      };
+  const said = listeningText(state.agentWaiting);
+  // Not "queued": on this page that is the Queue button's word, for pills the
+  // reviewer can still take back, and this Send leaves the page for good.
+  const then = state.agentWaiting
+    ? "your next Send reaches it at once"
+    : "Send anyway, it is handed over when the agent next listens";
+  return { said, detail: `${said} — ${then}` };
 }

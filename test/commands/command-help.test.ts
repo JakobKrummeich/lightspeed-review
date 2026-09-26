@@ -42,12 +42,12 @@ test("a command without a help entry is summarised as its own --help", () => {
 });
 
 /** The three verbs that hand the turn back all wait, and all say so the same way. */
-test("every waiting verb's help says to run it in the foreground and re-run it if killed", () => {
+test("every waiting verb's help says to call it with no timeout and re-run it if killed", () => {
   for (const verb of ["open", "reply", "publish"]) {
     const help = commandHelp(verb) ?? "";
-    assert.match(help, /foreground/, verb);
-    assert.match(help, /never under a timeout/, verb);
-    assert.match(help, /re-run the same command/, verb);
+    assert.match(help, /NO timeout parameter/, verb);
+    assert.match(help, /re-run exactly the same command/, verb);
+    assert.doesNotMatch(help, /foreground/, verb);
   }
 });
 

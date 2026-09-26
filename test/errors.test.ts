@@ -20,6 +20,7 @@ test("every refusal of the move or of the session state exits 2", () => {
     "session_ended",
     "session_not_found",
     "ambiguous_session",
+    "live_review_elsewhere",
   ];
 
   assert.deepEqual(
@@ -32,6 +33,7 @@ test("a failure of the machine, not of the command, exits 1", () => {
   const environment: ReviewErrorCode[] = [
     "server_not_running",
     "server_unreachable",
+    "server_state_mismatch",
     "git_ref_not_found",
     "config_missing",
     "internal_error",

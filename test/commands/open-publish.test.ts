@@ -69,6 +69,9 @@ interface Harness {
   ledger: LedgerStore | undefined;
   opened: string[];
   grouped: GroupDiffInput[];
+  /** The grouping notices, and each seam's turn, in the order they happened. */
+  steps: string[];
+  notices: StructuredOutput[];
 }
 
 /** A real review server on a real port: only the diff and the LLM are faked. */
@@ -93,10 +96,17 @@ async function withHarness(
   };
   const grouped: GroupDiffInput[] = [];
   const announced: StructuredOutput[] = [];
+  const steps: string[] = [];
+  const notices: StructuredOutput[] = [];
   let extractions = 0;
   const deps: RoundDeps = {
     extractDiff: () => extractedAt((extractions += 1)),
+    announceGrouping: (block) => {
+      steps.push("notice");
+      notices.push(block);
+    },
     groupDiff: async (input) => {
+      steps.push("group");
       grouped.push(input);
       return {
         groups: [
@@ -112,7 +122,7 @@ async function withHarness(
     listen: async () => LISTENED,
   };
   try {
-    await body({ config, deps, announced, store, ledger, opened, grouped });
+    await body({ config, deps, announced, store, ledger, opened, grouped, steps, notices });
   } finally {
     await server.stop();
   }
@@ -343,6 +353,238 @@ test("before it waits, open names the command that recovers a kill: open, no int
     assert.match(ifKilled(fresh), /`?lightspeed open feature-auth main`?$/);
     assert.match(ifKilled(again), /`?lightspeed open feature-auth main`?$/);
     assert.equal(Object.keys(fresh!).at(-1), "next");
+  });
+});
+
+/**
+ * Grouping is the one slow step before anything is printed. An agent killed
+ * there saw no output at all and no way back, so the notice goes out first,
+ * with the command that recovers it.
+ */
+test("open says it is grouping before the model call, naming the open to re-run", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, { intents: ["sign the tokens", "drop the cookie"], open: false });
+
+    assert.deepEqual(harness.steps, ["notice", "group"]);
+    const [notice] = harness.notices;
+    assert.equal(notice?.status, "grouping 2 files — can take minutes");
+    assert.match(ifKilled(notice), /Only this command died, and the review is unharmed/);
+    assert.match(ifKilled(notice), /never open another review, end or reopen to recover/);
+    assert.ok(
+      ifKilled(notice).endsWith(
+        ": lightspeed open feature-auth main --intent 'sign the tokens' --intent 'drop the cookie' --no-open",
+      ),
+      ifKilled(notice),
+    );
+  });
+});
+
+test("an --reopen being grouped is re-run with --reopen, or it would be refused as ended", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.store.save({ ...harness.store.get(KEY)!, status: "ended", endedBy: "reviewer" });
+
+    await open(harness, { reopen: true });
+
+    assert.match(ifKilled(harness.notices[1]), /--intent '[^']+' --reopen$/);
+  });
+});
+
+/** An apostrophe cannot be printed so it pastes as shown; a wrong command would be worse than none. */
+test("a grouping notice whose intent will not paste says to re-run the same command unchanged", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, { intents: ["the user's tokens"] });
+
+    assert.match(
+      ifKilled(harness.notices[0]),
+      /Re-run the same command, unchanged, with NO timeout parameter/,
+    );
+    assert.doesNotMatch(ifKilled(harness.notices[0]), /lightspeed open/);
+  });
+});
+
+test("a one-file diff calls no model, so nothing announces grouping", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, {
+      deps: {
+        ...harness.deps,
+        extractDiff: () => ({ ...extractedAt(1), files: [diffFile("src/api/users.ts")] }),
+      },
+    });
+
+    assert.deepEqual(harness.notices, []);
+  });
+});
+
+test("publish says it is grouping before the model call, naming the publish to re-run", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.steps.length = 0;
+
+    await publishNext(harness, {
+      intents: ["retry on 503"],
+      notes: [{ to: "main", text: "done" }],
+    });
+
+    assert.deepEqual(harness.steps, ["notice", "group"]);
+    assert.ok(
+      ifKilled(harness.notices[1]).endsWith(
+        ": lightspeed publish feature-auth main --intent 'retry on 503' --to main 'done'",
+      ),
+      ifKilled(harness.notices[1]),
+    );
+  });
+});
+
+/**
+ * Another open landed the review while this one was grouping: the server
+ * re-attaches instead of opening a second round, and the agent must be told
+ * that — "the review is open" would describe a round this command never made.
+ */
+test("a fresh open the server answers as a re-attach says re-attached and opens no browser", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, { open: false });
+    const landedMeanwhile = harness.store.get(KEY)!;
+    harness.store.remove(KEY);
+
+    await open(harness, {
+      deps: {
+        ...harness.deps,
+        ensureServerRunning: async () => harness.store.save(landedMeanwhile),
+      },
+    });
+
+    const shown = harness.announced[1]!;
+    assert.match(
+      String(shown.message),
+      /^re-attached to the live review; waiting for the reviewer's Send/,
+    );
+    assert.doesNotMatch(String(shown.message), /the review is open/);
+    assert.match(String(shown.note), /--intent is ignored/);
+    assert.equal(shown.turn, "reviewer");
+    assert.equal(shown.round, 1);
+    assert.equal((shown.session as { key: string }).key, KEY);
+    assert.match(ifKilled(shown), /: lightspeed open feature-auth main$/);
+    assert.equal("groups" in shown, false);
+    assert.deepEqual(harness.opened, []);
+    assert.equal(harness.store.get(KEY)?.rounds.length, 1);
+  });
+});
+
+/** A repository with `main`, a `develop` a commit ahead of it, the branch under review, and an `origin` remote tracking main. */
+function repoWithRemote(): string {
+  const repoRoot = newRepo("lsr-elsewhere-");
+  git(repoRoot, "commit", "--allow-empty", "-m", "base");
+  git(repoRoot, "remote", "add", "origin", "https://example.invalid/app.git");
+  git(repoRoot, "update-ref", "refs/remotes/origin/main", "main");
+  git(repoRoot, "branch", "develop");
+  git(repoRoot, "commit", "--allow-empty", "-m", "ahead");
+  git(repoRoot, "branch", "-f", "develop", "HEAD");
+  git(repoRoot, "reset", "--hard", "HEAD~1");
+  git(repoRoot, "checkout", "-b", BRANCH);
+  git(repoRoot, "commit", "--allow-empty", "-m", "tip");
+  return repoRoot;
+}
+
+/**
+ * Regression: `open feat origin/main` beside a live `feat main` (or the same
+ * open from another worktree) silently made a second review, and the agent
+ * waited there while the reviewer's Send sat in the first.
+ */
+test("a fresh open is refused while the branch is live against the same base spelled otherwise", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+
+    for (const base of ["origin/main", "refs/heads/main", "refs/remotes/origin/main"]) {
+      const error = await refusal(open(harness, { repoRoot, base }));
+
+      assert.equal(error.code, "live_review_elsewhere", base);
+      assert.match(error.message, new RegExp(`${BRANCH} against main is live`));
+      assert.match(
+        error.suggestions[0]!,
+        /^Run `lightspeed open feature-auth main` to re-attach to it/,
+      );
+    }
+    assert.equal(harness.grouped.length, 1);
+    assert.equal(harness.store.list().length, 1);
+  });
+});
+
+test("a remote-tracking base behind its branch still names it, and a second name at one commit is the same base", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+    git(repoRoot, "branch", "trunk", "main");
+    git(repoRoot, "update-ref", "refs/heads/main", "develop");
+
+    assert.equal(
+      (await refusal(open(harness, { repoRoot, base: "origin/main" }))).code,
+      "live_review_elsewhere",
+    );
+    git(repoRoot, "update-ref", "refs/heads/main", "trunk");
+    assert.equal(
+      (await refusal(open(harness, { repoRoot, base: "trunk" }))).code,
+      "live_review_elsewhere",
+    );
+  });
+});
+
+/** The re-run a weak model makes after a kill often drops --intent: it needs its review back, not a reason. */
+test("the duplicate is named before a missing --intent, and --reopen is not guarded", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+
+    const error = await refusal(open(harness, { repoRoot, base: "origin/main", intents: [] }));
+
+    assert.equal(error.code, "live_review_elsewhere");
+    await open(harness, { repoRoot, base: "origin/main", reopen: true });
+    assert.equal(harness.store.list().length, 2);
+  });
+});
+
+test("a fresh open from another worktree of the repository names the re-attach in the first", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    const worktree = join(mkdtempSync(join(tmpdir(), "lsr-elsewhere-wt-")), "wt");
+    git(repoRoot, "worktree", "add", "-b", "scratch", worktree, "main");
+    await open(harness, { repoRoot });
+
+    const error = await refusal(open(harness, { repoRoot: worktree }));
+
+    assert.equal(error.code, "live_review_elsewhere");
+    assert.match(error.message, new RegExp(`in ${repoRoot}`));
+    assert.equal(
+      error.suggestions[0]!.split(" to re-attach")[0],
+      `Run \`cd ${repoRoot} && lightspeed open feature-auth main\``,
+    );
+  });
+});
+
+test("an ended review, another base, or another repository's branch of the same name does not block an open", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "develop" });
+    await open(harness, { repoRoot: repoWithRemote(), base: "main" });
+    const ended = sessionKey(repoRoot, BRANCH, "develop");
+    harness.store.save({ ...harness.store.get(ended)!, status: "ended", endedBy: "agent" });
+
+    await open(harness, { repoRoot, base: "origin/main" });
+
+    assert.equal(harness.store.list().length, 3);
+  });
+});
+
+/** A live `feat main` does not stop `feat develop`: two bases are two diffs, and possibly two reviews on purpose. */
+test("the same branch against a base at another commit is a different review", async () => {
+  await withHarness(async (harness) => {
+    const repoRoot = repoWithRemote();
+    await open(harness, { repoRoot, base: "main" });
+
+    await open(harness, { repoRoot, base: "develop" });
+
+    assert.equal(harness.store.list().length, 2);
   });
 });
 

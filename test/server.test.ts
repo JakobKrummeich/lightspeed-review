@@ -133,12 +133,16 @@ test("a round posted with reopen opens the review again and keeps its history", 
  * A `serve` from weeks earlier was still answering the current CLI with a
  * pre-turn protocol; the version is the whole of what a handshake needs.
  */
-test("health reports ok and the version of the CLI that started it", async () => {
-  await withServer(async ({ url }) => {
+test("health reports ok, the version of the CLI that started it and where its reviews live", async () => {
+  await withServer(async ({ url, store }) => {
     const response = await fetch(`${url}/health`);
 
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { status: "ok", version: CLI_VERSION });
+    assert.deepEqual(await response.json(), {
+      status: "ok",
+      version: CLI_VERSION,
+      stateDir: store.stateDir,
+    });
   });
 });
 

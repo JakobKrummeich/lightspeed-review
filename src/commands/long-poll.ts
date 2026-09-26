@@ -111,7 +111,7 @@ function portIsNotServing(
     message: `port ${port} neither accepted a connection nor refused one`,
     detail: `${detail}; the machine answered nothing at all on that port`,
     suggestions: [
-      `Re-run the command that was waiting, in the foreground — it posts nothing twice`,
+      "Re-run the command that was waiting, with NO timeout parameter — it posts nothing twice",
       `Run \`lightspeed stop\` and then \`${reattachCall(target)}\` if it keeps failing`,
     ],
   });

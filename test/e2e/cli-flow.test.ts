@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { decode } from "@toon-format/toon";
 import { sessionKey } from "../../src/paths.ts";
+import { createReviewServer } from "../../src/server.ts";
+import { SessionStore } from "../../src/session-store.ts";
 import type { SessionRecord } from "../../src/session-types.ts";
 import { git, newRepo } from "../helpers/git-repo.ts";
 import { freePort } from "../helpers/ports.ts";
@@ -433,5 +435,39 @@ test("open on a branch git does not know fails before any server exists", async 
     assert.match(stdout, /^ {2}code: git_ref_not_found$/m);
     // Diff is extracted before a server is spawned: a bad ref must leave nothing listening.
     await assert.rejects(fetch(`http://127.0.0.1:${port}/health`));
+  });
+});
+
+/**
+ * Regression: a server started under another HOME kept the review in its own
+ * state dir. The CLI's re-run found nothing on its side and answered
+ * `intent_missing`, and a re-run with --intent printed "the review is open"
+ * over a review it had never made. Every command that talks to the server now
+ * asks where its reviews live first.
+ */
+test("a server keeping its reviews in another state dir is refused before any command acts", async () => {
+  await withLoop(async ({ port, repoRoot }) => {
+    const elsewhere = mkdtempSync(join(tmpdir(), "lsr-e2e-elsewhere-"));
+    const server = createReviewServer({ store: new SessionStore(elsewhere), port });
+    await server.start();
+    try {
+      for (const args of [
+        // Bare `lightspeed` read "no active review sessions" off this side's files.
+        [],
+        ["open", "feature", "main"],
+        ["open", "feature", "main", "--intent", "why", "--no-open"],
+        ["reply", "--to", "t1", "hi", "feature", "main"],
+      ]) {
+        const { stdout, code } = await runCli(args, repoRoot);
+
+        assert.equal(code, 1, stdout);
+        assert.match(stdout, /^ {2}code: server_state_mismatch$/m, args.join(" "));
+        assert.ok(stdout.includes(elsewhere), stdout);
+        assert.ok(stdout.includes(join(repoRoot, "state")), stdout);
+        assert.match(stdout, /lightspeed stop/);
+      }
+    } finally {
+      await server.stop();
+    }
   });
 });

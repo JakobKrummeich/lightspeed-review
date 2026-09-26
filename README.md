@@ -139,8 +139,11 @@ review is read on the machine that runs it. It must be 1-65535. A review server
 of lightspeed's own already listening there is reused rather than replaced, and
 `serve` pointed at it says `server_already_running`; a port some other process
 holds is `port_unavailable` rather than a silent second choice, because a
-reviewer following a URL to the wrong port learns nothing from it. `stateDir`
-holds `sessions/` and `feedback/`, and expands a leading `~/` or a bare `~` and
+reviewer following a URL to the wrong port learns nothing from it. A review
+server of this version that keeps its reviews in another `stateDir` (started
+under another `HOME`, say) is `server_state_mismatch`, naming both directories:
+it holds Sends where this CLI never looks, so `lightspeed stop` it and re-run.
+`stateDir` holds `sessions/` and `feedback/`, and expands a leading `~/` or a bare `~` and
 nothing else — a tilde further along the path is a literal character.
 `feedbackLog` is `on` or `off`; `off` writes no ledger at all and changes
 nothing else about a review.
@@ -351,7 +354,7 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 3.0.1 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.1.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 Every command but `init` (the explicit install) then checks the places `init`
@@ -413,8 +416,10 @@ Set lightspeed up in this repository. These are two separate jobs; do both.
    Skills are scanned at startup, so you cannot use the one you just wrote until then.
 4. Then open a review with:
    `lightspeed open <branch> <base> --intent "<why this branch exists>"`
-   in the foreground — it waits for my Send, so do not background it and do not
-   wrap it in a timeout. Every output ends in a `next:` rule: follow it.
+   with NO timeout parameter on your shell tool (not via `timeout` or `&`) — it
+   does not return until I Send, often minutes to hours. If it is killed anyway,
+   only the command died: re-run exactly the same command, and never open a
+   second review to recover. Every output ends in a `next:` rule: follow it.
 ```
 
 Credentials are agent-independent: the model named in `.lightspeed.conf.json`
@@ -517,11 +522,11 @@ failures are still TOON.
 
 A review is in one of three live states:
 
-| State         | Reviewer's header                              | Reviewer can                                                            | Agent ends it with                    |
-| ------------- | ---------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
-| You compose   | "Agent is listening" / "Agent isn't listening" | read replies, reply in any thread, resolve threads, add items, **Send** | —                                     |
-| Agent digests | "Agent is reading your 5 items"                | read the diff and approve files; compose, replies and queue are locked  | `reply` (talk) or `work` (start work) |
-| Agent works   | "Working on: _plan_"                           | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
+| State         | Reviewer's header                                        | Reviewer can                                                            | Agent ends it with                    |
+| ------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
+| You compose   | "Agent listening" / "Agent not listening"                | read replies, reply in any thread, resolve threads, add items, **Send** | —                                     |
+| Agent digests | "Agent reading" (hover: "Agent is reading your 5 items") | read the diff and approve files; compose, replies and queue are locked  | `reply` (talk) or `work` (start work) |
+| Agent works   | "Agent working" (hover: "Working on: _plan_")            | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
 
 **End** is available in every state, and `lightspeed end` closes the review from
 the agent's side — `lightspeed end <branch>` on a review already ended just says
@@ -539,10 +544,14 @@ Send & End with words included; End without Sending always goes.
 
 `open`, `reply` and `publish` **wait for the reviewer's Send**: they do not
 return until the next batch arrives (or the review ends), so one call is one
-turn and there is no separate listening command to forget. `work` and `end` wait
-for nothing. If a waiting command is killed — a harness timeout, a server
-restart — re-running the _same_ command re-attaches: the server recognises the
-reply or publish it already has and waits again, so nothing is posted twice.
+turn and there is no separate listening command to forget — often minutes to
+hours, so an agent calls them with no timeout parameter on its shell tool. `work`
+and `end` wait for nothing. If a waiting command is killed anyway — a harness
+timeout, a server restart — only the command died: the server and the review
+stay live and hold the reviewer's Send, and re-running the _same_ command
+re-attaches: the server recognises the reply or publish it already has and waits
+again, so nothing is posted twice. Opening another review, ending or reopening
+recovers nothing, and the help says never to.
 `open` on a live review is the same re-attach: no new round, just the wait, and
 `--intent` is only required when opening fresh (given anyway, it is reported as
 ignored); on a working turn `open` is refused, since nobody sends while the
@@ -551,7 +560,10 @@ agent works. Before it waits, every waiting command prints what landed —
 `next.if_killed`, the exact command to re-run (re-attaching with `open` when a
 word holds an apostrophe, quote, backslash or line break, which would not paste
 as printed) — except a command handing back a batch still being digested, which
-returns at once and has no wait to recover. The newest wait wins: a second
+returns at once and has no wait to recover. An `open` or `publish` with more
+than one file to group prints `status: grouping N files — can take minutes` and
+its own `next.if_killed` before the model call, so a command killed while
+grouping has already said how to recover. The newest wait wins: a second
 waiting command on the same review answers the first `superseded: true`, so a
 forgotten background wait never swallows a batch. Bare `lightspeed` asks the
 server whether a wait is already parked before it suggests `open`, and says how
@@ -581,15 +593,24 @@ included — so read the help, do not retry; exit 1 when the machine got in the
 way (server, git, model, config). A branchless command on a repository whose
 latest review ended is refused `session_ended`, naming who ended it; with no
 review here at all it is refused `session_not_found`, and with several live ones
-`ambiguous_session`. There is no timer
+`ambiguous_session`. A fresh `open` of a branch that is already live in this
+repository — against the same base spelled otherwise (`origin/main`,
+`refs/heads/main` or another ref at the same commit for `main`) or from another
+worktree — is refused `live_review_elsewhere` (exit 2), naming the command that
+re-attaches to the live one; an ended one does not count, and `--reopen` is not
+checked. There is no timer
 and no override: an agent that died holding the turn is recovered by re-running
 the command it died in.
 
 **Threads.** Every reviewer item, line or general, opens a thread with a short,
 session-stable id (`t1`, `t2`…); `main` is the main chat, where the agent's
 `--to main` lands. In the page a thread is the item followed by its whole
-exchange, stacked top to bottom, with a reply box at its foot and a line
-thread's jump to its lines. **Resolve** folds a thread; it sends nothing by
+exchange, stacked top to bottom, with a line thread's jump to its lines. Its
+foot — a reply box, **Reply** and **Resolve** (**Reopen** once folded) — is
+there whenever you can write: on your turn, and queueing while the agent works,
+whoever spoke last, so you can reply twice in a row. While the agent holds the
+turn, a thread whose last word is yours says "Waiting for the agent…" above
+it. **Resolve** folds a thread; it sends nothing by
 itself and travels with the next Send, where the agent reads `t4 resolved` — for
 a question "no further questions", for a change request "I agree with what you
 last said", not a withdrawn request. Thread replies and resolves queue like any
@@ -773,7 +794,7 @@ A ledger failure never fails a review: it is reported as
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
 - The conversation is threads: each item with its exchange stacked under it,
-  a reply box at the foot, and a **Resolve** toggle that folds it. The header
+  and a foot with a reply box, **Reply** and a **Resolve** that folds it. The header
   and the foot of the conversation say whose turn it is, and a small
   "Connection lost — reconnecting…" chip shows while the live update stream is
   down.

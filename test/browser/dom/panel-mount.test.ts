@@ -1355,6 +1355,14 @@ const opened: ConversationEntry = {
   prompts: [{ type: "message", id: "t1", comment: "per-request or per-batch?" }],
 };
 
+/** The agent had the last word in t1: its card now offers Reply and Resolve. */
+const answered: ConversationEntry = {
+  role: "agent",
+  at: "2025-01-01T00:03:00.000Z",
+  roundIndex: 0,
+  prompts: [{ type: "reply", thread: "t1", comment: "per-request, for now" }],
+};
+
 function replyBoxOf(root: FakeNode, thread = "t1"): FakeNode | undefined {
   return root
     .querySelectorAll(".lsr-thread-reply-box")
@@ -1368,7 +1376,7 @@ function pressIn(root: FakeNode, selector: string, thread = "t1"): void {
 }
 
 test("a reply in a thread is one more pill, and goes out with the rest on Send", async (t) => {
-  const { root, panel } = mount(t, session({ conversation: [opened] }));
+  const { root, panel } = mount(t, session({ conversation: [opened, answered] }));
   const sent = stubFetch(t);
   panel.queue([annotation]);
   replyBoxOf(root)!.value = "  per-batch  ";
@@ -1393,7 +1401,7 @@ test("a reply in a thread is one more pill, and goes out with the rest on Send",
 });
 
 test("Enter in a reply box adds the reply, as its button does; an empty one adds nothing", (t) => {
-  const { root } = mount(t, session({ conversation: [opened] }));
+  const { root } = mount(t, session({ conversation: [opened, answered] }));
   const field = replyBoxOf(root)!;
   field.value = "   ";
   root.dispatch("keydown", keydown(field, { key: "Enter" }));
@@ -1409,7 +1417,7 @@ test("Enter in a reply box adds the reply, as its button does; an empty one adds
 });
 
 test("a key in anything but a reply box is not a reply", (t) => {
-  const { root } = mount(t, session({ conversation: [opened] }));
+  const { root } = mount(t, session({ conversation: [opened, answered] }));
   replyBoxOf(root)!.value = "per-batch";
 
   root.dispatch("keydown", keydown(root.querySelector(".lsr-thread-reply-add"), { key: "Enter" }));
@@ -1420,7 +1428,7 @@ test("a key in anything but a reply box is not a reply", (t) => {
 
 /** Every redraw replaces the scroll, and a pill queued mid-reply is the ordinary way that happens. */
 test("a pill queued mid-reply does not cost the reviewer their sentence", (t) => {
-  const { root, panel } = mount(t, session({ conversation: [opened] }));
+  const { root, panel } = mount(t, session({ conversation: [opened, answered] }));
   replyBoxOf(root)!.value = "per-batch, becau";
 
   panel.queue([annotation]);
@@ -1429,7 +1437,7 @@ test("a pill queued mid-reply does not cost the reviewer their sentence", (t) =>
 });
 
 test("resolve folds the thread at once and travels as a pill; pressed again it is taken back", async (t) => {
-  const { root } = mount(t, session({ conversation: [opened] }));
+  const { root } = mount(t, session({ conversation: [opened, answered] }));
   const sent = stubFetch(t);
 
   pressIn(root, ".lsr-thread-resolve");
@@ -1470,31 +1478,36 @@ test("a resolved thread's toggle queues the reopen", (t) => {
  * Working: all of it queues. End is never locked by the turn.
  */
 test("while the agent digests everything that writes is locked, redraw after redraw", (t) => {
-  const { root, panel } = mount(t, session({ conversation: [opened] }));
+  const { root, panel } = mount(t, session({ conversation: [opened, answered] }));
   panel.queue([annotation]);
   panel.setTurn(READING, 1);
 
   const locked = (): boolean[] =>
-    [
-      "#lsr-send",
-      "#lsr-general-comment",
-      ".lsr-thread-reply-box",
-      ".lsr-thread-reply-add",
-      ".lsr-thread-resolve",
-      ".lsr-pill-remove",
-    ].map((selector) => root.querySelector(selector)?.disabled ?? false);
-  assert.deepEqual(locked(), [true, true, true, true, true, true]);
+    ["#lsr-send", "#lsr-general-comment", ".lsr-pill-remove"].map(
+      (selector) => root.querySelector(selector)?.disabled ?? false,
+    );
+  // Not drawn at all rather than drawn disabled: the foot only offers what can be pressed.
+  const footer = () => root.querySelectorAll(".lsr-thread-foot").length;
+  assert.deepEqual(locked(), [true, true, true]);
+  assert.equal(footer(), 0);
   assert.equal(root.querySelector("#lsr-send-end")?.disabled, false);
   assert.match(
     root.querySelector(".lsr-complete")?.textContent ?? "",
     /Locked while the agent reads/,
   );
 
-  panel.update(session({ conversation: [opened] }));
-  assert.deepEqual(locked(), [true, true, true, true, true, true]);
+  panel.update(session({ conversation: [opened, answered] }));
+  assert.deepEqual(locked(), [true, true, true]);
+  assert.equal(footer(), 0);
 
   panel.setTurn(WORKING);
-  assert.deepEqual(locked(), [false, false, false, false, false, false]);
+  assert.deepEqual(locked(), [false, false, false]);
+  assert.deepEqual(
+    [".lsr-thread-reply-box", ".lsr-thread-reply-add", ".lsr-thread-resolve"].map(
+      (selector) => root.querySelector(selector)?.disabled,
+    ),
+    [false, false, false],
+  );
   assert.equal(
     root.querySelector(".lsr-complete")?.textContent,
     "Queued items go into the next round.",
@@ -1502,15 +1515,18 @@ test("while the agent digests everything that writes is locked, redraw after red
 });
 
 test("a stale press while the agent digests writes nothing", (t) => {
-  const { root, panel, box } = mount(t, session({ conversation: [opened] }));
+  const { root, panel, box } = mount(t, session({ conversation: [opened, answered] }));
   const sent = stubFetch(t);
   panel.queue([annotation]);
-  panel.setTurn(READING);
+  // Held from before the turn moved, as a listener that raced the redraw would.
+  const staleAdd = root.querySelector(".lsr-thread-reply-add");
+  const staleResolve = root.querySelector(".lsr-thread-resolve");
   replyBoxOf(root)!.value = "per-batch";
+  panel.setTurn(READING);
   box()!.value = "one more";
 
-  pressIn(root, ".lsr-thread-reply-add");
-  pressIn(root, ".lsr-thread-resolve");
+  root.dispatch("click", { target: staleAdd });
+  root.dispatch("click", { target: staleResolve });
   root.dispatch("click", { target: root.querySelector(".lsr-pill-remove") });
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
   panel.queue([annotation]);
@@ -1523,7 +1539,7 @@ test("a stale press while the agent digests writes nothing", (t) => {
 });
 
 test("while the agent works a thread reply and a resolve queue like everything else", (t) => {
-  const { root, panel } = mount(t, session({ conversation: [opened] }));
+  const { root, panel } = mount(t, session({ conversation: [opened, answered] }));
   const sent = stubFetch(t);
   panel.setTurn(WORKING);
   replyBoxOf(root)!.value = "per-batch";
@@ -1533,4 +1549,47 @@ test("while the agent works a thread reply and a resolve queue like everything e
 
   assert.deepEqual(sent, []);
   assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
+});
+
+/** Replying twice in a row is the reviewer's call; the waiting line is for the agent's turn only. */
+test("a thread the reviewer spoke in last keeps its footer, and says it waits only while the agent holds the turn", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [opened] }));
+
+  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 1);
+  assert.equal(root.querySelector(".lsr-thread-waiting"), null);
+
+  panel.setTurn(WORKING);
+  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 1);
+  assert.equal(root.querySelector(".lsr-thread-waiting")?.textContent, "Waiting for the agent…");
+
+  panel.setTurn(READING);
+  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 0);
+  assert.equal(root.querySelector(".lsr-thread-waiting")?.textContent, "Waiting for the agent…");
+
+  panel.update(session({ conversation: [opened, answered] }));
+  assert.equal(root.querySelector(".lsr-thread-waiting"), null);
+});
+
+test("the reviewer can reply twice in a row in a thread they spoke in last", (t) => {
+  const { root } = mount(t, session({ conversation: [opened] }));
+  const sent = stubFetch(t);
+
+  replyBoxOf(root)!.value = "per-batch";
+  pressIn(root, ".lsr-thread-reply-add");
+  replyBoxOf(root)!.value = "and per-request later";
+  pressIn(root, ".lsr-thread-reply-add");
+
+  assert.deepEqual(sent, []);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
+});
+
+/** Only the compose row was redrawn on the status change, so the scroll kept its footers. */
+test("a review that ends takes the thread footers with it", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [opened, answered] }));
+  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 1);
+
+  panel.update(session({ conversation: [opened, answered], status: "ended" }));
+
+  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 0);
+  assert.equal(root.querySelector(".lsr-thread-waiting"), null);
 });

@@ -941,11 +941,3 @@ test("the round's announcement holds still too: no fold flight, no orbiting spar
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\] \{\s*animation: none;/);
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\]::after \{\s*display: none;/);
 });
-
-test("the header sets the reviewer's move apart from the agent's by weight, not by hue", () => {
-  // Both keep the accent the conversation's working line wears — an agent is live either way.
-  // Only one asks something of the reviewer, and the turn wins over waiting, so the rule names both.
-  const theirs = rulesFor('.lsr-presence[data-turn="reviewer"][data-waiting="true"]').join("");
-  assert.match(theirs, /font-weight: 600;/);
-  assert.doesNotMatch(rulesFor('.lsr-presence[data-turn="agent"]').join(""), /font-weight/);
-});

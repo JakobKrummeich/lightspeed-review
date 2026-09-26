@@ -4,6 +4,7 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { resolve } from "node:path";
 import { createIdSource } from "./ledger/records.ts";
 import type { LedgerStore } from "./ledger/store.ts";
 import type { CreateSessionRequest } from "./rounds/session-round.ts";
@@ -140,10 +141,15 @@ function buildRoutes(context: ServerContext): Route[] {
     {
       method: "GET",
       pattern: "/health",
-      // The version is the handshake: a client that reads a protocol this server
-      // does not speak must find that out before it blocks on an answer.
+      // The version and the state dir are the handshake: a client that reads a
+      // protocol this server does not speak, or keeps its reviews somewhere this
+      // server never looks, must find that out before it blocks on an answer.
       handler: (_request, response) =>
-        sendJson(response, 200, { status: "ok", version: CLI_VERSION }),
+        sendJson(response, 200, {
+          status: "ok",
+          version: CLI_VERSION,
+          stateDir: resolve(context.store.stateDir),
+        }),
     },
     { method: "POST", pattern: "/api/sessions", handler: bind(handleCreateSession) },
     { method: "GET", pattern: "/session/:key", handler: bind(handleReviewPage) },
