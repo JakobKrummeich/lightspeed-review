@@ -91,10 +91,15 @@
  * ghosts laid over the page (`dom/warp-send.ts`), so the send and the redraw
  * never wait on them: the sent words are already drawn underneath.
  */
+/*
+ * Over the panel, under every overlay (opening and replay 18, done and round
+ * 19, ended 20): a card that covers the page is what the reviewer is reading,
+ * and light crossing it would be light over the decision.
+ */
 .lsr-warp-layer {
   position: fixed;
   inset: 0;
-  z-index: 25;
+  z-index: 15;
   pointer-events: none;
 }
 
@@ -200,9 +205,10 @@
   }
 }
 
+/* Under the overlays, as the warp layer is. */
 .lsr-light-beam {
   position: fixed;
-  z-index: 25;
+  z-index: 15;
   width: 2px;
   transform-origin: top;
   background: linear-gradient(to bottom, transparent, var(--lsr-light-core) 80%, var(--lsr-accent));
