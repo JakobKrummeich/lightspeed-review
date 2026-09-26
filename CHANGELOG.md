@@ -1,5 +1,32 @@
 # Changelog
 
+## 3.4.0
+
+The review lights up at the moments a turn changes hands: sending, the
+agent's answer, each approval and the last one.
+
+- While the agent works, a firefly drifts in the working line instead of
+  three breathing dots.
+- Every tick sends a particle down the progress bar to the fill's new edge,
+  and the fill grows once it lands. Completing a chapter flashes its segment;
+  approving the last file lights the whole bar.
+- Every file approved opens the done card with a supernova — a point of
+  light, two rings and a flare — and the ✓ settles out of it. Nothing on the
+  card moves after that.
+- A send goes out at warp: what was sent squeezes into streaks that shoot into
+  the button that sent it, and the button flares as they land. It starts once
+  delivery succeeds, so a failed send never animates.
+- The agent's answer arrives on a beam from the header's turn dot to the first
+  new card, a spark runs once round each new card's edge and the answer fades
+  in. A card out of sight gets no beam; the dot's pulse alone says it.
+- When the turn comes back while the tab is in the background, the title
+  reads `● Your turn` and the favicon pulses; both clear when the tab is seen
+  or the turn goes back to the agent. The review page now has a favicon.
+- Under `prefers-reduced-motion`, every moment shows its end state without
+  movement, and the lit favicon holds still.
+- New `--lsr-light-*` tokens carry the light's colours; light scheme draws
+  ink-coloured cores so the light reads on a pale surface.
+
 ## 3.3.0
 
 The survey reads as a list of things to open, not as headings over a missing
