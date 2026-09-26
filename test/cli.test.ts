@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { git, newRepo } from "./helpers/git-repo.ts";
+import { freePort } from "./helpers/ports.ts";
 import { sessionKey } from "../src/paths.ts";
 import { SessionStore } from "../src/session-store.ts";
 
@@ -228,6 +229,51 @@ test("a session the server does not know is named the same way as one on disk", 
   assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
   // The way out keeps the argument the verb needs, so it runs as printed.
   assert.match(stdout, /lightspeed work '<plan>' feature\/greeting main/);
+});
+
+/** A repository whose config names a port nothing listens on: no review server. */
+async function repoWithoutServer(): Promise<string> {
+  const repoRoot = emptyRepo();
+  writeFileSync(
+    join(repoRoot, ".lightspeed.conf.json"),
+    JSON.stringify({
+      model: "anthropic/claude-haiku-4-5",
+      thinking: "off",
+      stateDir: join(repoRoot, "state"),
+      port: await freePort(),
+    }),
+  );
+  return repoRoot;
+}
+
+/**
+ * No server and no review: "restart the server and re-attach" pointed at a
+ * review that never existed, and the `open` it named failed on --intent.
+ */
+test("with no server and no review, a command's way out is a fresh open with --intent", async () => {
+  const repoRoot = await repoWithoutServer();
+
+  const { stdout, code } = await runCli(["reply", "--to", "t1", "hello", "feat", "main"], repoRoot);
+
+  assert.equal(code, 1);
+  assert.match(stdout, /^ {2}code: server_not_running$/m);
+  assert.match(stdout, /lightspeed open feat main --intent '<why this branch exists>'/);
+  assert.doesNotMatch(stdout, /re-attach/);
+});
+
+test("with no server but a live review on disk, the way out is still to re-attach", async () => {
+  const repoRoot = await repoWithoutServer();
+  storeSession(join(repoRoot, "state"), repoRoot, "feat");
+
+  const { stdout, code } = await runCli(["reply", "--to", "t1", "hello", "feat", "main"], repoRoot);
+
+  assert.equal(code, 1);
+  assert.match(stdout, /^ {2}code: server_not_running$/m);
+  assert.match(
+    stdout,
+    /Run `lightspeed open feat main` to restart the review server and re-attach/,
+  );
+  assert.doesNotMatch(stdout, /--intent/);
 });
 
 /**

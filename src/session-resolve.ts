@@ -1,7 +1,7 @@
 import { ReviewError } from "./errors.ts";
 import type { SessionRecord } from "./session-types.ts";
 import { openCall } from "./open-call.ts";
-import { helpReopen, publishCall, replyCall, workCall } from "./turn-help.ts";
+import { WAITS_FOR_SEND, helpReopen, publishCall, replyCall, workCall } from "./turn-help.ts";
 
 export interface ResolvedSession {
   branch: string;
@@ -33,6 +33,41 @@ export function missingSession(input: MissingSessionInput): ReviewError {
     message: `no review session for ${input.branch} against ${input.base} in ${input.repoRoot}`,
     detail: liveDetail(live),
     suggestions: [open, ...instead(input.verb, live)],
+  });
+}
+
+/**
+ * A command's failure read against the store, which only the dispatch layer has
+ * at hand: a 404 off the wire becomes the same `session_not_found` a missing
+ * file would be, and a dead server with no review on disk for the target stops
+ * pointing at a re-attach — there is nothing to re-attach to, and the `open` that
+ * line named failed on its missing --intent.
+ */
+export function readAgainstStore(error: unknown, input: MissingSessionInput): unknown {
+  if (!(error instanceof ReviewError)) return error;
+  if (error.code === "session_not_found") return missingSession(input);
+  if (error.code === "server_not_running" && !onDisk(input)) return noReviewYet(error, input);
+  return error;
+}
+
+function onDisk(input: MissingSessionInput): boolean {
+  return input.sessions.some(
+    (session) =>
+      session.repoRoot === input.repoRoot &&
+      session.branch === input.branch &&
+      session.base === input.base,
+  );
+}
+
+function noReviewYet(error: ReviewError, input: MissingSessionInput): ReviewError {
+  const target = `${input.branch} ${input.base}`;
+  return new ReviewError({
+    code: "server_not_running",
+    message: error.message,
+    ...(error.detail === undefined ? {} : { detail: error.detail }),
+    suggestions: [
+      `No review of ${input.branch} against ${input.base} exists yet: run \`${openCall(target)}\` to start the review server and open it — ${WAITS_FOR_SEND}`,
+    ],
   });
 }
 
