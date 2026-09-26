@@ -351,7 +351,7 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 3.0.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.0.1 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 Every command but `init` (the explicit install) then checks the places `init`

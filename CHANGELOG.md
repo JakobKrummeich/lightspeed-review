@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.0.1
+
+What the CLI tells the agent to do next is now true in the cases 3.0.0 got
+wrong.
+
+- `session_ended` names who ended the review. After an agent's `lightspeed end`,
+  `reply`, `work`, `publish` and `open` said "the reviewer ended this review";
+  they now say `` `lightspeed end` ended this review, not the reviewer `` (the
+  server's 409 carries `endedBy`). A new round is still the reviewer's call.
+- `pi_auth_missing` says the `open` or `publish` stopped and opened no round,
+  not that it "fell back"; the skill tells a bad model (which degrades to
+  `grouping.mode: fallback`) apart from missing credentials (which stop the run
+  until the human runs `lightspeed login` or exports a key).
+- `server_not_running` with no review on disk for the branch points at a fresh
+  `lightspeed open <branch> [base] --intent '<why this branch exists>'`, not at
+  re-attaching to a review that does not exist.
+- A command that hands back a batch the agent is digesting — `open`, or a
+  re-run `reply` or `publish` — returns at once and no longer prints
+  `next.if_killed`, which read as a wait to come.
+- `lightspeed end` on an already-ended review says it was already ended. Ending
+  while working with commits no round has shown still ends, and warns in
+  `help[]` that the reviewer never saw them, naming `--reopen`.
+- Every block prints `round` before `turn`, re-attach and publish re-run
+  included, and the home view's columns read `branch,base,round,turn,pending`.
+- Installed skills are stamped 3.0.1 and refreshed on the next command.
+
 ## 3.0.0
 
 A strict turn machine replaces the 2.x `wait`/`ask`/`say`/`start` loop. The
