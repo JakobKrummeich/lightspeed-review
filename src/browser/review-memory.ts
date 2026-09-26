@@ -35,6 +35,23 @@ export interface ReviewMemory {
   /** Pixels. */
   scroll: number;
   focus: number | undefined;
+  /**
+   * The reviewer's own fold per thread card, by card key. Not round-stamped:
+   * threads outlive rounds.
+   */
+  folds: Record<string, ThreadFold>;
+  /** The resolved group starts folded; unfolding it is a choice kept per review. */
+  resolvedShown: boolean;
+}
+
+/**
+ * `resolved`: whether the card was settled when the choice was made — the
+ * choice holds only while that is still so, so a thread the agent reopened by
+ * answering is not left folded by a fold made while it was resolved.
+ */
+export interface ThreadFold {
+  shut: boolean;
+  resolved: boolean;
 }
 
 export type ReviewPlace = Pick<ReviewMemory, "groups" | "files" | "scroll" | "focus">;
@@ -102,9 +119,15 @@ function rebased(memory: ReviewMemory, round: number | undefined): ReviewMemory 
   return { ...memory, ...emptyPlace(), round };
 }
 
-/** Three parts: three different kinds of nothing, unreadable as one run of `&&`. */
+/** Four parts: four different kinds of nothing, unreadable as one run of `&&`. */
 function isEmpty(memory: ReviewMemory): boolean {
-  return nothingUnsent(memory) && nothingShownYet(memory) && noPlaceKept(memory);
+  return (
+    nothingUnsent(memory) && nothingShownYet(memory) && noPlaceKept(memory) && noFoldKept(memory)
+  );
+}
+
+function noFoldKept(memory: ReviewMemory): boolean {
+  return Object.keys(memory.folds).length === 0 && !memory.resolvedShown;
 }
 
 function nothingUnsent(memory: ReviewMemory): boolean {
@@ -222,7 +245,23 @@ function parseMemory(text: string | undefined): ReviewMemory | undefined {
     files: asArray(value.files).filter((entry) => typeof entry === "string"),
     scroll: Math.max(asNumber(value.scroll) ?? 0, 0),
     focus: asInteger(value.focus),
+    folds: restoredFolds(value.folds),
+    resolvedShown: value.resolvedShown === true,
   };
+}
+
+/** Entry by entry: one corrupt fold costs that thread its fold, not every thread theirs. */
+function restoredFolds(value: unknown): Record<string, ThreadFold> {
+  if (!isRecord(value)) return {};
+  const folds: Record<string, ThreadFold> = {};
+  for (const [key, fold] of Object.entries(value)) {
+    if (isFold(fold)) folds[key] = { shut: fold.shut, resolved: fold.resolved };
+  }
+  return folds;
+}
+
+function isFold(value: unknown): value is ThreadFold {
+  return isRecord(value) && typeof value.shut === "boolean" && typeof value.resolved === "boolean";
 }
 
 /**
@@ -265,6 +304,8 @@ function emptyMemory(): ReviewMemory {
     replayed: undefined,
     unwrapped: false,
     ...emptyPlace(),
+    folds: {},
+    resolvedShown: false,
   };
 }
 

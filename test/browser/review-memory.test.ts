@@ -61,6 +61,8 @@ test("a review nobody has touched remembers nothing", () => {
     files: [],
     scroll: 0,
     focus: undefined,
+    folds: {},
+    resolvedShown: false,
   });
 });
 
@@ -205,6 +207,8 @@ test("fields stored as the wrong type fall back rather than travel", () => {
     files: ["src/api.ts"],
     scroll: 0,
     focus: undefined,
+    folds: {},
+    resolvedShown: false,
   });
 });
 
@@ -499,7 +503,14 @@ test("a store too small even for that keeps the queue and lets the place go", ()
   };
   storage.budget =
     "lsr:memory:abc123".length +
-    JSON.stringify({ ...stripped, groups: [], files: [], scroll: 0 }).length +
+    JSON.stringify({
+      ...stripped,
+      groups: [],
+      files: [],
+      scroll: 0,
+      folds: {},
+      resolvedShown: false,
+    }).length +
     8;
 
   updateMemory(storage, "abc123", {
@@ -619,4 +630,52 @@ test("a corrupt focus is dropped alone", () => {
 
   assert.equal(readMemory(storage, "abc123").focus, undefined);
   assert.equal(readMemory(storage, "abc123").draft, "kept");
+});
+
+test("a folded or unfolded thread and the shown resolved group come back after a reload", () => {
+  const storage = new FakeStorage();
+  const folds = {
+    t1: { shut: true, resolved: false },
+    "main@2025": { shut: false, resolved: true },
+  };
+
+  updateMemory(storage, "abc123", { folds, resolvedShown: true });
+
+  const memory = readMemory(storage, "abc123");
+  assert.deepEqual(memory.folds, folds);
+  assert.equal(memory.resolvedShown, true);
+});
+
+test("a fold choice alone keeps the record: dropping it would refold the thread on reload", () => {
+  const storage = new FakeStorage();
+
+  updateMemory(storage, "abc123", { folds: { t1: { shut: true, resolved: false } } });
+  assert.ok(storage.getItem("lsr:memory:abc123"));
+  updateMemory(storage, "abc123", { folds: {}, resolvedShown: true });
+  assert.ok(storage.getItem("lsr:memory:abc123"));
+  updateMemory(storage, "abc123", { resolvedShown: false });
+  assert.equal(storage.getItem("lsr:memory:abc123"), null);
+});
+
+test("fold entries of the wrong shape are dropped one by one, not trusted", () => {
+  const storage = new FakeStorage({
+    "lsr:memory:abc123": JSON.stringify({
+      v: 1,
+      at: 1,
+      folds: { t1: { shut: true, resolved: false }, t2: { shut: "yes", resolved: false }, t3: 4 },
+      resolvedShown: "yes",
+    }),
+  });
+
+  const memory = readMemory(storage, "abc123");
+  assert.deepEqual(memory.folds, { t1: { shut: true, resolved: false } });
+  assert.equal(memory.resolvedShown, false);
+});
+
+test("folds stored as something other than a record read as none", () => {
+  const storage = new FakeStorage({
+    "lsr:memory:abc123": JSON.stringify({ v: 1, at: 1, folds: [1, 2], draft: "kept" }),
+  });
+
+  assert.deepEqual(readMemory(storage, "abc123").folds, {});
 });
