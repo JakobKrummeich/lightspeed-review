@@ -35,6 +35,7 @@ export type ReviewErrorCode =
   | "server_unreachable"
   | "server_already_running"
   | "server_stale"
+  | "server_state_mismatch"
   | "port_unavailable"
   | "browser_bundle_missing"
   | "internal_error";

@@ -436,6 +436,41 @@ test("publish says it is grouping before the model call, naming the publish to r
   });
 });
 
+/**
+ * Another open landed the review while this one was grouping: the server
+ * re-attaches instead of opening a second round, and the agent must be told
+ * that — "the review is open" would describe a round this command never made.
+ */
+test("a fresh open the server answers as a re-attach says re-attached and opens no browser", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, { open: false });
+    const landedMeanwhile = harness.store.get(KEY)!;
+    harness.store.remove(KEY);
+
+    await open(harness, {
+      deps: {
+        ...harness.deps,
+        ensureServerRunning: async () => harness.store.save(landedMeanwhile),
+      },
+    });
+
+    const shown = harness.announced[1]!;
+    assert.match(
+      String(shown.message),
+      /^re-attached to the live review; waiting for the reviewer's Send/,
+    );
+    assert.doesNotMatch(String(shown.message), /the review is open/);
+    assert.match(String(shown.note), /--intent is ignored/);
+    assert.equal(shown.turn, "reviewer");
+    assert.equal(shown.round, 1);
+    assert.equal((shown.session as { key: string }).key, KEY);
+    assert.match(ifKilled(shown), /: lightspeed open feature-auth main$/);
+    assert.equal("groups" in shown, false);
+    assert.deepEqual(harness.opened, []);
+    assert.equal(harness.store.get(KEY)?.rounds.length, 1);
+  });
+});
+
 /** Working: nobody will send, so a wait would hang on edits only the agent can finish. */
 test("open on a working turn is refused before it announces a wait, naming publish", async () => {
   await withHarness(async (harness) => {

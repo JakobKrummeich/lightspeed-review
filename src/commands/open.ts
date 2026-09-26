@@ -5,7 +5,7 @@ import { sessionKey } from "../paths.ts";
 import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { stillWorking } from "../server.ts";
-import { turnFacts, turnLabel } from "../turn.ts";
+import { turnBlock, turnFacts, turnLabel, type TurnFacts } from "../turn.ts";
 import {
   endedMessage,
   helpReopen,
@@ -96,13 +96,20 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
         stillWorking(existing, "nobody sends while you work; publish ends the turn"),
       );
     }
-    await run.ensureServerRunning({ port: input.config.port });
-    run.announce(reattached(existing, input));
+    await run.ensureServerRunning({ port: input.config.port, stateDir: input.config.stateDir });
+    const url = `${serverOrigin(input.config.port)}/session/${existing.key}`;
+    run.announce(reattached({ ...turnFacts(existing), key: existing.key, url }, input));
     return await run.listen({ ...input, port: input.config.port });
   }
   refuseFreshOpen(existing, input, target);
   const rerun = openRerun(target, input.intents, input);
   const outcome = await makeRound({ ...input, verb: "open", rerun }, run);
+  // The server found the review live after all — another open landed it while
+  // this one grouped. Nothing was opened, so nothing is announced as open.
+  if (outcome.created.reattached === true) {
+    run.announce(reattached(outcome.created, input));
+    return await run.listen({ ...input, port: input.config.port });
+  }
   if (input.open !== false) run.openBrowser(outcome.created.url);
   const ledger = ledgerReport(outcome.created);
   // Written out before the wait rather than returned after it: the reviewer's
@@ -116,18 +123,19 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
   return await run.listen({ ...input, port: input.config.port });
 }
 
-function reattached(session: SessionRecord, input: OpenInput): StructuredOutput {
+/** Read off the session file, or off the server's answer when it re-attached a fresh open. */
+interface LiveReview extends Partial<TurnFacts> {
+  key: string;
+  url: string;
+}
+
+function reattached(review: LiveReview, input: OpenInput): StructuredOutput {
   return {
-    ...turnFacts(session),
-    session: {
-      key: session.key,
-      branch: input.branch,
-      base: input.base,
-      url: `${serverOrigin(input.config.port)}/session/${session.key}`,
-    },
-    message: `re-attached to the live review; ${waitClause(turnLabel(session))}`,
+    ...turnBlock(review),
+    session: { key: review.key, branch: input.branch, base: input.base, url: review.url },
+    message: `re-attached to the live review; ${waitClause(review.turn)}`,
     ...(input.intents.length === 0 ? {} : { note: intentIgnored(input) }),
-    ...ifKilled(turnLabel(session), reattachCall(`${input.branch} ${input.base}`)),
+    ...ifKilled(review.turn, reattachCall(`${input.branch} ${input.base}`)),
   };
 }
 

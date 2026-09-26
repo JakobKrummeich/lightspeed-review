@@ -11,6 +11,7 @@ import { parseInitArgs, runInit } from "./commands/init.ts";
 import { authStateDir, runLogin } from "./commands/login.ts";
 import { runLogout } from "./commands/logout.ts";
 import { runServe } from "./commands/serve.ts";
+import { assertServerSharesState } from "./commands/server-lifecycle.ts";
 import { parseWorkArgs, runWork } from "./commands/work.ts";
 import { parseSkillArgs, runSkill } from "./commands/skill.ts";
 import { parseOpenArgs, runOpen } from "./commands/open.ts";
@@ -113,6 +114,10 @@ function refuseTextAsBranch(input: Omit<TextAsBranchInput, "isRef">): void {
 }
 
 /**
+ * Every command that reads the session files first asks the server whether it
+ * reads the same ones (`assertServerSharesState`): otherwise a review live on
+ * the server's side is "not found" on this one.
+ *
  * The `session_not_found` and `server_not_running` catch lives here because this
  * is the only layer that has both halves: the store knows what is open in this
  * repository, and the dispatch knows which command asked. Below it, a 404 off
@@ -125,6 +130,7 @@ async function onSession<T>(
   run: (context: SessionContext) => T | Promise<T>,
 ): Promise<T> {
   const { repoRoot, config } = repoContext();
+  await assertServerSharesState(config.port, config.stateDir);
   const sessions = new SessionStore(config.stateDir).list();
   refuseTextAsBranch({ verb, repoRoot, branch, sessions });
   const target = resolveSession(sessions, repoRoot, branch, base);
@@ -142,6 +148,7 @@ async function onSession<T>(
 async function openCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, open, model, reopen, intents } = parseOpenArgs(args);
   const { repoRoot, config } = groupingContext();
+  await assertServerSharesState(config.port, config.stateDir);
   const target = resolveSession(new SessionStore(config.stateDir).list(), repoRoot, branch, base);
   return await runOpen({
     repoRoot,
@@ -163,6 +170,7 @@ async function replyCommand(args: string[]): Promise<StructuredOutput> {
 async function publishCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, model, intents, notes } = parsePublishArgs(args);
   const { repoRoot, config } = groupingContext();
+  await assertServerSharesState(config.port, config.stateDir);
   const sessions = new SessionStore(config.stateDir).list();
   refuseTextAsBranch({ verb: "publish", repoRoot, branch, sessions });
   const target = resolveSession(sessions, repoRoot, branch, base);

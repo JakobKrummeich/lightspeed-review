@@ -139,8 +139,11 @@ review is read on the machine that runs it. It must be 1-65535. A review server
 of lightspeed's own already listening there is reused rather than replaced, and
 `serve` pointed at it says `server_already_running`; a port some other process
 holds is `port_unavailable` rather than a silent second choice, because a
-reviewer following a URL to the wrong port learns nothing from it. `stateDir`
-holds `sessions/` and `feedback/`, and expands a leading `~/` or a bare `~` and
+reviewer following a URL to the wrong port learns nothing from it. A review
+server of this version that keeps its reviews in another `stateDir` (started
+under another `HOME`, say) is `server_state_mismatch`, naming both directories:
+it holds Sends where this CLI never looks, so `lightspeed stop` it and re-run.
+`stateDir` holds `sessions/` and `feedback/`, and expands a leading `~/` or a bare `~` and
 nothing else — a tilde further along the path is a literal character.
 `feedbackLog` is `on` or `off`; `off` writes no ledger at all and changes
 nothing else about a review.

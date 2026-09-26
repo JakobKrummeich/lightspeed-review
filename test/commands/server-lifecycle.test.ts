@@ -4,16 +4,21 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer as createHttpServer } from "node:http";
-import { ensureServerRunning } from "../../src/commands/server-lifecycle.ts";
+import {
+  assertServerSharesState,
+  ensureServerRunning,
+} from "../../src/commands/server-lifecycle.ts";
 import { CLI_VERSION } from "../../src/version.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore } from "../../src/session-store.ts";
 import { freePort, occupyPort } from "../helpers/ports.ts";
 
-function reviewServerOn(port: number): ReviewServer {
-  const store = new SessionStore(mkdtempSync(join(tmpdir(), "lsr-lifecycle-")));
-  return createReviewServer({ store, port });
+/** Where every server this file starts keeps its reviews, unless a test says otherwise. */
+const STATE_DIR = mkdtempSync(join(tmpdir(), "lsr-lifecycle-"));
+
+function reviewServerOn(port: number, stateDir = STATE_DIR): ReviewServer {
+  return createReviewServer({ store: new SessionStore(stateDir), port });
 }
 
 /** A review server from an older install: ours by `/health`, and obsolete. */
@@ -44,7 +49,7 @@ test("a server that is already listening is left alone", async () => {
   await server.start();
   let spawns = 0;
 
-  await ensureServerRunning({ port, spawnServer: () => (spawns += 1) });
+  await ensureServerRunning({ port, stateDir: STATE_DIR, spawnServer: () => (spawns += 1) });
 
   assert.equal(spawns, 0);
   await server.stop();
@@ -56,6 +61,7 @@ test("starts a background server and waits for it to answer", async () => {
 
   await ensureServerRunning({
     port,
+    stateDir: STATE_DIR,
     spawnServer: () => {
       started = reviewServerOn(port);
       setTimeout(() => void started!.start(), 30);
@@ -77,6 +83,7 @@ test("a server of another version is replaced, not talked to", async () => {
 
   await ensureServerRunning({
     port,
+    stateDir: STATE_DIR,
     spawnServer: () => {
       started = reviewServerOn(port);
       setTimeout(() => void started!.start(), 30);
@@ -87,6 +94,7 @@ test("a server of another version is replaced, not talked to", async () => {
   assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/health`)).json(), {
     status: "ok",
     version: CLI_VERSION,
+    stateDir: STATE_DIR,
   });
   await started!.stop();
 });
@@ -99,7 +107,7 @@ test("a server of this version is left running, review and all", async () => {
   await server.start();
   let spawns = 0;
 
-  await ensureServerRunning({ port, spawnServer: () => (spawns += 1) });
+  await ensureServerRunning({ port, stateDir: STATE_DIR, spawnServer: () => (spawns += 1) });
 
   assert.equal(spawns, 0);
   await server.stop();
@@ -111,7 +119,7 @@ test("a port held by something that is not a review server fails fast", async ()
   let spawns = 0;
 
   await assert.rejects(
-    () => ensureServerRunning({ port, spawnServer: () => (spawns += 1) }),
+    () => ensureServerRunning({ port, stateDir: STATE_DIR, spawnServer: () => (spawns += 1) }),
     (error: unknown) => {
       assert.ok(error instanceof ReviewError);
       assert.equal(error.code, "port_unavailable");
@@ -133,7 +141,13 @@ test("a missing browser bundle is reported before anything is spawned", async ()
   let spawns = 0;
 
   await assert.rejects(
-    () => ensureServerRunning({ port, staticDir, spawnServer: () => (spawns += 1) }),
+    () =>
+      ensureServerRunning({
+        port,
+        stateDir: STATE_DIR,
+        staticDir,
+        spawnServer: () => (spawns += 1),
+      }),
     (error: unknown) => {
       assert.ok(error instanceof ReviewError);
       assert.equal(error.code, "browser_bundle_missing");
@@ -148,11 +162,82 @@ test("reports the server as unreachable when the spawned process never answers",
   const port = await freePort();
 
   await assert.rejects(
-    () => ensureServerRunning({ port, spawnServer: () => undefined, timeoutMs: 80 }),
+    () =>
+      ensureServerRunning({
+        port,
+        stateDir: STATE_DIR,
+        spawnServer: () => undefined,
+        timeoutMs: 80,
+      }),
     (error: unknown) => {
       assert.ok(error instanceof ReviewError);
       assert.equal(error.code, "server_not_running");
       return true;
     },
   );
+});
+
+/**
+ * Regression: a server started under another HOME answered the same version,
+ * was reused, and kept the review where this CLI never looked — so its re-run
+ * found no session and was refused `intent_missing` while the reviewer's Send
+ * sat in the other directory.
+ */
+test("a server of this version keeping its reviews elsewhere is refused, naming both and the fix", async () => {
+  const port = await freePort();
+  const elsewhere = mkdtempSync(join(tmpdir(), "lsr-lifecycle-elsewhere-"));
+  const server = reviewServerOn(port, elsewhere);
+  await server.start();
+  let spawns = 0;
+
+  await assert.rejects(
+    () => ensureServerRunning({ port, stateDir: STATE_DIR, spawnServer: () => (spawns += 1) }),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "server_state_mismatch");
+      assert.match(
+        error.message,
+        new RegExp(`keeps its reviews in ${elsewhere}, this CLI in ${STATE_DIR}`),
+      );
+      assert.match(error.suggestions[0]!, /^Run `lightspeed stop`.*then re-run this command/);
+      return true;
+    },
+  );
+
+  assert.equal(spawns, 0);
+  await server.stop();
+});
+
+test("asking before a command: a server sharing the state dir, or none at all, passes", async () => {
+  const port = await freePort();
+  await assertServerSharesState(port, STATE_DIR);
+  const server = reviewServerOn(port);
+  await server.start();
+
+  await assertServerSharesState(port, STATE_DIR);
+
+  await server.stop();
+});
+
+test("asking before a command: a server keeping its reviews elsewhere is refused", async () => {
+  const port = await freePort();
+  const server = reviewServerOn(port, mkdtempSync(join(tmpdir(), "lsr-lifecycle-elsewhere-")));
+  await server.start();
+
+  await assert.rejects(
+    () => assertServerSharesState(port, STATE_DIR),
+    (error: unknown) => error instanceof ReviewError && error.code === "server_state_mismatch",
+  );
+
+  await server.stop();
+});
+
+/** Its sessions are its own business: an older server states no directory, and `server_stale` speaks for it. */
+test("asking before a command: a server that states no state dir is not refused for it", async () => {
+  const port = await freePort();
+  const stale = await staleServerOn(port, "2.0.0");
+
+  await assertServerSharesState(port, STATE_DIR);
+
+  await stale.close();
 });

@@ -78,6 +78,11 @@ export class SessionStore {
     this.#directory = sessionsDirPath(stateDir);
   }
 
+  /** What the server states on `/health`, so a CLI can tell it reads the same reviews. */
+  get stateDir(): string {
+    return this.#stateDir;
+  }
+
   get(key: string): SessionRecord | undefined {
     let contents: string;
     try {

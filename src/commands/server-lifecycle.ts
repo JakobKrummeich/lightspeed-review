@@ -1,11 +1,20 @@
 import { spawn } from "node:child_process";
+import { resolve } from "node:path";
 import { ReviewError } from "../errors.ts";
 import { assertBundlePresent, DEFAULT_STATIC_DIR } from "../static-assets.ts";
 import { CLI_VERSION } from "../version.ts";
-import { probePort, requestShutdown, reviewServerIsUp, serverHealth } from "./server-address.ts";
+import {
+  probePort,
+  requestShutdown,
+  reviewServerIsUp,
+  serverHealth,
+  type ServerHealth,
+} from "./server-address.ts";
 
 export interface EnsureServerOptions {
   port: number;
+  /** This CLI's: a server keeping its reviews anywhere else is refused, not reused. */
+  stateDir: string;
   /** Injected in tests. */
   spawnServer?: () => void;
   timeoutMs?: number;
@@ -22,7 +31,7 @@ const STALE_SHUTDOWN_MS = 2_000;
 export async function ensureServerRunning(options: EnsureServerOptions): Promise<void> {
   // Checked before spawning: into a port something else holds, spawning would
   // turn a clear conflict into a startup timeout.
-  if (await portIsHeldByCurrentServer(options.port)) return;
+  if (await portIsHeldByCurrentServer(options.port, options.stateDir)) return;
   // The spawned server checks the bundle too, but detached with no stdio its error
   // is just a startup timeout. Asking here costs two stat calls and answers exactly.
   assertBundlePresent(options.staticDir ?? DEFAULT_STATIC_DIR);
@@ -45,13 +54,51 @@ export async function ensureServerRunning(options: EnsureServerOptions): Promise
  * spend a turn on a decision this command has already made. Waiting polls
  * reconnect on their own once the port answers again.
  */
-async function portIsHeldByCurrentServer(port: number): Promise<boolean> {
+async function portIsHeldByCurrentServer(port: number, stateDir: string): Promise<boolean> {
   if ((await probePort(port)) !== "open") return false;
   const health = await serverHealth(port);
   if (health === undefined) throw portUnavailable(port);
-  if (health.version === CLI_VERSION) return true;
-  await shutDownStale(port);
-  return false;
+  if (health.version !== CLI_VERSION) {
+    await shutDownStale(port);
+    return false;
+  }
+  assertSameStateDir(port, health, stateDir);
+  return true;
+}
+
+/**
+ * Asked before a command touches a review, because the answer decides what the
+ * local session files mean: a server keeping its reviews elsewhere holds the
+ * reviewer's Sends where this CLI never looks, so a missing file here proves
+ * nothing and every answer read off one would be wrong. Nothing listening, or
+ * something that is not ours, is not this function's business — the command's
+ * own server calls diagnose those.
+ */
+export async function assertServerSharesState(port: number, stateDir: string): Promise<void> {
+  if ((await probePort(port)) !== "open") return;
+  const health = await serverHealth(port);
+  if (health !== undefined) assertSameStateDir(port, health, stateDir);
+}
+
+/**
+ * Refused rather than replaced, unlike a stale version: the other server may
+ * be somebody's live review — another HOME, another harness — and stopping it
+ * is a decision for whoever reads the error. A server too old to state its
+ * directory is let through; `server_stale` speaks for it.
+ */
+function assertSameStateDir(port: number, health: ServerHealth, stateDir: string): void {
+  if (health.stateDir === undefined || health.stateDir === resolve(stateDir)) return;
+  throw new ReviewError({
+    code: "server_state_mismatch",
+    message: `the review server on port ${port} keeps its reviews in ${health.stateDir}, this CLI in ${resolve(stateDir)}`,
+    detail:
+      "they see different reviews: the reviewer's Sends land where this CLI never looks," +
+      " so a review this CLI cannot find may still be live there",
+    suggestions: [
+      "Run `lightspeed stop` to shut that server down (its reviews stay on disk), then re-run this command; it brings up a server on this CLI's state dir",
+      `Or set a free \`port\` in .lightspeed.conf.json instead of ${port} to keep both running`,
+    ],
+  });
 }
 
 /**

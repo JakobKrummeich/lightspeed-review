@@ -101,7 +101,7 @@ export async function makeRound(
     intents: input.intents,
     ...previousGrouping(input),
   });
-  await run.ensureServerRunning({ port: input.config.port });
+  await run.ensureServerRunning({ port: input.config.port, stateDir: input.config.stateDir });
   const created = await publishRound(input, extracted, grouping);
   const { branch, base, intents } = input;
   return { created, extracted, grouping, branch, base, intents };

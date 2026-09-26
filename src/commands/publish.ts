@@ -86,7 +86,7 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
   const head = branchState(input.repoRoot, input.branch).head;
   const recovery = publishRerun(target, input.intents, input.notes);
   if (existing !== undefined && alreadyPublished(existing, head, input)) {
-    await run.ensureServerRunning({ port: input.config.port });
+    await run.ensureServerRunning({ port: input.config.port, stateDir: input.config.stateDir });
     run.announce({
       ...turnFacts(existing),
       rerun: true,
