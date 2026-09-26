@@ -1017,3 +1017,35 @@ test("a degraded ledger is reported with a reason and a help line, not an error"
     assert.ok((shown.help as string[]).some((line) => /ledger/i.test(line)));
   }, "broken");
 });
+
+/** Read top to bottom, the same two facts in the same order: a flip reads as a different block. */
+function roundBeforeTurn(block: StructuredOutput | undefined): void {
+  const keys = Object.keys(block ?? {});
+  assert.ok(keys.includes("round") && keys.includes("turn"), keys.join(", "));
+  assert.ok(keys.indexOf("round") < keys.indexOf("turn"), keys.join(", "));
+}
+
+test("every block before a wait names the round before the turn", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    await open(harness, { intents: [] });
+    const deps: RoundDeps = { ...harness.deps, extractDiff: () => extractedAt(2) };
+    await publishNext(harness, { deps });
+    await publish(harness, { deps });
+
+    const [fresh, reattached, published, rerun] = harness.announced;
+    assert.equal(rerun?.rerun, true);
+    for (const block of [fresh, reattached, published, rerun]) roundBeforeTurn(block);
+  });
+});
+
+test("a local publish re-run names the round before the turn", async () => {
+  await withHarness(async (harness) => {
+    const { repoRoot, deps } = await publishedAtTip(harness);
+
+    await publish(harness, { repoRoot, deps });
+
+    assert.equal(harness.announced[0]?.rerun, true);
+    roundBeforeTurn(harness.announced[0]);
+  });
+});

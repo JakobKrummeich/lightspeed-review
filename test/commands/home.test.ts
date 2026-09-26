@@ -48,6 +48,13 @@ test("a stored session becomes a row carrying its turn, round and queue", () => 
   ]);
 });
 
+/** The same order every other block prints them in: the round, then whose turn it is. */
+test("a row names the round before the turn", () => {
+  const [row] = sessionSummaries([record({})]);
+
+  assert.deepEqual(Object.keys(row!), ["branch", "base", "round", "turn", "pending"]);
+});
+
 /**
  * The plan an agent declared is the one thing on the record only it knows, and
  * an agent resumed after compaction reads this view to find out where it was.

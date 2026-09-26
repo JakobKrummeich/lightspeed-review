@@ -181,8 +181,8 @@ test("--all lists other repositories' sessions, which the repo-scoped view names
   assert.match(scoped.stdout, /^sessions: 0$/m);
   assert.match(scoped.stdout, /^elsewhere: 1 session in 1 other repo/m);
   assert.equal(all.code, 0, all.stdout);
-  assert.match(all.stdout, /^sessions\[1\]\{repo,branch,base,turn,round,pending\}:$/m);
-  assert.match(all.stdout, /^ {2}\/somewhere\/else,feat\/tokens,main,reviewer,1,0$/m);
+  assert.match(all.stdout, /^sessions\[1\]\{repo,branch,base,round,turn,pending\}:$/m);
+  assert.match(all.stdout, /^ {2}\/somewhere\/else,feat\/tokens,main,1,reviewer,0$/m);
 });
 
 /** Through the store: `approvals` reads the session file itself. */

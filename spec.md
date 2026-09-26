@@ -400,8 +400,8 @@ Every command takes `<branch> [base]` explicitly — same pattern as lavish's `<
 bin: ~/.local/bin/lightspeed
 description: Semantic diff review with targeted agent feedback
 repo: /home/me/app
-sessions[1]{branch,base,turn,round,pending}:
-  feature-auth,main,agent digesting,1,0
+sessions[1]{branch,base,round,turn,pending}:
+  feature-auth,main,1,agent digesting,0
 next:
   reread: "Lost the batch? Run `lightspeed open feature-auth main`: it hands back the batch you are digesting at once, and posts nothing"
   talk: "Anything that needs the reviewer — an answer, a doubt about a change request, a question of your own → one call, every reply in it: lightspeed reply --to t1 '<answer>' --to t2 '<answer>' feature-auth main"
