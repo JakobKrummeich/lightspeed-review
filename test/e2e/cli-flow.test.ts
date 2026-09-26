@@ -452,6 +452,8 @@ test("a server keeping its reviews in another state dir is refused before any co
     await server.start();
     try {
       for (const args of [
+        // Bare `lightspeed` read "no active review sessions" off this side's files.
+        [],
         ["open", "feature", "main"],
         ["open", "feature", "main", "--intent", "why", "--no-open"],
         ["reply", "--to", "t1", "hi", "feature", "main"],

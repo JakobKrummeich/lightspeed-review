@@ -14,11 +14,12 @@ review no longer splits into two.
 - `open` and `publish` say `status: grouping N files — can take minutes` before
   the grouping model call, with the command to re-run if it is killed there, so
   a killed grouping is no longer silent.
-- `/health` states the server's state dir. A command that finds a server
-  keeping its reviews in another state dir (another `HOME`, another harness) is
-  refused `server_state_mismatch` (exit 1), naming both directories, instead of
-  reporting a live review as missing or starting a second one beside it. A
-  server too old to state its dir is judged by version alone.
+- `/health` states the server's state dir. A command — bare `lightspeed`
+  included — that finds a server keeping its reviews in another state dir
+  (another `HOME`, another harness) is refused `server_state_mismatch` (exit 1),
+  naming both directories, instead of reporting a live review as missing or
+  starting a second one beside it. A server too old to state its dir is judged
+  by version alone.
 - When the server re-attaches an `open` to a live review, `open` says
   `re-attached to the live review` rather than reading as a fresh open.
 - A fresh `open` of a branch already live under another spelling of its base
