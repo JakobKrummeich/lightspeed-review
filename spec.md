@@ -308,8 +308,10 @@ lightspeed approvals [branch] [base]
   # Flags: --full (every path, not the first 50 of each list)
 
 lightspeed end [branch] [base]
-  # Agent-initiated session end. Never refused: on a review already ended it
-  #   says so from the session file, contacting no server and writing nothing;
+  # Agent-initiated session end. Named explicitly, a review already ended is
+  #   answered "already ended" from the session file, contacting no server and
+  #   writing nothing; branchless with no live review it is refused like every
+  #   branchless command (`session_ended`, naming who ended the latest one);
   #   ended while working with commits of the branch's own that no round showed
   #   (not merges, not main's commits, not rebased copies of published ones), it
   #   ends anyway and warns in help[] that they never reached the reviewer
