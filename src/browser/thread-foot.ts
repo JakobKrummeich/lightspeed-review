@@ -13,6 +13,8 @@ const REOPEN_LABEL = "Reopen";
 /** The panel's card, as far as its foot is concerned. */
 interface FootCard {
   id: string;
+  /** Where the card is anchored or what it asks: how a screen reader tells its reply box apart. */
+  label: string;
   legacy?: true;
   main: boolean;
   messages: readonly Pick<ThreadMessage, "role">[];
@@ -32,7 +34,7 @@ const WAITING_LINE = `\n    <p class="lsr-thread-waiting">Waiting for the agent�
  */
 export function renderThreadFoot(card: FootCard, resolved: boolean, mode: FootMode): string {
   if (!answerable(card)) return "";
-  return `${waitingLine(card, resolved, mode)}${writingFoot(card.id, resolved, mode)}`;
+  return `${waitingLine(card, resolved, mode)}${writingFoot(card, resolved, mode)}`;
 }
 
 /**
@@ -45,12 +47,12 @@ function waitingLine(card: FootCard, resolved: boolean, mode: FootMode): string 
   return agentsTurn && !resolved && !agentSpokeLast(card) ? WAITING_LINE : "";
 }
 
-function writingFoot(rawId: string, resolved: boolean, mode: FootMode): string {
+function writingFoot(card: FootCard, resolved: boolean, mode: FootMode): string {
   if (!takesWriting(mode)) return "";
-  const id = escapeHtml(rawId);
+  const id = escapeHtml(card.id);
   if (resolved) return threadFoot(actionRow(renderToggle(id, true)));
   return threadFoot(
-    `${renderReplyBox(id)}\n      ${actionRow(`${renderReplyAdd(id)}${renderToggle(id, false)}`)}`,
+    `${renderReplyBox(id, escapeHtml(card.label))}\n      ${actionRow(`${renderReplyAdd(id)}${renderToggle(id, false)}`)}`,
   );
 }
 
@@ -84,10 +86,11 @@ function renderToggle(id: string, resolved: boolean): string {
 /**
  * A reply is one more pill: it goes out with the rest of the batch on the next
  * Send, as the resolve toggle does, so replying in three threads is still one
- * turn for the agent. `id` is escaped by the caller.
+ * turn for the agent. Both arguments are escaped by the caller; the id stays
+ * out of the label, since `t2` names nothing the reviewer wrote.
  */
-function renderReplyBox(id: string): string {
-  return `<textarea class="lsr-thread-reply-box" data-thread="${id}" placeholder="Reply — Enter adds it to your next Send…" aria-label="Reply in ${id}"></textarea>`;
+function renderReplyBox(id: string, label: string): string {
+  return `<textarea class="lsr-thread-reply-box" data-thread="${id}" placeholder="Reply — Enter adds it to your next Send…" aria-label="Reply to ${label}"></textarea>`;
 }
 
 function renderReplyAdd(id: string): string {

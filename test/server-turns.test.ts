@@ -389,7 +389,15 @@ test("a re-run reply after an unread delivery re-attaches instead of answering i
     assert.equal(agentSaid(store.get(key)!).length, 1);
     const again = await pollOnce(url, key);
     assert.partialDeepStrictEqual(again.items, [
-      { id: "t1", status: "reply", you: "it retries 3x", reviewer: ["and on a 503?"] },
+      {
+        id: "t1",
+        status: "reply",
+        thread: [
+          { who: "reviewer", said: "wrap in a transaction" },
+          { who: "you", said: "it retries 3x" },
+        ],
+        reviewer: ["and on a 503?"],
+      },
     ]);
   });
 });

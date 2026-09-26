@@ -97,3 +97,12 @@ function composeControl(
 ): HTMLButtonElement | HTMLTextAreaElement | null {
   return view.composeHost?.querySelector<HTMLButtonElement | HTMLTextAreaElement>(id) ?? null;
 }
+
+/**
+ * Everything stays where it was — pills, box, reply boxes — and the note says
+ * why, in the live region the compose row already has.
+ */
+export function sayNotSent(view: ComposeView, why: string): void {
+  const note = view.composeHost?.querySelector(".lsr-complete");
+  if (note) note.textContent = `Not sent — ${why}`;
+}

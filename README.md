@@ -354,7 +354,7 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 3.1.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.2.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 Every command but `init` (the explicit install) then checks the places `init`
@@ -559,7 +559,7 @@ agent works. Before it waits, every waiting command prints what landed —
 `replied: [ids]`, the round it published, or `rerun: true` — closed by
 `next.if_killed`, the exact command to re-run (re-attaching with `open` when a
 word holds an apostrophe, quote, backslash or line break, which would not paste
-as printed) — except a command handing back a batch still being digested, which
+as printed), and last a top-level `url:`, the review page to hand the reviewer — except a command handing back a batch still being digested, which
 returns at once and has no wait to recover. An `open` or `publish` with more
 than one file to group prints `status: grouping N files — can take minutes` and
 its own `next.if_killed` before the model call, so a command killed while
@@ -577,15 +577,17 @@ re-attaching command is handed it again.
 
 What the agent reads after each Send is one item per thread the batch touched,
 with its id (`t4`), whether it is `new`, a `reply`, `resolved` or `reopened`,
-where it points (`file:line`), the agent's own last words there (`you`) and the
-reviewer's new ones — and a `next:` block that is a decision rule, not a menu:
+where it points (`file:line`, flagged `outdated` when that line has changed
+since the round it was drawn in), everything said in an open thread before
+(`thread`), or just what a thread resolved now was about (`asked`), and the
+reviewer's new words — and a `next:` block that is a decision rule, not a menu:
 anything that needs the reviewer goes in one `reply`; nothing left to discuss and
 something to change means `work`; anything ambiguous in a change request is
 worth asking now. Every refusal names the one right command: `work` or `reply`
 on the reviewer's turn answer `turn_not_yours`, `publish` while digesting answers
 `turn_still_yours`, `publish` on an unmoved HEAD answers `nothing_to_publish`
 naming `reply` — checked before any model call. A resolve in the batch comes
-with a `resolved:` line saying what it means, and every suggested `--to` names
+with a `resolved:` line saying what it means — do what the last words say, or, with none, your last answer is accepted — and every suggested `--to` names
 an open thread, never a resolved one. One exit-code rule: exit 2 when re-running
 the same command cannot help — a wrong command line, or a move wrong for the
 review's state, `session_ended`, `session_not_found` and `ambiguous_session`
@@ -793,8 +795,13 @@ A ledger failure never fails a review: it is reported as
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
-- The conversation is threads: each item with its exchange stacked under it,
-  and a foot with a reply box, **Reply** and a **Resolve** that folds it. The header
+- The conversation is threads, grouped by whose move it is: **Resolved** on top
+  (folded until you open it), **Waiting on agent**, and **Needs you** at the
+  bottom next to the compose box. Each thread is named by its file and line or
+  its first words, folds from its head, and has a foot with a reply box,
+  **Reply** and **Resolve**. A reply you have not sent yet sits in its thread
+  marked "not sent yet"; every message you sent says whether the agent has seen
+  it or nobody is listening yet. The header
   and the foot of the conversation say whose turn it is, and a small
   "Connection lost — reconnecting…" chip shows while the live update stream is
   down.
@@ -810,7 +817,7 @@ A ledger failure never fails a review: it is reported as
   touches — and no swept chapter carries the badge: the lane is the part of the
   survey the page has already said not to read.
 - A reload keeps the work: the queued feedback pills, the comment you were
-  halfway through typing, the chapter you were reading, which files you had
+  halfway through typing, which threads you folded, the chapter you were reading, which files you had
   open in it and where you had scrolled to. Sending the queue is what clears
   it. A new round does not put you
   back where you were in the diff it replaced — that diff is gone — but it does

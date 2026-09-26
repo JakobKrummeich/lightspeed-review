@@ -10,6 +10,9 @@ import {
 } from "../src/feedback.ts";
 import type { DiffGroup } from "../src/diff-extract.ts";
 import type { SessionRecord } from "../src/session-types.ts";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { git, newRepo } from "./helpers/git-repo.ts";
 
 /** Two groups that share a file, so the total counts distinct paths and not rows. */
 function groups(): DiffGroup[] {
@@ -458,6 +461,37 @@ test("an open poll carries no approval evidence: the review is not over", () => 
   };
 
   assert.equal("approval" in batchPayload(open), false);
+});
+
+/** Read off git, not the browser's word: the round-1 line number names something else in round 2. */
+test("the batch the agent is handed flags an anchor whose line has changed since its round", () => {
+  const repoRoot = newRepo("lsr-drift-");
+  writeFileSync(join(repoRoot, "a.ts"), "one\nshout\n");
+  git(repoRoot, "add", ".");
+  git(repoRoot, "commit", "-m", "r1");
+  const first = git(repoRoot, "rev-parse", "HEAD");
+  writeFileSync(join(repoRoot, "a.ts"), "/** doc */\none\nyell\n");
+  git(repoRoot, "commit", "-am", "r2");
+  const second = git(repoRoot, "rev-parse", "HEAD");
+  const base = session(2);
+  const ask = { ...annotation({ id: "t1", side: "new", line_start: 2, line_end: 2 }) };
+  const reply = { type: "reply" as const, thread: "t1", comment: "and?" };
+  const held: SessionRecord = {
+    ...base,
+    repoRoot,
+    rounds: [
+      { ...base.rounds[0]!, headCommit: first },
+      { ...base.rounds[1]!, headCommit: second },
+    ],
+    conversation: [
+      { role: "reviewer", at: "2025-01-01T01:00:00.000Z", roundIndex: 0, prompts: [ask as never] },
+      { role: "reviewer", at: "2025-01-02T01:00:00.000Z", roundIndex: 1, prompts: [reply] },
+    ],
+    batch: { id: "b1", at: "2025-01-02T01:00:01.000Z", prompts: [reply] },
+  };
+
+  const [item] = batchPayload(held).items;
+  assert.equal(item?.status === "reply" && item.outdated, true);
 });
 
 test("a reviewer's reply and resolve toggle parse, each naming its thread", () => {

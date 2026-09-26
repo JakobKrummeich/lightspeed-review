@@ -20,6 +20,8 @@ export class FakeNode {
   private data: Record<string, string | undefined> | undefined;
   private html = "";
   private children: FakeNode[] = [];
+  /** Set on adoption: a card's head folds on a press anywhere inside it, found by walking up. */
+  private parent: FakeNode | undefined;
   private readonly listeners = new Map<string, ((event: unknown) => void)[]>();
 
   constructor(tag = "div", attributes = "") {
@@ -112,10 +114,19 @@ export class FakeNode {
   }
 
   adopt(child: FakeNode): void {
+    child.parent = this;
     this.children.push(child);
   }
 
+  closest(selector: string): FakeNode | null {
+    if (this.matches(selector)) return this;
+    return this.parent?.closest(selector) ?? null;
+  }
+
+  /** `#id`, `.class`, `[data-attr]`, or a tag: the selectors the panel asks. */
   matches(selector: string): boolean {
+    const presence = /^\[([\w-]+)\]$/.exec(selector);
+    if (presence) return new RegExp(`(^|\\s)${presence[1]}="`).test(this.attributes);
     if (selector.startsWith("#")) return this.attribute("id") === selector.slice(1);
     if (selector.startsWith("."))
       return this.attribute("class").split(" ").includes(selector.slice(1));

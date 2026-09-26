@@ -2,7 +2,7 @@ import { REACHABLE_MODELS } from "../config.ts";
 import type { StructuredOutput } from "../output.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { openCall } from "../open-call.ts";
-import { batchItems, batchSize, openIds } from "../threads.ts";
+import { batchItems, batchSize, openIds, resolvedOf } from "../threads.ts";
 import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
 import {
   HELP_END,
@@ -177,9 +177,7 @@ function homeNext(mine: SessionRecord[], input: HomeInput): StructuredOutput {
 
 function agentsNext(only: SessionRecord, target: string, label: TurnLabel): StructuredOutput {
   const held = only.batch?.prompts ?? [];
-  const resolved = batchItems(held, only.conversation)
-    .filter((item) => item.status === "resolved")
-    .map((item) => item.id);
+  const resolved = resolvedOf(batchItems(held, only.conversation));
   // The same ids the batch itself offered: open ones only, never a resolved one.
   const rule = nextRule(label, target, openIds(only.conversation, held), resolved);
   // An agent resumed after compaction no longer holds the batch it is digesting.

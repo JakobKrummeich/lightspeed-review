@@ -8,7 +8,14 @@ import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { turnFacts, turnLabel } from "../turn.ts";
 import { handbackOf, isRerun } from "../turn-moves.ts";
-import { ifKilled, publishCall, publishLine, publishRerun, waitClause } from "../turn-help.ts";
+import {
+  ifKilled,
+  publishCall,
+  publishLine,
+  publishRerun,
+  urlLast,
+  waitClause,
+} from "../turn-help.ts";
 import { publishRefusal } from "../server.ts";
 import { refusalError, sessionGone, type SessionRef } from "./api-client.ts";
 import { allValues, lastValue, scanArgs } from "./args.ts";
@@ -20,6 +27,7 @@ import {
   resolveDeps,
   type RoundDeps,
 } from "./round.ts";
+import { reviewUrl } from "./server-address.ts";
 import { branchAndBase, takeToPairs } from "./to-args.ts";
 
 export interface PublishArgs {
@@ -87,12 +95,17 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
   const recovery = publishRerun(target, input.intents, input.notes);
   if (existing !== undefined && alreadyPublished(existing, head, input)) {
     await run.ensureServerRunning({ port: input.config.port, stateDir: input.config.stateDir });
-    run.announce({
-      ...turnFacts(existing),
-      rerun: true,
-      message: `this round is already published; ${waitClause(turnLabel(existing))}`,
-      ...ifKilled(turnLabel(existing), recovery),
-    });
+    run.announce(
+      urlLast(
+        {
+          ...turnFacts(existing),
+          rerun: true,
+          message: `this round is already published; ${waitClause(turnLabel(existing))}`,
+          ...ifKilled(turnLabel(existing), recovery),
+        },
+        reviewUrl(input.config.port, key),
+      ),
+    );
     return await run.listen({ ...input, port: input.config.port });
   }
   refuseLocally(existing, input, { key, target }, head);
@@ -103,13 +116,18 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
     run,
   );
   const ledger = ledgerReport(outcome.created);
-  run.announce({
-    ...publishedRound(outcome),
-    ...(outcome.created.rerun === true ? { rerun: true } : {}),
-    message: `published; ${waitClause(outcome.created.turn)}`,
-    ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
-    ...ifKilled(outcome.created.turn, recovery),
-  });
+  run.announce(
+    urlLast(
+      {
+        ...publishedRound(outcome),
+        ...(outcome.created.rerun === true ? { rerun: true } : {}),
+        message: `published; ${waitClause(outcome.created.turn)}`,
+        ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
+        ...ifKilled(outcome.created.turn, recovery),
+      },
+      outcome.created.url,
+    ),
+  );
   return await run.listen({ ...input, port: input.config.port });
 }
 

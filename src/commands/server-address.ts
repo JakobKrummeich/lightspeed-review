@@ -5,6 +5,11 @@ export function serverOrigin(port: number): string {
   return `http://127.0.0.1:${port}`;
 }
 
+/** The page a reviewer opens; the server builds the same address for `open`'s answer. */
+export function reviewUrl(port: number, key: string): string {
+  return `${serverOrigin(port)}/session/${key}`;
+}
+
 /** `refused` alone proves nothing is listening — everything else means a command
  * must not tell the agent to start another server. */
 export type PortState = "open" | "refused" | "unreachable";

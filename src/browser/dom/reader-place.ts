@@ -1,9 +1,10 @@
 import type { ReviewerPlace } from "../round-offer.ts";
+import { NOTHING_QUEUED, type QueueTally } from "../queued-pill.ts";
 
 export interface ReaderTracker {
   place(): ReviewerPlace;
   setFocus(focus: number | undefined): void;
-  setQueued(count: number): void;
+  setQueued(queued: QueueTally): void;
 }
 
 /**
@@ -13,14 +14,14 @@ export interface ReaderTracker {
  */
 export function trackReader(reviewRoot: HTMLElement, focus: number | undefined): ReaderTracker {
   let chapter = focus;
-  let queued = 0;
+  let queued = NOTHING_QUEUED;
   return {
     place: () => ({ scrolled: reviewRoot.scrollTop, queued, focus: chapter }),
     setFocus: (next) => {
       chapter = next;
     },
-    setQueued: (count) => {
-      queued = count;
+    setQueued: (next) => {
+      queued = next;
     },
   };
 }

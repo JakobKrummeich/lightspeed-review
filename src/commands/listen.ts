@@ -3,7 +3,7 @@ import { END_VERDICTS, type EndApproval, type PollPayload } from "../feedback.ts
 import { SELECTION_LIMIT, truncateContent, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import type { ReviewCloser } from "../session-types.ts";
-import type { BatchItem } from "../threads.ts";
+import { resolvedOf, type BatchItem, type ItemAnchor } from "../threads.ts";
 import { turnBlock, type TurnLabel } from "../turn.ts";
 import { endedClause, nextRule } from "../turn-help.ts";
 import { longPoll } from "./long-poll.ts";
@@ -58,7 +58,7 @@ export function batchOutput(result: PollPayload, target: string): StructuredOutp
     };
   }
   const open = result.items.filter((item) => item.status !== "resolved").map((item) => item.id);
-  const resolved = result.items.filter((item) => item.status === "resolved").map((item) => item.id);
+  const resolved = resolvedOf(result.items);
   return {
     ...turnBlock({ ...result, turn: turnOf(result) }),
     items,
@@ -89,17 +89,40 @@ function supersededOutput(result: PollPayload): StructuredOutput {
  */
 export function itemRow(item: BatchItem): StructuredOutput {
   const said = item.reviewer.length === 1 ? item.reviewer[0] : item.reviewer;
+  const words = item.reviewer.length === 0 ? {} : { reviewer: said };
+  if (item.status === "resolved") {
+    return {
+      id: item.id,
+      status: item.status,
+      ...(item.asked === undefined ? {} : { asked: item.asked }),
+      ...words,
+    };
+  }
   return {
     id: item.id,
     status: item.status,
-    ...(item.file === undefined ? {} : { at: placeOf(item) }),
-    ...(item.selected_text === undefined ? {} : { selected: selectionOf(item) }),
-    ...(item.you === undefined ? {} : { you: item.you }),
-    ...(item.reviewer.length === 0 ? {} : { reviewer: said }),
+    ...anchorRows(item),
+    ...("thread" in item ? { thread: item.thread } : {}),
+    ...words,
   };
 }
 
-function placeOf(item: BatchItem): string {
+/**
+ * `outdated` sits right under `at`: the line number is the round-N one, and an
+ * agent that opened today's file at it would read some other line.
+ */
+function anchorRows(anchor: ItemAnchor): StructuredOutput {
+  if (anchor.file === undefined) return {};
+  return {
+    at: placeOf(anchor),
+    ...(anchor.outdated === true && anchor.anchoredIn !== undefined
+      ? { outdated: `anchored in round ${anchor.anchoredIn + 1}; that line has changed since` }
+      : {}),
+    ...(anchor.selected_text === undefined ? {} : { selected: selectionOf(anchor) }),
+  };
+}
+
+function placeOf(item: ItemAnchor): string {
   if (item.line_start === undefined) return item.file!;
   const lines =
     item.line_start === item.line_end
@@ -112,7 +135,7 @@ function placeOf(item: BatchItem): string {
  * A selection is a pointer into a file the agent already has, so the cut costs
  * nothing as long as the pointer survives it.
  */
-function selectionOf(item: BatchItem): string {
+function selectionOf(item: ItemAnchor): string {
   const rest =
     item.line_start === undefined ? `${item.file} has the rest` : `${placeOf(item)} has the rest`;
   return truncateContent(item.selected_text!, SELECTION_LIMIT, rest);

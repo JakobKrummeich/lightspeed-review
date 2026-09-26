@@ -4,11 +4,11 @@ import { branchState } from "../git-state.ts";
 import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { turnBlock, type TurnFacts } from "../turn.ts";
-import { ifKilled, replyRerun, waitClause } from "../turn-help.ts";
+import { ifKilled, replyRerun, urlLast, waitClause } from "../turn-help.ts";
 import { apiRequest, jsonPost } from "./api-client.ts";
 import { scanArgs } from "./args.ts";
 import { listen, type ListenInput } from "./listen.ts";
-import { serverOrigin } from "./server-address.ts";
+import { reviewUrl, serverOrigin } from "./server-address.ts";
 import { branchAndBase, takeToPairs } from "./to-args.ts";
 
 export interface ReplyArgs {
@@ -64,7 +64,7 @@ export async function runReply(input: ReplyInput): Promise<StructuredOutput> {
     { key, target },
   )) as Partial<TurnFacts> & { rerun?: boolean };
   const announce = input.announce ?? printBlock;
-  announce(landed(answer, input.notes, target));
+  announce(urlLast(landed(answer, input.notes, target), reviewUrl(input.port, key)));
   return await (input.listen ?? listen)(input);
 }
 

@@ -9,45 +9,62 @@
 }
 
 /*
- * The line between two rounds of the conversation. It sticks to the top of the
- * history while the round under it scrolls past, so it is drawn over text and
- * must be opaque: the panel's own surface, not a tint of it.
+ * The column is grouped by whose move it is — resolved, waiting on the agent,
+ * needs you — and a group is told from the next by its heading and air, not a
+ * rule: the cards' own tone already separates them.
  */
-.lsr-round-mark {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: baseline;
-  gap: var(--lsr-space-2);
-  background: var(--lsr-surface);
-  padding: var(--lsr-space-2) 0;
-  /* More air above than below: with equal air the label floats between two
-   * rounds; it names what is under it, so it sits with it. */
-  margin: var(--lsr-space-4) 0 var(--lsr-space-2);
+.lsr-thread-group {
+  margin-bottom: var(--lsr-space-4);
+}
+
+.lsr-group-head {
+  margin: 0 0 var(--lsr-space-2);
   font-size: var(--lsr-size-label);
+  font-weight: 600;
   line-height: var(--lsr-leading-tight);
   color: var(--lsr-muted);
-}
-
-.lsr-round-mark::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--lsr-border);
-}
-
-.lsr-round-name {
-  color: var(--lsr-strong);
-  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  /* A narrow panel may wrap the note away; the round's number never goes. */
-  white-space: nowrap;
 }
 
-.lsr-round-mark[data-round-state="current"] .lsr-round-name {
+/* What needs the reviewer is the one heading worth the accent. */
+.lsr-thread-group[data-group="needs"] > .lsr-group-head {
   color: var(--lsr-accent);
+}
+
+/* The resolved group folds as a whole: its heading is the press, dressed as the heading. */
+.lsr-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lsr-space-2);
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.lsr-group-toggle::before,
+.lsr-thread-fold::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(-45deg);
+}
+
+/* Lifted as it turns: a square's corner pointing down sits below the line's middle. */
+.lsr-group-toggle[aria-expanded="true"]::before,
+.lsr-thread-fold[aria-expanded="true"]::before {
+  transform: translateY(-0.15rem) rotate(45deg);
+}
+
+.lsr-group-toggle:hover {
+  color: var(--lsr-text);
 }
 
 /*
@@ -146,7 +163,7 @@
 }
 
 .lsr-message-role,
-.lsr-thread-id,
+.lsr-thread-where,
 .lsr-prompt-file {
   font-size: var(--lsr-size-label);
   color: var(--lsr-muted);
@@ -161,19 +178,54 @@
 }
 
 /*
- * The thread's head: its id (what the agent types in `--to`) and the file it
- * jumps to. What the reviewer can do in the thread is at its foot.
+ * Where a delivery stands, beside the "you" it belongs to: a caption, so set
+ * in the sentence's case and weight rather than the label's.
+ */
+.lsr-message-delivery {
+  margin-left: var(--lsr-space-1);
+  color: var(--lsr-muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Sent into silence is caution, not error: amber, as for other "not yet" news. */
+.lsr-message-delivery[data-delivery="unheard"] {
+  color: var(--lsr-amber);
+}
+
+/*
+ * Not sent yet: the reviewer's bubble at a third of its tint, so it reads as
+ * theirs and as not-yet at once, with no outline to fence it off.
+ */
+.lsr-message.lsr-draft {
+  --lsr-bubble: color-mix(in oklab, var(--lsr-violet) 10%, var(--lsr-raised));
+
+  position: relative;
+}
+
+.lsr-draft .lsr-message-delivery {
+  font-style: italic;
+}
+
+/*
+ * The card's head is its fold: a press anywhere on it but the file jump folds
+ * or unfolds the card, and the chevron at the end says which way it goes.
  */
 .lsr-thread-head {
   display: flex;
   align-items: baseline;
   gap: var(--lsr-space-2);
+  min-width: 0;
 }
 
-.lsr-thread-id {
+.lsr-thread-head[data-fold] {
+  cursor: pointer;
+}
+
+.lsr-thread-where {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  text-transform: none;
+  white-space: nowrap;
 }
 
 .lsr-thread-head .lsr-prompt-file {
@@ -184,9 +236,40 @@
   white-space: nowrap;
 }
 
+/* Folded: the ask's first words, on one line, taking whatever room is left. */
+.lsr-thread-gist {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lsr-strong);
+}
+
+.lsr-thread-fold {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--lsr-muted);
+  cursor: pointer;
+}
+
+.lsr-thread-head:hover .lsr-thread-fold {
+  color: var(--lsr-text);
+}
+
 .lsr-thread-queued {
   font-size: var(--lsr-size-label);
   color: var(--lsr-amber);
+  white-space: nowrap;
 }
 
 /* The agent spoke here since your last Send: the one word that says so. */
@@ -198,18 +281,30 @@
   letter-spacing: 0.05em;
 }
 
-/* Folded: the head and one line of what the thread was about. */
-.lsr-thread-summary {
-  margin: var(--lsr-space-1) 0 0;
-  color: var(--lsr-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/*
+ * A folded card is a one-line row: tighter, and a step quieter than an open
+ * card — the tone, not a border, says it is put away.
+ */
+.lsr-thread[data-shut="true"] {
+  padding-block: var(--lsr-space-1);
+  background: color-mix(in oklab, var(--lsr-raised) 55%, var(--lsr-surface));
 }
 
-.lsr-thread[data-resolved="true"] {
-  background: transparent;
-  border: 1px solid var(--lsr-border);
+.lsr-thread[data-shut="true"] .lsr-thread-head {
+  align-items: center;
+}
+
+/* New comments not sent yet: the card steps back so its pale bubble is what reads. */
+.lsr-thread.lsr-pill {
+  background: color-mix(in oklab, var(--lsr-raised) 55%, var(--lsr-surface));
+  padding-right: var(--lsr-space-6);
+}
+
+/* The tray only counts now: the pills are drawn where they will land. */
+.lsr-queue-count {
+  margin: 0;
+  font-size: var(--lsr-size-meta);
+  color: var(--lsr-muted);
 }
 
 /*
@@ -296,13 +391,6 @@
   field-sizing: content;
 }
 
-.lsr-pill-thread {
-  display: block;
-  font-size: var(--lsr-size-label);
-  color: var(--lsr-muted);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-}
-
 /*
  * A pill that outlived the round it was queued in: amber, as on the "changed
  * after approval" badge, because both say time moved on under these words —
@@ -355,82 +443,4 @@
 .lsr-ended {
   color: var(--lsr-muted);
   font-size: var(--lsr-size-meta);
-}
-
-#lsr-status-banner {
-  display: flex;
-  min-width: 0;
-}
-
-.lsr-presence {
-  margin: 0;
-  font-size: var(--lsr-size-meta);
-  color: var(--lsr-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lsr-presence[data-waiting="true"],
-.lsr-presence[data-turn="agent"] {
-  color: var(--lsr-accent);
-}
-
-/*
- * Accent while an agent is live — working, reading or listening — and muted
- * when none is; never red or green, which the diff owns. The word carries one
- * weight in every state: the dot and the hue say which state it is.
- */
-.lsr-presence-dot {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-right: var(--lsr-space-1);
-  border-radius: 50%;
-  background: var(--lsr-muted);
-  vertical-align: middle;
-}
-
-.lsr-presence[data-waiting="true"] .lsr-presence-dot,
-.lsr-presence[data-turn="agent"] .lsr-presence-dot {
-  background: var(--lsr-accent);
-}
-
-/* Unknown while the stream is down: grey whatever the last frame said. */
-.lsr-presence[data-connection="lost"] {
-  color: var(--lsr-muted);
-}
-
-.lsr-ended-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Room at the edges, so a short window shrinks the margin before the card. */
-  padding: var(--lsr-space-6);
-  background: var(--lsr-scrim);
-  /* Above the annotation popup, which may still be open when the review ends. */
-  z-index: 20;
-}
-
-/*
- * The event stream is down and the browser is reconnecting: said, because a
- * page that silently stops updating reads as an agent with nothing to say.
- * Amber, as for other "time moved under you" news: caution, not error.
- */
-.lsr-connection {
-  margin: 0;
-  padding: 0 var(--lsr-space-2);
-  border-radius: 999px;
-  font-size: var(--lsr-size-label);
-  line-height: var(--lsr-leading-tight);
-  white-space: nowrap;
-  color: var(--lsr-amber);
-  border: 1px solid color-mix(in oklab, var(--lsr-amber) 42%, var(--lsr-surface));
-  background: color-mix(in oklab, var(--lsr-amber) 13%, transparent);
-}
-
-.lsr-connection[hidden] {
-  display: none;
 }

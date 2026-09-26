@@ -13,6 +13,7 @@ import {
   openRerun,
   publishCall,
   reattachCall,
+  urlLast,
   waitClause,
 } from "../turn-help.ts";
 import { refusalError } from "./api-client.ts";
@@ -26,7 +27,7 @@ import {
   resolveDeps,
   type RoundDeps,
 } from "./round.ts";
-import { serverOrigin } from "./server-address.ts";
+import { reviewUrl } from "./server-address.ts";
 
 export interface OpenArgs {
   branch: string | undefined;
@@ -98,7 +99,7 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
       );
     }
     await run.ensureServerRunning({ port: input.config.port, stateDir: input.config.stateDir });
-    const url = `${serverOrigin(input.config.port)}/session/${existing.key}`;
+    const url = reviewUrl(input.config.port, existing.key);
     run.announce(reattached({ ...turnFacts(existing), key: existing.key, url }, input));
     return await run.listen({ ...input, port: input.config.port });
   }
@@ -115,12 +116,17 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
   const ledger = ledgerReport(outcome.created);
   // Written out before the wait rather than returned after it: the reviewer's
   // url is no use to anybody after they have sent.
-  run.announce({
-    ...publishedRound(outcome),
-    message: "the review is open — give the reviewer the url; waiting for their first Send",
-    ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
-    ...ifKilled(outcome.created.turn, reattachCall(target)),
-  });
+  run.announce(
+    urlLast(
+      {
+        ...publishedRound(outcome),
+        message: "the review is open — give the reviewer the url; waiting for their first Send",
+        ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
+        ...ifKilled(outcome.created.turn, reattachCall(target)),
+      },
+      outcome.created.url,
+    ),
+  );
   return await run.listen({ ...input, port: input.config.port });
 }
 
@@ -131,13 +137,16 @@ interface LiveReview extends Partial<TurnFacts> {
 }
 
 function reattached(review: LiveReview, input: OpenInput): StructuredOutput {
-  return {
-    ...turnBlock(review),
-    session: { key: review.key, branch: input.branch, base: input.base, url: review.url },
-    message: `re-attached to the live review; ${waitClause(review.turn)}`,
-    ...(input.intents.length === 0 ? {} : { note: intentIgnored(input) }),
-    ...ifKilled(review.turn, reattachCall(`${input.branch} ${input.base}`)),
-  };
+  return urlLast(
+    {
+      ...turnBlock(review),
+      session: { key: review.key, branch: input.branch, base: input.base },
+      message: `re-attached to the live review; ${waitClause(review.turn)}`,
+      ...(input.intents.length === 0 ? {} : { note: intentIgnored(input) }),
+      ...ifKilled(review.turn, reattachCall(`${input.branch} ${input.base}`)),
+    },
+    review.url,
+  );
 }
 
 /** Said, not dropped: an agent that typed a reason believes the reviewer reads it. */

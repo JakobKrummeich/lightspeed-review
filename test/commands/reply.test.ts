@@ -226,7 +226,7 @@ test("before it waits, a reply says what landed and the exact command that recov
       assert.equal(shown?.turn, "reviewer");
       assert.deepEqual(shown?.replied, ["t1", "main"]);
       assert.equal("rerun" in shown!, false);
-      assert.equal(Object.keys(shown!).at(-1), "next");
+      assert.equal(Object.keys(shown!).at(-2), "next", "the recovery line, then the url");
       assert.match(
         (shown?.next as { if_killed: string }).if_killed,
         /lightspeed reply --to t1 'it is one already' --to main 'all else clear' feature-auth main$/,
@@ -252,6 +252,19 @@ test("a reply whose text has an apostrophe prints a kill recovery that pastes as
       const line = printed.split("\n").find((one) => one.includes("if_killed"))!;
       assert.doesNotMatch(line.slice(line.indexOf("lightspeed"), -1), /[\\"']/);
       assert.match(line, /: lightspeed open feature-auth main"$/);
+    },
+  );
+});
+
+test("a reply's block before the wait ends on the review's url", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot),
+    async ({ port, repoRoot, key }) => {
+      const announced: StructuredOutput[] = [];
+      await reply(port, repoRoot, [{ to: "t1", text: "done" }], announced);
+
+      assert.equal(Object.keys(announced[0]!).at(-1), "url");
+      assert.equal(announced[0]?.url, `http://127.0.0.1:${port}/session/${key}`);
     },
   );
 });

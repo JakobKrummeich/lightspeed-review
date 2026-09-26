@@ -88,7 +88,8 @@ interface Item {
   id: string;
   status: string;
   at?: string;
-  you?: string;
+  asked?: string;
+  thread?: { who: string; said: string }[];
   reviewer?: string | string[];
 }
 
@@ -257,14 +258,7 @@ test("a whole session: questions, replies, resolve, work, publish, end", async (
     const replied = await replying;
     assert.equal(replied.code, 0, replied.stdout);
     assert.deepEqual(answerOf(replied.stdout).items, [
-      {
-        id: "t1",
-        status: "resolved",
-        at: "app.ts:1",
-        selected: "const a = 2;",
-        you: "2 is the retry limit",
-        reviewer: "fine, keep it",
-      },
+      { id: "t1", status: "resolved", asked: "why 2?", reviewer: "fine, keep it" },
     ]);
 
     // 4. work: nothing left to discuss, something to change.
@@ -304,7 +298,11 @@ test("a whole session: questions, replies, resolve, work, publish, end", async (
     assert.equal(last.ended, true);
     assert.equal(last.endedBy, "reviewer");
     assert.equal(last.approval?.verdict, "signed-off");
-    assert.partialDeepStrictEqual(item(last, "t2"), { status: "resolved", you: "done: renamed" });
+    assert.deepEqual(item(last, "t2"), {
+      id: "t2",
+      status: "resolved",
+      asked: "rename a to MAX_RETRIES",
+    });
     assert.deepEqual(Object.keys(last.next ?? {}), ["done"]);
 
     const named = await runCli(["approvals", "feature", "main"], repoRoot);
@@ -347,7 +345,10 @@ test("a reply killed mid-wait is re-run: nothing is posted twice, and the Send s
     assert.equal(answered.code, 0, answered.stdout);
     assert.partialDeepStrictEqual(item(answerOf(answered.stdout), "t1"), {
       status: "reply",
-      you: "2 is the retry limit",
+      thread: [
+        { who: "reviewer", said: "why 2?" },
+        { who: "you", said: "2 is the retry limit" },
+      ],
       reviewer: "ok",
     });
 

@@ -6,9 +6,14 @@ import {
   roundOfferLabel,
   type ReviewerPlace,
 } from "../../src/browser/round-offer.ts";
+import { NOTHING_QUEUED, type QueueTally } from "../../src/browser/queued-pill.ts";
 
 function place(over: Partial<ReviewerPlace> = {}): ReviewerPlace {
-  return { scrolled: 0, queued: 0, focus: undefined, ...over };
+  return { scrolled: 0, queued: NOTHING_QUEUED, focus: undefined, ...over };
+}
+
+function tally(over: Partial<QueueTally>): QueueTally {
+  return { ...NOTHING_QUEUED, ...over };
 }
 
 test("a reviewer who has not started loses nothing, so the round is not held", () => {
@@ -26,7 +31,8 @@ test("reading inside a chapter is being somewhere, however far up it they are", 
 });
 
 test("words queued about this diff are worth protecting even at the top of it", () => {
-  assert.equal(holdsRound(place({ queued: 1 })), true);
+  assert.equal(holdsRound(place({ queued: tally({ comments: 1 }) })), true);
+  assert.equal(holdsRound(place({ queued: tally({ resolves: 1 }) })), true);
 });
 
 test("the offer names the round the reviewer would count, not the stored index", () => {
@@ -58,25 +64,57 @@ test("the popup counts one file the way the offer does", () => {
  * guessing wrong is pressing "keep reading" on a round they wanted.
  */
 test("the offer says the reviewer's unsent comments are kept", () => {
-  assert.equal(roundOfferLabel(1, 4, 2), "Round 2 is ready · 4 files · 2 comments kept");
-  assert.equal(roundOfferLabel(1, 4, 1), "Round 2 is ready · 4 files · 1 comment kept");
+  assert.equal(
+    roundOfferLabel(1, 4, tally({ comments: 2 })),
+    "Round 2 is ready · 4 files · 2 comments kept",
+  );
+  assert.equal(
+    roundOfferLabel(1, 4, tally({ comments: 1 })),
+    "Round 2 is ready · 4 files · 1 comment kept",
+  );
 });
 
 test("an empty queue is not mentioned: there is nothing to reassure anyone about", () => {
-  assert.equal(roundOfferLabel(1, 4, 0), "Round 2 is ready · 4 files");
+  assert.equal(roundOfferLabel(1, 4, NOTHING_QUEUED), "Round 2 is ready · 4 files");
   assert.equal(roundOfferLabel(1, 4), "Round 2 is ready · 4 files");
 });
 
 test("the card spells out what the header only counts", () => {
-  const html = renderRoundPopup(1, 4, 2);
+  const html = renderRoundPopup(1, 4, tally({ comments: 2 }));
 
   assert.match(
     html,
-    /<p class="lsr-round-queue">Your 2 comments stay queued — they go out on your next send\.<\/p>/,
+    /<p class="lsr-round-queue">Your 2 comments stay queued — they go out on your next Send\.<\/p>/,
   );
   assert.match(html, /aria-label="Round 2 is ready · 4 files · 2 comments kept"/);
 });
 
 test("a card with nothing queued behind it makes no promise about a queue", () => {
-  assert.doesNotMatch(renderRoundPopup(1, 4, 0), /lsr-round-queue/);
+  assert.doesNotMatch(renderRoundPopup(1, 4, NOTHING_QUEUED), /lsr-round-queue/);
+});
+
+test("one queued thing is spoken of in the singular", () => {
+  assert.match(
+    renderRoundPopup(1, 4, tally({ comments: 1 })),
+    /Your 1 comment stays queued — it goes out on your next Send\./,
+  );
+});
+
+test("replies and resolves are counted as what they are, not as comments", () => {
+  assert.equal(
+    roundOfferLabel(1, 4, tally({ replies: 1 })),
+    "Round 2 is ready · 4 files · 1 reply kept",
+  );
+  assert.match(
+    renderRoundPopup(1, 4, tally({ replies: 1 })),
+    /Your 1 reply stays queued — it goes out on your next Send\./,
+  );
+  assert.equal(
+    roundOfferLabel(1, 4, tally({ comments: 2, replies: 3, resolves: 1 })),
+    "Round 2 is ready · 4 files · 2 comments, 3 replies and 1 resolve kept",
+  );
+  assert.match(
+    renderRoundPopup(1, 4, tally({ comments: 1, resolves: 2 })),
+    /Your 1 comment and 2 resolves stay queued — they go out on your next Send\./,
+  );
 });

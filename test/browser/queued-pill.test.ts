@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   stalePillRound,
+  tallyOf,
+  queuedTotal,
   stampPills,
   unstampedPill,
   type QueuedPill,
@@ -63,4 +65,29 @@ test("a general comment is never called stale: it has no lines to fall out of li
     stalePillRound({ type: "message", comment: "and the tests", round: 1 }, 3),
     undefined,
   );
+});
+
+test("a queued reply or resolve is never called stale: it names a thread, not lines", () => {
+  // Threads outlive rounds; a reply queued through the agent's turn is the ordinary case.
+  assert.equal(
+    stalePillRound({ type: "reply", thread: "t1", comment: "ok", round: 1 }, 3),
+    undefined,
+  );
+  assert.equal(
+    stalePillRound({ type: "resolve", thread: "t1", resolved: true, round: 1 }, 3),
+    undefined,
+  );
+});
+
+test("the tally counts line and general comments as comments, apart from replies and resolves", () => {
+  const tally = tallyOf([
+    annotation,
+    { type: "message", comment: "and the tests" },
+    { type: "reply", thread: "t1", comment: "ok" },
+    { type: "resolve", thread: "t2", resolved: true },
+    { type: "resolve", thread: "t3", resolved: false },
+  ]);
+
+  assert.deepEqual(tally, { comments: 2, replies: 1, resolves: 2 });
+  assert.equal(queuedTotal(tally), 5);
 });

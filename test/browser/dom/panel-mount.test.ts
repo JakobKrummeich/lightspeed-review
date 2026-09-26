@@ -4,6 +4,7 @@ import { setTimeout as tick } from "node:timers/promises";
 import { mountPanel } from "../../../src/browser/dom/panel-mount.ts";
 import type { SessionData } from "../../../src/browser/dom/session-api.ts";
 import type {
+  AnnotationPrompt,
   ConversationEntry,
   FeedbackPrompt,
   SessionStatus,
@@ -38,7 +39,8 @@ const annotation: FeedbackPrompt = {
 const reply: ConversationEntry = {
   role: "agent",
   at: "2025-01-01T00:05:00.000Z",
-  prompts: [{ type: "message", comment: "wrapped it in a transaction" }],
+  // Posted to `main`, so it is news the column shows open rather than folded-away history.
+  prompts: [{ type: "reply", thread: "main", comment: "wrapped it in a transaction" }],
 };
 
 function session(over: Partial<SessionData> = {}): SessionData {
@@ -98,6 +100,12 @@ function mount(
     box: () => root.querySelector("#lsr-general-comment"),
     ended: () => ended,
   };
+}
+
+/** What the tray counts: every queued pill, wherever the column draws it. */
+function queuedIn(root: FakeNode): number {
+  const count = root.querySelector(".lsr-queue-count")?.textContent ?? "";
+  return Number(/^(\d+)/.exec(count)?.[1] ?? 0);
 }
 
 function type(root: FakeNode, box: FakeNode, text: string): void {
@@ -307,7 +315,7 @@ test("a press on Queue sends nothing to the agent", (t) => {
   // Send only on your turn: the pills stay in the tray, and nothing is put on
   // the wire on somebody else's turn.
   assert.deepEqual(sent, []);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 1, "an empty box queues nothing more");
+  assert.equal(queuedIn(root), 1, "an empty box queues nothing more");
 });
 
 test("Enter on the agent's turn queues the comment, like the button beneath it", (t) => {
@@ -400,7 +408,7 @@ test("everything queued on the agent's turn goes out in order on the next Send",
       ended: false,
     },
   ]);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 0, "sent is no longer queued");
+  assert.equal(queuedIn(root), 0, "sent is no longer queued");
 });
 
 test("text in the box and a Queue press on the agent's turn put nothing on the wire", async (t) => {
@@ -444,7 +452,7 @@ test("a Queue press hands the box back, so the next comment is typed straight aw
   box()!.focused = false;
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
   assert.equal(box()?.focused, true, "and after a press on an empty box, which queues nothing");
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
+  assert.equal(queuedIn(root), 1);
 });
 
 test("a Queue press while an end is on the wire queues nothing", async (t) => {
@@ -458,7 +466,7 @@ test("a Queue press while an end is on the wire queues nothing", async (t) => {
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
 
   // The review may be about to close: nothing moves until the end is answered.
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
+  assert.equal(queuedIn(root), 0);
   assert.equal(box()?.value, "one more thing");
   assert.deepEqual(
     flight.sent.map((sent) => sent.prompts),
@@ -501,7 +509,7 @@ test("a general comment restored from a reload in a later round wears no stale b
   const { root } = mount(t, session({ rounds }), storage);
 
   // The annotation still warns its lines may have moved; the message has no lines to move.
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
+  assert.equal(queuedIn(root), 2);
   assert.equal(root.querySelectorAll(".lsr-pill-round").length, 1);
 });
 
@@ -515,7 +523,7 @@ test("a queued general comment comes out of the tray like any pill", (t) => {
   root.dispatch("click", { target: root.querySelector(".lsr-pill-remove") });
 
   assert.doesNotMatch(shown(root), /never mind this one/);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
+  assert.equal(queuedIn(root), 0);
 });
 
 test("ending on the agent's turn ends the review and leaves the queue queued", async (t) => {
@@ -535,7 +543,7 @@ test("ending on the agent's turn ends the review and leaves the queue queued", a
   // And the button said `End without Sending`, so what was not sent is still
   // there: on the page, and on disk for the reload after a reopen. Dropping it
   // would be the one thing the label promised would not happen.
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 1, "the queue is still queued");
+  assert.equal(queuedIn(root), 1, "the queue is still queued");
   assert.equal(box()?.value, "and one more thing");
   await stored();
   const remembered = readMemory(storage, "key");
@@ -552,7 +560,7 @@ test("a reviewer reading an earlier round is not yanked back down by a reply", (
   assert.equal(host.scrollTop, 120, "they chose to be up here");
 });
 
-test("a new round rules its line into the history without touching the draft", (t) => {
+test("a new round redraws the history without touching the draft", (t) => {
   const { root, panel, box } = mount(t, session({ conversation: [reply] }));
   const typing = box();
   assert.ok(typing, "the compose box is mounted");
@@ -569,8 +577,8 @@ test("a new round rules its line into the history without touching the draft", (
   );
 
   const scroll = root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "";
-  assert.match(scroll, /lsr-round-mark/, "the round that just opened is marked");
-  assert.match(scroll, /Round 2/);
+  assert.match(scroll, /wrapped it in a transaction/);
+  assert.doesNotMatch(scroll, /Round 2/, "rounds are not ruled into the column");
   assert.equal(box(), typing);
   assert.equal(typing.value, "still not right");
 });
@@ -1070,7 +1078,13 @@ test("the server's own copy replaces the echo instead of doubling it", async (t)
 
   panel.update(
     session({
-      conversation: [{ role: "reviewer", at: "2025-01-01T00:01:00.000Z", prompts: [queued[0]!] }],
+      conversation: [
+        {
+          role: "reviewer",
+          at: "2025-01-01T00:01:00.000Z",
+          prompts: [{ ...(queued[0] as AnnotationPrompt), id: "t1" }],
+        },
+      ],
     }),
   );
 
@@ -1092,7 +1106,13 @@ test("a fresh read that lands mid-flight is not echoed on top of", async (t) => 
   // before this send's answer — already carrying the words the echo would add.
   panel.update(
     session({
-      conversation: [{ role: "reviewer", at: "2025-01-01T00:01:00.000Z", prompts: [queued[0]!] }],
+      conversation: [
+        {
+          role: "reviewer",
+          at: "2025-01-01T00:01:00.000Z",
+          prompts: [{ ...(queued[0] as AnnotationPrompt), id: "t1" }],
+        },
+      ],
     }),
   );
   flight.settle(true);
@@ -1105,28 +1125,16 @@ test("a fresh read that lands mid-flight is not echoed on top of", async (t) => 
   );
 });
 
-test("the echoed turn is stamped with the round the reviewer is looking at", async (t) => {
+test("the echoed items are named as the server will name them, so they draw as open threads", async (t) => {
   stubFetch(t);
-  const { root, box } = mount(
-    t,
-    session({
-      conversation: [reply],
-      rounds: [
-        { index: 0, at: "2025-01-01T00:00:00.000Z" },
-        { index: 1, at: "2025-01-02T00:00:00.000Z" },
-      ],
-    }),
-  );
+  const { root, box } = mount(t, session({ conversation: [opened] }));
   type(root, box()!, "still not right");
 
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
   await tick(0);
 
-  const history = shown(root);
-  assert.ok(
-    history.indexOf("Round 2") < history.indexOf("still not right"),
-    "the new turn belongs under the line for the round on screen, not the one before it",
-  );
+  assert.match(shown(root), /data-key="t2"[^>]*data-group="waiting"/);
+  assert.doesNotMatch(shown(root), /data-legacy/);
 });
 
 test("a Send & End that carried nothing adds no turn to the conversation", async (t) => {
@@ -1405,15 +1413,15 @@ test("Enter in a reply box adds the reply, as its button does; an empty one adds
   const field = replyBoxOf(root)!;
   field.value = "   ";
   root.dispatch("keydown", keydown(field, { key: "Enter" }));
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
+  assert.equal(queuedIn(root), 0);
 
   replyBoxOf(root)!.value = "per-batch";
   const event = keydown(replyBoxOf(root), { key: "Enter" });
   root.dispatch("keydown", event);
 
   assert.equal(event.defaultPrevented, true);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
-  assert.match(shown(root), /reply in t1/);
+  assert.equal(queuedIn(root), 1);
+  assert.match(shown(root), /lsr-draft[\s\S]*per-batch/, "drawn in its card, not sent yet");
 });
 
 test("a key in anything but a reply box is not a reply", (t) => {
@@ -1423,7 +1431,7 @@ test("a key in anything but a reply box is not a reply", (t) => {
   root.dispatch("keydown", keydown(root.querySelector(".lsr-thread-reply-add"), { key: "Enter" }));
   root.dispatch("keydown", keydown(new FakeNode("textarea"), { key: "Enter" }));
 
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
+  assert.equal(queuedIn(root), 0);
 });
 
 /** Every redraw replaces the scroll, and a pill queued mid-reply is the ordinary way that happens. */
@@ -1445,11 +1453,13 @@ test("resolve folds the thread at once and travels as a pill; pressed again it i
   assert.match(shown(root), /data-resolved="true"/);
   assert.match(shown(root), /resolves on your next Send/);
   assert.equal(sent.length, 0, "resolving sends nothing by itself");
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
+  assert.equal(queuedIn(root), 1);
+  assert.match(shown(root), /data-shut="true"/, "folded at the press");
 
+  root.dispatch("click", { target: root.querySelector(".lsr-thread-fold") });
   pressIn(root, ".lsr-thread-resolve");
   assert.match(shown(root), /data-resolved="false"/);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 0, "no second, opposite pill");
+  assert.equal(queuedIn(root), 0, "no second, opposite pill");
 
   pressIn(root, ".lsr-thread-resolve");
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
@@ -1465,11 +1475,13 @@ test("a resolved thread's toggle queues the reopen", (t) => {
     prompts: [{ type: "resolve", thread: "t1", resolved: true }],
   };
   const { root } = mount(t, session({ conversation: [opened, resolved] }));
+  root.dispatch("click", { target: root.querySelector(".lsr-group-toggle") });
+  root.dispatch("click", { target: root.querySelector(".lsr-thread-fold") });
 
   pressIn(root, ".lsr-thread-resolve");
 
   assert.match(shown(root), /reopens on your next Send/);
-  assert.match(shown(root), /reopen t1/);
+  assert.equal(queuedIn(root), 1);
 });
 
 /**
@@ -1532,7 +1544,7 @@ test("a stale press while the agent digests writes nothing", (t) => {
   panel.queue([annotation]);
 
   assert.deepEqual(sent, []);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
+  assert.equal(queuedIn(root), 1);
   assert.equal(panel.writesLocked(), true);
   panel.setTurn(WORKING);
   assert.equal(panel.writesLocked(), false);
@@ -1548,7 +1560,7 @@ test("while the agent works a thread reply and a resolve queue like everything e
   pressIn(root, ".lsr-thread-resolve");
 
   assert.deepEqual(sent, []);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
+  assert.equal(queuedIn(root), 2);
 });
 
 /** Replying twice in a row is the reviewer's call; the waiting line is for the agent's turn only. */
@@ -1580,7 +1592,7 @@ test("the reviewer can reply twice in a row in a thread they spoke in last", (t)
   pressIn(root, ".lsr-thread-reply-add");
 
   assert.deepEqual(sent, []);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
+  assert.equal(queuedIn(root), 2);
 });
 
 /** Only the compose row was redrawn on the status change, so the scroll kept its footers. */
@@ -1592,4 +1604,148 @@ test("a review that ends takes the thread footers with it", (t) => {
 
   assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 0);
   assert.equal(root.querySelector(".lsr-thread-waiting"), null);
+});
+
+/** The fake parses markup but keeps it only where it was assigned: the mount's, until the first redraw. */
+function drawn(root: FakeNode): string {
+  return shown(root) || root.innerHTML;
+}
+
+const settledT1: ConversationEntry = {
+  role: "reviewer",
+  at: "2025-01-01T00:04:00.000Z",
+  roundIndex: 0,
+  prompts: [{ type: "resolve", thread: "t1", resolved: true }],
+};
+
+test("a press anywhere on a card's head folds it, and the fold outlives a reload", (t) => {
+  const storage = new FakeStorage();
+  const conversation = [opened, answered];
+  const { root } = mount(t, session({ conversation }), storage);
+
+  root.dispatch("click", { target: root.querySelector(".lsr-thread-where") });
+
+  assert.match(drawn(root), /data-shut="true"/);
+  assert.deepEqual(readMemory(storage, "key").folds, { t1: { shut: true, resolved: false } });
+  const again = mount(t, session({ conversation }), storage);
+  assert.match(drawn(again.root), /data-shut="true"/);
+
+  again.root.dispatch("click", { target: again.root.querySelector(".lsr-thread-gist") });
+  assert.match(drawn(again.root), /data-shut="false"/);
+});
+
+test("the file press in a card's head jumps to the lines without folding the card", (t) => {
+  const jumps: string[] = [];
+  const line: ConversationEntry = {
+    ...opened,
+    prompts: [{ ...annotation, id: "t1", side: "new", line_start: 4, line_end: 4 }],
+  };
+  const { root } = mount(t, session({ conversation: [line] }), new FakeStorage(), (file) =>
+    jumps.push(file),
+  );
+
+  root.dispatch("click", { target: root.querySelector(".lsr-prompt-file") });
+
+  assert.deepEqual(jumps, ["src/api/users.ts"]);
+  assert.match(drawn(root), /data-shut="false"/);
+});
+
+test("folding is reading, so it stays live while the agent digests", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [opened, answered] }));
+  panel.setTurn(READING, 1);
+
+  root.dispatch("click", { target: root.querySelector(".lsr-thread-fold") });
+
+  assert.match(drawn(root), /data-shut="true"/);
+});
+
+test("a press outside any card's head folds nothing", (t) => {
+  const { root } = mount(t, session({ conversation: [opened, answered] }));
+
+  root.dispatch("click", { target: root.querySelector(".lsr-prompt-comment") });
+  root.dispatch("click", { target: root.querySelector(".lsr-thread-group") });
+
+  assert.match(drawn(root), /data-shut="false"/);
+});
+
+test("a fold press naming a card no longer drawn does nothing", (t) => {
+  const storage = new FakeStorage();
+  const { root, panel } = mount(t, session({ conversation: [opened, answered] }), storage);
+  const stale = root.querySelector(".lsr-thread-fold");
+  panel.update(session({ conversation: [] }));
+
+  root.dispatch("click", { target: stale });
+
+  assert.deepEqual(readMemory(storage, "key").folds, {});
+});
+
+test("the resolved group unfolds on its heading's press, and stays unfolded after a reload", (t) => {
+  const storage = new FakeStorage();
+  const conversation = [opened, settledT1];
+  const { root } = mount(t, session({ conversation }), storage);
+  assert.doesNotMatch(drawn(root), /data-key="t1"/);
+
+  root.dispatch("click", { target: root.querySelector(".lsr-group-toggle") });
+
+  assert.match(drawn(root), /data-key="t1"/);
+  assert.equal(readMemory(storage, "key").resolvedShown, true);
+  const again = mount(t, session({ conversation }), storage);
+  assert.match(drawn(again.root), /data-key="t1"/);
+  again.root.dispatch("click", { target: again.root.querySelector(".lsr-group-toggle") });
+  assert.doesNotMatch(drawn(again.root), /data-key="t1"/);
+});
+
+test("a card's fold chosen while resolved does not hold once the agent reopens it by answering", (t) => {
+  const storage = new FakeStorage();
+  updateMemory(storage, "key", {
+    resolvedShown: true,
+    folds: { t1: { shut: false, resolved: true } },
+  });
+  const { root, panel } = mount(t, session({ conversation: [opened, settledT1] }), storage);
+  assert.match(drawn(root), /data-shut="false"/, "unfolded, as chosen, while resolved");
+  root.dispatch("click", { target: root.querySelector(".lsr-thread-fold") });
+  assert.deepEqual(readMemory(storage, "key").folds.t1, { shut: true, resolved: true });
+
+  const reopened: ConversationEntry = { ...answered, at: "2025-01-01T00:05:00.000Z" };
+  panel.update(session({ conversation: [opened, settledT1, reopened] }));
+
+  assert.match(drawn(root), /data-shut="false"/, "open again: the fold was made while resolved");
+});
+
+test("the page is told the queue by kind, so the round offer can count replies as replies", (t) => {
+  installFakeElements((undo) => t.after(undo));
+  const tallies: unknown[] = [];
+  const root = new FakeNode();
+  const panel = mountPanel({
+    root: asPanelRoot(root),
+    key: "key",
+    session: session({ conversation: [opened, answered] }),
+    storage: new FakeStorage(),
+    onEnd: () => {},
+    onPending: (queued) => tallies.push(queued),
+    onJump: () => {},
+  });
+
+  panel.queue([annotation]);
+  replyBoxOf(root)!.value = "per-batch";
+  pressIn(root, ".lsr-thread-reply-add");
+
+  assert.deepEqual(tallies.at(-1), { comments: 1, replies: 1, resolves: 0 });
+});
+
+test("words the server holds read as unheard until the agent picks them up", (t) => {
+  const asked: ConversationEntry = { ...opened, at: "2025-01-01T00:10:00.000Z" };
+  const held = session({
+    conversation: [asked],
+    pending: asked.prompts,
+    batch: { id: "b0", prompts: [], at: "2025-01-01T00:00:30.000Z" },
+  });
+  const { root, panel } = mount(t, held);
+  assert.match(drawn(root), /data-delivery="unheard">sent · agent not listening/);
+
+  panel.setTurn({ holder: "agent", mode: "digesting", at: "2025-01-01T00:11:00.000Z" }, 1);
+
+  assert.match(drawn(root), /data-delivery="seen">✓ seen by agent/);
+  panel.update(held);
+  assert.match(drawn(root), /data-delivery="seen"/, "a stale refetch does not undo the pickup");
 });

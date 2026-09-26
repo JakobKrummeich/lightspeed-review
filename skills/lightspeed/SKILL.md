@@ -61,7 +61,7 @@ and the one command to run next.
 ## What an item says
 
 ```
-items[2]:
+items[3]:
   - id: t4
     status: new
     at: src/turn.ts:20
@@ -70,24 +70,37 @@ items[2]:
   - id: t2
     status: reply
     at: src/poll.ts:40
-    you: it retries 3x
+    outdated: anchored in round 1; that line has changed since
+    selected: retries = 3
+    thread[2]{who,said}:
+      reviewer,why 3 retries?
+      you,it retries 3x
     reviewer: and on a 503?
+  - id: t1
+    status: resolved
+    asked: rename a
+    reviewer: MAX_RETRIES please
 ```
 
 - `id` is what `--to` takes; `main` is the main chat, where your own
   top-level remarks go — each `--to main` is its own card on the page.
 - `status`: `new` (a new item), `reply` (the reviewer answered in a
-  thread; `you` is what you said last there), `resolved` or
-  `reopened`. Resolving a question means "no further questions"; resolving
-  a change request means "I agree with what you last said" — implement that
-  agreed version, it is not withdrawn. A batch holding resolves says so on a
-  `resolved:` line of `next:`. Every `--to` a line suggests names an
-  open thread; never answer into one the reviewer resolved unless you must —
-  doing so reopens it.
-- `at` is `file:line` (or `file:start-end`) in your branch; `(base)`
-  marks lines numbered in the base. `selected` quotes the reviewer's
-  selection, cut at 200 characters with a pointer to the rest.
-  General items have neither.
+  thread), `resolved` or `reopened`. `reviewer` is always what they
+  said in this batch. An open thread (`reply`, `reopened`) also brings
+  `thread`: everything said in it before, oldest first — `you` rows are
+  yours — so answer from it, not from memory. A thread resolved in this batch
+  brings only `asked` (what it was about) and any last words. A resolve
+  with words means "do what they say"; a bare one means "I accept your last
+  answer" — on a change request, make that agreed change; it is not withdrawn.
+  A batch holding resolves spells this out on a `resolved:` line of
+  `next:`. Every `--to` a line suggests names an open thread; never
+  answer into one the reviewer resolved unless you must — doing so reopens it.
+- `at` is `file:line` (or `file:start-end`) as the reviewer drew it,
+  in the round they drew it; `(base)` marks lines numbered in the base.
+  When that line reads differently in the round on show, `outdated` says
+  so — find the code by `selected` and the thread, not by the number.
+  `selected` quotes the reviewer's selection, cut at 200
+  characters with a pointer to the rest. General items have neither.
 
 ## Rules
 
@@ -99,8 +112,10 @@ items[2]:
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
   Never open another review, `end` or `--reopen` to recover.
 - Before it waits, each of the three prints what landed (`replied`, the round, or
-  `rerun: true`) closed by `next.if_killed` — that exact command; one
-  that hands back a batch you are digesting returns at once, without it. An
+  `rerun: true`) closed by `next.if_killed` — that exact command — and
+  last a top-level `url:`, the review page: give it to the reviewer
+  whenever they may not have it open. One that hands back a batch you are
+  digesting returns at once, without `if_killed`. An
   `open` or `publish` with files to group says so first, on a
   `status:` line with its own `next.if_killed`: grouping can take
   minutes. Only one wait per review: a newer one makes the older exit
