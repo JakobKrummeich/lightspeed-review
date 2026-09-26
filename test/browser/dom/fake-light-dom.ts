@@ -144,6 +144,10 @@ export class FakeTextArea extends FakeBox {
 
 export class FakeLightDocument {
   readonly body = new FakeBox("body");
+  /** Animation frames asked for so far. */
+  frames = 0;
+  /** What `prefers-reduced-motion: reduce` answers. */
+  reducedMotion = false;
 
   createElement(tag: string): FakeBox {
     return new FakeBox(tag);
@@ -155,8 +159,8 @@ export class FakeLightDocument {
 }
 
 /**
- * A document, an 800px-tall window, the textarea class and animation frames,
- * undone after the test; `setTimeout` is mocked, so a test says when a moment
+ * A document, an 800px-tall window that answers the reduced-motion query, the
+ * textarea class and animation frames, undone after the test; `setTimeout` is mocked, so a test says when a moment
  * is over and when a frame comes.
  */
 export function installLightDom(t: TestContext): FakeLightDocument {
@@ -169,10 +173,18 @@ export function installLightDom(t: TestContext): FakeLightDocument {
   };
   const page = new FakeLightDocument();
   globals.document = page;
-  globals.window = { innerHeight: 800 };
+  globals.window = {
+    innerHeight: 800,
+    matchMedia: (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)" && page.reducedMotion,
+    }),
+  };
   globals.HTMLTextAreaElement = FakeTextArea;
   // A frame is 16ms of the mocked clock.
-  globals.requestAnimationFrame = (step: () => void) => setTimeout(step, 16);
+  globals.requestAnimationFrame = (step: () => void) => {
+    page.frames += 1;
+    return setTimeout(step, 16);
+  };
   t.mock.timers.enable({ apis: ["setTimeout"] });
   t.after(() => {
     globals.document = before.document;

@@ -55,9 +55,12 @@ function pulseAt(dot: DOMRect): Record<string, string> {
 /**
  * Keeps a light on the dot for as long as it lasts: the redrawn dot often
  * stands elsewhere along the header, its words having changed. Read, then
- * written, once a frame; over when the light is.
+ * written, once a frame; over when the light is. Not at all under reduced
+ * motion, where the lights are not drawn and the page would be measured every
+ * frame for nothing.
  */
 function follow(light: HTMLElement, place: () => Record<string, string> | undefined): void {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const step = (): void => {
     if (!light.isConnected) return;
     for (const [name, value] of Object.entries(place() ?? {})) light.style.setProperty(name, value);

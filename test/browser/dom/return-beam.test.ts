@@ -134,6 +134,29 @@ test("the pulse and the beam keep to the dot the banner redrew somewhere else al
   assert.equal(beam?.style.getPropertyValue("height"), "286px");
 });
 
+test("the pulse and the beam stop following the dot once they are gone", (t) => {
+  const { document, root } = page(t);
+  returnBeam(asElement(root), ["t1"]);
+  t.mock.timers.tick(1800);
+  const frames = document.frames;
+
+  t.mock.timers.tick(1000);
+
+  assert.ok(frames > 0, "they followed the dot while they lasted");
+  assert.equal(document.frames, frames, "no frame is asked for after the moment");
+});
+
+test("under reduced motion the lights are laid but never follow the dot", (t) => {
+  // The stylesheet does not draw them there: measuring the page each frame would be for nothing.
+  const { document, root } = page(t);
+  document.reducedMotion = true;
+
+  returnBeam(asElement(root), ["t1"]);
+  t.mock.timers.tick(1800);
+
+  assert.equal(document.frames, 0);
+});
+
 test("with no dot in the header the card still arrives, without a beam", (t) => {
   const { document, dot, card, root } = page(t);
   dot.remove();
