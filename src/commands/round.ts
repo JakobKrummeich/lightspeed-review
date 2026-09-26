@@ -185,7 +185,6 @@ export function publishedRound({
       branch,
       base,
       intents,
-      url: created.url,
     },
     ledger: ledgerReport(created),
     diff: extracted.stats,

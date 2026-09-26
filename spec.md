@@ -23,7 +23,7 @@ Developer working in TUI with Pi agent:
    └─ Extracts git diff
    └─ Groups it with the configured model (lightspeed-owned prompts)
    └─ Opens browser with grouped diff view
-   └─ Prints the round (session key, url, groups), then WAITS for the
+   └─ Prints the round (session key, groups, then the url), then WAITS for the
       reviewer's first Send (help[] tells the agent to call it with no timeout
       parameter on its shell tool, never via `timeout` or `&`, and that a kill
       leaves the server and the review live). Delivery is the only thing that
@@ -134,7 +134,10 @@ if the agent is digesting, it is handed the same batch again.
 `publish` prints the round it published (or `rerun: true`), `open` prints the
 round or the re-attach — each closed by `next.if_killed`: the exact command to
 re-run if the wait is killed (`lightspeed open <branch> [base]`, no `--intent`,
-for `open`). A command that hands back a batch the agent is digesting does not
+for `open`), and then by a top-level `url:` — the review page, last because the
+agent relays what it read last, and on every such block (`reply` and a re-run
+included) so the reviewer is never left hunting for the tab the agent waits on.
+`session:` no longer carries it. A command that hands back a batch the agent is digesting does not
 wait — it returns that batch at once — so its block carries no `if_killed`. The line is pasted as printed, TOON escapes included, so a `reply`
 or `publish` whose words hold an apostrophe, a double quote, a backslash or a
 line break — none of which survives that trip — names `lightspeed open <branch>
@@ -465,7 +468,6 @@ session:
   branch: feature-auth
   base: main
   intents[1]: replace session cookies with signed tokens
-  url: "http://127.0.0.1:4388/session/a3f8c21b9e4d5f60"
 ledger:
   status: on
   path: ~/.lightspeed/feedback
@@ -482,6 +484,7 @@ groups[4]{name,files}:
 message: the review is open — give the reviewer the url; waiting for their first Send
 next:
   if_killed: "Killed or timed out? Only this command died — the server and this review stay live and hold the reviewer's Send; never open another review, end or reopen to recover. Re-run exactly this, with NO timeout parameter — it posts nothing twice: lightspeed open feature-auth main"
+url: "http://127.0.0.1:4388/session/a3f8c21b9e4d5f60"
 round: 1
 turn: agent digesting
 items[2]:
@@ -514,6 +517,7 @@ replied[2]: t1,t2
 message: replied; waiting for the reviewer's Send
 next:
   if_killed: "Killed or timed out? Only this command died — the server and this review stay live and hold the reviewer's Send; never open another review, end or reopen to recover. Re-run exactly this, with NO timeout parameter — it posts nothing twice: lightspeed reply --to t1 'one transaction already' --to t2 'billing moved to v2 last sprint, nothing calls it' feature-auth main"
+url: "http://127.0.0.1:4388/session/a3f8c21b9e4d5f60"
 round: 1
 turn: agent digesting
 items[1]{id,status,at,selected,you,reviewer}:

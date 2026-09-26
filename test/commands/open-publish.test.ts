@@ -192,8 +192,8 @@ test("open creates the session, shows the round, then waits for the first Send",
       branch: BRANCH,
       base: BASE,
       intents: INTENTS,
-      url: `http://127.0.0.1:${harness.config.port}/session/${KEY}`,
     });
+    assert.equal(shown?.url, `http://127.0.0.1:${harness.config.port}/session/${KEY}`);
     assert.equal(shown?.turn, "reviewer");
     assert.equal(shown?.round, 1);
     assert.deepEqual(shown?.diff, extractedAt(1).stats);
@@ -263,7 +263,7 @@ test("opens the review page in a browser", async () => {
   await withHarness(async (harness) => {
     await open(harness);
 
-    assert.deepEqual(harness.opened, [(harness.announced[0]?.session as { url: string }).url]);
+    assert.deepEqual(harness.opened, [harness.announced[0]?.url]);
   });
 });
 
@@ -352,7 +352,7 @@ test("before it waits, open names the command that recovers a kill: open, no int
     const [fresh, again] = harness.announced;
     assert.match(ifKilled(fresh), /`?lightspeed open feature-auth main`?$/);
     assert.match(ifKilled(again), /`?lightspeed open feature-auth main`?$/);
-    assert.equal(Object.keys(fresh!).at(-1), "next");
+    assert.equal(Object.keys(fresh!).at(-2), "next", "the recovery line, then the url");
   });
 });
 
@@ -983,7 +983,7 @@ test("before it waits, publish says the round is out and the exact command that 
 
     const [shown] = harness.announced;
     assert.equal(shown?.round, 2);
-    assert.equal(Object.keys(shown!).at(-1), "next");
+    assert.equal(Object.keys(shown!).at(-2), "next", "the recovery line, then the url");
     assert.match(
       ifKilled(shown),
       /lightspeed publish feature-auth main --intent 'sign the tokens' --intent 'drop the cookie' --to main 'done: signed'$/,
@@ -1332,6 +1332,38 @@ test("every block before a wait names the round before the turn", async () => {
     const [fresh, reattached, published, rerun] = harness.announced;
     assert.equal(rerun?.rerun, true);
     for (const block of [fresh, reattached, published, rerun]) roundBeforeTurn(block);
+  });
+});
+
+/** The address is what the agent relays; last is where it reads it, and every wait needs it. */
+function endsOnUrl(block: StructuredOutput | undefined, port: number, key = KEY): void {
+  const keys = Object.keys(block ?? {});
+  assert.equal(keys.at(-1), "url", keys.join(", "));
+  assert.equal(block?.url, `http://127.0.0.1:${port}/session/${key}`);
+  assert.equal("url" in ((block?.session as object | undefined) ?? {}), false);
+}
+
+test("every block before a wait ends on the review's url, and session no longer carries it", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    await open(harness, { intents: [] });
+    const deps: RoundDeps = { ...harness.deps, extractDiff: () => extractedAt(2) };
+    await publishNext(harness, { deps });
+    await publish(harness, { deps });
+
+    assert.equal(harness.announced.length, 4);
+    for (const block of harness.announced) endsOnUrl(block, harness.config.port);
+  });
+});
+
+test("a local publish re-run ends on the review's url too", async () => {
+  await withHarness(async (harness) => {
+    const { repoRoot, deps, key } = await publishedAtTip(harness);
+
+    await publish(harness, { repoRoot, deps });
+
+    assert.equal(harness.announced[0]?.rerun, true);
+    endsOnUrl(harness.announced[0], harness.config.port, key);
   });
 });
 

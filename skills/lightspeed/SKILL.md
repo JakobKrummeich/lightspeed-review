@@ -99,8 +99,10 @@ items[2]:
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
   Never open another review, `end` or `--reopen` to recover.
 - Before it waits, each of the three prints what landed (`replied`, the round, or
-  `rerun: true`) closed by `next.if_killed` — that exact command; one
-  that hands back a batch you are digesting returns at once, without it. An
+  `rerun: true`) closed by `next.if_killed` — that exact command — and
+  last a top-level `url:`, the review page: give it to the reviewer
+  whenever they may not have it open. One that hands back a batch you are
+  digesting returns at once, without `if_killed`. An
   `open` or `publish` with files to group says so first, on a
   `status:` line with its own `next.if_killed`: grouping can take
   minutes. Only one wait per review: a newer one makes the older exit

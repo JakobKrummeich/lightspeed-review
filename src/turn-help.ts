@@ -199,6 +199,16 @@ export function ifKilled(
   };
 }
 
+/**
+ * Every block shown before a wait ends on the review's address, at the top
+ * level: the agent relays what it read last, and an address nested in
+ * `session:` — or absent, on `reply` — was relayed stale or not at all, leaving
+ * the reviewer hunting for the tab the agent is waiting on.
+ */
+export function urlLast<T extends object>(block: T, url: string): T & { url: string } {
+  return { ...block, url };
+}
+
 export function endCall(target: string): string {
   return `lightspeed end ${target}`.trimEnd();
 }

@@ -559,7 +559,7 @@ agent works. Before it waits, every waiting command prints what landed —
 `replied: [ids]`, the round it published, or `rerun: true` — closed by
 `next.if_killed`, the exact command to re-run (re-attaching with `open` when a
 word holds an apostrophe, quote, backslash or line break, which would not paste
-as printed) — except a command handing back a batch still being digested, which
+as printed), and last a top-level `url:`, the review page to hand the reviewer — except a command handing back a batch still being digested, which
 returns at once and has no wait to recover. An `open` or `publish` with more
 than one file to group prints `status: grouping N files — can take minutes` and
 its own `next.if_killed` before the model call, so a command killed while
