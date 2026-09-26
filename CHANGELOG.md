@@ -9,7 +9,9 @@ agent's answer, each approval and the last one.
   three breathing dots.
 - Every tick sends a particle down the progress bar to the fill's new edge,
   and the fill grows once it lands. Completing a chapter flashes its segment;
-  approving the last file lights the whole bar.
+  approving the last file lights the whole bar. A tick that moves focus on to
+  the next chapter, and the survey's bulk **Approve**, play the same way. An
+  untick takes the light down and its width applies at once.
 - Every file approved opens the done card with a supernova — a point of
   light, two rings and a flare — and the ✓ settles out of it. Nothing on the
   card moves after that.
@@ -21,7 +23,8 @@ agent's answer, each approval and the last one.
   in. A card out of sight gets no beam; the dot's pulse alone says it.
 - When the turn comes back while the tab is in the background, the title
   reads `● Your turn` and the favicon pulses; both clear when the tab is seen
-  or the turn goes back to the agent. The review page now has a favicon.
+  or the turn goes back to the agent, and a review that has ended never lights
+  them. The review page now has a favicon.
 - Under `prefers-reduced-motion`, every moment shows its end state without
   movement, and the lit favicon holds still.
 - New `--lsr-light-*` tokens carry the light's colours; light scheme draws
