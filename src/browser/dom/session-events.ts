@@ -201,12 +201,14 @@ function applyRound(wired: Wired, fresh: SessionData): void {
   else if (fresh.status === "ended") page.replayReopen.hidden = true;
   // The end's own presence frame says "reviewer", and may land either side of this.
   if (fresh.status === "ended") wired.beacon.setEnded();
+  // An answer the reviewer never sees costs more than the width. Opened before
+  // the panel draws it: the draw decides from what is in sight how the answer
+  // is lit, and a folded panel has nothing in sight.
+  if (agentSpokeAgain(live.drawn.conversation, fresh.conversation)) railControl.expand();
   panel.update(fresh);
   // Whole session, not status alone: an ended review is summed over the page,
   // last send included.
   banner.setSession(fresh);
-  // An answer the reviewer never sees costs more than the width.
-  if (agentSpokeAgain(live.drawn.conversation, fresh.conversation)) railControl.expand();
   live.drawn = fresh;
 }
 

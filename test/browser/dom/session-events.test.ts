@@ -279,9 +279,10 @@ test("a reconnect onto the same round with missed talk draws it in place", async
     "panel turn reviewer",
     "beacon turn reviewer",
     "diff same-round",
+    // Opened before the draw that lights the answer, or a folded panel has no card in sight.
+    "rail expand",
     "panel 1 said",
     "banner",
-    "rail expand",
   ]);
   // The refetch speaks for the round, never for the turn: nothing after it overrules presence.
   assert.equal(live.round, 0);
