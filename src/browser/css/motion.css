@@ -58,6 +58,15 @@
     display: none;
   }
 
+  /* The survey row's arrow stays put; its label and tint still answer the pointer. */
+  .lsr-index-open > [aria-hidden="true"] {
+    transition: none;
+  }
+
+  .lsr-index-entry:is(:hover, :focus-visible) .lsr-index-open > [aria-hidden="true"] {
+    transform: none;
+  }
+
   .lsr-done-card,
   .lsr-done-mark {
     animation: none;

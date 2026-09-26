@@ -83,9 +83,10 @@ interface IndexRow {
 /**
  * Pure (assertable without a DOM). Entries are buttons, not links: they expand
  * the group too, and a fragment link would land on a collapsed heading. Plain
- * list: reading order is the reviewer's call. The lane is absent rather than
- * empty: a heading saying "0 files, nothing to decide" is a thing to read on a
- * screen built to be read in one look.
+ * list: reading order is the reviewer's call — unless there is no order to
+ * call, and then the one studied chapter is `sole` (see `renderEntry`). The
+ * lane is absent rather than empty: a heading saying "0 files, nothing to
+ * decide" is a thing to read on a screen built to be read in one look.
  *
  * The split moves nothing: `trailSweeps` (`src/group-tier.ts`) has already put
  * the swept chapters at the end of the array. Ordering here instead would
@@ -97,14 +98,15 @@ export function renderGroupIndex(groups: DiffGroup[], approved: string[]): strin
   const rows = groupIndexEntries(groups, approved).map((entry, index) => ({ entry, index }));
   const study = rows.filter(({ entry }) => !entry.sweep);
   const swept = rows.filter(({ entry }) => entry.sweep);
+  const sole = rows.length === 1 && study.length === 1;
   return `<nav class="lsr-index" aria-label="Groups in this review">
-  ${study.length === 0 ? "" : renderList(study)}
+  ${study.length === 0 ? "" : renderList(study, sole)}
   ${swept.length === 0 ? "" : renderLane(swept)}
 </nav>`;
 }
 
-function renderList(rows: IndexRow[]): string {
-  const items = rows.map(({ entry, index }) => renderEntry(entry, index)).join("\n    ");
+function renderList(rows: IndexRow[], sole = false): string {
+  const items = rows.map(({ entry, index }) => renderEntry(entry, index, sole)).join("\n    ");
   return `<ol class="lsr-index-list">
     ${items}
   </ol>`;
@@ -126,14 +128,27 @@ function renderLane(rows: IndexRow[]): string {
   </section>`;
 }
 
-function renderEntry(entry: GroupIndexEntry, index: number): string {
+/**
+ * The row ends on its way in said in words: a name over three counts, alone on
+ * the screen, read as a heading over a diff that was missing, and a reviewer
+ * facing one "All Changes" took the review for empty. The arrow is drawn for
+ * the eye only; a screen reader already hears a button.
+ *
+ * `sole` is the review with nothing to choose between — one chapter, and one
+ * to study. The survey is then only a step on the way to the diff, so the row
+ * says what it opens and its label is drawn as the screen's one primary press.
+ * A lone swept chapter is not sole: its lane's approve is that press already,
+ * and two calls on one screen would be none.
+ */
+function renderEntry(entry: GroupIndexEntry, index: number, sole: boolean): string {
   return `<li class="lsr-index-item">
-      <button type="button" class="lsr-index-entry" data-group-index="${index}">
+      <button type="button" class="lsr-index-entry" data-group-index="${index}"${sole ? " data-sole" : ""}>
         <span class="lsr-index-name">${escapeHtml(entry.name)}</span>
         <span class="lsr-index-files">${indexFilesLabel(entry)}</span>
         <span class="lsr-index-lines">${linesLabel(entry.insertions, entry.deletions)}</span>
         <span class="lsr-index-counter">${indexCounterLabel(entry)}</span>
         <span class="lsr-index-logic"${entry.densestLogic ? "" : " hidden"}>${LOGIC_BADGE_LABEL}</span>
+        <span class="lsr-index-open">${sole ? "Open the chapter" : "Open"}<span aria-hidden="true">→</span></span>
       </button>
     </li>`;
 }

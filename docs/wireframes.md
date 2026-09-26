@@ -97,20 +97,20 @@ round: the reasons are read once and the survey is returned to many times.
 │                                                              │
 │  ┌─ nav.lsr-index ────────────────────────────────────────┐  │
 │  │ ┌─ button.lsr-index-entry ───────────────────────────┐ │  │
-│  │ │ Chapter name     3 files   +120 −8    1/3 approved │ │  │
+│  │ │ Chapter name   3 files +120 −8  1/3 approved Open →│ │  │
 │  │ │ [Densest logic]                                    │ │  │
 │  │ └────────────────────────────────────────────────────┘ │  │
 │  │ ┌────────────────────────────────────────────────────┐ │  │
-│  │ │ Another chapter  2 files   +40 −2     0/2 approved │ │  │
+│  │ │ Another chapter 2 files +40 −2  0/2 approved Open →│ │  │
 │  │ └────────────────────────────────────────────────────┘ │  │
 │  │ ──────────────────────────────────────────────────────  │
 │  │ ┌─ section.lsr-sweep ────────────────────────────────┐ │  │
 │  │ │ Mechanical — 27 files, nothing to decide           │ │  │ .lsr-sweep-heading
 │  │ │ ┌────────────────────────────────────────────────┐ │ │  │
-│  │ │ │ Renamed modules 25 files  +0 −0   0/25 approved│ │ │  │ .lsr-index-entry
+│  │ │ │ Renamed modules 25 files +0 −0 0/25 appr. Open →│ │ │  │ .lsr-index-entry
 │  │ │ └────────────────────────────────────────────────┘ │ │  │
 │  │ │ ┌────────────────────────────────────────────────┐ │ │  │
-│  │ │ │ Docs             2 files  +40 −2   0/2 approved│ │ │  │
+│  │ │ │ Docs            2 files +40 −2  0/2 appr. Open →│ │ │  │
 │  │ │ └────────────────────────────────────────────────┘ │ │  │
 │  │ │ ( Approve 27 files )                               │ │  │ .lsr-sweep-approve
 │  │ └────────────────────────────────────────────────────┘ │  │
@@ -130,8 +130,19 @@ alike; `dom/intent-mount.ts` delegates the press from the section, because
 
 Classes per entry: `.lsr-index-name` `.lsr-index-files` `.lsr-index-lines`
 `.lsr-index-counter` `.lsr-index-logic` (badge, densest chapter only, and never
-a chapter in the sweep lane). The whole
-row is one button → enters focus mode. **A row says how big a chapter is, never
+a chapter in the sweep lane) `.lsr-index-open` (the row's way in, `Open →`, the
+arrow `aria-hidden`). The whole row is one button → enters focus mode; it is a
+card on the surface tone, painted by `css/survey.css`, with a tint under the
+pointer and a focus ring. A review of one chapter to study marks its row
+`data-sole` and draws the label as a primary button, `Open the chapter →`:
+
+```
+┌─ button.lsr-index-entry[data-sole] ──────────────────────────────┐
+│ All Changes    1 file  +5 −1  0/1 approved  [Open the chapter →] │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**A row says how big a chapter is, never
 what it is for**: the rationale is said once, at full size, on the chapter's own
 gate (§4) — a clamped grey copy of it here was a line nobody read.
 

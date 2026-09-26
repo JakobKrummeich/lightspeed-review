@@ -1416,6 +1416,16 @@ function press(page: Mounted, selector: string): void {
   page.root.dispatch("click", { target });
 }
 
+test("pressing an entry's Open label opens its chapter, as the row around it does", (t) => {
+  // The label is the row's affordance, not a second control: a press on it is a press on the row.
+  const page = mount(t, [group("All Changes", ["a.png"])]);
+
+  press(page, ".lsr-index-open");
+
+  assert.ok(page.root.querySelector(".lsr-focus-bar"), "the chapter is open");
+  assert.equal(page.root.querySelector(".lsr-index"), null);
+});
+
 test("pressing an index entry focuses that chapter and nothing else is rendered", (t) => {
   const page = mount(t, [group("API", ["a.png"]), group("Docs", ["b.png"])]);
 

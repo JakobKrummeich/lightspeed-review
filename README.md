@@ -789,9 +789,11 @@ A ledger failure never fails a review: it is reported as
   wrapper opens once per review, never on a later round, never on a round that
   stated no reason, and never on a review that has ended.
 - The page opens on the survey and nothing else: what the change is for, and
-  under it the chapters the model grouped the diff into. No diff is drawn
-  there. Pressing a chapter opens it alone, and that is where the lines are
-  read.
+  under it the chapters the model grouped the diff into, each a card ending in
+  **Open →**. No diff is drawn there. Pressing a chapter (or Tab to it and
+  Enter) opens it alone, and that is where the lines are read. A review of one
+  chapter says so with a single **Open the chapter →** button, so it never
+  reads as an empty heading.
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
