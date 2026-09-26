@@ -221,10 +221,12 @@ the command line is wrong, or the move is wrong for the review's state
 `ambiguous_session`). Exit 1 when the machine got in the way — the server, git,
 the model, the config — and the same command may work once that is fixed. Every
 server-gone failure (`server_not_running`, `server_unreachable`, a 503 mid-wait)
-with a review of the target on disk names `lightspeed open <branch> [base]`,
+with a live review of the target on disk names `lightspeed open <branch> [base]`,
 which restarts the server and re-attaches. `server_not_running` with no review
 of the target on disk has nothing to re-attach to, so it names the fresh open
-`lightspeed open <branch> [base] --intent '<why this branch exists>'` instead.
+`lightspeed open <branch> [base] --intent '<why this branch exists>'` instead;
+with an ended one on disk the command is refused `session_ended`, naming who
+ended it, exactly as a running server would refuse it.
 
 ### Threads and items
 
