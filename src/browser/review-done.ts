@@ -9,6 +9,7 @@
 export function renderReviewDone(queued: number, sendsQueue = true): string {
   return `<div class="lsr-done-overlay">
   <div class="lsr-done-card" role="dialog" aria-modal="true" aria-label="Every file is approved">
+    <span class="lsr-done-nova" aria-hidden="true"><i class="lsr-done-point"></i><i class="lsr-done-ring"></i><i class="lsr-done-ring"></i><i class="lsr-done-flare"></i></span>
     <span class="lsr-done-mark" aria-hidden="true">✓</span>
     <p class="lsr-done-eyebrow">Nothing left to read</p>
     <h2 class="lsr-done-title">Every file is approved</h2>
