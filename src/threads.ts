@@ -116,6 +116,24 @@ export function nextThreadId(prompts: FeedbackPrompt[]): string {
   return `t${Math.max(0, ...taken) + 1}`;
 }
 
+/**
+ * Every new item opens a thread: `t1`, `t2`… in the order they were sent.
+ * Shared by the server, which names them for good, and the page's echo of a
+ * Send, which must name them alike or its words would draw as id-less history.
+ */
+export function withThreadIds(
+  known: readonly FeedbackPrompt[],
+  prompts: readonly FeedbackPrompt[],
+): FeedbackPrompt[] {
+  let taken = [...known];
+  return prompts.map((prompt) => {
+    if (prompt.type !== "annotation" && prompt.type !== "message") return prompt;
+    const named = { ...prompt, id: nextThreadId(taken) };
+    taken = [...taken, named];
+    return named;
+  });
+}
+
 /** Every id a reply may name: each item's thread, and `main`. */
 export function threadIds(prompts: FeedbackPrompt[]): Set<string> {
   const ids = new Set<string>([MAIN_THREAD]);

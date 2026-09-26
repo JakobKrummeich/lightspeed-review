@@ -5,7 +5,6 @@ import {
   renderCompose,
   renderPanel,
   renderScroll,
-  sendIsLocked,
   writesLocked,
   type PanelState,
 } from "../conversation-panel.ts";
@@ -14,20 +13,27 @@ import { sameTurn } from "../agent-presence.ts";
 import { submitsOnEnter } from "./enter-key.ts";
 import type { LinePlace } from "./line-numbers.ts";
 import { atBottom, placeOn, toBottom } from "./panel-dom.ts";
-import { composeFrozen, lockControls, type ComposeView } from "./panel-lock.ts";
+import { composeFrozen, lockControls, sayNotSent, type ComposeView } from "./panel-lock.ts";
 import {
   clearGeneralComment,
   deliver,
   echoSent,
   generalCommentBox,
+  onTheWire,
   replyBox,
   replyBoxes,
   restoreReplies,
   typedReplies,
-  withGeneralComment,
 } from "./panel-wire.ts";
 import { stampPills, tallyOf, type QueueTally } from "../queued-pill.ts";
-import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
+import {
+  readMemory,
+  updateMemory,
+  type ReviewMemory,
+  type ReviewMemoryStorage,
+} from "../review-memory.ts";
+import { deliveryFacts, handedOnTurn } from "../delivery.ts";
+import { foldPress, groupPress } from "./panel-folds.ts";
 import { saveLater } from "./save-later.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
@@ -78,7 +84,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
   const { root, key, session, storage } = options;
   // Restored before the first draw, so pills are simply there.
   const remembered = readMemory(storage, key);
-  const state = openingState(session, remembered.pending);
+  const state = openingState(session, remembered);
   root.innerHTML = renderPanel(state);
   const view: PanelView = {
     options,
@@ -124,6 +130,8 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     update(fresh: SessionData) {
       state.conversation = fresh.conversation;
       state.rounds = fresh.rounds;
+      // Against the turn the page already has: a presence event can outrun the refetch.
+      state.delivery = handedOnTurn(deliveryFacts(fresh), state.turn);
       // Status first: the thread foot is drawn from it, and a review that just
       // ended must not keep a Reply the draw below would otherwise leave behind.
       setStatus(view, fresh.status);
@@ -137,6 +145,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     setTurn(turn: Turn, items?: number) {
       if (sameTurn(turn, state.turn) && items === state.items) return;
       state.turn = turn;
+      state.delivery = handedOnTurn(state.delivery, turn);
       if (items === undefined) delete state.items;
       else state.items = items;
       // Full redraw for one line at the foot: `draw` follows the panel to the
@@ -158,14 +167,17 @@ export function mountPanel(options: PanelOptions): MountedPanel {
  * SSE: a reload must show the turn the server already has written down, not a
  * Send that turns into Queue one round trip later.
  */
-function openingState(session: SessionData, pending: PanelState["pending"]): PanelState {
+function openingState(session: SessionData, remembered: ReviewMemory): PanelState {
   return {
-    pending,
+    pending: remembered.pending,
     conversation: session.conversation,
     rounds: session.rounds,
     status: session.status,
     allApproved: false,
     ...presenceOf(session),
+    delivery: deliveryFacts(session),
+    folds: remembered.folds,
+    resolvedShown: remembered.resolvedShown,
   };
 }
 
@@ -267,16 +279,25 @@ function drawNote(view: PanelView): void {
 function handleClick(view: PanelView, event: Event): void {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
+  if (controlPress(view, target)) return;
+  // Last: anywhere on a card's head folds it, but its own presses act instead.
+  if (groupPress(view, target) || foldPress(view, target)) draw(view);
+}
+
+/** Every press that is not a fold; true when the press was one of them. */
+function controlPress(view: PanelView, target: HTMLElement): boolean {
   if (target.classList.contains("lsr-prompt-file")) {
     jumpPress(view, target);
-    return;
+    return true;
   }
-  if (threadPress(view, target) || pillPress(view, target)) return;
-  if (target.id === "lsr-send") {
-    press(view);
-    return;
-  }
-  if (target.id === "lsr-send-end") void send(view, true);
+  return threadPress(view, target) || pillPress(view, target) || composePress(view, target);
+}
+
+function composePress(view: PanelView, target: HTMLElement): boolean {
+  if (target.id === "lsr-send") press(view);
+  else if (target.id === "lsr-send-end") void send(view, true);
+  else return false;
+  return true;
 }
 
 /** Taking a pill back writes to the queue, so it is locked with the rest. */
@@ -367,7 +388,7 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   const { options, state } = view;
   // One press at a time: a second mid-wire would send the same prompts twice.
   if (view.sending) return;
-  const prompts = onTheWire(view, ended);
+  const prompts = onTheWire(view.state, options.root, ended);
   if (prompts === undefined) return;
   // Conversation before the send, so the echo below can tell whether it is
   // still the one it was written for.
@@ -403,30 +424,7 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   if (ended) options.onEnd(prompts);
 }
 
-/**
- * Everything stays where it was — pills, box, reply boxes — and the note says
- * why, in the live region the compose row already has.
- */
-function sayNotSent(view: PanelView, why: string): void {
-  const note = view.composeHost?.querySelector(".lsr-complete");
-  if (note) note.textContent = `Not sent — ${why}`;
-}
-
 function setSending(view: PanelView, sending: boolean): void {
   view.sending = sending;
   lockControls(view);
-}
-
-/**
- * Ending is never gated and sending always is, so a locked end is exactly what
- * the button says: it ends, and the queue stays queued rather than going out on
- * somebody else's turn. An unlocked send is only ever about prompts — with none
- * there is no send — while an end may carry nothing at all, which is the happy
- * path of a review where everything was approved.
- */
-function onTheWire(view: PanelView, ended: boolean): FeedbackPrompt[] | undefined {
-  const locked = sendIsLocked(view.state);
-  if (locked && !ended) return undefined;
-  const prompts = locked ? [] : withGeneralComment(view.options.root, view.state.pending);
-  return prompts.length === 0 && !ended ? undefined : prompts;
 }

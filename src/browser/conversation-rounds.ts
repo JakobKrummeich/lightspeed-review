@@ -1,4 +1,4 @@
-import type { ConversationEntry, RoundMark } from "../session-store.ts";
+import type { RoundMark } from "../session-store.ts";
 
 /** Anything said at a moment, possibly stamped with the round it was said in. */
 export interface Placed {
@@ -6,55 +6,12 @@ export interface Placed {
   roundIndex?: number;
 }
 
-export interface RoundSegment<T extends Placed = ConversationEntry> {
-  round: number;
-  current: boolean;
-  entries: T[];
-}
-
 /**
- * Silent rounds get no segment, except the round on screen: an empty divider
- * there is exactly the news that everything above it is older than what the
- * reviewer sees.
- */
-export function roundSegments<T extends Placed>(
-  conversation: readonly T[],
-  rounds: readonly RoundMark[],
-): RoundSegment<T>[] {
-  if (conversation.length === 0) return [];
-  const current = currentRound(rounds);
-  const segments = grouped(conversation, rounds, current);
-  if (segments.at(-1)?.current !== true) {
-    segments.push({ round: current, current: true, entries: [] });
-  }
-  return segments;
-}
-
-/**
- * Exported because several places ask this (diff, pill stamps, live segment)
+ * Exported because several places ask this (diff, pill stamps, the panel)
  * and two readings must not disagree.
  */
 export function currentRound(rounds: readonly RoundMark[]): number {
   return rounds.at(-1)?.index ?? 0;
-}
-
-/**
- * Grouped by adjacency, not by key: shown in said order, and a clock that
- * stepped backwards must not reorder it.
- */
-function grouped<T extends Placed>(
-  conversation: readonly T[],
-  rounds: readonly RoundMark[],
-  current: number,
-): RoundSegment<T>[] {
-  const segments: RoundSegment<T>[] = [];
-  for (const entry of conversation) {
-    const round = roundOf(entry, rounds);
-    const open = segments.at(-1);
-    if (open !== undefined && open.round === round) open.entries.push(entry);
-    else segments.push({ round, current: round === current, entries: [entry] });
-  }
-  return segments;
 }
 
 /**

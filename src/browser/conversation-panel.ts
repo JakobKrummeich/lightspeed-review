@@ -1,17 +1,11 @@
 import { escapeHtml } from "../escape-html.ts";
-import { currentRound, roundSegments, type RoundSegment } from "./conversation-rounds.ts";
+import { currentRound } from "./conversation-rounds.ts";
 import { agentTurnText } from "./turn-words.ts";
-import { renderThreadFoot } from "./thread-foot.ts";
-import { stalePillRound, type QueuedPill } from "./queued-pill.ts";
-import { MAIN_THREAD, threadsOf, type Thread, type ThreadMessage } from "../threads.ts";
-import type {
-  ConversationEntry,
-  AnnotationPrompt,
-  FeedbackPrompt,
-  RoundMark,
-  SessionStatus,
-  Turn,
-} from "../session-store.ts";
+import type { QueuedPill } from "./queued-pill.ts";
+import type { DeliveryFacts } from "./delivery.ts";
+import type { ThreadFold } from "./review-memory.ts";
+import { renderDrafts, renderGroups, type ColumnState } from "./thread-cards.ts";
+import type { ConversationEntry, RoundMark, SessionStatus, Turn } from "../session-store.ts";
 
 export interface PanelState {
   pending: QueuedPill[];
@@ -24,6 +18,11 @@ export interface PanelState {
   turn: Turn;
   /** How many items the agent is reading; only while it digests. */
   items?: number;
+  /** How far the reviewer's sent words got: held by the server, or picked up. */
+  delivery: DeliveryFacts;
+  /** The reviewer's own card folds, remembered per review. */
+  folds: Record<string, ThreadFold>;
+  resolvedShown: boolean;
 }
 
 export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
@@ -120,18 +119,40 @@ export function renderPanel(state: PanelState): string {
 
 /**
  * One scroll container for conversation and queue, so the compose box stays
- * pinned: a long conversation must not push send out of reach.
+ * pinned: a long conversation must not push send out of reach. New unsent
+ * comments sit just above the box they were typed near; the tray under them
+ * only counts what goes out on the next Send.
  */
 export function renderScroll(state: PanelState): string {
-  const current = currentRound(state.rounds);
+  const column = columnOf(state);
   return `
   <section class="lsr-conversation">
-  ${renderConversation(state)}${renderTurnLine(state)}
+  ${renderGroups(column)}${renderTurnLine(state)}
   </section>
+  ${renderDrafts(column)}
   <section class="lsr-queue">
-  ${state.pending.length === 0 ? `<p class="lsr-empty">${emptyTray(state)}</p>` : state.pending.map((pill, index) => renderPill(pill, index, current)).join("\n  ")}
+  ${state.pending.length === 0 ? `<p class="lsr-empty">${emptyTray(state)}</p>` : queueCount(state.pending.length)}
   </section>
 `;
+}
+
+function columnOf(state: PanelState): ColumnState {
+  return {
+    conversation: state.conversation,
+    pending: state.pending,
+    mode: composeMode(state),
+    status: state.status,
+    round: currentRound(state.rounds),
+    delivery: state.delivery,
+    folds: state.folds,
+    resolvedShown: state.resolvedShown,
+  };
+}
+
+/** The pills themselves are drawn where they will land; this only counts them. */
+function queueCount(queued: number): string {
+  const rest = queued === 1 ? "it goes" : "they go";
+  return `<p class="lsr-queue-count">${queued} not sent yet · ${rest} out with your next Send</p>`;
 }
 
 /**
@@ -202,214 +223,4 @@ function renderTurnLine(state: PanelState): string {
     <span class="lsr-working-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     ${escapeHtml(agentTurnText(state.turn, state.items))}
   </p>`;
-}
-
-/**
- * Threads, not a stream: every item the reviewer sent is a card with its whole
- * exchange stacked under it, oldest first, and a reply box at the foot. Placed
- * by the round the item opened in, so a thread stays where it was read. A
- * conversation that never crossed a round boundary gets no round rule: one
- * label over everything is furniture.
- */
-function renderConversation(state: PanelState): string {
-  const segments = roundSegments(cardsOf(state), state.rounds);
-  const ruled = segments.length > 1;
-  const pending = pendingResolves(state.pending);
-  const mode = composeMode(state);
-  const parts: string[] = [];
-  for (const segment of segments) {
-    if (ruled) parts.push(renderRoundMark(segment));
-    for (const card of segment.entries) {
-      parts.push(renderThread(card, segment, pending.get(card.id), mode));
-    }
-  }
-  return parts.join("\n  ");
-}
-
-/** A thread as the panel draws it: `main` split into one card per post. */
-interface Card extends Thread {
-  /** The agent has spoken in it since the reviewer's last Send. */
-  fresh: boolean;
-  main: boolean;
-}
-
-/**
- * Threads stay where they opened, but a thread the agent spoke in since the
- * reviewer's last Send is news: left in place, an answer in an old thread sat
- * rounds above the fold. Those move to the foot of the current round, latest
- * activity last, as a chat reads. Each `main` post is its own card — one
- * ever-growing card read as one old thread.
- */
-function cardsOf(state: PanelState): Card[] {
-  const lastSend = state.conversation.findLast((entry) => entry.role === "reviewer")?.at ?? "";
-  const cards = threadsOf(state.conversation)
-    .flatMap(splitMain)
-    .map((thread) => ({
-      ...thread,
-      // Legacy words are history from before 3.0: never news, whatever their stamp.
-      fresh:
-        thread.legacy !== true &&
-        thread.messages.some((said) => said.role === "agent" && said.at > lastSend),
-    }));
-  // Stable, so threads opened in one moment keep the order they were sent in.
-  const settled = cards.filter((card) => !card.fresh).sort((a, b) => order(a.at, b.at));
-  const current = currentRound(state.rounds);
-  const news = cards
-    .filter((card) => card.fresh)
-    .map((card) => ({ ...card, at: latestOf(card), roundIndex: current }))
-    .sort((a, b) => order(a.at, b.at));
-  return [...settled, ...news];
-}
-
-function splitMain(thread: Thread): Omit<Card, "fresh">[] {
-  if (thread.id !== MAIN_THREAD) return [{ ...thread, main: false }];
-  return thread.messages.map((said) => ({
-    ...thread,
-    messages: [said],
-    at: said.at,
-    ...(said.roundIndex === undefined ? {} : { roundIndex: said.roundIndex }),
-    main: true,
-  }));
-}
-
-function latestOf(thread: Thread): string {
-  return thread.messages.reduce((latest, said) => (said.at > latest ? said.at : latest), thread.at);
-}
-
-function order(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-/**
- * A resolve is queued like any pill and travels with the next Send, but the
- * thread folds at the press: tidying the overview is what the toggle is for.
- * The last queued toggle per thread wins.
- */
-function pendingResolves(pending: readonly QueuedPill[]): Map<string, boolean> {
-  const resolves = new Map<string, boolean>();
-  for (const pill of pending) if (pill.type === "resolve") resolves.set(pill.thread, pill.resolved);
-  return resolves;
-}
-
-function renderRoundMark(segment: RoundSegment<Card>): string {
-  // Escaped: comes from a session file, which may be hand-edited.
-  const name = escapeHtml(`Round ${segment.round + 1}`);
-  const note = segment.current ? "reviewing now" : "earlier round";
-  return `<div class="lsr-round-mark" data-round-state="${roundState(segment)}" role="separator" aria-label="${name}, ${note}">
-    <span class="lsr-round-name">${name}</span>
-    <span class="lsr-round-note">${note}</span>
-  </div>`;
-}
-
-/** The two states the stylesheet knows, as a type rather than a convention. */
-function roundState(segment: RoundSegment<Card>): "current" | "earlier" {
-  return segment.current ? "current" : "earlier";
-}
-
-/**
- * Resolved folds the whole thread to its head, which keeps the item's words as
- * a one-line summary so the fold still says which thread it is.
- */
-function renderThread(
-  card: Card,
-  segment: RoundSegment<Card>,
-  queued: boolean | undefined,
-  mode: ComposeMode,
-): string {
-  const resolved = queued ?? card.resolved;
-  const body = resolved ? "" : `\n    ${renderThreadBody(card)}`;
-  return `<article class="lsr-thread" data-round-state="${roundState(segment)}" data-resolved="${resolved}"${card.fresh ? ` data-new="true"` : ""}${card.legacy ? ` data-legacy="true"` : ""}>
-    ${renderThreadHead(card, resolved, queued !== undefined)}${body}${renderThreadFoot(card, resolved, mode)}
-  </article>`;
-}
-
-function renderThreadHead(card: Card, resolved: boolean, queued: boolean): string {
-  const file = card.item?.type === "annotation" ? renderFilePress(card.item) : "";
-  const summary = resolved
-    ? `<p class="lsr-thread-summary">${escapeHtml(threadSummary(card))}</p>`
-    : "";
-  if (card.legacy) return `<header class="lsr-thread-head">${file}</header>${summary}`;
-  const id = escapeHtml(card.id);
-  return `<header class="lsr-thread-head"><span class="lsr-thread-id">${id}</span>${newMark(card)}${file}${queuedMark(resolved, queued)}</header>${summary}`;
-}
-
-function newMark(card: Card): string {
-  return card.fresh ? `<span class="lsr-thread-new">new</span>` : "";
-}
-
-function queuedMark(resolved: boolean, queued: boolean): string {
-  if (!queued) return "";
-  return `<span class="lsr-thread-queued">${resolved ? "resolves" : "reopens"} on your next Send</span>`;
-}
-
-function threadSummary(thread: Thread): string {
-  return thread.messages[0]?.comment ?? "the agent's own messages";
-}
-
-/**
- * Each message its own block, never nested deeper: you → agent → you… for as
- * many turns as it takes. What the reviewer can do next is the foot's.
- */
-function renderThreadBody(card: Card): string {
-  const selection =
-    card.item?.type === "annotation"
-      ? `<pre class="lsr-prompt-selection">${escapeHtml(card.item.selected_text)}</pre>\n    `
-      : "";
-  return `${selection}${card.messages.map(renderMessage).join("\n    ")}`;
-}
-
-function renderMessage(message: ThreadMessage): string {
-  const who = message.role === "reviewer" ? "you" : "agent";
-  return `<div class="lsr-message" data-role="${message.role}">
-      <p class="lsr-message-role">${who}</p>
-      <p class="lsr-prompt-comment">${escapeHtml(message.comment)}</p>
-    </div>`;
-}
-
-function renderPill(pill: QueuedPill, index: number, current: number): string {
-  return `<div class="lsr-pill">
-    ${renderStaleBadge(pill, current)}${renderPillThread(pill)}${renderPromptBody(pill)}
-    <button type="button" class="lsr-pill-remove" data-index="${index}" title="Remove">×</button>
-  </div>`;
-}
-
-/** A reply in the tray names the thread it goes to; the card it will land under is elsewhere. */
-function renderPillThread(pill: QueuedPill): string {
-  if (pill.type !== "reply") return "";
-  return `<span class="lsr-pill-thread">${escapeHtml(`reply in ${pill.thread}`)}</span>\n    `;
-}
-
-/** No stamp, no badge: absence is not a claim. */
-function renderStaleBadge(pill: QueuedPill, current: number): string {
-  const stale = stalePillRound(pill, current);
-  if (stale === undefined) return "";
-  // Escaped: comes from `localStorage`, which may be hand-edited.
-  const name = escapeHtml(`round ${stale + 1}`);
-  const why = escapeHtml(
-    `Queued in round ${stale + 1} — the diff has changed since, so its lines may not line up.`,
-  );
-  return `<span class="lsr-pill-round" role="note" title="${why}" aria-label="${why}">${name}</span>\n    `;
-}
-
-function renderPromptBody(prompt: FeedbackPrompt): string {
-  if (prompt.type === "resolve") {
-    return `<p class="lsr-prompt-comment">${escapeHtml(`${prompt.resolved ? "resolve" : "reopen"} ${prompt.thread}`)}</p>`;
-  }
-  const comment = `<p class="lsr-prompt-comment">${escapeHtml(prompt.comment)}</p>`;
-  if (prompt.type !== "annotation") return comment;
-  return `${renderFilePress(prompt)}
-    <pre class="lsr-prompt-selection">${escapeHtml(prompt.selected_text)}</pre>
-    ${comment}`;
-}
-
-/**
- * Basename only; full path in the tooltip — every comment paying the path's
- * width glued the card into one block. Without an anchor the press still opens the file.
- */
-function renderFilePress(prompt: AnnotationPrompt): string {
-  const path = escapeHtml(prompt.file);
-  const anchor =
-    prompt.side === undefined ? "" : ` data-side="${prompt.side}" data-line="${prompt.line_start}"`;
-  const name = escapeHtml(prompt.file.split("/").at(-1) ?? prompt.file);
-  return `<button type="button" class="lsr-prompt-file" data-file="${path}"${anchor} title="${path}">${name}</button>`;
 }

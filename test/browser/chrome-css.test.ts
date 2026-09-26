@@ -437,27 +437,6 @@ test("dimming never stacks: one faded card, not a faded file inside a faded grou
   assert.match(files[0] ?? "", /opacity: 1;/);
 });
 
-test("regression guard: the round's line keeps the three properties that pin it", () => {
-  // Legibility was judged in a browser; this pins the three declarations that judgement rests on.
-  const mark = rulesFor(".lsr-round-mark").join("");
-  assert.match(mark, /position: sticky;/);
-  assert.match(mark, /top: 0;/);
-  assert.match(mark, /background: var\(--lsr-surface\);/);
-});
-
-test("an earlier round keeps its bubbles: history is neither flattened nor faded", () => {
-  // Old entries keep contrast (reviewer scrolled up to read them); opacity is barred because it
-  // multiplies down the tree, and a flat card would take the agent's grey bubble off the page.
-  const faded = [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
-    .filter(
-      ([, list, body]) =>
-        /\.lsr-(thread|message)[^,{]*data-round-state="earlier"/.test(list ?? "") &&
-        /background|opacity/.test(body ?? ""),
-    )
-    .map(([, list]) => list?.trim());
-  assert.deepEqual(faded, [], "a rule takes an earlier round's bubble away");
-});
-
 test("each voice of the sidechat is one hue, worn on its label, with no stripe down the card", () => {
   // The agent keeps the accent it has everywhere else on the page; the reviewer the violet of
   // the replay. The bubble is the glance and the label the word, for whoever cannot tell the

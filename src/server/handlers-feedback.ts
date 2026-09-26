@@ -7,7 +7,7 @@ import { withAgentReplies, withFeedback, type FeedbackRequest } from "../feedbac
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
 import type { AgentTurn, FeedbackPrompt, SessionRecord } from "../session-types.ts";
-import { nextThreadId } from "../threads.ts";
+import { withThreadIds } from "../threads.ts";
 import { turnFacts } from "../turn.ts";
 import { handbackOf, isRerun, withHandback } from "../turn-moves.ts";
 import { requireSession, type ServerContext } from "./context.ts";
@@ -68,7 +68,7 @@ export async function handleFeedback(
   }
   // Ids minted here, where the whole conversation is known: they must be
   // short and unique for the session's life, and exist with the ledger off.
-  const prompts = withThreadIds(session, feedback.prompts);
+  const prompts = withThreadIds(everyPrompt(session), feedback.prompts);
   const unknown = unknownTargets(session, prompts);
   if (unknown.length > 0) {
     sendJson(response, 422, unknownThreads(session, unknown, knownThreads(session)));
@@ -122,17 +122,6 @@ function wordsOnEnd(): DomainErrorBody {
       "End without Sending ends the review now; to have them read, wait for the agent to hand back",
     ],
   };
-}
-
-/** Every new item opens a thread: `t1`, `t2`… in the order they were sent. */
-function withThreadIds(session: SessionRecord, prompts: FeedbackPrompt[]): FeedbackPrompt[] {
-  let known = everyPrompt(session);
-  return prompts.map((prompt) => {
-    if (prompt.type !== "annotation" && prompt.type !== "message") return prompt;
-    const named = { ...prompt, id: nextThreadId(known) };
-    known = [...known, named];
-    return named;
-  });
 }
 
 /** Replies and resolves may name only threads that exist, this Send's new ones included. */

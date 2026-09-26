@@ -2,10 +2,11 @@
  * Separate from the mount because none of it knows anything about the mount:
  * give it a root and prompts, and it works.
  */
-import type { PanelState } from "../conversation-panel.ts";
+import { sendIsLocked, type PanelState } from "../conversation-panel.ts";
 import { currentRound } from "../conversation-rounds.ts";
 import { unstampedPill } from "../queued-pill.ts";
 import type { ConversationEntry, FeedbackPrompt } from "../../session-store.ts";
+import { withThreadIds } from "../../threads.ts";
 import { sendFeedback } from "./session-api.ts";
 
 /**
@@ -28,7 +29,11 @@ export function echoSent(
       role: "reviewer",
       at: new Date().toISOString(),
       roundIndex: currentRound(state.rounds),
-      prompts,
+      // Named as the server will name them: an id-less item draws as history.
+      prompts: withThreadIds(
+        state.conversation.flatMap((entry) => entry.prompts),
+        prompts,
+      ),
     },
   ];
 }
@@ -100,4 +105,22 @@ export function withGeneralComment(
 export function clearGeneralComment(root: HTMLElement): void {
   const box = generalCommentBox(root);
   if (box) box.value = "";
+}
+
+/**
+ * Ending is never gated and sending always is, so a locked end is exactly what
+ * the button says: it ends, and the queue stays queued rather than going out on
+ * somebody else's turn. An unlocked send is only ever about prompts — with none
+ * there is no send — while an end may carry nothing at all, which is the happy
+ * path of a review where everything was approved.
+ */
+export function onTheWire(
+  state: PanelState,
+  root: HTMLElement,
+  ended: boolean,
+): FeedbackPrompt[] | undefined {
+  const locked = sendIsLocked(state);
+  if (locked && !ended) return undefined;
+  const prompts = locked ? [] : withGeneralComment(root, state.pending);
+  return prompts.length === 0 && !ended ? undefined : prompts;
 }
