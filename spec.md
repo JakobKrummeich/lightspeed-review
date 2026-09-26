@@ -70,7 +70,7 @@ Developer working in TUI with Pi agent:
 | #   | Principle                          | Implementation                                                                                                                                     |
 | --- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **Token-efficient output**         | All CLI output in TOON via `axi-sdk-js` — except `skill`, whose stdout is the markdown document itself; its errors stay TOON                       |
-| 2   | **Minimal default schemas**        | Session list: `{branch, base, turn, round, pending}` — 5 fields; `--all` widens it to every repository                                             |
+| 2   | **Minimal default schemas**        | Session list: `{branch, base, round, turn, pending}` — 5 fields; `--all` widens it to every repository                                             |
 | 3   | **Content truncation**             | The CLI never prints the diff — the browser shows it. `approvals` lists the first 50 paths of each list, `--full` for every one                    |
 | 4   | **Pre-computed aggregates**        | `total_files`, `total_groups`, `files_changed`, `insertions`, `deletions`, `pending_prompts` inline                                                |
 | 5   | **Definitive empty states**        | `sessions: 0` + explicit `no active sessions` message, never silent empty                                                                          |
@@ -443,7 +443,7 @@ help[1]: "Run `lightspeed open <branch> [base] --intent '<why this branch exists
 ### open (the round, then the first batch)
 
 `open` prints two TOON documents, each led by `round:` — the round it opened,
-before the wait, and the batch that ended the wait. `turn` and `round` lead
+before the wait, and the batch that ended the wait. `round` and `turn` lead
 both, because they are what the next command has to be chosen against; `next:`
 closes the batch, so the decision rule is the last thing the agent reads.
 
