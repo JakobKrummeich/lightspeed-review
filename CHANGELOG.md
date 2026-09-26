@@ -27,14 +27,18 @@ review no longer splits into two.
   commit) or from another worktree of the same repository is refused
   `live_review_elsewhere` (exit 2), naming the command that re-attaches to the
   live one. `--reopen` skips the check.
-- The review page: each thread card ends in a foot holding the reply box,
-  **Reply** and **Resolve**, drawn only when the agent spoke last and the page
-  takes writing; a thread whose last word is the reviewer's says "Waiting for
-  the agent…". **Reopen** sits in the same foot.
+- The review page: each thread card ends in a foot — the reply box across the
+  card's full width, then **Reply** and **Resolve** as one pair of buttons at
+  the right — drawn only when the agent spoke last and the page takes writing;
+  a thread whose last word is the reviewer's says "Waiting for the agent…".
+  **Reopen** sits in the same row.
 - The header says a short word beside a dot — "Agent listening", "Agent not
-  listening", "Agent reading", "Agent working", "Connection lost" — and keeps
-  the whole sentence (the plan, the item count, what a Send does now) in its
-  tooltip. The conversation's foot still says the whole sentence.
+  listening", "Agent reading", "Agent working", "Connection lost" — at one
+  weight in every state, and keeps the whole sentence (the plan, the item
+  count, what a Send does now) in its tooltip. The dot is the accent while an
+  agent works, reads or listens and grey when none does; a lost connection
+  greys the word and drops the dot. The conversation's foot still says the
+  whole sentence.
 - A 3.0.x server left running is replaced by the next `open` or `publish`, as
   any server of another version is; other commands refuse it `server_stale`
   until then.

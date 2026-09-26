@@ -1,6 +1,7 @@
 import { escapeHtml } from "../escape-html.ts";
 import { currentRound, roundSegments, type RoundSegment } from "./conversation-rounds.ts";
 import { agentTurnText } from "./turn-words.ts";
+import { renderThreadFoot } from "./thread-foot.ts";
 import { stalePillRound, type QueuedPill } from "./queued-pill.ts";
 import { MAIN_THREAD, threadsOf, type Thread, type ThreadMessage } from "../threads.ts";
 import type {
@@ -65,9 +66,6 @@ export const QUEUE_LABEL = "Queue";
 export const SENDING_LABEL = "Sending…";
 export const SEND_END_LABEL = "Send & End";
 export const END_ONLY_LABEL = "End without Sending";
-export const REPLY_LABEL = "Reply";
-export const RESOLVE_LABEL = "Resolve";
-export const REOPEN_LABEL = "Reopen";
 
 /** Whether words may reach the agent now: only on the reviewer's own turn. */
 export function sendIsLocked(state: ComposeState): boolean {
@@ -335,44 +333,6 @@ function renderThreadHead(card: Card, resolved: boolean, queued: boolean): strin
   return `<header class="lsr-thread-head"><span class="lsr-thread-id">${id}</span>${newMark(card)}${file}${queuedMark(resolved, queued)}</header>${summary}`;
 }
 
-const WAITING_LINE = `\n    <p class="lsr-thread-waiting">Waiting for the agent…</p>`;
-
-/**
- * The card's foot offers only what the reviewer can do in it now. Reply and
- * Resolve once the agent has had the last word and the page takes writing —
- * their own turn, or the agent's working one, which queues. Their own last
- * word is the agent's to answer, and says so quietly rather than inviting a
- * second message on top. A folded thread's Reopen follows the page's lock
- * alone: whoever spoke last, reopening is the reviewer's call. Legacy words
- * and `main` posts have no thread to answer in.
- */
-function renderThreadFoot(card: Card, resolved: boolean, mode: ComposeMode): string {
-  if (!answerable(card)) return "";
-  if (!resolved && !agentSpokeLast(card)) return mode === "ended" ? "" : WAITING_LINE;
-  if (!takesWriting(mode)) return "";
-  const id = escapeHtml(card.id);
-  if (resolved) return threadFoot(renderToggle(id, true));
-  return threadFoot(`${renderReplyControls(id)}\n      ${renderToggle(id, false)}`);
-}
-
-/** Legacy words and `main` posts have no thread to answer in. */
-function answerable(card: Card): boolean {
-  return card.legacy !== true && !card.main;
-}
-
-function agentSpokeLast(card: Card): boolean {
-  return card.messages.at(-1)?.role === "agent";
-}
-
-/** The reviewer's turn sends, the agent's working one queues; nothing else writes. */
-function takesWriting(mode: ComposeMode): boolean {
-  return mode === "send" || mode === "queue";
-}
-
-function threadFoot(controls: string): string {
-  return `\n    <footer class="lsr-thread-foot">\n      ${controls}\n    </footer>`;
-}
-
 function newMark(card: Card): string {
   return card.fresh ? `<span class="lsr-thread-new">new</span>` : "";
 }
@@ -380,10 +340,6 @@ function newMark(card: Card): string {
 function queuedMark(resolved: boolean, queued: boolean): string {
   if (!queued) return "";
   return `<span class="lsr-thread-queued">${resolved ? "resolves" : "reopens"} on your next Send</span>`;
-}
-
-function renderToggle(id: string, resolved: boolean): string {
-  return `<button type="button" class="lsr-thread-resolve" data-thread="${id}" aria-expanded="${!resolved}">${resolved ? REOPEN_LABEL : RESOLVE_LABEL}</button>`;
 }
 
 function threadSummary(thread: Thread): string {
@@ -408,16 +364,6 @@ function renderMessage(message: ThreadMessage): string {
       <p class="lsr-message-role">${who}</p>
       <p class="lsr-prompt-comment">${escapeHtml(message.comment)}</p>
     </div>`;
-}
-
-/**
- * A reply is one more pill: it goes out with the rest of the batch on the next
- * Send, as the resolve toggle does, so replying in three threads is still one
- * turn for the agent. `id` is escaped by the caller.
- */
-function renderReplyControls(id: string): string {
-  return `<textarea class="lsr-thread-reply-box" data-thread="${id}" placeholder="Reply — Enter adds it to your next Send…" aria-label="Reply in ${id}"></textarea>
-      <button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="${id}">${REPLY_LABEL}</button>`;
 }
 
 function renderPill(pill: QueuedPill, index: number, current: number): string {

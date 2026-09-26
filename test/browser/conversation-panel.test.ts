@@ -542,12 +542,13 @@ function cardOf(html: string, id: string): string {
   return html.slice(start, html.indexOf("</article>", start));
 }
 
-test("a thread the agent answered last ends in a footer: reply box, Reply, Resolve, in that order", () => {
+/** The box on its own row, so its placeholder has the card's width; the two presses in a row under it. */
+test("a thread the agent answered last ends in a footer: reply box, then Reply and Resolve in one row", () => {
   const card = cardOf(renderScroll(panelState({ conversation: exchange })), "t2");
 
   assert.match(
     card,
-    /<footer class="lsr-thread-foot">\s*<textarea class="lsr-thread-reply-box" data-thread="t2"[^>]*aria-label="Reply in t2"><\/textarea>\s*<button type="button" class="lsr-thread-reply-add lsr-secondary" data-thread="t2">Reply<\/button>\s*<button type="button" class="lsr-thread-resolve" data-thread="t2" aria-expanded="true">Resolve<\/button>\s*<\/footer>/,
+    /<footer class="lsr-thread-foot">\s*<textarea class="lsr-thread-reply-box" data-thread="t2"[^>]*aria-label="Reply in t2"><\/textarea>\s*<div class="lsr-thread-actions">\s*<button type="button" class="lsr-thread-action lsr-thread-reply-add" data-thread="t2">Reply<\/button>\s*<button type="button" class="lsr-thread-action lsr-thread-resolve" data-thread="t2" aria-expanded="true">Resolve<\/button>\s*<\/div>\s*<\/footer>/,
   );
   assert.ok(card.indexOf("batched") < card.indexOf("lsr-thread-foot"));
   const head = card.slice(0, card.indexOf("</header>"));
@@ -596,7 +597,7 @@ test("a resolve toggle folds the whole thread to its head and a one-line summary
   assert.match(html, /<p class="lsr-thread-summary">why a new table\?<\/p>/);
   assert.match(
     cardOf(html, "t2"),
-    /<footer class="lsr-thread-foot">\s*<button type="button" class="lsr-thread-resolve" data-thread="t2" aria-expanded="false">Reopen<\/button>\s*<\/footer>/,
+    /<footer class="lsr-thread-foot">\s*<div class="lsr-thread-actions">\s*<button type="button" class="lsr-thread-action lsr-thread-resolve" data-thread="t2" aria-expanded="false">Reopen<\/button>\s*<\/div>\s*<\/footer>/,
   );
   assert.doesNotMatch(html, /batched/, "the exchange is folded away");
   assert.doesNotMatch(html, /data-thread="t2" placeholder/, "and its reply box with it");
