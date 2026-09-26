@@ -304,7 +304,9 @@ lightspeed approvals [branch] [base]
   # Flags: --full (every path, not the first 50 of each list)
 
 lightspeed end [branch] [base]
-  # Agent-initiated session end
+  # Agent-initiated session end. Never refused: on a review already ended it
+  #   says so; ended while working with commits the last round lacks, it ends
+  #   anyway and warns in help[] that they never reached the reviewer
 
 lightspeed serve
   # Runs the review server in the foreground until it is stopped. `open` spawns

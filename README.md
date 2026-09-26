@@ -524,7 +524,8 @@ A review is in one of three live states:
 | Agent works   | "Working on: _plan_"                           | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
 
 **End** is available in every state, and `lightspeed end` closes the review from
-the agent's side. Delivery of a Send to a listening agent is what moves the turn
+the agent's side — never refused, but ending while working with commits no round
+has shown yet warns that the reviewer never saw them. Delivery of a Send to a listening agent is what moves the turn
 to digesting; `reply` hands it back; `work` moves it to working; `publish` opens
 the next round and hands it back, and the reviewer's queue drops into that round.
 `reply` from working is refused unless nothing has changed since `work` — HEAD

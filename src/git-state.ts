@@ -53,6 +53,12 @@ export function isCommit(repoRoot: string, name: string): boolean {
   return quietGit(repoRoot, ["rev-parse", "--verify", "--quiet", `${name}^{commit}`]) !== undefined;
 }
 
+/** Commits on `tip` that `from` lacks; unknown when git cannot say (a sha gone, no repo). */
+export function commitsSince(repoRoot: string, from: string, tip: string): number | undefined {
+  const count = quietGit(repoRoot, ["rev-list", "--count", `${from}..${tip}`])?.trim();
+  return count === undefined || count === "" ? undefined : Number(count);
+}
+
 function quietGit(repoRoot: string, args: string[]): string | undefined {
   try {
     return execFileSync("git", args, {

@@ -191,7 +191,7 @@ async function approvalsCommand(args: string[]): Promise<StructuredOutput> {
 
 async function endCommand(args: string[]): Promise<StructuredOutput> {
   return await onSession("end", args[0], args[1], ({ config, ...target }) =>
-    runEnd({ ...target, port: config.port }),
+    runEnd({ ...target, port: config.port, stateDir: config.stateDir }),
   );
 }
 
