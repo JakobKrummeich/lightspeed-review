@@ -217,10 +217,11 @@ export function endLabel(state: ComposeState): string {
  */
 function renderTurnLine(state: PanelState): string {
   if (state.turn.holder !== "agent" || state.status === "ended") return "";
-  // Decorative; the sentence beside them carries the meaning.
+  // Decorative; the sentence beside it carries the meaning. Three nested
+  // layers, one axis of drift each: see `light.css`.
   return `
   <p class="lsr-working">
-    <span class="lsr-working-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="lsr-firefly" aria-hidden="true"><i><i><i></i></i></i></span>
     ${escapeHtml(agentTurnText(state.turn, state.items))}
   </p>`;
 }

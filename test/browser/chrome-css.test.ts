@@ -888,9 +888,9 @@ test("a reviewer who asked for less motion gets the handover without the movemen
 test("the busy marker holds still for that reviewer rather than going away", () => {
   const quiet = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\n\}/.exec(bare)?.[1] ?? "";
 
-  // Hiding the marker would answer the preference by taking the news away: the dots stop
-  // animating but stay up.
-  assert.match(quiet, /\.lsr-working-dots i \{\s*animation: none;/);
+  // Hiding the marker would answer the preference by taking the news away: the firefly
+  // stops drifting but stays lit.
+  assert.match(quiet, /\.lsr-firefly i \{\s*animation: none;/);
   assert.doesNotMatch(quiet, /\.lsr-working[\w-]* \{[^}]*display: none/);
 });
 
