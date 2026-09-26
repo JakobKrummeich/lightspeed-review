@@ -466,3 +466,40 @@ test("a reply from a working turn that recorded no HEAD says so", async () => {
     },
   );
 });
+
+/**
+ * An agent that ended the review and is told the reviewer did passes that on
+ * to its user as the reviewer's decision. The refusal names whoever closed it.
+ */
+test("a reply on an ended review names who ended it, the agent's end included", async () => {
+  for (const [endedBy, closer] of [
+    ["agent", /`lightspeed end` ended this review, not the reviewer/],
+    ["reviewer", /the reviewer ended this review/],
+  ] as const) {
+    await withServer(
+      (repoRoot) => session(repoRoot, { status: "ended", endedBy }),
+      async ({ port, repoRoot }) => {
+        const error = await refused(reply(port, repoRoot, [{ to: "t1", text: "still there?" }]));
+
+        assert.equal(error.code, "session_ended");
+        assert.match(error.message, closer);
+        if (endedBy === "agent") assert.doesNotMatch(error.message, /the reviewer ended/);
+        assert.match(error.suggestions.join("\n"), /--reopen/);
+      },
+    );
+  }
+});
+
+test("work on a review the agent ended does not say the reviewer ended it", async () => {
+  await withServer(
+    (repoRoot) => session(repoRoot, { status: "ended", endedBy: "agent" }),
+    async ({ port, repoRoot }) => {
+      const error = await refused(
+        runWork({ repoRoot, branch: BRANCH, base: BASE, port, plan: "more" }),
+      );
+
+      assert.equal(error.code, "session_ended");
+      assert.match(error.message, /`lightspeed end` ended this review, not the reviewer/);
+    },
+  );
+});

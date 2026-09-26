@@ -6,7 +6,14 @@ import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { stillWorking } from "../server.ts";
 import { turnFacts, turnLabel } from "../turn.ts";
-import { helpReopen, ifKilled, publishCall, reattachCall, waitClause } from "../turn-help.ts";
+import {
+  endedMessage,
+  helpReopen,
+  ifKilled,
+  publishCall,
+  reattachCall,
+  waitClause,
+} from "../turn-help.ts";
 import { refusalError } from "./api-client.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
 import {
@@ -131,8 +138,8 @@ function intentIgnored(input: OpenInput): string {
 }
 
 /**
- * Checked before any git or model work: nothing is worth doing on a review the
- * reviewer ended, or on a fresh one nobody has said the reason for.
+ * Checked before any git or model work: nothing is worth doing on an ended
+ * review, or on a fresh one nobody has said the reason for.
  */
 function refuseFreshOpen(
   existing: SessionRecord | undefined,
@@ -142,7 +149,7 @@ function refuseFreshOpen(
   if (existing?.status === "ended" && input.reopen !== true) {
     throw new ReviewError({
       code: "session_ended",
-      message: "the reviewer ended this review; only they ask for a new round",
+      message: endedMessage(existing.endedBy),
       suggestions: [helpReopen(target)],
     });
   }

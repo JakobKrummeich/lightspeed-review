@@ -6,6 +6,7 @@
  * and core code importing `commands/` is how the old import cycles formed.
  */
 import { openCall } from "./open-call.ts";
+import type { ReviewCloser } from "./session-types.ts";
 import { MAIN_THREAD } from "./threads.ts";
 import type { TurnLabel } from "./turn.ts";
 
@@ -145,6 +146,21 @@ export const HELP_END = `Run \`${endCall("<branch> [base]")}\` to close the revi
  */
 export function helpEndedOn(target: string): string {
   return `Run \`lightspeed approvals ${target}\` for the verdict the review ended on`;
+}
+
+/**
+ * The refusal an ended review answers every move with, naming who closed it:
+ * a review closed by `lightspeed end` and blamed on the reviewer is what an
+ * agent then reports to its user as the reviewer's decision. A new round is the
+ * reviewer's call either way. Unnamed only on a record older than `endedBy`.
+ */
+export function endedMessage(endedBy: ReviewCloser | undefined): string {
+  if (endedBy === "reviewer")
+    return "the reviewer ended this review; only they ask for a new round";
+  if (endedBy === "agent") {
+    return "`lightspeed end` ended this review, not the reviewer; a new round is still the reviewer's call";
+  }
+  return "this review is ended; only the reviewer asks for a new round";
 }
 
 /** Only ever at the reviewer's request: an ended review is their decision. */

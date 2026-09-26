@@ -527,6 +527,35 @@ test("re-opening an ended review is refused, with the way to ask for a new round
   });
 });
 
+/** Who closed it is on the record; `lightspeed end` is not the reviewer's decision. */
+test("open and publish on a review the agent ended say `lightspeed end` closed it", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    toWorking(harness.store);
+    harness.store.save({ ...harness.store.get(KEY)!, status: "ended", endedBy: "agent" });
+
+    const opened = await refusal(open(harness));
+    const published = await refusal(publish(harness));
+
+    for (const error of [opened, published]) {
+      assert.equal(error.code, "session_ended");
+      assert.match(error.message, /`lightspeed end` ended this review, not the reviewer/);
+      assert.match(error.suggestions.join("\n"), /Only if the reviewer asks for another round/);
+    }
+  });
+});
+
+test("open on a review the reviewer ended still says the reviewer ended it", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.store.save({ ...harness.store.get(KEY)!, status: "ended", endedBy: "reviewer" });
+
+    const error = await refusal(open(harness));
+
+    assert.match(error.message, /^the reviewer ended this review/);
+  });
+});
+
 test("--reopen opens a new round on a review the reviewer asked to continue", async () => {
   await withHarness(async (harness) => {
     await open(harness);

@@ -204,8 +204,9 @@ suggested `--to` names an open thread of the session — never a resolved one, a
 digesting answers `turn_still_yours`; `publish` on an unmoved HEAD answers
 `nothing_to_publish`, naming `reply`; `--to` naming no thread of the session
 answers `feedback_item_unknown`. On an ended review every command that speaks
-into it is refused `session_ended`, pointing at `lightspeed approvals <branch>
-<base>` for the verdict it ended on, and a branchless command on a repository
+into it is refused `session_ended`, naming who ended it (the reviewer, or an
+agent's `lightspeed end` — the server's 409 carries `endedBy`) and pointing at
+`lightspeed approvals <branch> <base>` for the verdict it ended on, and a branchless command on a repository
 whose latest review ended is refused the same way, naming who ended it (with no
 review here at all, `session_not_found`; with several live ones,
 `ambiguous_session`); only

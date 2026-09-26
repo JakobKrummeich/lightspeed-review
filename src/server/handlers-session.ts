@@ -17,6 +17,7 @@ import { loadAssets } from "../static-assets.ts";
 import { logReplies } from "./agent-notes.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
+import { reviewEnded } from "./turn-refusals.ts";
 import { logOutcomes, logRound, logRoundEnd, type LedgerReport } from "./ledger-log.ts";
 import { publishRefusal } from "./publish-rules.ts";
 import { parseCreateSession } from "./validate.ts";
@@ -49,10 +50,10 @@ function open(
   existing: SessionRecord | undefined,
   payload: CreateSessionRequest,
 ): void {
-  // A review the reviewer ended is theirs to restart. Refusing before anything
-  // is written keeps the round they closed the round they see.
+  // An ended review is the reviewer's to restart, whoever closed it. Refusing
+  // before anything is written keeps the round they closed the round they see.
   if (existing?.status === "ended" && payload.reopen !== true) {
-    sendJson(response, 409, endedError());
+    sendJson(response, 409, reviewEnded(existing));
     return;
   }
   if (existing !== undefined && existing.status !== "ended") {
@@ -70,7 +71,7 @@ function publish(
   payload: CreateSessionRequest,
 ): void {
   if (existing === undefined) sendJson(response, 404, missing());
-  else if (existing.status === "ended") sendJson(response, 409, endedError());
+  else if (existing.status === "ended") sendJson(response, 409, reviewEnded(existing));
   else publishLive(context, response, existing, payload);
 }
 
@@ -147,15 +148,6 @@ function answerFor(context: ServerContext, session: SessionRecord) {
     url: `${context.baseUrl()}/session/${session.key}`,
     status: session.status,
     ...turnFacts(session),
-  };
-}
-
-function endedError() {
-  return {
-    error: {
-      code: "session_ended",
-      message: "the reviewer ended this review; only they ask for a new round",
-    },
   };
 }
 

@@ -203,3 +203,21 @@ test("a server that shut down mid-wait is re-attached to, naming this review wit
   );
   assert.doesNotMatch(parsed.suggestions.join(" "), /--intent/);
 });
+
+/** The server says who closed the review; the refusal must not guess the reviewer. */
+test("a 409 names who ended the review, as the server reports it", () => {
+  const about = { key: "abc", target: "feature-auth main" };
+  const read = (body: unknown) => parseBody(409, JSON.stringify(body), about) as ReviewError;
+
+  const byAgent = read({ error: { code: "session_ended", message: "x" }, endedBy: "agent" });
+  const byReviewer = read({ error: { code: "session_ended", message: "x" }, endedBy: "reviewer" });
+  const unknown = parseBody(409, "not json", about) as ReviewError;
+
+  assert.equal(byAgent.code, "session_ended");
+  assert.match(byAgent.message, /`lightspeed end` ended this review, not the reviewer/);
+  assert.match(byReviewer.message, /^the reviewer ended this review; only they ask/);
+  assert.doesNotMatch(unknown.message, /the reviewer ended/);
+  for (const error of [byAgent, byReviewer, unknown]) {
+    assert.match(error.suggestions.join("\n"), /lightspeed open feature-auth main --reopen/);
+  }
+});

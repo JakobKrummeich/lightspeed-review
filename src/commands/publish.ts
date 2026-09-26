@@ -120,7 +120,7 @@ function refuseLocally(
   head: string | undefined,
 ): void {
   if (existing === undefined) throw sessionGone(404, about);
-  if (existing.status === "ended") throw sessionGone(409, about);
+  if (existing.status === "ended") throw sessionGone(409, about, existing.endedBy);
   // No tip read, no telling a re-run from a refusal: the server compares the
   // extracted HEAD and decides.
   if (head === undefined) return;
