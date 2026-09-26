@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.3.0
+
+The survey reads as a list of things to open, not as headings over a missing
+diff.
+
+- Every chapter on the survey is a card on the surface tone that ends in
+  **Open →**, tints under the pointer and shows a focus ring when reached by
+  Tab; Enter or Space opens it as a click does.
+- A review of one chapter to study draws that chapter's label as the screen's
+  primary button, **Open the chapter →**, so a lone "All Changes · 1 file"
+  no longer reads as an empty section. This holds on first open and after
+  taking a new round. A review whose only chapter is swept keeps the lane's
+  **Approve** as its one primary press.
+- The survey's styles moved from `css/index.css` into their own
+  `css/survey.css`, which brings `index.css` back under the stylesheet ceiling.
+
 ## 3.2.0
 
 The agent reads each thread whole, and the reviewer's panel says whose move it
