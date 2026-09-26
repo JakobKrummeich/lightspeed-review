@@ -184,7 +184,10 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     finish: { setTurn: () => {} },
     beacon: {
       setTurn: (turn) => log.push(`beacon turn ${turn.holder}`),
-      setEnded: (ended) => void endings.push(ended),
+      setEnded: (ended) => {
+        endings.push(ended);
+        if (ended) log.push("beacon ended");
+      },
     },
     refreshReplay: () => log.push("replay"),
     place: () => place,
@@ -344,6 +347,27 @@ test("a review that ends puts the tab beacon out, and a reopen lets it light aga
   await settled();
 
   assert.deepEqual(endings, [true, false]);
+});
+
+test("the end's own presence frame puts the tab beacon out before it hands the turn back", (t) => {
+  // Regression: the frame lands before the fetch that says the review ended, and a hidden tab
+  // read "● Your turn" and twinkled for as long as that fetch took.
+  const { stream, log, endings } = world(t).page();
+
+  stream().emit(
+    "presence",
+    JSON.stringify({ waiting: false, turn: { holder: "reviewer", at: "" }, ended: true }),
+  );
+  stream().emit(
+    "presence",
+    JSON.stringify({ waiting: false, turn: { holder: "reviewer", at: "" } }),
+  );
+
+  assert.deepEqual(
+    log.filter((line) => line.startsWith("beacon")),
+    ["beacon ended", "beacon turn reviewer", "beacon turn reviewer"],
+  );
+  assert.deepEqual(endings, [true], "a frame never reopens the review: only a round does");
 });
 
 test("an older answer landing last does not put the old round back", async (t) => {

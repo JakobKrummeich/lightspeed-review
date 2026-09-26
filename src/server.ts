@@ -71,10 +71,13 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   const staticDir = options.staticDir ?? DEFAULT_STATIC_DIR;
   const assets = loadAssets(staticDir);
   // Reads the turn off the store rather than holding one: the presence frame is
-  // then whatever the last write said, restart or no restart.
+  // then whatever the last write said, restart or no restart. The end is said
+  // with it: the end's frame hands the turn back, and lands before the page has
+  // fetched the session that says it ended.
   const transport = new SessionTransport((key) => {
     const session = options.store.get(key);
-    return session === undefined ? undefined : presenceOf(session);
+    if (session === undefined) return undefined;
+    return { ...presenceOf(session), ...(session.status === "ended" ? { ended: true } : {}) };
   });
   /** One id source per server: it orders every record this run writes. */
   const nextId = createIdSource();

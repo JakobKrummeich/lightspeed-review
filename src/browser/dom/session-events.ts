@@ -161,6 +161,10 @@ function openStream(
     banner.setPresence(presence);
     panel.setTurn(presence.turn, presence.items);
     wired.finish.setTurn(presence.turn);
+    // Before the turn: the end's frame hands the turn back ahead of the fetch
+    // that says the review ended. Never taken back here; a reopen is a round,
+    // and `applyRound` says it.
+    if (presence.ended) wired.beacon.setEnded(true);
     wired.beacon.setTurn(presence.turn);
   });
   // A dropped stream reconnects by itself; a refused one never does. The

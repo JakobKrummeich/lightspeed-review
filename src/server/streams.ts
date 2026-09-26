@@ -15,7 +15,8 @@ export type WakeReason = "feedback" | "shutdown" | "superseded";
  */
 export type Waker = (reason: WakeReason) => boolean;
 
-export type PresenceReader = (key: string) => PresenceFacts | undefined;
+/** `ended` only on a review that has ended; absent, the review is open. */
+export type PresenceReader = (key: string) => (PresenceFacts & { ended?: true }) | undefined;
 
 export class SessionTransport {
   private readonly streams = new Map<string, Set<ServerResponse>>();

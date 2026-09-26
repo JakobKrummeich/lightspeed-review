@@ -1075,6 +1075,20 @@ test("a browser opening the stream is told straight away whether an agent is wai
   });
 });
 
+test("the presence frame says the review ended, and only once it has", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+    const stream = await openStream(url, key);
+    assert.doesNotMatch(await stream.until(/event: presence/), /"ended"/);
+
+    await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
+
+    // The end's frame hands the turn back; the page must know it ended before it believes that.
+    assert.match(await stream.until(/event: presence/), /"holder":"reviewer"[\s\S]*"ended":true/);
+    stream.close();
+  });
+});
+
 test("presence flips while an agent polls and back when it gives up", async () => {
   await withServer(async ({ url }) => {
     const { key } = await postSession(url);
