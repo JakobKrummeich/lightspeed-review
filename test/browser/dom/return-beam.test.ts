@@ -40,12 +40,21 @@ function page(t: TestContext) {
 const beams = (document: { body: FakeBox }): FakeBox[] =>
   document.body.querySelectorAll(".lsr-light-beam");
 
+/** Where each pulse was laid: left, top, width, height. */
+const pulses = (document: { body: FakeBox }): string[][] =>
+  document.body
+    .querySelectorAll(".lsr-light-pulse")
+    .map((pulse) =>
+      ["left", "top", "width", "height"].map((name) => pulse.style.getPropertyValue(name)),
+    );
+const AT_THE_DOT = [["500px", "10px", "8px", "8px"]];
+
 test("a new card in sight gets the beam from the dot, a lap of light and its answer faded in", (t) => {
-  const { document, dot, card, other, answers, root } = page(t);
+  const { document, card, other, answers, root } = page(t);
 
   returnBeam(asElement(root), ["t1"]);
 
-  assert.equal(dot.getAttribute("data-light"), "pulse");
+  assert.deepEqual(pulses(document), AT_THE_DOT);
   assert.equal(card.getAttribute("data-light"), "arrive");
   assert.equal(other.getAttribute("data-light"), null, "a card with nothing new stays still");
   // The newest answer, not the older one above it.
@@ -72,25 +81,38 @@ test("a card off to the side is reached by a turned beam that lands inside its c
 });
 
 test("a new card scrolled out of sight gets no beam: the dot's pulse alone says it", (t) => {
-  const { document, dot, card, root } = page(t);
+  const { document, card, root } = page(t);
   card.at({ left: 410, top: 760, width: 280, height: 80 });
 
   returnBeam(asElement(root), ["t1"]);
 
-  assert.equal(dot.getAttribute("data-light"), "pulse");
+  assert.deepEqual(pulses(document), AT_THE_DOT);
   assert.equal(card.getAttribute("data-light"), null);
   assert.deepEqual(beams(document), []);
 });
 
 test("a folded panel lays nothing out, so only the dot pulses", (t) => {
-  const { document, dot, card, scroll, root } = page(t);
+  const { document, scroll, card, root } = page(t);
   scroll.at({ left: 0, top: 0, width: 0, height: 0 });
   card.at({ left: 0, top: 0, width: 0, height: 0 });
 
   returnBeam(asElement(root), ["t1"]);
 
-  assert.equal(dot.getAttribute("data-light"), "pulse");
+  assert.deepEqual(pulses(document), AT_THE_DOT);
   assert.deepEqual(beams(document), []);
+});
+
+test("the pulse outlives the dot it was laid over, which the banner redraws at once", (t) => {
+  // Regression: set on the dot as a state, the pulse went with it 10–30ms later and never showed.
+  const { document, dot, root } = page(t);
+
+  returnBeam(asElement(root), ["t1"]);
+  dot.remove();
+
+  assert.deepEqual(pulses(document), AT_THE_DOT);
+  assert.equal(dot.getAttribute("data-light"), null, "nothing is set on the dot itself");
+  t.mock.timers.tick(900);
+  assert.deepEqual(pulses(document), []);
 });
 
 test("with no dot in the header the card still arrives, without a beam", (t) => {

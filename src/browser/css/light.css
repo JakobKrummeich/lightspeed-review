@@ -184,17 +184,14 @@
  * to the new card, a spark runs once round the card's edge and the answer
  * fades in. A card out of sight gets no beam; the dot's pulse alone says it.
  */
-.lsr-presence-dot[data-light="pulse"] {
-  position: relative;
-}
-
-.lsr-presence-dot[data-light="pulse"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
+/* Laid over the header's turn dot at its place (`dom/return-beam.ts`), under the overlays. */
+.lsr-light-pulse {
+  position: fixed;
+  z-index: 15;
   border-radius: 50%;
   background: var(--lsr-light-core);
   box-shadow: 0 0 0.5rem 0.25rem var(--lsr-light-glow);
+  pointer-events: none;
   animation: lsr-light-pulse 900ms ease-out both;
 }
 

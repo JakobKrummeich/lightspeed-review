@@ -86,7 +86,7 @@
   .lsr-done-nova,
   .lsr-done-card::before,
   .lsr-compose-actions [data-light]::after,
-  .lsr-presence-dot[data-light]::after,
+  .lsr-light-pulse,
   .lsr-thread[data-light]::before,
   .lsr-thread[data-light]::after {
     display: none;
