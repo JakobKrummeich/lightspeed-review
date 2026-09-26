@@ -1,5 +1,43 @@
 # Changelog
 
+## 3.1.0
+
+An agent whose command was killed mid-wait now knows what survived, and one
+review no longer splits into two.
+
+- Every wait names the shell tool's timeout parameter: the command does not
+  return until the reviewer Sends, so it is called with NO timeout parameter,
+  not via `timeout` or `&`. `next.if_killed` and the skill say that a kill ends
+  only the command — the server and the review stay live and hold the
+  reviewer's Send — and that the recovery is re-running exactly the same
+  command, never opening another review, ending or reopening.
+- `open` and `publish` say `status: grouping N files — can take minutes` before
+  the grouping model call, with the command to re-run if it is killed there, so
+  a killed grouping is no longer silent.
+- `/health` states the server's state dir. A command that finds a server
+  keeping its reviews in another state dir (another `HOME`, another harness) is
+  refused `server_state_mismatch` (exit 1), naming both directories, instead of
+  reporting a live review as missing or starting a second one beside it. A
+  server too old to state its dir is judged by version alone.
+- When the server re-attaches an `open` to a live review, `open` says
+  `re-attached to the live review` rather than reading as a fresh open.
+- A fresh `open` of a branch already live under another spelling of its base
+  (`main`, `origin/main`, `refs/heads/main`, or another name at the same
+  commit) or from another worktree of the same repository is refused
+  `live_review_elsewhere` (exit 2), naming the command that re-attaches to the
+  live one. `--reopen` skips the check.
+- The review page: each thread card ends in a foot holding the reply box,
+  **Reply** and **Resolve**, drawn only when the agent spoke last and the page
+  takes writing; a thread whose last word is the reviewer's says "Waiting for
+  the agent…". **Reopen** sits in the same foot.
+- The header says a short word beside a dot — "Agent listening", "Agent not
+  listening", "Agent reading", "Agent working", "Connection lost" — and keeps
+  the whole sentence (the plan, the item count, what a Send does now) in its
+  tooltip. The conversation's foot still says the whole sentence.
+- A 3.0.x server left running is replaced by the next `open` or `publish`, as
+  any server of another version is; other commands refuse it `server_stale`
+  until then.
+
 ## 3.0.1
 
 What the CLI tells the agent to do next is now true in the cases 3.0.0 got

@@ -373,7 +373,7 @@ or `skill` writes carries one stamp line (under the frontmatter, or first in the
 plain dialect and inside the `<!-- lightspeed:start -->` block):
 
 ```
-<!-- written by lightspeed 3.0.1 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.1.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 `content` hashes the skill as written. Before every command except `init`, the
