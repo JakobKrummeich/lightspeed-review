@@ -543,7 +543,7 @@ function cardOf(html: string, id: string): string {
 }
 
 /** The box on its own row, so its placeholder has the card's width; the two presses in a row under it. */
-test("a thread the agent answered last ends in a footer: reply box, then Reply and Resolve in one row", () => {
+test("a thread on the reviewer's turn ends in a footer: reply box, then Reply and Resolve in one row", () => {
   const card = cardOf(renderScroll(panelState({ conversation: exchange })), "t2");
 
   assert.match(
@@ -572,16 +572,48 @@ test("while the agent digests, or once the review ended, an answered thread has 
   }
 });
 
-/** The reviewer's own last word is the agent's to answer; a Reply there would only pile on. */
-test("a thread the reviewer spoke in last waits quietly for the agent instead of a footer", () => {
-  for (const turn of [REVIEWERS_TURN, AGENTS_TURN, WORKING]) {
-    const card = cardOf(renderScroll(panelState({ conversation: exchange, turn })), "t1");
+/** Replying twice in a row is the reviewer's call: whoever spoke last, their turn writes. */
+test("on the reviewer's turn a thread they spoke in last still ends in the footer, with no waiting line", () => {
+  const card = cardOf(renderScroll(panelState({ conversation: exchange })), "t1");
 
-    assert.match(card, /<p class="lsr-thread-waiting">Waiting for the agent…<\/p>/, turn.holder);
-    assert.doesNotMatch(card, /lsr-thread-foot|lsr-thread-reply-box|lsr-thread-resolve/);
-  }
+  assert.match(card, /<textarea class="lsr-thread-reply-box" data-thread="t1"/);
+  assert.match(card, />Reply<\/button>/);
+  assert.match(card, />Resolve<\/button>/);
+  assert.doesNotMatch(card, /Waiting for the agent/);
+});
+
+/** The agent holds the turn and owes this thread an answer; while it works the reviewer can still queue more. */
+test("while the agent works, a thread the reviewer spoke in last says it waits, above a footer that queues", () => {
+  const card = cardOf(renderScroll(panelState({ conversation: exchange, turn: WORKING })), "t1");
+
+  assert.match(card, /<p class="lsr-thread-waiting">Waiting for the agent…<\/p>/);
+  assert.match(card, /lsr-thread-foot/);
+  assert.ok(card.indexOf("lsr-thread-waiting") < card.indexOf("lsr-thread-foot"));
+});
+
+test("while the agent digests, a thread the reviewer spoke in last says it waits, with no footer", () => {
+  const card = cardOf(
+    renderScroll(panelState({ conversation: exchange, turn: AGENTS_TURN })),
+    "t1",
+  );
+
+  assert.match(card, /<p class="lsr-thread-waiting">Waiting for the agent…<\/p>/);
+  assert.doesNotMatch(card, /lsr-thread-foot|lsr-thread-reply-box|lsr-thread-resolve/);
+});
+
+test("an ended review shows neither the waiting line nor a footer", () => {
   const ended = cardOf(renderScroll(panelState({ conversation: exchange, status: "ended" })), "t1");
-  assert.doesNotMatch(ended, /Waiting for the agent/);
+
+  assert.doesNotMatch(ended, /Waiting for the agent|lsr-thread-foot/);
+});
+
+/** The agent has answered: nothing is owed, so nothing waits, whoever holds the turn. */
+test("a thread the agent answered last never shows the waiting line", () => {
+  for (const turn of [REVIEWERS_TURN, AGENTS_TURN, WORKING]) {
+    const card = cardOf(renderScroll(panelState({ conversation: exchange, turn })), "t2");
+
+    assert.doesNotMatch(card, /Waiting for the agent/, turn.holder);
+  }
 });
 
 test("a resolve toggle folds the whole thread to its head and a one-line summary", () => {

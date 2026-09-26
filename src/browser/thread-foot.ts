@@ -24,19 +24,30 @@ type FootMode = "send" | "locked" | "queue" | "ended";
 const WAITING_LINE = `\n    <p class="lsr-thread-waiting">Waiting for the agent…</p>`;
 
 /**
- * The card's foot offers only what the reviewer can do in it now. Reply and
- * Resolve once the agent has had the last word and the page takes writing —
- * their own turn, or the agent's working one, which queues. Their own last
- * word is the agent's to answer, and says so quietly rather than inviting a
- * second message on top. A folded thread's Reopen follows the page's lock
- * alone: whoever spoke last, reopening is the reviewer's call. Legacy words
- * and `main` posts have no thread to answer in.
+ * The card's foot offers only what the reviewer can do in it now: Reply and
+ * Resolve (Reopen once folded) whenever the page takes writing — their own
+ * turn, or the agent's working one, which queues — whoever spoke last, since
+ * a second message in a row is theirs to send. Legacy words and `main` posts
+ * have no thread to answer in.
  */
 export function renderThreadFoot(card: FootCard, resolved: boolean, mode: FootMode): string {
   if (!answerable(card)) return "";
-  if (!resolved && !agentSpokeLast(card)) return mode === "ended" ? "" : WAITING_LINE;
+  return `${waitingLine(card, resolved, mode)}${writingFoot(card.id, resolved, mode)}`;
+}
+
+/**
+ * Said only while the agent holds the turn — digesting or working — and owes
+ * this thread an answer. On the reviewer's own turn nobody is waited on: the
+ * next word there is theirs to write.
+ */
+function waitingLine(card: FootCard, resolved: boolean, mode: FootMode): string {
+  const agentsTurn = mode === "queue" || mode === "locked";
+  return agentsTurn && !resolved && !agentSpokeLast(card) ? WAITING_LINE : "";
+}
+
+function writingFoot(rawId: string, resolved: boolean, mode: FootMode): string {
   if (!takesWriting(mode)) return "";
-  const id = escapeHtml(card.id);
+  const id = escapeHtml(rawId);
   if (resolved) return threadFoot(actionRow(renderToggle(id, true)));
   return threadFoot(
     `${renderReplyBox(id)}\n      ${actionRow(`${renderReplyAdd(id)}${renderToggle(id, false)}`)}`,

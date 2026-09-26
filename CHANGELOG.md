@@ -29,9 +29,10 @@ review no longer splits into two.
   live one. `--reopen` skips the check.
 - The review page: each thread card ends in a foot — the reply box across the
   card's full width, then **Reply** and **Resolve** as one pair of buttons at
-  the right — drawn only when the agent spoke last and the page takes writing;
-  a thread whose last word is the reviewer's says "Waiting for the agent…".
-  **Reopen** sits in the same row.
+  the right — drawn whenever the reviewer can write (their turn, or queueing
+  while the agent works), whoever spoke last, so they can reply twice in a row.
+  While the agent holds the turn, a thread whose last word is the reviewer's
+  says "Waiting for the agent…" above it. **Reopen** sits in the same row.
 - The header says a short word beside a dot — "Agent listening", "Agent not
   listening", "Agent reading", "Agent working", "Connection lost" — at one
   weight in every state, and keeps the whole sentence (the plan, the item

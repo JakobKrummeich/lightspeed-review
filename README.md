@@ -605,8 +605,12 @@ the command it died in.
 **Threads.** Every reviewer item, line or general, opens a thread with a short,
 session-stable id (`t1`, `t2`…); `main` is the main chat, where the agent's
 `--to main` lands. In the page a thread is the item followed by its whole
-exchange, stacked top to bottom, with a reply box at its foot and a line
-thread's jump to its lines. **Resolve** folds a thread; it sends nothing by
+exchange, stacked top to bottom, with a line thread's jump to its lines. Its
+foot — a reply box, **Reply** and **Resolve** (**Reopen** once folded) — is
+there whenever you can write: on your turn, and queueing while the agent works,
+whoever spoke last, so you can reply twice in a row. While the agent holds the
+turn, a thread whose last word is yours says "Waiting for the agent…" above
+it. **Resolve** folds a thread; it sends nothing by
 itself and travels with the next Send, where the agent reads `t4 resolved` — for
 a question "no further questions", for a change request "I agree with what you
 last said", not a withdrawn request. Thread replies and resolves queue like any
@@ -790,7 +794,7 @@ A ledger failure never fails a review: it is reported as
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
 - The conversation is threads: each item with its exchange stacked under it,
-  a reply box at the foot, and a **Resolve** toggle that folds it. The header
+  and a foot with a reply box, **Reply** and a **Resolve** that folds it. The header
   and the foot of the conversation say whose turn it is, and a small
   "Connection lost — reconnecting…" chip shows while the live update stream is
   down.

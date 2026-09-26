@@ -241,9 +241,9 @@
 
 /*
  * The thread's foot, in reading order: the box on its own row, then Reply and
- * Resolve at the far edge. Drawn only when the agent spoke last and the page
- * takes writing, so it never shows a control the reviewer cannot use. A
- * folded thread's Reopen sits alone in the same row.
+ * Resolve at the far edge. Drawn whenever the page takes writing, whoever
+ * spoke last, and never otherwise, so it shows no control the reviewer cannot
+ * use. A folded thread's Reopen sits alone in the same row.
  */
 .lsr-thread-foot {
   display: flex;
@@ -278,7 +278,7 @@
   border-color: var(--lsr-accent);
 }
 
-/* The reviewer spoke last: the agent's move, said without asking anything. */
+/* The reviewer spoke last on the agent's turn: said without asking anything. */
 .lsr-thread-waiting {
   margin: var(--lsr-space-2) 0 0;
   font-size: var(--lsr-size-label);

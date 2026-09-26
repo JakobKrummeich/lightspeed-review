@@ -1551,17 +1551,36 @@ test("while the agent works a thread reply and a resolve queue like everything e
   assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
 });
 
-/** The reviewer's own last word is the agent's to answer; the foot says so instead. */
-test("a thread the reviewer spoke in last shows the waiting line, and the footer once the agent answers", (t) => {
+/** Replying twice in a row is the reviewer's call; the waiting line is for the agent's turn only. */
+test("a thread the reviewer spoke in last keeps its footer, and says it waits only while the agent holds the turn", (t) => {
   const { root, panel } = mount(t, session({ conversation: [opened] }));
 
+  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 1);
+  assert.equal(root.querySelector(".lsr-thread-waiting"), null);
+
+  panel.setTurn(WORKING);
+  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 1);
+  assert.equal(root.querySelector(".lsr-thread-waiting")?.textContent, "Waiting for the agent…");
+
+  panel.setTurn(READING);
   assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 0);
   assert.equal(root.querySelector(".lsr-thread-waiting")?.textContent, "Waiting for the agent…");
 
   panel.update(session({ conversation: [opened, answered] }));
-
-  assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 1);
   assert.equal(root.querySelector(".lsr-thread-waiting"), null);
+});
+
+test("the reviewer can reply twice in a row in a thread they spoke in last", (t) => {
+  const { root } = mount(t, session({ conversation: [opened] }));
+  const sent = stubFetch(t);
+
+  replyBoxOf(root)!.value = "per-batch";
+  pressIn(root, ".lsr-thread-reply-add");
+  replyBoxOf(root)!.value = "and per-request later";
+  pressIn(root, ".lsr-thread-reply-add");
+
+  assert.deepEqual(sent, []);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
 });
 
 /** Only the compose row was redrawn on the status change, so the scroll kept its footers. */
