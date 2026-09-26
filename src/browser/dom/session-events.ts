@@ -205,10 +205,12 @@ function applyRound(wired: Wired, fresh: SessionData): void {
   else if (fresh.status === "ended") page.replayReopen.hidden = true;
   // Both ways: `open --reopen` lights the tab again on the next flip.
   wired.beacon.setEnded(fresh.status === "ended");
-  // An answer the reviewer never sees costs more than the width. Opened before
-  // the panel draws it: the draw decides from what is in sight how the answer
-  // is lit, and a folded panel has nothing in sight.
-  if (agentSpokeAgain(live.drawn.conversation, fresh.conversation)) railControl.expand();
+  // An answer the reviewer never sees costs more than the width. Opened, and
+  // taken to the foot, before the panel draws it: the draw decides from what is
+  // in sight how the answer is lit, and follows the foot only from the foot.
+  if (agentSpokeAgain(live.drawn.conversation, fresh.conversation) && railControl.expand()) {
+    panel.toFoot();
+  }
   panel.update(fresh);
   // Whole session, not status alone: an ended review is summed over the page,
   // last send included.

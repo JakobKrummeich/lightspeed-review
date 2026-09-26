@@ -50,6 +50,11 @@ export interface MountedPanel {
   /** Nothing may be written — the line popup asks before it queues. */
   writesLocked(): boolean;
   /**
+   * To the newest talk. A folded panel lays nothing out, so its draws cannot
+   * follow the foot: unfolded, it stands wherever it was when it was folded.
+   */
+  toFoot(): void;
+  /**
    * The same send as Send & End, queue and comment included, so there is one
    * way a review ends however the word was given.
    */
@@ -115,8 +120,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
 
   root.addEventListener("click", (event) => handleClick(view, event));
   root.addEventListener("input", (event) => {
-    if (event.target !== generalCommentBox(root)) return;
-    rememberDraft.soon();
+    if (event.target === generalCommentBox(root)) rememberDraft.soon();
   });
   // Both guard their own box, so neither can act on the other's Enter.
   root.addEventListener("keydown", (event) => {
@@ -157,6 +161,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
       draw(view);
     },
     writesLocked: () => writesLocked(state),
+    toFoot: () => toBottom(view.scrollHost),
     end() {
       // Not awaited, as the button's own press is not: the send reports
       // through `onEnd`, and a failure leaves the controls full to press again.

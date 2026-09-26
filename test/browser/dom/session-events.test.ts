@@ -138,6 +138,8 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
   const connections: boolean[] = [];
   /** What the tab beacon was told of the review's end, apart from `log`: every draw says it. */
   const endings: boolean[] = [];
+  /** Folded until the first `expand`, as a reviewer who put the panel away left it. */
+  const rail = { folded: true };
   const roots = {
     review: new FakeNode("div"),
     intent: new FakeNode("div"),
@@ -172,6 +174,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       setAllApproved: () => {},
       setTurn: (turn) => log.push(`panel turn ${turn.holder}`),
       writesLocked: () => false,
+      toFoot: () => log.push("panel to foot"),
       end: () => {},
     },
     banner: {
@@ -180,7 +183,15 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       setEndedByReviewer: () => {},
       setConnected: (connected) => void connections.push(connected),
     },
-    railControl: { setQueued: () => {}, expand: () => log.push("rail expand") },
+    railControl: {
+      setQueued: () => {},
+      expand: () => {
+        log.push("rail expand");
+        const { folded } = rail;
+        rail.folded = false;
+        return folded;
+      },
+    },
     finish: { setTurn: () => {} },
     beacon: {
       setTurn: (turn) => log.push(`beacon turn ${turn.holder}`),
@@ -198,7 +209,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     assert.ok(open, "the page opened its stream");
     return open;
   };
-  return { stream, log, live, roots, connections, endings };
+  return { stream, log, live, roots, connections, endings, rail };
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -284,8 +295,10 @@ test("a reconnect onto the same round with missed talk draws it in place", async
     "panel turn reviewer",
     "beacon turn reviewer",
     "diff same-round",
-    // Opened before the draw that lights the answer, or a folded panel has no card in sight.
+    // Opened before the draw that lights the answer, or a folded panel has no card in sight;
+    // and at its foot, where a folded panel's draws could not keep it.
     "rail expand",
+    "panel to foot",
     "panel 1 said",
     "banner",
   ]);
@@ -295,6 +308,19 @@ test("a reconnect onto the same round with missed talk draws it in place", async
   assert.equal(roots.review.scrollTop, 500, "no one is moved inside a round");
   assert.equal(roots.offer.hidden, true);
   assert.equal(roots.popup.hidden, true);
+});
+
+test("an answer drawn into an open panel leaves the reviewer's scroll to the panel", async (t) => {
+  // Only an unfolded panel is taken to its foot: in an open one the reviewer may be reading
+  // further up, and the panel's own draw decides whether they were following.
+  const { stream, server, log, rail } = world(t).page();
+  rail.folded = false;
+  server.serving = session(0, [reply]);
+
+  stream().emit("session");
+  await settled();
+
+  assert.deepEqual(log, ["diff same-round", "rail expand", "panel 1 said", "banner"]);
 });
 
 test("once drawn, the same talk is not drawn again on the next reconnect", async (t) => {

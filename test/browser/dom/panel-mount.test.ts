@@ -1808,3 +1808,13 @@ test("every draw hands the light the conversation it drew", (t) => {
 
   assert.deepEqual(asked, ["drawn 1"]);
 });
+
+test("a panel sent to its foot shows the newest talk, wherever it stood", (t) => {
+  // Folded, the panel laid nothing out and its draws could not follow the foot.
+  const { root, panel } = mount(t);
+  const host = scrolledTo(root, 120);
+
+  panel.toFoot();
+
+  assert.equal(host.scrollTop, host.scrollHeight);
+});
