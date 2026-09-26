@@ -53,9 +53,29 @@ export function isCommit(repoRoot: string, name: string): boolean {
   return quietGit(repoRoot, ["rev-parse", "--verify", "--quiet", `${name}^{commit}`]) !== undefined;
 }
 
-/** Commits on `tip` that `from` lacks; unknown when git cannot say (a sha gone, no repo). */
-export function commitsSince(repoRoot: string, from: string, tip: string): number | undefined {
-  const count = quietGit(repoRoot, ["rev-list", "--count", `${from}..${tip}`])?.trim();
+/**
+ * The branch's own work since the round the reviewer last saw: commits on `tip`
+ * that neither `published` nor `base` has, merges left out, and a commit whose
+ * patch the published history already carries left out too. A plain `from..tip`
+ * counted every commit a merge of main brought in, and every published commit a
+ * rebase onto main rewrote, as work nobody reviewed. Unknown — a ref gone, no
+ * repo — is `undefined`, never 0, so a caller claims nothing either way.
+ */
+export function unpublishedCommits(
+  repoRoot: string,
+  refs: { published: string; tip: string; base: string },
+): number | undefined {
+  const count = quietGit(repoRoot, [
+    "rev-list",
+    "--count",
+    "--no-merges",
+    "--right-only",
+    "--cherry-pick",
+    `${refs.published}...${refs.tip}`,
+    "--not",
+    refs.base,
+    "--",
+  ])?.trim();
   return count === undefined || count === "" ? undefined : Number(count);
 }
 
