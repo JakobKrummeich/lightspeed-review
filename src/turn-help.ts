@@ -15,13 +15,26 @@ import type { TurnLabel } from "./turn.ts";
 export const HELP_OPEN = `Run \`${openCall("<branch> [base]")}\` to open a review; repeat --intent once per reason`;
 
 /**
+ * The words every kill recovery shares. Weaker models ran the waits under
+ * their shell tool's own timeout, read the kill as the server or the review
+ * dying, and opened a second review while the reviewer's Send sat in the
+ * first — so the tool parameter is named, the survivors are named, and the
+ * wrong recoveries are forbidden by name. "Foreground" said none of that.
+ */
+const NO_TIMEOUT = "call your shell tool with NO timeout parameter, not via `timeout` or `&`";
+const NEVER_RESTART = "never open another review, end or reopen to recover";
+const RERUN_THIS = "Re-run exactly this, with NO timeout parameter — it posts nothing twice";
+
+/**
  * Worded once and repeated verbatim wherever a command that waits is named.
  * "Waits for your Send" is the CLI's word; the browser's is "locked" — never
  * "blocking", which blurred the two.
  */
 export const WAITS_FOR_SEND =
-  "it waits for the reviewer's Send, so run it in the foreground and never under a timeout;" +
-  " if it is killed anyway, re-run the same command — it posts nothing twice";
+  `it does not return until the reviewer Sends (often minutes to hours), so ${NO_TIMEOUT};` +
+  " if it is killed anyway, only the command died — the server and this review stay live and" +
+  " hold the reviewer's Send: re-run exactly the same command with NO timeout (it posts" +
+  ` nothing twice), and ${NEVER_RESTART}`;
 
 /**
  * What the wait after a hand-back does, said before it starts: a batch the agent
@@ -124,7 +137,9 @@ export function ifKilled(
   if (turn === "agent digesting") return {};
   return {
     next: {
-      if_killed: `Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: ${command}`,
+      if_killed:
+        "Killed or timed out? Only this command died — the server and this review stay live" +
+        ` and hold the reviewer's Send; ${NEVER_RESTART}. ${RERUN_THIS}: ${command}`,
     },
   };
 }

@@ -31,7 +31,7 @@ goes into your next round).
 | `end` | always | no | ended |
 
 `open`, `reply` and `publish` hand the turn back **and** wait for the
-next Send, so one call is one turn: it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice. There is no separate
+next Send, so one call is one turn: it does not return until the reviewer Sends (often minutes to hours), so call your shell tool with NO timeout parameter, not via `timeout` or `&`; if it is killed anyway, only the command died — the server and this review stay live and hold the reviewer's Send: re-run exactly the same command with NO timeout (it posts nothing twice), and never open another review, end or reopen to recover. There is no separate
 `wait` to forget. Plain `lightspeed` (no arguments) shows where you are
 and the one command to run next.
 
@@ -53,7 +53,7 @@ and the one command to run next.
 
    Anything ambiguous in a change request? Ask now with reply: asking is cheaper than redoing a round built on a guess. You may leave items unanswered. End this turn with reply or with work, never both.
 3. **Work.** Edit, test, commit. A question for the reviewer? Publish what you have and ask in the new round. reply works from here only while nothing has changed since work.
-4. **Publish.** Edit, test and commit, then → lightspeed publish <branch> --intent '<what this round changed>' --to t4 'done: <what you did>' — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice
+4. **Publish.** Edit, test and commit, then → lightspeed publish <branch> --intent '<what this round changed>' --to t4 'done: <what you did>' — it does not return until the reviewer Sends (often minutes to hours), so call your shell tool with NO timeout parameter, not via `timeout` or `&`; if it is killed anyway, only the command died — the server and this review stay live and hold the reviewer's Send: re-run exactly the same command with NO timeout (it posts nothing twice), and never open another review, end or reopen to recover
    Files the reviewer already approved come back ticked unless you touched them.
 5. **Close it** when the reviewer is done.
    > Run `lightspeed end <branch> [base]` to close the review from your side
@@ -91,10 +91,14 @@ items[2]:
 
 ## Rules
 
-- Run `open`, `reply` and `publish` in the foreground, never under a
-  timeout. If one is killed anyway, re-run the same command: the server
+- `open`, `reply` and `publish` do not return until the reviewer
+  Sends — often minutes to hours. Call your shell tool with NO timeout
+  parameter, not via `timeout` or `&`. If one is killed anyway, only that
+  command died: the server and the review stay live and hold the reviewer's
+  Send. Re-run exactly the same command with NO timeout — the server
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
-  Before it waits, each prints what landed (`replied`, the round, or
+  Never open another review, `end` or `--reopen` to recover.
+- Before it waits, each of the three prints what landed (`replied`, the round, or
   `rerun: true`) closed by `next.if_killed` — that exact command; one
   that hands back a batch you are digesting returns at once, without it. Only
   one wait per review: a newer one makes the older exit `superseded: true`,

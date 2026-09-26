@@ -107,10 +107,14 @@ items[2]:
 
 const RULES = `## Rules
 
-- Run \`open\`, \`reply\` and \`publish\` in the foreground, never under a
-  timeout. If one is killed anyway, re-run the same command: the server
+- \`open\`, \`reply\` and \`publish\` do not return until the reviewer
+  Sends — often minutes to hours. Call your shell tool with NO timeout
+  parameter, not via \`timeout\` or \`&\`. If one is killed anyway, only that
+  command died: the server and the review stay live and hold the reviewer's
+  Send. Re-run exactly the same command with NO timeout — the server
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
-  Before it waits, each prints what landed (\`replied\`, the round, or
+  Never open another review, \`end\` or \`--reopen\` to recover.
+- Before it waits, each of the three prints what landed (\`replied\`, the round, or
   \`rerun: true\`) closed by \`next.if_killed\` — that exact command; one
   that hands back a batch you are digesting returns at once, without it. Only
   one wait per review: a newer one makes the older exit \`superseded: true\`,

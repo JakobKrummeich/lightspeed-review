@@ -7,6 +7,7 @@ import {
   endedClause,
   endedMessage,
   helpReopen,
+  ifKilled,
   nextRule,
   publishCall,
   replyCall,
@@ -55,7 +56,7 @@ test("resolved items get their meaning spelled out: agreement, not a withdrawn r
   ]);
 });
 
-test("working: publish, waiting in the foreground; a question goes in the new round", () => {
+test("working: publish, waiting with no timeout; a question goes in the new round", () => {
   const rule = nextRule("agent working", TARGET, ["t5"]);
 
   assert.deepEqual(Object.keys(rule), ["publish", "stuck"]);
@@ -70,7 +71,7 @@ test("the reviewer's turn: the only move is to listen by re-running open", () =>
 
   assert.deepEqual(Object.keys(rule), ["listen"]);
   assert.match(rule.listen!, /lightspeed open feat\/tokens main`/);
-  assert.match(rule.listen!, /foreground/);
+  assert.match(rule.listen!, /NO timeout parameter/);
 });
 
 test("ended: done, and a new round only when the reviewer asks for one", () => {
@@ -102,4 +103,41 @@ test("the closer is named the same way in every ended-review sentence", () => {
   assert.equal(endedClause("agent"), "`lightspeed end` ended this review, not the reviewer");
   assert.equal(endedClause("reviewer"), "the reviewer ended this review");
   assert.equal(endedClause(undefined), "this review is ended");
+});
+
+/**
+ * Weaker models ran a waiting command under their shell tool's timeout, read
+ * the kill as the review dying, and opened a second review while the
+ * reviewer's Send sat in the first. Every clause below answers one of those
+ * misreadings.
+ */
+test("a waiting command is described by how long it takes and what a kill leaves alive", () => {
+  assert.match(
+    WAITS_FOR_SEND,
+    /does not return until the reviewer Sends \(often minutes to hours\)/,
+  );
+  assert.match(
+    WAITS_FOR_SEND,
+    /call your shell tool with NO timeout parameter, not via `timeout` or `&`/,
+  );
+  assert.match(WAITS_FOR_SEND, /only the command died/);
+  assert.match(WAITS_FOR_SEND, /the server and this review stay live and hold the reviewer's Send/);
+  assert.match(WAITS_FOR_SEND, /re-run exactly the same command with NO timeout/);
+  assert.match(WAITS_FOR_SEND, /posts nothing twice/);
+  assert.match(WAITS_FOR_SEND, /never open another review, end or reopen to recover/);
+  assert.doesNotMatch(WAITS_FOR_SEND, /foreground/);
+});
+
+test("the kill recovery says the review survived, forbids a second review, and ends on the command", () => {
+  const line = ifKilled("reviewer", "lightspeed open feat main").next!.if_killed;
+
+  assert.match(line, /^Killed or timed out\? Only this command died/);
+  assert.match(line, /the server and this review stay live and hold the reviewer's Send/);
+  assert.match(line, /never open another review, end or reopen to recover/);
+  assert.match(line, /Re-run exactly this, with NO timeout parameter — it posts nothing twice/);
+  assert.ok(line.endsWith(": lightspeed open feat main"), line);
+});
+
+test("a hand-back of a batch being digested has no wait to recover, so no kill line", () => {
+  assert.deepEqual(ifKilled("agent digesting", "lightspeed open feat main"), {});
 });

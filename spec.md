@@ -23,10 +23,11 @@ Developer working in TUI with Pi agent:
    └─ Extracts git diff
    └─ Groups it with the configured model (lightspeed-owned prompts)
    └─ Opens browser with grouped diff view
-   └─ Prints the round (session key, url, groups), then WAITS in the foreground
-      for the reviewer's first Send (help[] tells the agent never to background
-      it or wrap it in a timeout). Delivery is the only thing that hands the
-      agent the turn.
+   └─ Prints the round (session key, url, groups), then WAITS for the
+      reviewer's first Send (help[] tells the agent to call it with no timeout
+      parameter on its shell tool, never via `timeout` or `&`, and that a kill
+      leaves the server and the review live). Delivery is the only thing that
+      hands the agent the turn.
 
 3. User reviews in browser:
    └─ Main area: grouped/ordered diffs, syntax highlighted
@@ -111,8 +112,11 @@ back; `end` ends the review.
 **One call is one turn.** `open`, `reply` and `publish` wait for the reviewer's
 next Send before they return (or for the review to end), so there is no separate
 listening command an agent can forget to run. `work` and `end` wait for nothing.
-The waiting commands must run in the foreground and never under a timeout; their
-help says so.
+The waiting commands take minutes to hours, so the agent calls them with no
+timeout parameter on its shell tool (not via `timeout` or `&`); their help says
+so, and says that a killed one leaves the server and the review live, to be
+re-attached by re-running it — never by opening another review, ending or
+reopening.
 
 **Re-running is re-attaching.** A waiting command that was killed — a harness
 timeout, a `serve` restart — is re-run as it was. The server recognises a
@@ -477,7 +481,7 @@ groups[4]{name,files}:
   Tests,7
 message: the review is open — give the reviewer the url; waiting for their first Send
 next:
-  if_killed: "Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: lightspeed open feature-auth main"
+  if_killed: "Killed or timed out? Only this command died — the server and this review stay live and hold the reviewer's Send; never open another review, end or reopen to recover. Re-run exactly this, with NO timeout parameter — it posts nothing twice: lightspeed open feature-auth main"
 round: 1
 turn: agent digesting
 items[2]:
@@ -509,7 +513,7 @@ turn: reviewer
 replied[2]: t1,t2
 message: replied; waiting for the reviewer's Send
 next:
-  if_killed: "Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: lightspeed reply --to t1 'one transaction already' --to t2 'billing moved to v2 last sprint, nothing calls it' feature-auth main"
+  if_killed: "Killed or timed out? Only this command died — the server and this review stay live and hold the reviewer's Send; never open another review, end or reopen to recover. Re-run exactly this, with NO timeout parameter — it posts nothing twice: lightspeed reply --to t1 'one transaction already' --to t2 'billing moved to v2 last sprint, nothing calls it' feature-auth main"
 round: 1
 turn: agent digesting
 items[1]{id,status,at,selected,you,reviewer}:
@@ -530,7 +534,7 @@ turn: agent working
 plan: wrap the user writes in one transaction
 message: "the reviewer's header names this plan; they can queue, not send, until you publish"
 next:
-  publish: "Edit, test and commit, then → lightspeed publish feature-auth main --intent '<what this round changed>' --to t1 'done: <what you did>' — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice"
+  publish: "Edit, test and commit, then → lightspeed publish feature-auth main --intent '<what this round changed>' --to t1 'done: <what you did>' — it does not return until the reviewer Sends (often minutes to hours), so call your shell tool with NO timeout parameter, not via `timeout` or `&`; if it is killed anyway, only the command died — the server and this review stay live and hold the reviewer's Send: re-run exactly the same command with NO timeout (it posts nothing twice), and never open another review, end or reopen to recover"
   stuck: A question for the reviewer? Publish what you have and ask in the new round. reply works from here only while nothing has changed since work.
 ```
 
@@ -569,7 +573,7 @@ error:
   code: turn_not_yours
   message: "work is not yours to run: the reviewer holds the turn (turn: reviewer)"
   detail: "the turn moves to you when the reviewer's Send is delivered to a waiting `lightspeed open`, `reply` or `publish`, and never before"
-help[1]: "Run `lightspeed open feature-auth main` to listen for the reviewer's next Send — it waits for the reviewer's Send, so run it in the foreground and never under a timeout; if it is killed anyway, re-run the same command — it posts nothing twice"
+help[1]: "Run `lightspeed open feature-auth main` to listen for the reviewer's next Send — it does not return until the reviewer Sends (often minutes to hours), so call your shell tool with NO timeout parameter, not via `timeout` or `&`; if it is killed anyway, only the command died — the server and this review stay live and hold the reviewer's Send: re-run exactly the same command with NO timeout (it posts nothing twice), and never open another review, end or reopen to recover"
 ```
 
 ```
@@ -1043,7 +1047,7 @@ Only one state is stated on screen: `needs-reapproval` carries the amber pill `c
 11. **Ordering:** LLM returns an ordered array; position is the order, no `order` field
 12. **Grouping threshold:** ≤7 changed files → skip the LLM
 13. **Validation:** schema + coverage check, errors fed back into the same conversation, ≤2 repairs
-14. **Waiting (`open`/`reply`/`publish`):** no `--timeout-ms`, no heartbeat; foreground, forever; re-run to re-attach
+14. **Waiting (`open`/`reply`/`publish`):** no `--timeout-ms`, no heartbeat; no shell timeout, forever; re-run to re-attach
 15. **Hooks:** dropped. Skill only
 
 16. **HTTP layer (D1):** `node:http` + tiny router. Decided — no capability loss vs Express for this feature set

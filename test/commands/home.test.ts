@@ -287,7 +287,7 @@ test("a reviewer's turn is the one turn home offers to listen from", () => {
 
   assert.deepEqual(output.next, nextRule("reviewer", "feat/tokens main"));
   assert.match((output.next as { listen: string }).listen, /lightspeed open feat\/tokens main`/);
-  assert.match((output.next as { listen: string }).listen, /foreground/);
+  assert.match((output.next as { listen: string }).listen, /NO timeout parameter/);
 });
 
 /** Telling an agent to start a wait that is already running supersedes its own command. */

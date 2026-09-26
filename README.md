@@ -413,8 +413,10 @@ Set lightspeed up in this repository. These are two separate jobs; do both.
    Skills are scanned at startup, so you cannot use the one you just wrote until then.
 4. Then open a review with:
    `lightspeed open <branch> <base> --intent "<why this branch exists>"`
-   in the foreground — it waits for my Send, so do not background it and do not
-   wrap it in a timeout. Every output ends in a `next:` rule: follow it.
+   with NO timeout parameter on your shell tool (not via `timeout` or `&`) — it
+   does not return until I Send, often minutes to hours. If it is killed anyway,
+   only the command died: re-run exactly the same command, and never open a
+   second review to recover. Every output ends in a `next:` rule: follow it.
 ```
 
 Credentials are agent-independent: the model named in `.lightspeed.conf.json`
@@ -539,10 +541,14 @@ Send & End with words included; End without Sending always goes.
 
 `open`, `reply` and `publish` **wait for the reviewer's Send**: they do not
 return until the next batch arrives (or the review ends), so one call is one
-turn and there is no separate listening command to forget. `work` and `end` wait
-for nothing. If a waiting command is killed — a harness timeout, a server
-restart — re-running the _same_ command re-attaches: the server recognises the
-reply or publish it already has and waits again, so nothing is posted twice.
+turn and there is no separate listening command to forget — often minutes to
+hours, so an agent calls them with no timeout parameter on its shell tool. `work`
+and `end` wait for nothing. If a waiting command is killed anyway — a harness
+timeout, a server restart — only the command died: the server and the review
+stay live and hold the reviewer's Send, and re-running the _same_ command
+re-attaches: the server recognises the reply or publish it already has and waits
+again, so nothing is posted twice. Opening another review, ending or reopening
+recovers nothing, and the help says never to.
 `open` on a live review is the same re-attach: no new round, just the wait, and
 `--intent` is only required when opening fresh (given anyway, it is reported as
 ignored); on a working turn `open` is refused, since nobody sends while the
