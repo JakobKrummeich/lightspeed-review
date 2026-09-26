@@ -34,6 +34,7 @@ function page(t: TestContext) {
     .at({ left: 400, top: 100, width: 300, height: 600 })
     .append(card, other);
   const root = new FakeBox("aside").append(scroll);
+  document.body.append(root);
   return { document, dot, card, other, answers, scroll, root };
 }
 
@@ -113,6 +114,24 @@ test("the pulse outlives the dot it was laid over, which the banner redraws at o
   assert.equal(dot.getAttribute("data-light"), null, "nothing is set on the dot itself");
   t.mock.timers.tick(900);
   assert.deepEqual(pulses(document), []);
+});
+
+test("the pulse and the beam keep to the dot the banner redrew somewhere else along the header", (t) => {
+  // Regression: laid at the old dot's place, the pulse stood 27px off the redrawn dot in Chromium.
+  const { document, dot, root } = page(t);
+  returnBeam(asElement(root), ["t1"]);
+
+  dot.remove();
+  document.body.append(
+    new FakeBox("span", "lsr-presence-dot").at({ left: 530, top: 10, width: 8, height: 8 }),
+  );
+  t.mock.timers.tick(16);
+
+  assert.deepEqual(pulses(document), [["530px", "10px", "8px", "8px"]]);
+  const [beam] = beams(document);
+  // From the new centre (534, 14) to the card's top edge, still straight down: x 534 is over it.
+  assert.equal(beam?.style.getPropertyValue("left"), "533px");
+  assert.equal(beam?.style.getPropertyValue("height"), "286px");
 });
 
 test("with no dot in the header the card still arrives, without a beam", (t) => {

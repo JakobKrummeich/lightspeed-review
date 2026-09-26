@@ -59,6 +59,11 @@ export class FakeBox {
     return { left, top, width, height, right: left + width, bottom: top + height };
   }
 
+  /** In the page: its topmost ancestor is the document's body. */
+  get isConnected(): boolean {
+    return this.parentElement ? this.parentElement.isConnected : this.tagName === "body";
+  }
+
   get id(): string {
     return this.attributes.get("id") ?? "";
   }
@@ -150,8 +155,9 @@ export class FakeLightDocument {
 }
 
 /**
- * A document, an 800px-tall window and the textarea class, undone after the
- * test; `setTimeout` is mocked, so a test says when a moment is over.
+ * A document, an 800px-tall window, the textarea class and animation frames,
+ * undone after the test; `setTimeout` is mocked, so a test says when a moment
+ * is over and when a frame comes.
  */
 export function installLightDom(t: TestContext): FakeLightDocument {
   const globals = globalThis as Record<string, unknown>;
@@ -159,16 +165,20 @@ export function installLightDom(t: TestContext): FakeLightDocument {
     document: globals.document,
     window: globals.window,
     textarea: globals.HTMLTextAreaElement,
+    frame: globals.requestAnimationFrame,
   };
   const page = new FakeLightDocument();
   globals.document = page;
   globals.window = { innerHeight: 800 };
   globals.HTMLTextAreaElement = FakeTextArea;
+  // A frame is 16ms of the mocked clock.
+  globals.requestAnimationFrame = (step: () => void) => setTimeout(step, 16);
   t.mock.timers.enable({ apis: ["setTimeout"] });
   t.after(() => {
     globals.document = before.document;
     globals.window = before.window;
     globals.HTMLTextAreaElement = before.textarea;
+    globals.requestAnimationFrame = before.frame;
   });
   return page;
 }

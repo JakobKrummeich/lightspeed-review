@@ -17,12 +17,17 @@ const CORNER = 12;
  * read after a write makes the browser lay the page out again to answer it.
  */
 export function returnBeam(root: HTMLElement, cards: string[]): void {
-  const from = document.querySelector(".lsr-presence-dot")?.getBoundingClientRect();
+  const from = dotBox();
   const lit = cardsInSight(root, cards);
   const target = lit[0]?.getBoundingClientRect();
   if (from) pulse(from);
   for (const card of lit) arrive(card);
-  if (from && target) beam(from, target);
+  if (from && target && lit[0]) beam(from, lit[0], target);
+}
+
+function dotBox(): DOMRect | undefined {
+  const box = document.querySelector(".lsr-presence-dot")?.getBoundingClientRect();
+  return box && box.width > 0 ? box : undefined;
 }
 
 /**
@@ -30,15 +35,37 @@ export function returnBeam(root: HTMLElement, cards: string[]): void {
  * a few milliseconds after the answer lands, and would take a state set on
  * the old one away with it before a frame of the pulse was drawn.
  */
-function pulse(dot: DOMRect): void {
-  if (dot.width === 0) return;
-  spark(document.body, "lsr-light-pulse", PULSE_MS, {
+function pulse(from: DOMRect): void {
+  const light = spark(document.body, "lsr-light-pulse", PULSE_MS, pulseAt(from));
+  follow(light, () => {
+    const dot = dotBox();
+    return dot && pulseAt(dot);
+  });
+}
+
+function pulseAt(dot: DOMRect): Record<string, string> {
+  return {
     left: `${dot.left}px`,
     top: `${dot.top}px`,
     width: `${dot.width}px`,
     height: `${dot.height}px`,
-  });
+  };
 }
+
+/**
+ * Keeps a light on the dot for as long as it lasts: the redrawn dot often
+ * stands elsewhere along the header, its words having changed. Read, then
+ * written, once a frame; over when the light is.
+ */
+function follow(light: HTMLElement, place: () => Record<string, string> | undefined): void {
+  const step = (): void => {
+    if (!light.isConnected) return;
+    for (const [name, value] of Object.entries(place() ?? {})) light.style.setProperty(name, value);
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 /** Matched by `data-key` read back, not a selector: a key is the reviewer's text. */
 function cardsInSight(root: HTMLElement, keys: string[]): HTMLElement[] {
   const scroll = root.querySelector<HTMLElement>(".lsr-panel-scroll");
@@ -60,17 +87,26 @@ function arrive(card: HTMLElement): void {
   if (newest) play(newest, "arrive", MOMENT_MS);
 }
 
+/** From the dot to the card, and with them both wherever they go while it lasts. */
+function beam(from: DOMRect, card: HTMLElement, box: DOMRect): void {
+  const light = spark(document.body, "lsr-light-beam", MOMENT_MS, beamAt(from, box));
+  follow(light, () => {
+    const dot = dotBox();
+    return dot && card.isConnected ? beamAt(dot, card.getBoundingClientRect()) : undefined;
+  });
+}
+
 /** Aimed at the card's top edge, as straight below the dot as the card allows. */
-function beam(from: DOMRect, box: DOMRect): void {
+function beamAt(from: DOMRect, box: DOMRect): Record<string, string> {
   const x = from.left + from.width / 2;
   const y = from.top + from.height / 2;
   const dx = Math.min(Math.max(x, box.left + CORNER), box.right - CORNER) - x;
   const dy = box.top - y;
-  spark(document.body, "lsr-light-beam", MOMENT_MS, {
+  return {
     left: `${x - 1}px`,
     top: `${y}px`,
     height: `${Math.hypot(dx, dy)}px`,
     // Drawn pointing down; turned toward the card about its top end.
     "--lsr-beam-turn": `${Math.atan2(-dx, dy)}rad`,
-  });
+  };
 }
