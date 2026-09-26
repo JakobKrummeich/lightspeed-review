@@ -12,8 +12,8 @@ import {
   type GroupApprovalFlip,
 } from "../diff-view.ts";
 import { sweepApproved } from "../group-index.ts";
-import { progressChange, progressSegments, renderProgressBar } from "../progress-bar.ts";
-import { accelerate } from "./accelerator.ts";
+import { renderProgressBar } from "../progress-bar.ts";
+import { aimTick } from "./accelerator.ts";
 import { createApprovedFormStore, type ApprovedFormStore } from "./approved-form-store.ts";
 import {
   applyCollapsePlan,
@@ -299,8 +299,10 @@ function approveSweep(view: DiffView): void {
   const { state } = view;
   const next = sweepApproved(state.groups, state.approved);
   if (next.length === state.approved.length) return;
+  const light = aimTick(view.options.progress, state.groups, state.approved, next);
   state.approved = next;
   draw(view);
+  light.redrawn(view.options.root);
   persistApproved(view.options.key, state.approved).catch(() =>
     console.error("lightspeed: approved state was not saved"),
   );
@@ -317,24 +319,20 @@ function handleTick(view: DiffView, event: Event): void {
   // finished or undid folds; hand-opened blocks stay as left.
   const fileFlips = fileApprovalFlips(state.groups, state.approved, next);
   const groupFlips = groupApprovalFlips(state.groups, state.approved, next);
-  const change = progressChange(
-    progressSegments(state.groups, state.approved),
-    progressSegments(state.groups, next),
-  );
+  // Aimed before anything below writes to the page.
+  const light = aimTick(progress, state.groups, state.approved, next);
   state.approved = next;
   const onward = chapterToReadNext(state, groupFlips);
   if (onward !== undefined) {
-    // A whole draw, so nothing below is patched; the light plays on the new bar.
+    // A whole draw, so nothing below is patched; the light grows the new bar.
     setFocus(view, onward);
-    accelerate(progress, change, input);
+    light.redrawn(root, input);
   } else {
     applyApprovedState(root, state.groups, state.approved);
     applyCollapsePlan(root, tickCollapsePlan(fileFlips, groupFlips));
     // A tick's folds are as much a state worth restoring as hand-opened ones.
     reportOpen(view);
-    // Lit before the patch, so the fill grows behind the particle.
-    accelerate(progress, change, input);
-    applyProgressState(progress, state.groups, state.approved);
+    light.fire(input, () => applyProgressState(progress, state.groups, state.approved));
   }
   // A tick redraws nothing, so completion has to be reported from here too.
   view.options.onApproved(reviewApproved(state.groups, state.approved));

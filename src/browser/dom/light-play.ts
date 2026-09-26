@@ -6,25 +6,45 @@
  * whether or not anybody saw it move.
  */
 
-/** The latest moment started on each element: only its own timer may end it. */
-const playing = new WeakMap<Element, object>();
+/**
+ * The latest moment started on each element, with the custom properties it
+ * set: only its own timer may end it, and ending it takes those too.
+ */
+const playing = new WeakMap<Element, { names: string[] }>();
 
 /**
- * Sets `data-light` for `ms`. The same moment again restarts it: the flush
- * between taking the state off and putting it back is what a browser needs to
- * see the animation as new, and the earlier moment's timer then ends nothing.
+ * Sets `data-light` for `ms`, and `place`'s custom properties with it. The
+ * same moment again restarts it: the flush between taking the state off and
+ * putting it back is what a browser needs to see the animation as new, and
+ * the earlier moment's timer then ends nothing.
  */
-export function play(element: Element, moment: string, ms: number): void {
+export function play(
+  element: Element,
+  moment: string,
+  ms: number,
+  place: Record<string, string> = {},
+): void {
   if (element.getAttribute("data-light") !== null) {
-    element.removeAttribute("data-light");
+    stop(element);
     void (element as HTMLElement).offsetWidth;
   }
-  const run = {};
+  const run = { names: Object.keys(place) };
   playing.set(element, run);
+  const { style } = element as HTMLElement;
+  for (const [name, value] of Object.entries(place)) style.setProperty(name, value);
   element.setAttribute("data-light", moment);
   setTimeout(() => {
-    if (playing.get(element) === run) element.removeAttribute("data-light");
+    if (playing.get(element) === run) stop(element);
   }, ms);
+}
+
+/** Ends the element's moment now, whichever it is, and the properties it set. */
+export function stop(element: Element): void {
+  const run = playing.get(element);
+  playing.delete(element);
+  element.removeAttribute("data-light");
+  const { style } = element as HTMLElement;
+  for (const name of run?.names ?? []) style.removeProperty(name);
 }
 
 /**

@@ -4,14 +4,17 @@
  * where it stopped; a finished chapter flashes and a glint crosses it; the
  * last one sends a glint down every segment. The tick's own box glows.
  */
-import type { ProgressChange } from "../progress-bar.ts";
-import { play, spark } from "./light-play.ts";
+import type { DiffGroup } from "../../diff-extract.ts";
+import { progressChange, progressSegments, type ProgressChange } from "../progress-bar.ts";
+import { play, spark, stop } from "./light-play.ts";
 
 /** Long enough for the slowest run, the last glint and its fade. */
 const MOMENT_MS = 2400;
 const TICK_MS = 600;
 /** The whole bar is crossed in this, however many segments it has. */
 const SWEEP_MS = 540;
+/** Everything a run lays into a segment, taken out again by an untick. */
+const RUN_LIGHTS = ["lsr-light-photon", "lsr-light-edge", "lsr-light-flash", "lsr-light-glint"];
 
 interface Run {
   /** Where the particle sets off and lands, from the segment's own left edge. */
@@ -20,32 +23,81 @@ interface Run {
   ms: number;
 }
 
+/** Aimed once, then fired on whichever bar the tick left on the page. */
+export interface Accelerator {
+  /**
+   * The bar is patched in place: `grow` writes its new widths, and is called
+   * once the run is lit, so the fill grows behind the particle.
+   */
+  fire(tick: Element, grow: () => void): void;
+  /**
+   * The bar has been redrawn at its new widths (a tick that moved focus on, a
+   * sweep), on elements that never showed the old ones: the grown fill is set
+   * back to where the tick found it and grown from there. The tick's box glows
+   * if the redraw drew it again.
+   */
+  redrawn(root: ParentNode, tick?: HTMLInputElement): void;
+}
+
+/** `before` and `after` are the approved lists either side of the tick. */
+export function aimTick(
+  progress: HTMLElement,
+  groups: DiffGroup[],
+  before: string[],
+  after: string[],
+): Accelerator {
+  const change = progressChange(progressSegments(groups, before), progressSegments(groups, after));
+  return aimAccelerator(progress, change);
+}
+
 /**
- * Called before the fill's width is patched: measuring flushes styles, and
- * the moment's state has to be on the segment when the width changes, so the
- * fill grows behind the particle rather than ahead of it.
+ * Measures the bar now, before the tick writes anything to the page: every
+ * patch and redraw after it would make this read lay the page out again.
  */
-export function accelerate(
+export function aimAccelerator(
   progress: HTMLElement,
   change: ProgressChange | undefined,
-  tick: Element,
-): void {
-  play(tick, "tick", TICK_MS);
-  if (change === undefined) return;
-  const segments = [...progress.querySelectorAll<HTMLElement>(".lsr-progress-segment")];
-  const segment = segments.find((one) => one.dataset.groupIndex === String(change.index));
-  const run = segment && runTo(segment, change.share);
-  // No box: the bar is not drawn at this width, and there is nowhere to run.
-  if (!segment || !run) return;
-  launch(segment, run, change.share);
-  if (change.kind !== "partial") finishChapter(segment, run.ms);
-  if (change.kind === "all") sweep(segments, run.ms);
+): Accelerator {
+  const segment = change && segmentAt(progress, change.index);
+  const run = segment && change && runTo(segment, change.share);
+  const was = segment?.querySelector(".lsr-progress-fill")?.getAttribute("style") ?? "";
+  const light = (grow: () => void): void => {
+    if (change && run) launch(progress, change, run, grow);
+    else settle(progress, grow);
+  };
+  return {
+    fire(tick, grow) {
+      play(tick, "tick", TICK_MS);
+      light(grow);
+    },
+    redrawn(root, tick) {
+      const live = tick && liveTick(root, tick);
+      if (live) play(live, "tick", TICK_MS);
+      const fill = change && segmentAt(progress, change.index)?.querySelector(".lsr-progress-fill");
+      if (!fill) return;
+      const grown = fill.getAttribute("style") ?? "";
+      // Back to the old width with nothing to animate the way back, read so
+      // the browser holds it as where the growth starts.
+      fill.setAttribute("style", `${was}; transition: none`);
+      void (fill as HTMLElement).offsetWidth;
+      light(() => fill.setAttribute("style", grown));
+    },
+  };
+}
+
+function segmentAt(progress: HTMLElement, index: number): HTMLElement | undefined {
+  return segmentsOf(progress).find((one) => one.dataset.groupIndex === String(index));
+}
+
+function segmentsOf(progress: HTMLElement): HTMLElement[] {
+  return [...progress.querySelectorAll<HTMLElement>(".lsr-progress-segment")];
 }
 
 /**
  * From the start of the bar, not of the segment: the light comes from where
  * the reviewer's progress began. A farther edge is a longer run, capped so a
- * wide bar does not keep the moment going.
+ * wide bar does not keep the moment going. No box: the bar is not drawn at
+ * this width, and there is nowhere to run.
  */
 function runTo(segment: HTMLElement, share: number): Run | undefined {
   const box = segment.getBoundingClientRect();
@@ -56,18 +108,50 @@ function runTo(segment: HTMLElement, share: number): Run | undefined {
   return { from, to, ms: Math.round(Math.min(600, 220 + (to - from) / 2)) };
 }
 
-function launch(segment: HTMLElement, run: Run, share: number): void {
-  segment.style.setProperty("--lsr-photon-ms", `${run.ms}ms`);
-  play(segment, "run", MOMENT_MS);
+/**
+ * The segment holds the run only until the particle lands: its fill's growth
+ * waits on the particle that long, and a width set after that — an untick —
+ * applies at once. The sparks carry their own copy of the run's length, so
+ * the segment's can go without cutting them short.
+ */
+function launch(progress: HTMLElement, change: ProgressChange, run: Run, grow: () => void): void {
+  const segment = segmentAt(progress, change.index);
+  if (!segment) {
+    grow();
+    return;
+  }
+  const length = { "--lsr-photon-ms": `${run.ms}ms` };
+  play(segment, "run", run.ms, length);
+  grow();
   spark(segment, "lsr-light-photon", MOMENT_MS, {
+    ...length,
     "--lsr-photon-from": `${run.from}px`,
     "--lsr-photon-to": `${run.to}px`,
   });
-  spark(segment, "lsr-light-edge", MOMENT_MS, { "--lsr-edge-at": `${share * 100}%` });
+  spark(segment, "lsr-light-edge", MOMENT_MS, {
+    ...length,
+    "--lsr-edge-at": `${change.share * 100}%`,
+  });
+  if (change.kind !== "partial") finishChapter(segment, run.ms);
+  if (change.kind === "all") sweep(segmentsOf(progress), run.ms);
+}
+
+/**
+ * An untick: nothing celebrates it, and a run still going would hold its
+ * width change back behind a particle bound for an edge that is gone.
+ */
+function settle(progress: HTMLElement, grow: () => void): void {
+  for (const segment of segmentsOf(progress)) {
+    if (segment.getAttribute("data-light") === "run") stop(segment);
+    for (const name of RUN_LIGHTS) {
+      for (const light of segment.querySelectorAll(`.${name}`)) light.remove();
+    }
+  }
+  grow();
 }
 
 function finishChapter(segment: HTMLElement, ms: number): void {
-  spark(segment, "lsr-light-flash", MOMENT_MS);
+  spark(segment, "lsr-light-flash", MOMENT_MS, { "--lsr-photon-ms": `${ms}ms` });
   glint(segment, ms + 120);
 }
 
@@ -80,4 +164,18 @@ function sweep(segments: HTMLElement[], ms: number): void {
 function glint(segment: HTMLElement, at: number): void {
   const fill = segment.querySelector(".lsr-progress-fill");
   if (fill) spark(fill, "lsr-light-glint", MOMENT_MS, { "--lsr-glint-at": `${at}ms` });
+}
+
+/**
+ * The box the redraw drew in the ticked one's place, matched by what it
+ * ticks: a tick that moved focus on to another chapter has none on screen.
+ */
+function liveTick(root: ParentNode, tick: HTMLInputElement): HTMLInputElement | undefined {
+  if (tick.isConnected) return tick;
+  return [...root.querySelectorAll<HTMLInputElement>("input")].find(
+    (input) =>
+      input.className === tick.className &&
+      input.dataset.file === tick.dataset.file &&
+      input.dataset.groupIndex === tick.dataset.groupIndex,
+  );
 }

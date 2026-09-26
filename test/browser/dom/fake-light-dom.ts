@@ -23,6 +23,10 @@ class FakeStyle {
   getPropertyValue(name: string): string {
     return this.properties.get(name) ?? "";
   }
+
+  removeProperty(name: string): void {
+    this.properties.delete(name);
+  }
 }
 
 export class FakeBox {
