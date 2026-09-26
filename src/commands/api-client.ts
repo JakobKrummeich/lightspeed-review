@@ -2,7 +2,8 @@ import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import type { DomainErrorBody } from "../server.ts";
 import { openCall } from "../open-call.ts";
 import type { ReviewCloser } from "../session-types.ts";
-import { endedMessage, helpEndedOn, helpReopen, helpRestart, reattachCall } from "../turn-help.ts";
+import { endedReview } from "../session-resolve.ts";
+import { helpRestart, reattachCall } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /**
@@ -61,13 +62,7 @@ function errorForStatus(
       suggestions: [`Run \`${openCall(target(about))}\` to open the session first`],
     });
   }
-  if (status === 409) {
-    return new ReviewError({
-      code: "session_ended",
-      message: endedMessage(endedBy),
-      suggestions: [helpEndedOn(target(about)), helpReopen(target(about))],
-    });
-  }
+  if (status === 409) return endedReview(target(about), endedBy);
   if (status === 503) {
     return new ReviewError({
       code: "server_not_running",

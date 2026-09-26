@@ -4,6 +4,8 @@ import {
   HELP_OPEN,
   TURN_RULES,
   WAITS_FOR_SEND,
+  endedClause,
+  endedMessage,
   helpReopen,
   nextRule,
   publishCall,
@@ -90,4 +92,14 @@ test("every placeholder is single-quoted, so a pasted line runs as written", () 
 test("the turn rules are the three the protocol reduces to", () => {
   assert.equal(TURN_RULES.length, 3);
   assert.match(TURN_RULES[1], /reply.*work.*never both/);
+});
+
+/** One wording for who closed a review, wherever an ended review is explained. */
+test("the closer is named the same way in every ended-review sentence", () => {
+  for (const endedBy of ["reviewer", "agent", undefined] as const) {
+    assert.ok(endedMessage(endedBy).startsWith(endedClause(endedBy)), String(endedBy));
+  }
+  assert.equal(endedClause("agent"), "`lightspeed end` ended this review, not the reviewer");
+  assert.equal(endedClause("reviewer"), "the reviewer ended this review");
+  assert.equal(endedClause(undefined), "this review is ended");
 });

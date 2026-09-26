@@ -277,6 +277,32 @@ test("with no server but a live review on disk, the way out is still to re-attac
 });
 
 /**
+ * Ended on disk, no server: "restart and re-attach" led to an `open` refused
+ * `session_ended`. The review's own answer comes first, naming who ended it.
+ */
+test("with no server and an ended review on disk, a command is refused session_ended", async () => {
+  const repoRoot = await repoWithoutServer();
+  storeSession(join(repoRoot, "state"), repoRoot, "feat");
+  const store = new SessionStore(join(repoRoot, "state"));
+  const key = sessionKey(repoRoot, "feat", "main");
+  store.save({ ...store.get(key)!, status: "ended", endedBy: "agent" });
+
+  for (const args of [
+    ["reply", "--to", "main", "hi", "feat", "main"],
+    ["work", "more", "feat", "main"],
+  ]) {
+    const { stdout, code } = await runCli(args, repoRoot);
+
+    assert.equal(code, 2, stdout);
+    assert.match(stdout, /^ {2}code: session_ended$/m);
+    assert.match(stdout, /`lightspeed end` ended this review, not the reviewer/);
+    assert.match(stdout, /lightspeed approvals feat main/);
+    assert.match(stdout, /lightspeed open feat main --reopen/);
+    assert.doesNotMatch(stdout, /re-attach/);
+  }
+});
+
+/**
  * `reply --to main fixed it`: the shell split the text, and its last word reads
  * as a branch. No such branch and a live review here means the words were text.
  */

@@ -5,7 +5,7 @@ import { sessionKey } from "../paths.ts";
 import type { ReviewCloser } from "../session-types.ts";
 import type { BatchItem } from "../threads.ts";
 import { turnBlock, type TurnLabel } from "../turn.ts";
-import { nextRule } from "../turn-help.ts";
+import { endedClause, nextRule } from "../turn-help.ts";
 import { longPoll } from "./long-poll.ts";
 import { serverOrigin } from "./server-address.ts";
 import { assertServerCurrent } from "./server-lifecycle.ts";
@@ -183,11 +183,10 @@ function endedHelp(result: PollPayload): string {
   return [closerClause(result.endedBy), ...approvalClauses(counted(result.approval))].join("; ");
 }
 
-/** A record that does not say must not be read as either party. */
+/** A record that does not say must not be read as either party; opening a help line, capitalised. */
 function closerClause(endedBy: ReviewCloser | undefined): string {
-  if (endedBy === "reviewer") return "The reviewer ended this review";
-  if (endedBy === "agent") return "`lightspeed end` closed this review, not the reviewer";
-  return "This review is ended";
+  const clause = endedClause(endedBy);
+  return clause.charAt(0).toUpperCase() + clause.slice(1);
 }
 
 /** An older server's account is unreadable rather than empty — it recorded
