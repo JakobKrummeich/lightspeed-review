@@ -17,6 +17,8 @@ interface Harness {
   port: number;
   /** Poll requests the server saw, dropped ones included. */
   polls: PollRequest[];
+  /** Every POST the server saw, as `<url> <body>`: the delivery acknowledgements. */
+  posts: string[];
   answer: (status: number, body: string) => void;
   close: () => Promise<void>;
 }
@@ -28,10 +30,13 @@ interface HarnessOptions {
   healthy?: boolean;
   /** Node's own idle keep-alive, short enough to expire between requests. */
   keepAliveTimeoutMs?: number;
+  /** The status every POST is answered with; 200 unless a test says otherwise. */
+  postStatus?: number;
 }
 
 async function pollServer(options: HarnessOptions = {}): Promise<Harness> {
   const polls: PollRequest[] = [];
+  const posts: string[] = [];
   const waiting = new Set<ServerResponse>();
   const sockets = new Map<unknown, number>();
   let toDrop = options.dropped ?? 0;
@@ -41,7 +46,15 @@ async function pollServer(options: HarnessOptions = {}): Promise<Harness> {
       return;
     }
     if (request.method === "POST") {
-      response.writeHead(200, { "content-type": "application/json" }).end("{}");
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => (body += chunk));
+      request.on("end", () => {
+        posts.push(`${request.url} ${body}`);
+        response
+          .writeHead(options.postStatus ?? 200, { "content-type": "application/json" })
+          .end("{}");
+      });
       return;
     }
     if (!sockets.has(request.socket)) sockets.set(request.socket, sockets.size);
@@ -65,6 +78,7 @@ async function pollServer(options: HarnessOptions = {}): Promise<Harness> {
   return {
     port,
     polls,
+    posts,
     answer: (status, body) => {
       for (const response of waiting) {
         response.writeHead(status, { "content-type": "application/json" });
@@ -171,6 +185,26 @@ test("a server error ends the poll at once as a lightspeed bug, not as feedback"
   );
   assert.equal(harness.polls.length, 1);
   await harness.close();
+});
+
+/**
+ * The prompts are in this process's hands before the acknowledgement goes out: a
+ * refused acknowledgement costs one re-delivery on the next poll, while a failed
+ * wait would cost the agent the feedback it is holding. A 500 is the sharpest
+ * case, because it arrives as a ReviewError — the kind `longPoll` treats as final.
+ */
+test("a delivery the server fails to confirm still hands the answer back", async (t) => {
+  const harness = await pollServer({ postStatus: 500 });
+  // Closed even when an assertion fails, so a regression fails instead of hanging.
+  t.after(() => harness.close());
+
+  const polling = pollFor(harness);
+  await untilPolled(harness, 1);
+  harness.answer(200, JSON.stringify({ status: "feedback", prompts: [], delivery: "d-1" }));
+
+  assert.deepEqual(await polling, { status: "feedback", prompts: [], delivery: "d-1" });
+  assert.deepEqual(harness.posts, ['/api/session/abc/delivered {"delivery":"d-1"}']);
+  assert.equal(harness.polls.length, 1);
 });
 
 test("nothing listening is reported as server_not_running once the probes are spent", async () => {
