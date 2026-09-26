@@ -179,6 +179,12 @@ export function handleEnd(
 ) {
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
+  // Idempotent in fact, not just in exit code: closing again re-logged the round
+  // end to the ledger and re-stamped a record nothing had changed.
+  if (session.status === "ended") {
+    sendJson(response, 200, { status: "ended", ...turnFacts(session) });
+    return;
+  }
   const now = new Date().toISOString();
   const ended = withClosedRound({
     ...session,
