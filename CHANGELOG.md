@@ -20,11 +20,13 @@ agent's answer, each approval and the last one.
   delivery succeeds, so a failed send never animates.
 - The agent's answer arrives on a beam from the header's turn dot to the first
   new card, a spark runs once round each new card's edge and the answer fades
-  in. A card out of sight gets no beam; the dot's pulse alone says it.
+  in. A card out of sight gets no beam; the dot's pulse alone says it. An
+  answer to a folded panel opens it at the newest talk, beam and all.
 - When the turn comes back while the tab is in the background, the title
   reads `● Your turn` and the favicon pulses; both clear when the tab is seen
-  or the turn goes back to the agent, and a review that has ended never lights
-  them. The review page now has a favicon.
+  or the turn goes back to the agent. A review that has ended never lights
+  them, not even for the turn its end hands back; reopened with
+  `open --reopen`, it lights them again. The review page now has a favicon.
 - Under `prefers-reduced-motion`, every moment shows its end state without
   movement, and the lit favicon holds still.
 - New `--lsr-light-*` tokens carry the light's colours; light scheme draws
