@@ -354,7 +354,7 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 3.1.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.2.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 Every command but `init` (the explicit install) then checks the places `init`
@@ -795,8 +795,13 @@ A ledger failure never fails a review: it is reported as
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim.
-- The conversation is threads: each item with its exchange stacked under it,
-  and a foot with a reply box, **Reply** and a **Resolve** that folds it. The header
+- The conversation is threads, grouped by whose move it is: **Resolved** on top
+  (folded until you open it), **Waiting on agent**, and **Needs you** at the
+  bottom next to the compose box. Each thread is named by its file and line or
+  its first words, folds from its head, and has a foot with a reply box,
+  **Reply** and **Resolve**. A reply you have not sent yet sits in its thread
+  marked "not sent yet"; every message you sent says whether the agent has seen
+  it or nobody is listening yet. The header
   and the foot of the conversation say whose turn it is, and a small
   "Connection lost — reconnecting…" chip shows while the live update stream is
   down.
@@ -812,7 +817,7 @@ A ledger failure never fails a review: it is reported as
   touches — and no swept chapter carries the badge: the lane is the part of the
   survey the page has already said not to read.
 - A reload keeps the work: the queued feedback pills, the comment you were
-  halfway through typing, the chapter you were reading, which files you had
+  halfway through typing, which threads you folded, the chapter you were reading, which files you had
   open in it and where you had scrolled to. Sending the queue is what clears
   it. A new round does not put you
   back where you were in the diff it replaced — that diff is gone — but it does

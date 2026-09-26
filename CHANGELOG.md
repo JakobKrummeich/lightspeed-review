@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.2.0
+
+The agent reads each thread whole, and the reviewer's panel says whose move it
+is.
+
+- Every block printed before a wait ends on a top-level `url:` line, so the
+  review's address is the last thing the agent sees before the command blocks.
+  The grouping notice (`status: grouping N files`) is the one exception.
+- Batch items for a reply or a reopened thread carry `thread[]` — every earlier
+  message as `{who, said}` — so the agent answers the whole exchange, not the
+  last line. A resolved thread's item carries only what it was about (`asked`)
+  and the reviewer's last words; `next.resolved` says per thread whether to act on a last word or keep
+  the last answer's promise.
+- A thread anchored in an earlier round whose line has changed since says so:
+  `outdated: "anchored in round N; that line has changed since"`.
+- The conversation panel groups threads by whose move it is — Resolved,
+  Waiting on agent, Needs you — and remembers which cards and groups the
+  reviewer folded. Cards show where a thread sits and its first words, never
+  raw ids.
+- Drafts sit inside their thread's card, marked not sent yet; a comment on a
+  new line shows as a New · not sent yet card, and the tray counts what is not
+  sent yet.
+- Each sent message says how far it got: sent, seen by agent, or sent · agent
+  not listening.
+- The round offer counts queued replies and resolves as what they are, and the
+  stale badge marks only line comments.
+- Installed skills are stamped 3.2.0 and refreshed on the next command.
+
 ## 3.1.0
 
 An agent whose command was killed mid-wait now knows what survived, and one
