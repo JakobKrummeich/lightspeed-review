@@ -17,6 +17,7 @@ import { wireFinish } from "./finish.ts";
 import { wireIntent } from "./intent-mount.ts";
 import { mountOpening } from "./opening-overlay.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
+import { mountPanelLight } from "./panel-light.ts";
 import type { LinePlace } from "./line-numbers.ts";
 import { createReplayRefresher } from "./replay-refresh.ts";
 import { mountReplayOverlay, type ReplayOpening } from "./replay-overlay.ts";
@@ -266,6 +267,7 @@ function mountPanelSide(
       onQueued(queued);
     },
     onJump,
+    light: mountPanelLight(page.panelRoot, session.conversation),
   });
   return { banner, railControl, panel };
 }

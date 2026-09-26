@@ -1749,3 +1749,62 @@ test("words the server holds read as unheard until the agent picks them up", (t)
   panel.update(held);
   assert.match(drawn(root), /data-delivery="seen"/, "a stale refetch does not undo the pickup");
 });
+
+/** The panel with a light that records when it was asked, and what was on screen then. */
+function mountLit(t: TestContext, initial: SessionData = session()) {
+  installFakeElements((undo) => t.after(undo));
+  const root = new FakeNode();
+  const asked: string[] = [];
+  const panel = mountPanel({
+    root: asPanelRoot(root),
+    key: "key",
+    session: initial,
+    storage: new FakeStorage(),
+    onEnd: () => {},
+    onPending: () => {},
+    onJump: () => {},
+    light: {
+      sent: (ended) =>
+        asked.push(
+          `sent ended=${ended} queued=${queuedIn(root)} box=${root.querySelector("#lsr-general-comment")?.value}`,
+        ),
+      drawn: (conversation) => asked.push(`drawn ${conversation.length}`),
+    },
+  });
+  return { root, panel, asked };
+}
+
+test("a send that went out lights its drafts while they are still on screen", async (t) => {
+  const { root, panel, asked } = mountLit(t);
+  stubFetch(t);
+  panel.queue([annotation]);
+  root.querySelector("#lsr-general-comment")!.value = "and the changelog";
+  asked.length = 0;
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+
+  // Measured before the draw takes the pill and the box's words away; the
+  // draw itself follows at once, with the reviewer's words and no news.
+  assert.deepEqual(asked, ["sent ended=false queued=1 box=and the changelog", "drawn 1"]);
+});
+
+test("an end that sends nothing has nothing to light", async (t) => {
+  const { root, panel, asked } = mountLit(t);
+  stubFetch(t);
+  panel.setTurn(WORKING);
+  asked.length = 0;
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send-end") });
+  await tick(0);
+
+  assert.deepEqual(asked, ["drawn 0"]);
+});
+
+test("every draw hands the light the conversation it drew", (t) => {
+  const { panel, asked } = mountLit(t);
+
+  panel.update(session({ conversation: [reply] }));
+
+  assert.deepEqual(asked, ["drawn 1"]);
+});

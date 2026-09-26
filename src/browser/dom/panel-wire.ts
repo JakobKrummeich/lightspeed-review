@@ -82,6 +82,12 @@ export function typedReplies(root: HTMLElement): Map<string, string> {
   return typed;
 }
 
+/** No `document` outside a browser; there is then nothing focused to keep. */
+export function focusedReply(root: HTMLElement): string | undefined {
+  const active = (globalThis as { document?: Document }).document?.activeElement;
+  return replyBoxes(root).find((box) => box === active)?.dataset.thread;
+}
+
 export function restoreReplies(root: HTMLElement, typed: Map<string, string>): void {
   for (const [thread, said] of typed) {
     const box = replyBox(root, thread);
