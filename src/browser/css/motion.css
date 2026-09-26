@@ -31,7 +31,11 @@
     transition: none;
   }
 
-  .lsr-firefly i {
+  /* Every layer by its own selector: `light.css` names the inner two more
+   * closely, and a rule for the outer one alone loses to them. */
+  .lsr-firefly i,
+  .lsr-firefly i i,
+  .lsr-firefly i i i {
     animation: none;
   }
 
@@ -88,12 +92,12 @@
   .lsr-compose-actions [data-light]::after,
   .lsr-light-pulse,
   .lsr-thread[data-light]::before,
-  .lsr-thread[data-light]::after {
+  .lsr-thread[data-light]::after,
+  .lsr-tick input[data-light="tick"]:checked::before {
     display: none;
   }
 
-  .lsr-message[data-light],
-  .lsr-tick input[data-light] {
+  .lsr-message[data-light] {
     animation: none;
   }
 

@@ -113,14 +113,23 @@
   }
 }
 
+/*
+ * The box's own glow: a layer over it that fades, so only opacity moves.
+ * `::before`, because the drawn box's `::after` is its tick mark (`index.css`).
+ */
 .lsr-tick input[data-light="tick"]:checked {
-  animation: lsr-light-tick 600ms ease-out;
+  position: relative;
 }
 
-@keyframes lsr-light-tick {
-  from {
-    box-shadow: 0 0 0.625rem var(--lsr-light-glow);
-  }
+.lsr-tick input[data-light="tick"]:checked::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0.625rem var(--lsr-light-glow);
+  opacity: 0;
+  pointer-events: none;
+  animation: lsr-light-flash 600ms ease-out;
 }
 
 /*
