@@ -1,0 +1,290 @@
+/*
+ * Light moments: light moves when the turn changes hands between the reviewer
+ * and the agent, and at nothing else — never while the diff is only being read
+ * or scrolled, and never in the way of a press. Every moment is a one-shot the
+ * page starts on its event and takes down after it (`dom/light-play.ts`); the
+ * firefly alone lasts, exactly as long as the working line it sits in.
+ *
+ * Movement is carried by transform and opacity. The colours are the
+ * `--lsr-light-*` tokens, so one rule draws both skies: starlight at night, a
+ * star atlas on paper. `motion.css` holds each moment's still end state, and
+ * `light-approval.css` the two moments that answer the reviewer's ticks.
+ */
+
+/*
+ * The firefly: the agent is at work. One spark drifting in a small box, its
+ * path the sum of three nested layers — across, up and down, a wobble — whose
+ * periods share no rhythm, so the path does not come round again for hours.
+ * Each layer only goes back and forth, so nothing travels one way, and the
+ * spark's light barely moves: a pulse or a sweep is what reads as "loading".
+ */
+.lsr-firefly {
+  position: relative;
+  flex: 0 0 auto;
+  width: 2.125rem;
+  height: 1rem;
+}
+
+.lsr-firefly i {
+  position: absolute;
+  inset: 0;
+  animation: lsr-firefly-across 5.3s ease-in-out infinite alternate;
+}
+
+.lsr-firefly i i {
+  animation-name: lsr-firefly-rise;
+  animation-duration: 3.7s;
+}
+
+/* Centred, so a spark whose layers stand still sits in the middle of the box. */
+.lsr-firefly i i i {
+  inset: calc(50% - 0.25rem) auto auto calc(50% - 0.25rem);
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--lsr-light-spark);
+  box-shadow: 0 0 0.5rem 0.125rem var(--lsr-light-glow);
+  animation-name: lsr-firefly-wobble;
+  animation-duration: 2.3s;
+}
+
+@keyframes lsr-firefly-across {
+  from {
+    transform: translateX(-0.8125rem);
+  }
+
+  to {
+    transform: translateX(0.8125rem);
+  }
+}
+
+@keyframes lsr-firefly-rise {
+  from {
+    transform: translateY(0.25rem);
+  }
+
+  to {
+    transform: translateY(-0.25rem);
+  }
+}
+
+@keyframes lsr-firefly-wobble {
+  0% {
+    transform: translate(-0.125rem, 0.0625rem);
+    opacity: 0.85;
+  }
+
+  40% {
+    transform: translate(0.1875rem, -0.125rem);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-0.0625rem, 0.1875rem);
+    opacity: 0.9;
+  }
+}
+
+/*
+ * 01 Warp Send: what went out squeezes into streaks that shoot into the
+ * button that sent it, and the button flares as they land. The streaks are
+ * ghosts laid over the page (`dom/warp-send.ts`), so the send and the redraw
+ * never wait on them: the sent words are already drawn underneath.
+ */
+.lsr-warp-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+
+.lsr-warp-ghost {
+  position: fixed;
+  transform-origin: right center;
+  animation: lsr-warp-streak 620ms cubic-bezier(0.7, 0, 0.3, 1) var(--lsr-warp-delay) both;
+}
+
+.lsr-warp-ghost > * {
+  height: 100%;
+  margin: 0;
+  animation: lsr-light-out 620ms linear var(--lsr-warp-delay) both;
+}
+
+/* The streak itself: light over the copy, burning in as the copy goes out. */
+.lsr-warp-ghost::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--lsr-accent), var(--lsr-light-core));
+  box-shadow: 0 0 0.875rem var(--lsr-light-glow);
+  opacity: 0;
+  animation: lsr-light-in 620ms linear var(--lsr-warp-delay) both;
+}
+
+@keyframes lsr-warp-streak {
+  30% {
+    transform: scale(1.08, 0.18);
+  }
+
+  100% {
+    transform: translate(var(--lsr-warp-dx), var(--lsr-warp-dy)) scale(0.1, 0.06);
+    opacity: 0;
+  }
+}
+
+@keyframes lsr-light-out {
+  30%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lsr-light-in {
+  30%,
+  100% {
+    opacity: 1;
+  }
+}
+
+.lsr-compose-actions [data-light="flare"] {
+  position: relative;
+}
+
+.lsr-compose-actions [data-light="flare"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 2px var(--lsr-light-core),
+    0 0 1.75rem 0.5rem var(--lsr-light-glow);
+  opacity: 0;
+  pointer-events: none;
+  animation: lsr-light-flare 700ms ease-out 480ms both;
+}
+
+@keyframes lsr-light-flare {
+  15% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * 03 Return beam: the agent answered. The header's turn dot sends a beam down
+ * to the new card, a spark runs once round the card's edge and the answer
+ * fades in. A card out of sight gets no beam; the dot's pulse alone says it.
+ */
+.lsr-presence-dot[data-light="pulse"] {
+  position: relative;
+}
+
+.lsr-presence-dot[data-light="pulse"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--lsr-light-core);
+  box-shadow: 0 0 0.5rem 0.25rem var(--lsr-light-glow);
+  animation: lsr-light-pulse 900ms ease-out both;
+}
+
+@keyframes lsr-light-pulse {
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+.lsr-light-beam {
+  position: fixed;
+  z-index: 25;
+  width: 2px;
+  transform-origin: top;
+  background: linear-gradient(to bottom, transparent, var(--lsr-light-core) 80%, var(--lsr-accent));
+  box-shadow: 0 0 0.625rem 1px var(--lsr-light-glow);
+  pointer-events: none;
+  animation: lsr-light-beam 900ms cubic-bezier(0.6, 0, 0.2, 1) both;
+}
+
+@keyframes lsr-light-beam {
+  0% {
+    transform: rotate(var(--lsr-beam-turn)) scaleY(0);
+  }
+
+  35% {
+    transform: rotate(var(--lsr-beam-turn)) scaleY(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: rotate(var(--lsr-beam-turn)) scaleY(1);
+    opacity: 0;
+  }
+}
+
+/* The card's own glow: a layer that fades, so only opacity moves. */
+.lsr-thread[data-light="arrive"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 1.375rem var(--lsr-light-glow);
+  opacity: 0;
+  pointer-events: none;
+  animation: lsr-light-swell 1400ms ease-out 280ms;
+}
+
+@keyframes lsr-light-swell {
+  40% {
+    opacity: 1;
+  }
+}
+
+/* One lap of the card's own outline, then gone. */
+.lsr-thread[data-light="arrive"]::after {
+  content: "";
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--lsr-light-spark);
+  box-shadow: 0 0 0.75rem 0.1875rem var(--lsr-light-glow);
+  offset-path: inset(0 round 0.5rem);
+  offset-rotate: 0deg;
+  opacity: 0;
+  pointer-events: none;
+  animation: lsr-light-orbit 1100ms linear 280ms both;
+}
+
+@keyframes lsr-light-orbit {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+
+  5%,
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.lsr-message[data-light="arrive"] {
+  animation: lsr-light-fade 400ms ease-out 420ms both;
+}
+
+@keyframes lsr-light-fade {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}

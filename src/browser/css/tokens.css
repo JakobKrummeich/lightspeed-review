@@ -88,6 +88,30 @@
   --lsr-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /*
+   * The light moments (`light.css`): light moves when the turn changes hands,
+   * and it is drawn two ways. At night it is starlight — a white-hot core in a
+   * wide accent halo. On paper it is a star atlas, where white would vanish:
+   * the core is cobalt ink, the halo a thin wash. Always the accent's hue,
+   * never red or green, which the diff owns.
+   */
+  --lsr-light-core: light-dark(var(--lsr-accent), var(--lsr-white));
+  --lsr-light-ink: light-dark(color-mix(in oklab, var(--lsr-accent) 85%, black), var(--lsr-white));
+  --lsr-light-glow: light-dark(
+    color-mix(in oklab, var(--lsr-accent) 38%, transparent),
+    color-mix(in oklab, var(--lsr-accent) 75%, transparent)
+  );
+  /* The sheen that runs over a filled bar: white on either sheet, because it
+   * crosses the accent fill, never the page. */
+  --lsr-light-glint: color-mix(in oklab, var(--lsr-white) 85%, transparent);
+  /* A point of light: ink at the centre, the accent around it, then nothing. */
+  --lsr-light-spark: radial-gradient(
+    circle,
+    var(--lsr-light-ink) 0 30%,
+    var(--lsr-accent) 55%,
+    transparent 72%
+  );
+
+  /*
    * Code and chrome are both 1rem: the reviewer reads their editor at 16px, and
    * a comment about a line should not be smaller than the line. 1.5 leading is
    * the accessibility floor for body text and what editors sit at for code;

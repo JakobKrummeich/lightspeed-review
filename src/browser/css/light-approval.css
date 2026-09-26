@@ -1,0 +1,248 @@
+/*
+ * The light moments of approval, split from `light.css` for size and by
+ * subject: the reviewer's own progress rather than the handover. Same rules
+ * as there — a one-shot per event, transform and opacity, the
+ * `--lsr-light-*` tokens — and the still end states in `motion.css`.
+ */
+
+/*
+ * 05 Accelerator: a tick. A particle runs along the bar to the fill's new
+ * edge, the fill grows behind it and a spark marks where it stopped; a
+ * finished chapter flashes and a glint crosses it; the last one sends a glint
+ * down the whole bar. `--lsr-photon-ms`, the particle's run, is set per tick
+ * because a farther segment is a longer run.
+ */
+.lsr-progress-fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.lsr-progress-segment[data-light] .lsr-progress-fill {
+  transition: width 320ms cubic-bezier(0.3, 0.8, 0.3, 1) var(--lsr-photon-ms);
+}
+
+/* Centred on their point by `translate`, which the animated transform adds to. */
+.lsr-light-photon,
+.lsr-light-edge {
+  position: absolute;
+  top: 50%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--lsr-light-spark);
+  box-shadow: 0 0 0.75rem 0.1875rem var(--lsr-light-glow);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lsr-light-photon {
+  left: 0;
+  width: 0.625rem;
+  height: 0.625rem;
+  animation: lsr-light-run var(--lsr-photon-ms) cubic-bezier(0.7, 0, 1, 1) both;
+}
+
+@keyframes lsr-light-run {
+  0% {
+    transform: translateX(var(--lsr-photon-from));
+    opacity: 1;
+  }
+
+  95% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(var(--lsr-photon-to));
+    opacity: 0;
+  }
+}
+
+/* `forwards`, not `both`: the spark is not there until the particle is. */
+.lsr-light-edge {
+  left: var(--lsr-edge-at);
+  width: 0.875rem;
+  height: 0.875rem;
+  animation: lsr-light-mark 650ms ease-out var(--lsr-photon-ms) forwards;
+}
+
+@keyframes lsr-light-mark {
+  from {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+
+  to {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+.lsr-light-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--lsr-light-core);
+  box-shadow: 0 0 1.125rem 0.375rem var(--lsr-light-glow);
+  opacity: 0;
+  pointer-events: none;
+  animation: lsr-light-flash 700ms ease-out var(--lsr-photon-ms) forwards;
+}
+
+@keyframes lsr-light-flash {
+  from {
+    opacity: 0.9;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+/* Inside the fill, which clips it: only what is approved is crossed. */
+.lsr-light-glint {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, var(--lsr-light-glint) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: lsr-light-glint 650ms ease-out var(--lsr-glint-at) forwards;
+}
+
+@keyframes lsr-light-glint {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+.lsr-tick input[data-light="tick"]:checked {
+  animation: lsr-light-tick 600ms ease-out;
+}
+
+@keyframes lsr-light-tick {
+  from {
+    box-shadow: 0 0 0.625rem var(--lsr-light-glow);
+  }
+}
+
+/*
+ * 09 Supernova: every file is approved. A point of light, two rings and a
+ * flare streak, then the ✓ settles out of it — and nothing on the card moves
+ * after that, because the reviewer is about to decide. Laid over the mark from
+ * the card's corner, where the mark is.
+ */
+.lsr-done-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 2.125rem var(--lsr-light-glow);
+  opacity: 0;
+  pointer-events: none;
+  animation: lsr-light-swell 1200ms ease-out 300ms;
+}
+
+.lsr-done-nova {
+  position: absolute;
+  inset: var(--lsr-space-6) auto auto var(--lsr-space-6);
+  width: var(--lsr-space-8);
+  height: var(--lsr-space-8);
+  pointer-events: none;
+}
+
+.lsr-done-nova i {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.lsr-done-point {
+  background: var(--lsr-light-core);
+  box-shadow: 0 0 1.5rem 0.625rem var(--lsr-light-glow);
+  animation: lsr-nova-point 600ms ease-out;
+}
+
+@keyframes lsr-nova-point {
+  0% {
+    transform: scale(0.05);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(0.35);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.9);
+  }
+}
+
+.lsr-done-ring {
+  border: 2px solid var(--lsr-accent);
+  animation: lsr-nova-ring 900ms ease-out 300ms;
+}
+
+.lsr-done-ring + .lsr-done-ring {
+  animation-delay: 430ms;
+}
+
+@keyframes lsr-nova-ring {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+
+  to {
+    transform: scale(3);
+  }
+}
+
+.lsr-done-nova .lsr-done-flare {
+  inset: calc(50% - 1px) auto auto calc(50% - 11.25rem);
+  width: 22.5rem;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--lsr-light-glow) 30%,
+    var(--lsr-light-core) 50%,
+    var(--lsr-light-glow) 70%,
+    transparent
+  );
+  animation: lsr-nova-flare 900ms ease-out 280ms;
+}
+
+@keyframes lsr-nova-flare {
+  0% {
+    transform: scaleX(0.05);
+  }
+
+  25% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scaleX(1.2);
+  }
+}
+
+/* Positioned so it paints over the nova, which comes before it. */
+.lsr-done-mark {
+  position: relative;
+  animation: lsr-nova-settle 900ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+@keyframes lsr-nova-settle {
+  0%,
+  30% {
+    transform: scale(0.05);
+    opacity: 0;
+  }
+
+  70% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
