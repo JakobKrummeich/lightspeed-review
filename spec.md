@@ -117,8 +117,11 @@ help says so.
 **Re-running is re-attaching.** A waiting command that was killed — a harness
 timeout, a `serve` restart — is re-run as it was. The server recognises a
 `reply` it already has (same fingerprint, and either the same batch or a batch
-not yet acknowledged) and a `publish` whose head is already the last round's, so
-nothing is posted twice; the command simply waits again. `open` on a live review
+not yet acknowledged) and a `publish` whose head is already the last round's
+under the same rule, so nothing is posted twice; the command simply waits again
+— or, if the agent is digesting, is handed that batch back at once. A `publish`
+with other words, or after a newer batch was acknowledged, is no re-run: it is
+refused as the turn rules it out, never answered `rerun: true`. `open` on a live review
 is the same re-attach: no new round, no `--intent` required, just the wait — and
 if the agent is digesting, it is handed the same batch again.
 
