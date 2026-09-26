@@ -42,15 +42,17 @@ test("says no status word beside the presence label, in any status", () => {
 
     assert.doesNotMatch(html, /lsr-status|data-status/, `a ${status} session shows a status line`);
     assert.doesNotMatch(html, new RegExp(`>${status}<`), `a ${status} session says its status`);
-    assert.equal(presenceText(html), "Agent is listening");
+    assert.equal(presenceText(html), "Agent listening");
   }
   const ended = renderStatusBanner(banner({ status: "ended" }));
   assert.doesNotMatch(ended, /lsr-status|>ended</, "an ended review says so only in its overlay");
 });
 
-/** What the header shows, as opposed to what its tooltip carries. */
+/** What the header shows, as opposed to what its tooltip carries; the dot says nothing. */
 function presenceText(html: string): string | undefined {
-  return /<p class="lsr-presence"[^>]*>([^<]*)<\/p>/.exec(html)?.[1]?.replaceAll("&#39;", "'");
+  return /<p class="lsr-presence"[^>]*>(?:<span class="lsr-presence-dot" aria-hidden="true"><\/span>)?([^<]*)<\/p>/
+    .exec(html)?.[1]
+    ?.replaceAll("&#39;", "'");
 }
 
 function presenceTitle(html: string): string | undefined {
@@ -62,15 +64,15 @@ test("says the agent is listening while an agent polls on the reviewer's turn", 
   const html = renderStatusBanner(banner({ agentWaiting: true }));
 
   assert.match(html, /data-waiting="true"/);
-  assert.equal(presenceText(html), "Agent is listening");
-  assert.equal(presenceTitle(html), "an agent is listening: your next Send reaches it at once");
+  assert.equal(presenceText(html), "Agent listening");
+  assert.equal(presenceTitle(html), "Agent is listening — your next Send reaches it at once");
 });
 
 test("says the agent isn't listening when no agent polls, rather than hiding the fact", () => {
   const html = renderStatusBanner(banner({ agentWaiting: false }));
 
   assert.match(html, /data-waiting="false"/);
-  assert.equal(presenceText(html), "Agent isn't listening");
+  assert.equal(presenceText(html), "Agent not listening");
 });
 
 /** It does not say "queued": that is the Queue button's word, and this Send leaves the page. */
@@ -79,7 +81,7 @@ test("keeps the send-anyway advice in the tooltip when nobody is listening", () 
 
   assert.equal(
     presenceTitle(html),
-    "no agent is listening — Send anyway, it is handed over when the agent next listens",
+    "Agent isn&#39;t listening — Send anyway, it is handed over when the agent next listens",
   );
 });
 
@@ -109,9 +111,10 @@ test("says how many items the agent is reading while it digests", () => {
   const html = renderStatusBanner(banner({ turn: READING, items: 5 }));
 
   assert.match(html, /data-turn="agent"/);
-  assert.equal(presenceText(html), "Agent is reading your 5 items");
+  assert.equal(presenceText(html), "Agent reading");
+  assert.equal(presenceTitle(html), "Agent is reading your 5 items");
   assert.equal(
-    presenceText(renderStatusBanner(banner({ turn: READING, items: 1 }))),
+    presenceTitle(renderStatusBanner(banner({ turn: READING, items: 1 }))),
     "Agent is reading your 1 item",
   );
 });
@@ -119,11 +122,11 @@ test("says how many items the agent is reading while it digests", () => {
 test("a digesting turn with no count said reads as your feedback", () => {
   const html = renderStatusBanner(banner({ turn: READING }));
 
-  assert.equal(presenceText(html), "Agent is reading your feedback");
+  assert.equal(presenceTitle(html), "Agent is reading your feedback");
 });
 
-/** The whole sentence in the header; the corner cuts it with an ellipsis, the tooltip has it all. */
-test("a declared plan is what the header says it is working on", () => {
+/** A short word in the header, so a long plan never crowds the corner; the tooltip has it all. */
+test("a declared plan is what the header's tooltip says it is working on", () => {
   const html = renderStatusBanner(
     banner({
       turn: {
@@ -135,7 +138,7 @@ test("a declared plan is what the header says it is working on", () => {
     }),
   );
 
-  assert.equal(presenceText(html), "Working on: splitting the helper out");
+  assert.equal(presenceText(html), "Agent working");
   assert.equal(presenceTitle(html), "Working on: splitting the helper out");
 });
 
@@ -144,7 +147,8 @@ test("work with no plan says it is working on your feedback", () => {
     banner({ turn: { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" } }),
   );
 
-  assert.equal(presenceText(html), "Working on your feedback");
+  assert.equal(presenceText(html), "Agent working");
+  assert.equal(presenceTitle(html), "Working on your feedback");
 });
 
 test("a plan cannot inject markup into the header", () => {
@@ -171,7 +175,7 @@ test("the turn beats listening, since what became of the feedback is the news", 
   // nothing the reviewer can act on; what became of their feedback does.
   const html = renderStatusBanner(banner({ agentWaiting: true, turn: READING, items: 2 }));
 
-  assert.equal(presenceText(html), "Agent is reading your 2 items");
+  assert.equal(presenceText(html), "Agent reading");
   assert.doesNotMatch(html, /listening/i);
 });
 
@@ -192,11 +196,23 @@ test("while the connection is lost the header says so instead of a presence it c
   assert.equal(presenceText(html), "Connection lost");
   assert.match(html, /data-connection="lost"/);
   assert.match(presenceTitle(html) ?? "", /last known: Agent is listening/);
+  assert.doesNotMatch(
+    html,
+    /lsr-presence-dot/,
+    "a dot would claim a live agent the page cannot see",
+  );
 });
 
 test("a live connection draws no connection mark at all", () => {
   const html = renderStatusBanner(banner({ agentWaiting: true, connected: true }));
 
   assert.doesNotMatch(html, /data-connection/);
-  assert.equal(presenceText(html), "Agent is listening");
+  assert.equal(presenceText(html), "Agent listening");
+});
+
+/** The dot is decoration: the word beside it is what a screen reader says. */
+test("marks the presence with a dot hidden from assistive tech", () => {
+  const html = renderStatusBanner(banner({ agentWaiting: true }));
+
+  assert.match(html, /<span class="lsr-presence-dot" aria-hidden="true"><\/span>Agent listening/);
 });

@@ -76,7 +76,7 @@ test("the served page already says what the agent is doing", () => {
   });
 
   assert.match(html, /data-turn="agent"/);
-  assert.match(html, />Working on: splitting the helper out</);
+  assert.match(html, /title="Working on: splitting the helper out"[^>]*>.*Agent working</);
 });
 
 test("the served page counts the items a digesting agent is reading", () => {
@@ -94,7 +94,7 @@ test("the served page counts the items a digesting agent is reading", () => {
     },
   });
 
-  assert.match(html, />Agent is reading your 2 items</);
+  assert.match(html, /title="Agent is reading your 2 items"/);
 });
 
 test("the header carries a hidden connection chip for the bundle to show", () => {

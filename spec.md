@@ -93,11 +93,11 @@ A session has exactly one turn holder at a time, persisted on the record as
 the v2 `reading` mode becomes `digesting`, and a session written before the turn
 existed reads as the reviewer's.
 
-| State         | Reviewer's header                              | Reviewer can                                                            | Agent ends it with                    |
-| ------------- | ---------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
-| You compose   | "Agent is listening" / "Agent isn't listening" | read replies, reply in any thread, resolve threads, add items, **Send** | —                                     |
-| Agent digests | "Agent is reading your 5 items"                | read the diff and approve files; compose, replies and queue are locked  | `reply` (talk) or `work` (start work) |
-| Agent works   | "Working on: _plan_"                           | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
+| State         | Reviewer's header                                        | Reviewer can                                                            | Agent ends it with                    |
+| ------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
+| You compose   | "Agent listening" / "Agent not listening"                | read replies, reply in any thread, resolve threads, add items, **Send** | —                                     |
+| Agent digests | "Agent reading" (hover: "Agent is reading your 5 items") | read the diff and approve files; compose, replies and queue are locked  | `reply` (talk) or `work` (start work) |
+| Agent works   | "Agent working" (hover: "Working on: _plan_")            | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
 
 **End** is available in every state, on both sides.
 

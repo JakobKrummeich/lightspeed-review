@@ -1,8 +1,10 @@
 /**
  * The header and the foot of the conversation both say this, and two copies
  * would drift — which a reviewer reads as two different things happening.
+ * The header has room for a word or two, so it says the short word and keeps
+ * the sentence one hover away; the foot has room for the sentence.
  */
-import type { AgentTurn } from "../session-store.ts";
+import type { AgentTurn, Turn } from "../session-store.ts";
 
 /**
  * Digesting and working lock differently, so the reviewer is owed which one it
@@ -22,4 +24,13 @@ export function agentTurnText(turn: AgentTurn, items?: number): string {
 /** The reviewer's turn, said as a fact about a live connection, never a timer. */
 export function listeningText(waiting: boolean): string {
   return waiting ? "Agent is listening" : "Agent isn't listening";
+}
+
+/**
+ * The header's corner: short enough that a long plan never crowds the round
+ * controls beside it. What the agent is working on is the tooltip's to say.
+ */
+export function presenceWord(turn: Turn, waiting: boolean): string {
+  if (turn.holder === "agent") return turn.mode === "working" ? "Agent working" : "Agent reading";
+  return waiting ? "Agent listening" : "Agent not listening";
 }

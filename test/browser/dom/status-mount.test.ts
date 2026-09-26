@@ -71,17 +71,17 @@ test("the presence frame decides what the banner says", (t) => {
   const banner = mountStatusBanner(session());
 
   banner.setPresence({ waiting: true, turn: REVIEWERS_TURN });
-  assert.match(root.innerHTML, />Agent is listening</);
+  assert.match(root.innerHTML, />Agent listening</);
 
   banner.setPresence({ waiting: false, turn: AGENTS_TURN, items: 4 });
-  assert.match(root.innerHTML, />Agent is reading your 4 items</);
+  assert.match(root.innerHTML, /title="Agent is reading your 4 items"[^>]*>.*Agent reading</);
 
   // A frame without the count is not the old count restated.
   banner.setPresence({ waiting: false, turn: AGENTS_TURN });
-  assert.match(root.innerHTML, />Agent is reading your feedback</);
+  assert.match(root.innerHTML, /title="Agent is reading your feedback"/);
 
   banner.setPresence({ waiting: false, turn: REVIEWERS_TURN });
-  assert.match(root.innerHTML, />Agent isn&#39;t listening</);
+  assert.match(root.innerHTML, />Agent not listening</);
 });
 
 /** `work` publishes a presence frame and nothing else — no session event, no
@@ -100,7 +100,7 @@ test("a plan declared mid-turn reaches the header without a reload", (t) => {
     },
   });
 
-  assert.match(root.innerHTML, />Working on: splitting the helper out</);
+  assert.match(root.innerHTML, /title="Working on: splitting the helper out"/);
 });
 
 test("a session that ended draws the summary of what the fresh read says", (t) => {
@@ -170,5 +170,5 @@ test("the header greys to connection lost while the stream is down, and comes ba
 
   banner.setConnected(true);
   assert.doesNotMatch(root.innerHTML, /Connection lost/);
-  assert.match(root.innerHTML, /Agent is listening/);
+  assert.match(root.innerHTML, />Agent listening</);
 });

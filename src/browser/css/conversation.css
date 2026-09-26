@@ -361,11 +361,22 @@
   color: var(--lsr-accent);
 }
 
+/* Wears the line's own colour, so it lights with the accent and greys without it. */
+.lsr-presence-dot {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-right: var(--lsr-space-1);
+  border-radius: 50%;
+  background: currentcolor;
+  vertical-align: middle;
+}
+
 /*
  * Weight, not a second hue: both states keep the accent the conversation's
  * working line wears, because a live agent is involved either way — but only
  * this one asks something of the reviewer. Named with the turn because the
- * turn wins over listening: a parked second agent under "Working on: …" is
+ * turn wins over listening: a parked second agent under "Agent working" is
  * no call to act.
  */
 .lsr-presence[data-turn="reviewer"][data-waiting="true"] {

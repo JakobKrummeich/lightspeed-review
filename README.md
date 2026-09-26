@@ -522,11 +522,11 @@ failures are still TOON.
 
 A review is in one of three live states:
 
-| State         | Reviewer's header                              | Reviewer can                                                            | Agent ends it with                    |
-| ------------- | ---------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
-| You compose   | "Agent is listening" / "Agent isn't listening" | read replies, reply in any thread, resolve threads, add items, **Send** | —                                     |
-| Agent digests | "Agent is reading your 5 items"                | read the diff and approve files; compose, replies and queue are locked  | `reply` (talk) or `work` (start work) |
-| Agent works   | "Working on: _plan_"                           | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
+| State         | Reviewer's header                                        | Reviewer can                                                            | Agent ends it with                    |
+| ------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
+| You compose   | "Agent listening" / "Agent not listening"                | read replies, reply in any thread, resolve threads, add items, **Send** | —                                     |
+| Agent digests | "Agent reading" (hover: "Agent is reading your 5 items") | read the diff and approve files; compose, replies and queue are locked  | `reply` (talk) or `work` (start work) |
+| Agent works   | "Agent working" (hover: "Working on: _plan_")            | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
 
 **End** is available in every state, and `lightspeed end` closes the review from
 the agent's side — `lightspeed end <branch>` on a review already ended just says
