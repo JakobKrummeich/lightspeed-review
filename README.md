@@ -577,15 +577,17 @@ re-attaching command is handed it again.
 
 What the agent reads after each Send is one item per thread the batch touched,
 with its id (`t4`), whether it is `new`, a `reply`, `resolved` or `reopened`,
-where it points (`file:line`), the agent's own last words there (`you`) and the
-reviewer's new ones — and a `next:` block that is a decision rule, not a menu:
+where it points (`file:line`, flagged `outdated` when that line has changed
+since the round it was drawn in), everything said in an open thread before
+(`thread`), or just what a thread resolved now was about (`asked`), and the
+reviewer's new words — and a `next:` block that is a decision rule, not a menu:
 anything that needs the reviewer goes in one `reply`; nothing left to discuss and
 something to change means `work`; anything ambiguous in a change request is
 worth asking now. Every refusal names the one right command: `work` or `reply`
 on the reviewer's turn answer `turn_not_yours`, `publish` while digesting answers
 `turn_still_yours`, `publish` on an unmoved HEAD answers `nothing_to_publish`
 naming `reply` — checked before any model call. A resolve in the batch comes
-with a `resolved:` line saying what it means, and every suggested `--to` names
+with a `resolved:` line saying what it means — do what the last words say, or, with none, your last answer is accepted — and every suggested `--to` names
 an open thread, never a resolved one. One exit-code rule: exit 2 when re-running
 the same command cannot help — a wrong command line, or a move wrong for the
 review's state, `session_ended`, `session_not_found` and `ambiguous_session`

@@ -243,14 +243,25 @@ chat, where `--to main` lands. What the agent reads after each Send is one item
 per thread the batch touched:
 
 - `id` and `status` — `new`, `reply`, `resolved` or `reopened`;
-- `at` (`file:line`) and `selected` for a line thread;
-- `you` — the agent's own last words in that thread, so it answers in context;
-- `reviewer` — the reviewer's new words (a list when there are several).
+- `at` (`file:line`) and `selected` for a line thread, as drawn in the round the
+  thread opened in; when that line reads differently in the round on show
+  (`src/anchor-drift.ts` compares the two rounds' files in git), `outdated:
+"anchored in round N; that line has changed since"` sits under `at`. Nothing
+  is claimed when git cannot produce the older file;
+- `thread[N]{who,said}` — on an open thread (`reply`, `reopened`), everything
+  said in it before this batch, oldest first, `who` being `reviewer` or `you`
+  (the agent), so it answers from the thread rather than from memory;
+- `asked` — on a thread resolved in this batch, instead of the history and the
+  anchor: what the thread was about (its opening words);
+- `reviewer` — the reviewer's words in this batch (a list when there are
+  several), never repeated in `thread`.
 
 A thread reply and a Resolve/Reopen toggle are items in the batch like any
 other (`{type: "reply" | "resolve", thread, …}`) and travel with the next Send.
-`t4 resolved` means, for a question, "no further questions", and for a change
-request "I agree with what you last said" — not a withdrawn request. The agent
+A resolve that carries words means "resolved with a last word — do what it
+says"; a bare `t4 resolved` means "I accept your last answer there" — for a
+change request, make that agreed change; it is not withdrawn. `next.resolved`
+says which is which, by id. The agent
 answering in a resolved thread reopens it. Items from
 a v2 session carry no id; the page shows them as read-only legacy threads.
 
@@ -506,8 +517,9 @@ next:
 ### reply (what landed, then the next batch)
 
 Before the wait, what landed and the exact command that recovers a kill. Then
-the items the batch touched, one per thread: `you` is the agent's own last words
-there, `reviewer` the reviewer's new ones. A uniform list prints as a table. A
+the items the batch touched, one per thread: an open thread's `thread` rows are
+everything said in it before, `reviewer` the reviewer's new words; a resolved
+one carries only `asked` and any last words. A uniform list prints as a table. A
 batch holding resolves spells out what they mean on a `resolved:` line.
 
 ```
@@ -520,10 +532,21 @@ next:
 url: "http://127.0.0.1:4388/session/a3f8c21b9e4d5f60"
 round: 1
 turn: agent digesting
-items[1]{id,status,at,selected,you,reviewer}:
-  t2,resolved,"src/billing/legacy.ts:12",const oldFunction = (x) => x * 2;,"billing moved to v2 last sprint, nothing calls it","fine, keep it removed"
+items[2]:
+  - id: t1
+    status: reply
+    at: "src/api/users.ts:42"
+    selected: "const user = await db.user.create({ data: { name, email } });"
+    thread[2]{who,said}:
+      reviewer,Wrap this in a transaction
+      you,one transaction already
+    reviewer: and the audit write?
+  - id: t2
+    status: resolved
+    asked: "Overall good — why was oldFunction removed? Billing still needs it"
+    reviewer: "fine, keep it removed"
 next:
-  resolved: "t2: the reviewer agrees with your last words there — if that was a change, implement it (work); it is not withdrawn"
+  resolved: "t2: resolved with a last word — do what it says"
   talk: …
   work: …
   ambiguity: …

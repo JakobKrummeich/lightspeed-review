@@ -1,6 +1,7 @@
 import { parsePrompt } from "./feedback-prompt.ts";
 import { approvalPaths, type ApprovalPaths } from "./review-files.ts";
 import type { FeedbackPrompt, ReviewCloser, SessionRecord } from "./session-types.ts";
+import { withDrift } from "./anchor-drift.ts";
 import { batchItems, type BatchItem } from "./threads.ts";
 import { reviewerTurn, turnFacts, type TurnLabel } from "./turn.ts";
 
@@ -141,10 +142,15 @@ export function batchPayload(session: SessionRecord): PollPayload {
   return {
     status: session.status,
     ended: false,
-    items: batch === undefined ? [] : batchItems(batch.prompts, session.conversation),
+    items: batch === undefined ? [] : itemsOf(batch.prompts, session),
     ...turnFacts(session),
     ...(batch === undefined ? {} : { delivery: batch.id }),
   };
+}
+
+/** Anchors checked against the round on show: a line number from round 1 may name nothing now. */
+function itemsOf(prompts: FeedbackPrompt[], session: SessionRecord): BatchItem[] {
+  return withDrift(batchItems(prompts, session.conversation), session);
 }
 
 /**
@@ -161,7 +167,7 @@ export function endedPayload(session: SessionRecord): {
     payload: {
       status: session.status,
       ended: true,
-      items: batchItems(session.pending, session.conversation),
+      items: itemsOf(session.pending, session),
       ...turnFacts(session),
       ...endEvidence(session),
     },

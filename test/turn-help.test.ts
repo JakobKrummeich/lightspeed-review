@@ -44,12 +44,25 @@ test("a line with no session to read names a placeholder id, never a made-up one
   assert.match(publishCall(TARGET), /--to <id> 'done: /);
 });
 
-test("resolved items get their meaning spelled out: agreement, not a withdrawn request", () => {
-  const rule = nextRule("agent digesting", TARGET, ["t2"], ["t1", "t3"]);
+test("resolved items get their meaning spelled out: last words to act on, or your answer accepted", () => {
+  const rule = nextRule(
+    "agent digesting",
+    TARGET,
+    ["t2"],
+    [
+      { id: "t1", worded: true },
+      { id: "t3", worded: false },
+      { id: "t5", worded: true },
+    ],
+  );
 
-  assert.match(rule.resolved!, /^t1, t3: the reviewer agrees with your last words there/);
-  assert.match(rule.resolved!, /if that was a change, implement it \(work\)/);
-  assert.match(rule.resolved!, /not withdrawn/);
+  assert.equal(
+    rule.resolved,
+    "t1, t5: resolved with a last word — do what it says. t3: the reviewer accepts your" +
+      " last answer there — if it promised a change, make it (work); it is not withdrawn",
+  );
+  const bare = nextRule("agent digesting", TARGET, [], [{ id: "t3", worded: false }]);
+  assert.match(bare.resolved!, /^t3: the reviewer accepts your last answer there/);
   assert.deepEqual(Object.keys(nextRule("agent digesting", TARGET, ["t2"])), [
     "talk",
     "work",

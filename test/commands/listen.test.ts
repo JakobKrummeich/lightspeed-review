@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { nextRule } from "../../src/turn-help.ts";
 import { batchOutput, itemRow, listen } from "../../src/commands/listen.ts";
 import { ReviewError } from "../../src/errors.ts";
-import { SELECTION_LIMIT } from "../../src/output.ts";
+import { renderToon, SELECTION_LIMIT } from "../../src/output.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { CLI_VERSION } from "../../src/version.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
@@ -199,7 +199,7 @@ test("the reviewer's comment comes back whole however long it is", async () => {
   });
 });
 
-test("an item row names the place, the agent's last words and every reviewer message", () => {
+test("an item row names the place, the thread so far and every new reviewer message", () => {
   assert.deepEqual(
     itemRow({
       id: "t2",
@@ -208,22 +208,57 @@ test("an item row names the place, the agent's last words and every reviewer mes
       side: "old",
       line_start: 3,
       line_end: 5,
-      you: "it is cached upstream",
+      thread: [
+        { who: "reviewer", said: "why cache?" },
+        { who: "you", said: "it is cached upstream" },
+      ],
       reviewer: ["where?", "link it"],
     }),
     {
       id: "t2",
       status: "reply",
       at: "src/a.ts:3-5 (base)",
-      you: "it is cached upstream",
+      thread: [
+        { who: "reviewer", said: "why cache?" },
+        { who: "you", said: "it is cached upstream" },
+      ],
       reviewer: ["where?", "link it"],
     },
   );
-  // A bare resolve says nothing, and prints no empty reviewer list.
-  assert.deepEqual(itemRow({ id: "main", status: "resolved", reviewer: [] }), {
-    id: "main",
+  // A bare resolve says what it was about, and prints no empty reviewer list.
+  assert.deepEqual(itemRow({ id: "t4", status: "resolved", asked: "why 2?", reviewer: [] }), {
+    id: "t4",
     status: "resolved",
+    asked: "why 2?",
   });
+});
+
+test("an anchor whose line changed since its round says so beside the place", () => {
+  const row = itemRow({
+    id: "t1",
+    status: "reply",
+    file: "greet.ts",
+    side: "new",
+    line_start: 5,
+    line_end: 5,
+    selected_text: "export const shout",
+    anchoredIn: 0,
+    outdated: true,
+    thread: [{ who: "reviewer", said: "rename" }],
+    reviewer: ["and the README"],
+  });
+
+  assert.deepEqual(Object.keys(row), [
+    "id",
+    "status",
+    "at",
+    "outdated",
+    "selected",
+    "thread",
+    "reviewer",
+  ]);
+  assert.equal(row.outdated, "anchored in round 1; that line has changed since");
+  assert.match(renderToon({ items: [row] }), /thread\[1\]\{who,said\}:\n\s+reviewer,rename/);
 });
 
 test("a resolved item is not offered as one to reply to", () => {

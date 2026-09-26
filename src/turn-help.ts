@@ -7,7 +7,7 @@
  */
 import { openCall } from "./open-call.ts";
 import type { ReviewCloser } from "./session-types.ts";
-import { MAIN_THREAD } from "./threads.ts";
+import { MAIN_THREAD, type Resolved } from "./threads.ts";
 import type { TurnLabel } from "./turn.ts";
 
 /** Placeholders in single quotes: an agent copies these into a shell, where
@@ -274,7 +274,7 @@ export function nextRule(
   turn: TurnLabel,
   target: string,
   ids: readonly string[] = [],
-  resolved: readonly string[] = [],
+  resolved: readonly Resolved[] = [],
 ): Record<string, string> {
   if (turn === "agent digesting") return digestingRule(target, ids, resolved);
   if (turn === "agent working") return workingRule(target, shownIds(ids)[0]!);
@@ -287,7 +287,7 @@ export function nextRule(
 function digestingRule(
   target: string,
   ids: readonly string[],
-  resolved: readonly string[],
+  resolved: readonly Resolved[],
 ): Record<string, string> {
   return {
     ...(resolved.length === 0 ? {} : { resolved: resolvedMeaning(resolved) }),
@@ -304,12 +304,28 @@ function digestingRule(
   };
 }
 
-/** Said in the batch itself: the skill is read once, and a resolve read as "dropped" costs a round. */
-function resolvedMeaning(resolved: readonly string[]): string {
-  return (
-    `${resolved.join(", ")}: the reviewer agrees with your last words there — if that was a` +
-    " change, implement it (work); it is not withdrawn"
-  );
+/**
+ * Said in the batch itself: the skill is read once, and a resolve read as
+ * "dropped" costs a round. Two readings, because a resolve that carries words
+ * is those words' deadline, not agreement with whatever the agent said last —
+ * which may have been a question.
+ */
+function resolvedMeaning(resolved: readonly Resolved[]): string {
+  const ids = (worded: boolean) =>
+    resolved.filter((one) => one.worded === worded).map((one) => one.id);
+  const said = ids(true);
+  const bare = ids(false);
+  return [
+    ...(said.length === 0
+      ? []
+      : [`${said.join(", ")}: resolved with a last word — do what it says`]),
+    ...(bare.length === 0
+      ? []
+      : [
+          `${bare.join(", ")}: the reviewer accepts your last answer there — if it promised a` +
+            " change, make it (work); it is not withdrawn",
+        ]),
+  ].join(". ");
 }
 
 function workingRule(target: string, id: string): Record<string, string> {

@@ -155,23 +155,50 @@ export function batchSize(prompts: FeedbackPrompt[]): number {
 
 export type BatchItemStatus = "new" | "reply" | "resolved" | "reopened";
 
-/**
- * One thread as the agent is handed it: what is new in it since the agent last
- * spoke, and — for a reply — what the agent itself said last, so the answer
- * can be read without scrolling back.
- */
-export interface BatchItem {
-  id: string;
-  status: BatchItemStatus;
+/** One message of a thread's past as the agent is handed it: `you` is the agent itself. */
+export interface ThreadLine {
+  who: "reviewer" | "you";
+  said: string;
+}
+
+/** Where a line item points, as the reviewer drew it. */
+export interface ItemAnchor {
   file?: string;
   side?: "old" | "new";
   line_start?: number;
   line_end?: number;
   selected_text?: string;
-  /** The agent's last words in this thread, before this batch. */
-  you?: string;
-  /** What the reviewer said in this batch, oldest first; empty for a bare resolve. */
+  /** The round the anchor was drawn in (`SessionRound.index`); only on a line anchor. */
+  anchoredIn?: number;
+  /** Set by the server when that line reads differently in the round on show. */
+  outdated?: true;
+}
+
+/**
+ * One thread as the agent is handed it, shaped by what it needs to act:
+ * a new item is its own ask; an open thread brings everything said in it
+ * before this batch (`thread`), so the answer can be written without
+ * scrolling back through rounds; a thread resolved now brings only what it
+ * was about (`asked`) and any last words — its history is closed business.
+ * `reviewer` is always this batch's words, never repeated in `thread`.
+ */
+export type BatchItem =
+  | ({ id: string; status: "new"; reviewer: string[] } & ItemAnchor)
+  | ({
+      id: string;
+      status: "reply" | "reopened";
+      thread: ThreadLine[];
+      reviewer: string[];
+    } & ItemAnchor)
+  | { id: string; status: "resolved"; asked?: string; reviewer: string[] };
+
+/** What a batch did to one thread, before it is shaped for the agent. */
+interface Touch {
+  id: string;
+  status: BatchItemStatus;
   reviewer: string[];
+  /** A new item's own words, which carry its anchor. */
+  item?: AnnotationPrompt | MessagePrompt;
 }
 
 /**
@@ -183,46 +210,83 @@ export function batchItems(
   conversation: ConversationEntry[],
 ): BatchItem[] {
   const threads = new Map(threadsOf(conversation).map((thread) => [thread.id, thread]));
-  const items = new Map<string, BatchItem>();
+  const touches = new Map<string, Touch>();
   for (const prompt of prompts) {
     const id = prompt.type === "reply" || prompt.type === "resolve" ? prompt.thread : prompt.id;
     if (id === undefined) continue;
-    const item = items.get(id) ?? blankItem(id, threads.get(id));
-    items.set(id, withPrompt(item, prompt));
+    const touch = touches.get(id) ?? { id, status: "reply", reviewer: [] };
+    touches.set(id, withPrompt(touch, prompt));
   }
-  return [...items.values()];
+  return [...touches.values()].map((touch) => shaped(touch, threads.get(touch.id)));
 }
 
-function blankItem(id: string, thread: Thread | undefined): BatchItem {
-  const you = thread?.messages.findLast((message) => message.role === "agent")?.comment;
-  return {
-    id,
-    status: "reply",
-    ...anchorOf(thread?.item),
-    ...(you === undefined ? {} : { you }),
-    reviewer: [],
-  };
+function withPrompt(touch: Touch, prompt: FeedbackPrompt): Touch {
+  if (prompt.type === "resolve") {
+    return { ...touch, status: prompt.resolved ? "resolved" : "reopened" };
+  }
+  const reviewer = [...touch.reviewer, prompt.comment];
+  if (prompt.type === "reply") return { ...touch, reviewer };
+  return { ...touch, status: "new", reviewer, item: prompt };
 }
 
-function anchorOf(item: AnnotationPrompt | MessagePrompt | undefined): Partial<BatchItem> {
+function shaped(touch: Touch, thread: Thread | undefined): BatchItem {
+  const { id, reviewer } = touch;
+  if (touch.status === "resolved") return resolvedItem(id, thread, reviewer);
+  const anchor = anchorOf(touch.item ?? thread?.item, thread?.roundIndex);
+  if (touch.status === "new") return { id, status: "new", ...anchor, reviewer };
+  return { id, status: touch.status, ...anchor, thread: pastOf(thread, reviewer.length), reviewer };
+}
+
+function resolvedItem(id: string, thread: Thread | undefined, reviewer: string[]): BatchItem {
+  const asked = thread?.item?.comment;
+  return { id, status: "resolved", ...(asked === undefined ? {} : { asked }), reviewer };
+}
+
+/**
+ * Everything said in the thread before this batch. The batch's own words are
+ * the thread's last reviewer messages — nothing the agent says lands between a
+ * Send and its delivery — so dropping that many from the end leaves the past,
+ * including anything the reviewer said twice in a row in an earlier batch.
+ */
+function pastOf(thread: Thread | undefined, fresh: number): ThreadLine[] {
+  const messages = thread?.messages ?? [];
+  let drop = fresh;
+  let end = messages.length;
+  while (drop > 0 && end > 0 && messages[end - 1]!.role === "reviewer") {
+    end -= 1;
+    drop -= 1;
+  }
+  return messages.slice(0, end).map((message) => ({
+    who: message.role === "agent" ? "you" : "reviewer",
+    said: message.comment,
+  }));
+}
+
+function anchorOf(
+  item: AnnotationPrompt | MessagePrompt | undefined,
+  round: number | undefined,
+): ItemAnchor {
   if (item?.type !== "annotation") return {};
+  if (item.side === undefined) return { file: item.file, selected_text: item.selected_text };
   return {
     file: item.file,
-    ...(item.side === undefined
-      ? {}
-      : { side: item.side, line_start: item.line_start, line_end: item.line_end }),
+    side: item.side,
+    line_start: item.line_start,
+    line_end: item.line_end,
     selected_text: item.selected_text,
+    ...(round === undefined ? {} : { anchoredIn: round }),
   };
 }
 
-function withPrompt(item: BatchItem, prompt: FeedbackPrompt): BatchItem {
-  if (prompt.type === "resolve") {
-    return { ...item, status: prompt.resolved ? "resolved" : "reopened" };
-  }
-  const reviewer = [...item.reviewer, prompt.comment];
-  if (prompt.type === "reply") return { ...item, reviewer };
-  // A new item: nothing the agent said can precede it.
-  const fresh = { ...item, ...anchorOf(prompt), status: "new" as const, reviewer };
-  delete fresh.you;
-  return fresh;
+/** A thread the reviewer resolved in the batch, and whether they said anything with it. */
+export interface Resolved {
+  id: string;
+  worded: boolean;
+}
+
+/** The batch's resolves, as `next.resolved` needs them. */
+export function resolvedOf(items: readonly BatchItem[]): Resolved[] {
+  return items
+    .filter((item) => item.status === "resolved")
+    .map((item) => ({ id: item.id, worded: item.reviewer.length > 0 }));
 }
