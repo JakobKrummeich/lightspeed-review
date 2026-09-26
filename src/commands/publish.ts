@@ -84,14 +84,14 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const existing = new SessionStore(input.config.stateDir).get(key);
   const head = branchState(input.repoRoot, input.branch).head;
-  const rerun = ifKilled(publishRerun(target, input.intents, input.notes));
+  const recovery = publishRerun(target, input.intents, input.notes);
   if (existing !== undefined && alreadyPublished(existing, head, input)) {
     await run.ensureServerRunning({ port: input.config.port });
     run.announce({
       ...turnFacts(existing),
       rerun: true,
       message: `this round is already published; ${waitClause(turnLabel(existing))}`,
-      ...rerun,
+      ...ifKilled(turnLabel(existing), recovery),
     });
     return await run.listen({ ...input, port: input.config.port });
   }
@@ -103,7 +103,7 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
     ...(outcome.created.rerun === true ? { rerun: true } : {}),
     message: `published; ${waitClause(outcome.created.turn)}`,
     ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
-    ...rerun,
+    ...ifKilled(outcome.created.turn, recovery),
   });
   return await run.listen({ ...input, port: input.config.port });
 }
@@ -120,7 +120,7 @@ function refuseLocally(
   head: string | undefined,
 ): void {
   if (existing === undefined) throw sessionGone(404, about);
-  if (existing.status === "ended") throw sessionGone(409, about);
+  if (existing.status === "ended") throw sessionGone(409, about, existing.endedBy);
   // No tip read, no telling a re-run from a refusal: the server compares the
   // extracted HEAD and decides.
   if (head === undefined) return;

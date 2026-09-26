@@ -1,7 +1,9 @@
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import type { DomainErrorBody } from "../server.ts";
 import { openCall } from "../open-call.ts";
-import { helpEndedOn, helpReopen, helpRestart, reattachCall } from "../turn-help.ts";
+import type { ReviewCloser } from "../session-types.ts";
+import { endedReview } from "../session-resolve.ts";
+import { helpRestart, reattachCall } from "../turn-help.ts";
 import { diagnosePort } from "./server-address.ts";
 
 /**
@@ -37,11 +39,19 @@ function target(about: SessionRef | undefined): string {
 }
 
 /** What a missing or ended session is answered with — raised by a command that saw it first. */
-export function sessionGone(status: 404 | 409, about: SessionRef): ReviewError {
-  return errorForStatus(status, about)!;
+export function sessionGone(
+  status: 404 | 409,
+  about: SessionRef,
+  endedBy?: ReviewCloser,
+): ReviewError {
+  return errorForStatus(status, about, endedBy)!;
 }
 
-function errorForStatus(status: number, about?: SessionRef): ReviewError | undefined {
+function errorForStatus(
+  status: number,
+  about?: SessionRef,
+  endedBy?: ReviewCloser,
+): ReviewError | undefined {
   if (status === 404) {
     return new ReviewError({
       code: "session_not_found",
@@ -52,13 +62,7 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
       suggestions: [`Run \`${openCall(target(about))}\` to open the session first`],
     });
   }
-  if (status === 409) {
-    return new ReviewError({
-      code: "session_ended",
-      message: "the reviewer ended this review; only they ask for a new round",
-      suggestions: [helpEndedOn(target(about)), helpReopen(target(about))],
-    });
-  }
+  if (status === 409) return endedReview(target(about), endedBy);
   if (status === 503) {
     return new ReviewError({
       code: "server_not_running",
@@ -73,7 +77,7 @@ function errorForStatus(status: number, about?: SessionRef): ReviewError | undef
  * connection: the two clients must not drift on what a 500 or a non-JSON body
  * means. */
 export function parseBody(status: number, body: string, about?: SessionRef): unknown {
-  const failure = errorForStatus(status, about);
+  const failure = errorForStatus(status, about, status === 409 ? closerOf(body) : undefined);
   if (failure) return failure;
   if (status === 422) return domainError(body);
   if (status < 200 || status > 299) {
@@ -139,7 +143,14 @@ export function refusalError({ error, help }: DomainErrorBody): ReviewError {
   return new ReviewError({ ...error, suggestions: help });
 }
 
+/** Who ended the review, as the server's 409 says; unread, the refusal names nobody. */
+function closerOf(body: string): ReviewCloser | undefined {
+  const { endedBy } = readErrorBody(body);
+  return endedBy === "agent" || endedBy === "reviewer" ? endedBy : undefined;
+}
+
 type ErrorBody = {
+  endedBy?: unknown;
   error?: { code?: unknown; message?: unknown; detail?: unknown };
   help?: unknown;
 };

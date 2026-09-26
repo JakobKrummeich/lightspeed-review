@@ -42,12 +42,13 @@ export function agentWorking(
 export type TurnLabel = "reviewer" | "agent digesting" | "agent working" | "ended";
 
 export interface TurnFacts {
-  turn: TurnLabel;
   round: number;
+  turn: TurnLabel;
 }
 
+/** Round first, as `turnBlock` prints them: spread into a block, the key order is the print order. */
 export function turnFacts(session: Pick<SessionRecord, "status" | "turn" | "rounds">): TurnFacts {
-  return { turn: turnLabel(session), round: roundNumber(session) };
+  return { round: roundNumber(session), turn: turnLabel(session) };
 }
 
 /**

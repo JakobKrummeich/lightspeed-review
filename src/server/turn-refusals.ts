@@ -6,8 +6,15 @@
 import type { SessionRecord } from "../session-types.ts";
 import { turnLabel } from "../turn.ts";
 import { openIds } from "../threads.ts";
-import { helpReattach, publishCall, replyCall, shownIds, workCall } from "../turn-help.ts";
-import type { DomainErrorBody } from "./http.ts";
+import {
+  endedMessage,
+  helpReattach,
+  publishCall,
+  replyCall,
+  shownIds,
+  workCall,
+} from "../turn-help.ts";
+import type { DomainErrorBody, SessionEndedBody } from "./http.ts";
 
 function targetOf(session: SessionRecord): string {
   return `${session.branch} ${session.base}`;
@@ -16,6 +23,18 @@ function targetOf(session: SessionRecord): string {
 /** The ids a fixing command may name: the session's open ones, or the main chat. */
 function idsOf(session: SessionRecord): string[] {
   return shownIds(openIds(session.conversation, session.batch?.prompts));
+}
+
+/**
+ * Every agent move on an ended review is answered with this 409. `endedBy`
+ * rides along because the CLI words the refusal itself, and without it could
+ * only guess who closed the review — it guessed the reviewer.
+ */
+export function reviewEnded(session: SessionRecord): SessionEndedBody {
+  return {
+    error: { code: "session_ended", message: endedMessage(session.endedBy) },
+    ...(session.endedBy === undefined ? {} : { endedBy: session.endedBy }),
+  };
 }
 
 /** The reviewer holds the turn: the only move is to listen for their Send. */

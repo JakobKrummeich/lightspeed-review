@@ -409,7 +409,7 @@ test("an agent's own `end` is not reported as the reviewer ending the review", a
 
     assert.equal(
       endedHelp(output),
-      "`lightspeed end` closed this review, not the reviewer; verdict: none",
+      "`lightspeed end` ended this review, not the reviewer; verdict: none",
     );
     assert.equal((output.approval as { verdict: string }).verdict, "none");
   });

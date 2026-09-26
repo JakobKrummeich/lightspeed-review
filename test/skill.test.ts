@@ -88,3 +88,25 @@ test("the skill quotes every working rule the CLI prints, and nothing unfilled",
   for (const line of Object.values(working)) assert.ok(skill.includes(line), line);
   assert.doesNotMatch(skill, /\bundefined\b/);
 });
+
+/**
+ * A bad model degrades the round; missing credentials stop it (both pinned
+ * against `groupDiff` in test/llm/grouping.test.ts). SKILL.md is generated
+ * output an agent reads as the contract, so the two outcomes must be two
+ * separate claims: worded as one, an agent told its user a credential-less
+ * review would "fall back".
+ */
+test("the skill states the fallback and the credentials stop as separate claims", () => {
+  const paragraph = skill.split("\n\n").find((block) => block.includes("grouping.mode: fallback"));
+  const sentences = (paragraph ?? "").replace(/\n/g, " ").split(/(?<=[.:—])\s+(?=[A-Z])/);
+  const degrades = sentences.find((sentence) => /does not fail the run/.test(sentence));
+  const stops = sentences.find((sentence) => /credentials/i.test(sentence));
+
+  assert.ok(degrades !== undefined && stops !== undefined, paragraph);
+  assert.notEqual(degrades, stops);
+  assert.doesNotMatch(degrades, /credential|login/i);
+  assert.match(stops, /`pi_auth_missing`/);
+  assert.match(stops, /no round opened/);
+  assert.match(stops, /`lightspeed login <provider>`/);
+  assert.doesNotMatch(stops, /fallback/);
+});

@@ -269,6 +269,32 @@ test("a missing credential for a login-capable provider suggests lightspeed logi
   );
 });
 
+/**
+ * Missing credentials stop the round rather than degrade it, so the command
+ * did not fall back: it failed, and nothing was posted.
+ */
+test("a missing credential's last help line says the command stopped, not that it fell back", async () => {
+  const { models } = fauxModels([
+    fauxAssistantMessage("", {
+      stopReason: "error",
+      errorMessage: "Provider is not configured: anthropic",
+    }),
+  ]);
+
+  await assert.rejects(
+    () => call(models, [userMessage]),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "pi_auth_missing");
+      const last = error.suggestions.at(-1) ?? "";
+      assert.doesNotMatch(last, /fell back/);
+      assert.match(last, /re-run the `lightspeed open` or `lightspeed publish` that stopped/);
+      assert.match(last, /no round/);
+      return true;
+    },
+  );
+});
+
 test("a rejected credential for a login-capable provider suggests lightspeed login first", async () => {
   const { models } = fauxModels(
     [fauxAssistantMessage("", { stopReason: "error", errorMessage: "401 unauthorized" })],

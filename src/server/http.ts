@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ReviewErrorCode } from "../errors.ts";
+import type { ReviewCloser } from "../session-types.ts";
 import { readJsonBody } from "../router.ts";
 
 /**
@@ -11,11 +12,18 @@ import { readJsonBody } from "../router.ts";
  * there is always at least one line.
  *
  * Not the shape of the 409s a session's status answers: those carry no help,
- * because the client knows the one move an ended review leaves.
+ * because the client knows the one move an ended review leaves — only who
+ * ended it, which the client cannot know (`SessionEndedBody`).
  */
 export interface DomainErrorBody {
   error: { code: ReviewErrorCode; message: string; detail?: string };
   help: [string, ...string[]];
+}
+
+/** The 409 an agent's move on an ended review is answered with (`reviewEnded`). */
+export interface SessionEndedBody {
+  error: { code: "session_ended"; message: string };
+  endedBy?: ReviewCloser;
 }
 
 export function sendJson(response: ServerResponse, status: number, body: unknown): void {

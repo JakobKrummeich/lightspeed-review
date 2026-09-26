@@ -306,6 +306,29 @@ test("a re-attach says whether it hands back the batch being digested or waits f
   });
 });
 
+/**
+ * A kill recovery is for a wait, and handing back a held batch is none: the
+ * line read as "this may block", on a command that had already returned.
+ */
+test("a re-attach that hands back the batch being digested prints no kill recovery", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    await open(harness, { intents: [] });
+    harness.store.save({
+      ...harness.store.get(KEY)!,
+      turn: agentDigesting("2025-01-01T00:00:00Z"),
+    });
+    await open(harness, { intents: ["ignored"] });
+
+    const [, onReviewers, onDigesting] = harness.announced;
+    assert.match(ifKilled(onReviewers), /lightspeed open feature-auth main$/);
+    assert.equal(onDigesting?.next, undefined);
+    assert.match(String(onDigesting?.message), /re-attached/);
+    assert.match(String(onDigesting?.note), /--intent is ignored/);
+    assert.equal((onDigesting?.session as { key: string }).key, KEY);
+  });
+});
+
 function ifKilled(block: StructuredOutput | undefined): string {
   return (block?.next as { if_killed: string }).if_killed;
 }
@@ -501,6 +524,35 @@ test("re-opening an ended review is refused, with the way to ask for a new round
     assert.equal(error.code, "session_ended");
     assert.ok(error.suggestions.some((line) => line.includes("--reopen")));
     assert.deepEqual(harness.store.get(KEY), ended);
+  });
+});
+
+/** Who closed it is on the record; `lightspeed end` is not the reviewer's decision. */
+test("open and publish on a review the agent ended say `lightspeed end` closed it", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    toWorking(harness.store);
+    harness.store.save({ ...harness.store.get(KEY)!, status: "ended", endedBy: "agent" });
+
+    const opened = await refusal(open(harness));
+    const published = await refusal(publish(harness));
+
+    for (const error of [opened, published]) {
+      assert.equal(error.code, "session_ended");
+      assert.match(error.message, /`lightspeed end` ended this review, not the reviewer/);
+      assert.match(error.suggestions.join("\n"), /Only if the reviewer asks for another round/);
+    }
+  });
+});
+
+test("open on a review the reviewer ended still says the reviewer ended it", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.store.save({ ...harness.store.get(KEY)!, status: "ended", endedBy: "reviewer" });
+
+    const error = await refusal(open(harness));
+
+    assert.match(error.message, /^the reviewer ended this review/);
   });
 });
 
@@ -811,6 +863,7 @@ test("a server-recognised re-run over a batch never acknowledged says it hands t
     assert.equal(shown?.rerun, true);
     assert.equal(shown?.turn, "agent digesting");
     assert.match(String(shown?.message), /handing back the batch you are digesting/);
+    assert.equal(shown?.next, undefined, "no wait, so no kill recovery");
   });
 });
 
@@ -828,6 +881,7 @@ test("a local re-run over a batch never acknowledged says it hands that batch ba
       String(shown?.message),
       /already published; handing back the batch you are digesting/,
     );
+    assert.equal(shown?.next, undefined, "no wait, so no kill recovery");
   });
 });
 
@@ -1016,4 +1070,36 @@ test("a degraded ledger is reported with a reason and a help line, not an error"
     assert.match(ledger.reason, /ENOTDIR|not a directory/i);
     assert.ok((shown.help as string[]).some((line) => /ledger/i.test(line)));
   }, "broken");
+});
+
+/** Read top to bottom, the same two facts in the same order: a flip reads as a different block. */
+function roundBeforeTurn(block: StructuredOutput | undefined): void {
+  const keys = Object.keys(block ?? {});
+  assert.ok(keys.includes("round") && keys.includes("turn"), keys.join(", "));
+  assert.ok(keys.indexOf("round") < keys.indexOf("turn"), keys.join(", "));
+}
+
+test("every block before a wait names the round before the turn", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    await open(harness, { intents: [] });
+    const deps: RoundDeps = { ...harness.deps, extractDiff: () => extractedAt(2) };
+    await publishNext(harness, { deps });
+    await publish(harness, { deps });
+
+    const [fresh, reattached, published, rerun] = harness.announced;
+    assert.equal(rerun?.rerun, true);
+    for (const block of [fresh, reattached, published, rerun]) roundBeforeTurn(block);
+  });
+});
+
+test("a local publish re-run names the round before the turn", async () => {
+  await withHarness(async (harness) => {
+    const { repoRoot, deps } = await publishedAtTip(harness);
+
+    await publish(harness, { repoRoot, deps });
+
+    assert.equal(harness.announced[0]?.rerun, true);
+    roundBeforeTurn(harness.announced[0]);
+  });
 });

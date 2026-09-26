@@ -442,6 +442,28 @@ test("ending from the browser records the round end once, with the approved set"
   });
 });
 
+/**
+ * A second `end` has nothing to close: re-closing it logged another round end
+ * and re-stamped the record while the CLI said nothing was left to close.
+ */
+test("ending a review that is already ended writes nothing and logs nothing", async () => {
+  await withServer("on", async ({ url, store, ledger }) => {
+    const { key } = await startRound(url);
+    await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
+    const ended = store.get(key)!;
+    const logged = ledger?.read({}).records.length;
+
+    const again = await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
+
+    assert.equal(again.status, 200);
+    assert.partialDeepStrictEqual(await again.json(), { status: "ended", turn: "ended" });
+    assert.deepEqual(store.get(key), ended);
+    assert.equal(ledger?.read({}).records.length, logged);
+    const ends = (ledger?.read({}).records ?? []).filter((record) => record.kind === "round_end");
+    assert.equal(ends.length, 1);
+  });
+});
+
 test("ending with nothing said keeps the ledger to what happened", async () => {
   await withServer("on", async ({ url, ledger }) => {
     const { key } = await startRound(url);

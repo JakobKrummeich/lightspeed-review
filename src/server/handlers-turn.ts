@@ -9,7 +9,7 @@ import { openIds } from "../threads.ts";
 import { agentWorking, turnFacts } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendJson } from "./http.ts";
-import { reviewerHolds } from "./turn-refusals.ts";
+import { reviewEnded, reviewerHolds } from "./turn-refusals.ts";
 import { readWork } from "./validate.ts";
 
 export async function handleWork(
@@ -53,12 +53,7 @@ export async function handleWork(
  */
 function workableTurn(session: SessionRecord, response: ServerResponse): AgentTurn | undefined {
   if (session.status === "ended") {
-    sendJson(response, 409, {
-      error: {
-        code: "session_ended",
-        message: "this review is ended; there is no turn left to work in",
-      },
-    });
+    sendJson(response, 409, reviewEnded(session));
     return undefined;
   }
   if (session.turn.holder === "agent") return session.turn;

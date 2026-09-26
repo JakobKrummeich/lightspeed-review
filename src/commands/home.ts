@@ -22,8 +22,8 @@ export interface SessionSummary {
    * So the home view answers "may I send?" and "am I owed a turn?" without a
    * second command.
    */
-  turn: TurnLabel;
   round: number;
+  turn: TurnLabel;
   pending: number;
   /**
    * An agent resumed after compaction reads this view to find out where it was,
@@ -44,8 +44,8 @@ export function sessionSummaries(
     ...(options.repo === true ? { repo: session.repoRoot } : {}),
     branch: session.branch,
     base: session.base,
-    turn: turnLabel(session),
     round: roundNumber(session),
+    turn: turnLabel(session),
     pending: session.pending.length,
     ...(noted ? { note: declaredPlan(session) } : {}),
   }));

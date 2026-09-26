@@ -6,6 +6,7 @@
  * and core code importing `commands/` is how the old import cycles formed.
  */
 import { openCall } from "./open-call.ts";
+import type { ReviewCloser } from "./session-types.ts";
 import { MAIN_THREAD } from "./threads.ts";
 import type { TurnLabel } from "./turn.ts";
 
@@ -112,9 +113,15 @@ export function publishRerun(
 
 /**
  * Closes every block shown before a wait: the wait may outlive the agent's
- * shell, and the way back must be on screen before it begins, not after.
+ * shell, and the way back must be on screen before it begins, not after. None
+ * while the agent digests: the "wait" then hands the held batch straight back
+ * (as `waitClause` says), and a recovery line there read as a wait to come.
  */
-export function ifKilled(command: string): { next: { if_killed: string } } {
+export function ifKilled(
+  turn: TurnLabel | undefined,
+  command: string,
+): { next?: { if_killed: string } } {
+  if (turn === "agent digesting") return {};
   return {
     next: {
       if_killed: `Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: ${command}`,
@@ -139,6 +146,28 @@ export const HELP_END = `Run \`${endCall("<branch> [base]")}\` to close the revi
  */
 export function helpEndedOn(target: string): string {
   return `Run \`lightspeed approvals ${target}\` for the verdict the review ended on`;
+}
+
+/**
+ * Who closed an ended review, worded once for every sentence that explains
+ * one — a refusal, the batch that reports the end, the home of a repo whose
+ * latest review is over. Blamed on the reviewer, an agent's own `lightspeed end`
+ * reached its user as the reviewer's decision; "you ended" was a guess too,
+ * since another shell or the human may have run it. Unnamed only on a record
+ * older than `endedBy`.
+ */
+export function endedClause(endedBy: ReviewCloser | undefined): string {
+  if (endedBy === "reviewer") return "the reviewer ended this review";
+  if (endedBy === "agent") return "`lightspeed end` ended this review, not the reviewer";
+  return "this review is ended";
+}
+
+/** The refusal an ended review answers every move with: a new round is the reviewer's call either way. */
+export function endedMessage(endedBy: ReviewCloser | undefined): string {
+  if (endedBy === "reviewer") return `${endedClause(endedBy)}; only they ask for a new round`;
+  if (endedBy === "agent")
+    return `${endedClause(endedBy)}; a new round is still the reviewer's call`;
+  return `${endedClause(endedBy)}; only the reviewer asks for a new round`;
 }
 
 /** Only ever at the reviewer's request: an ended review is their decision. */

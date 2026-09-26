@@ -31,7 +31,7 @@ import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.t
 import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
 import {
-  missingSession,
+  readAgainstStore,
   resolveSession,
   textAsBranch,
   type ResolvedSession,
@@ -113,10 +113,10 @@ function refuseTextAsBranch(input: Omit<TextAsBranchInput, "isRef">): void {
 }
 
 /**
- * The `session_not_found` catch lives here because this is the only layer that
- * has both halves: the store knows what is open in this repository, and the
- * dispatch knows which command asked. Below it, a 404 off the wire and a
- * missing file on disk would each have to invent the same sentence.
+ * The `session_not_found` and `server_not_running` catch lives here because this
+ * is the only layer that has both halves: the store knows what is open in this
+ * repository, and the dispatch knows which command asked. Below it, a 404 off
+ * the wire and a missing file on disk would each have to invent the same sentence.
  */
 async function onSession<T>(
   verb: string,
@@ -131,8 +131,7 @@ async function onSession<T>(
   try {
     return await run({ repoRoot, config, ...target });
   } catch (error) {
-    if (!(error instanceof ReviewError) || error.code !== "session_not_found") throw error;
-    throw missingSession({ repoRoot, ...target, verb, sessions });
+    throw readAgainstStore(error, { repoRoot, ...target, verb, sessions });
   }
 }
 
@@ -192,7 +191,7 @@ async function approvalsCommand(args: string[]): Promise<StructuredOutput> {
 
 async function endCommand(args: string[]): Promise<StructuredOutput> {
   return await onSession("end", args[0], args[1], ({ config, ...target }) =>
-    runEnd({ ...target, port: config.port }),
+    runEnd({ ...target, port: config.port, stateDir: config.stateDir }),
   );
 }
 

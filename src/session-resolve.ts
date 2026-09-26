@@ -1,7 +1,17 @@
 import { ReviewError } from "./errors.ts";
 import type { SessionRecord } from "./session-types.ts";
 import { openCall } from "./open-call.ts";
-import { helpReopen, publishCall, replyCall, workCall } from "./turn-help.ts";
+import type { ReviewCloser } from "./session-types.ts";
+import {
+  WAITS_FOR_SEND,
+  endedClause,
+  endedMessage,
+  helpEndedOn,
+  helpReopen,
+  publishCall,
+  replyCall,
+  workCall,
+} from "./turn-help.ts";
 
 export interface ResolvedSession {
   branch: string;
@@ -33,6 +43,59 @@ export function missingSession(input: MissingSessionInput): ReviewError {
     message: `no review session for ${input.branch} against ${input.base} in ${input.repoRoot}`,
     detail: liveDetail(live),
     suggestions: [open, ...instead(input.verb, live)],
+  });
+}
+
+/**
+ * A command's failure read against the store, which only the dispatch layer has
+ * at hand: a 404 off the wire becomes the same `session_not_found` a missing
+ * file would be, and a dead server with no review on disk for the target stops
+ * pointing at a re-attach — there is nothing to re-attach to, and the `open` that
+ * line named failed on its missing --intent.
+ */
+export function readAgainstStore(error: unknown, input: MissingSessionInput): unknown {
+  if (!(error instanceof ReviewError)) return error;
+  if (error.code === "session_not_found") return missingSession(input);
+  if (error.code !== "server_not_running") return error;
+  const record = onDisk(input);
+  if (record === undefined) return noReviewYet(error, input);
+  // An ended review answers for itself: re-attaching to it is refused anyway.
+  if (record.status === "ended")
+    return endedReview(`${input.branch} ${input.base}`, record.endedBy);
+  return error;
+}
+
+function onDisk(input: MissingSessionInput): SessionRecord | undefined {
+  return input.sessions.find(
+    (session) =>
+      session.repoRoot === input.repoRoot &&
+      session.branch === input.branch &&
+      session.base === input.base,
+  );
+}
+
+/**
+ * Every move on an ended review is refused the same way, whoever saw it first —
+ * the server's 409, the session file, or the file read after the server was
+ * found gone: who ended it, the verdict it ended on, and the one way back.
+ */
+export function endedReview(target: string, endedBy: ReviewCloser | undefined): ReviewError {
+  return new ReviewError({
+    code: "session_ended",
+    message: endedMessage(endedBy),
+    suggestions: [helpEndedOn(target), helpReopen(target)],
+  });
+}
+
+function noReviewYet(error: ReviewError, input: MissingSessionInput): ReviewError {
+  const target = `${input.branch} ${input.base}`;
+  return new ReviewError({
+    code: "server_not_running",
+    message: error.message,
+    ...(error.detail === undefined ? {} : { detail: error.detail }),
+    suggestions: [
+      `No review of ${input.branch} against ${input.base} exists yet: run \`${openCall(target)}\` to start the review server and open it — ${WAITS_FOR_SEND}`,
+    ],
   });
 }
 
@@ -160,8 +223,6 @@ function latestHere(sessions: SessionRecord[], repoRoot: string): SessionRecord 
     );
 }
 
-const ENDED_BY = { reviewer: "the reviewer ended", agent: "you ended" } as const;
-
 /**
  * The last review here is over: "no live session" read as "open one", and an
  * agent reopened a review the reviewer had closed. Who closed it decides the
@@ -169,11 +230,9 @@ const ENDED_BY = { reviewer: "the reviewer ended", agent: "you ended" } as const
  */
 function endedHere(latest: SessionRecord): ReviewError {
   const target = `${latest.branch} ${latest.base}`;
-  const what = `the review of ${latest.branch} against ${latest.base}, the latest in this repo`;
   return new ReviewError({
     code: "session_ended",
-    message:
-      latest.endedBy === undefined ? `${what}, is ended` : `${ENDED_BY[latest.endedBy]} ${what}`,
+    message: `the latest review in this repo, of ${latest.branch} against ${latest.base}: ${endedClause(latest.endedBy)}`,
     suggestions: [helpReopen(target), `Another branch: \`${openCall("<branch> [base]")}\``],
   });
 }

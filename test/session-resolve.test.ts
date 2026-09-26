@@ -166,7 +166,7 @@ test("a repository whose latest review ended says who ended it and reopens only 
     (error: unknown) => {
       assert.ok(error instanceof ReviewError);
       assert.equal(error.code, "session_ended");
-      assert.match(error.message, /the reviewer ended the review of feature-auth against main/);
+      assert.match(error.message, /of feature-auth against main: the reviewer ended this review/);
       assert.match(error.suggestions[0]!, /Only if the reviewer asks/);
       assert.match(error.suggestions[0]!, /lightspeed open feature-auth main --reopen/);
       return true;
@@ -181,7 +181,11 @@ test("a review the agent ended is said to be the agent's doing", () => {
     () => resolveSession(sessions, "/repo", undefined, undefined),
     (error: unknown) => {
       assert.ok(error instanceof ReviewError);
-      assert.match(error.message, /you ended the review of feature-auth against main/);
+      // Not "you": another shell, or the human, may have run it.
+      assert.match(
+        error.message,
+        /of feature-auth against main: `lightspeed end` ended this review, not the reviewer/,
+      );
       return true;
     },
   );

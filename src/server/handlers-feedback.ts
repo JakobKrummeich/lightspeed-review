@@ -15,7 +15,7 @@ import { announceRoundEnd } from "./handlers-session.ts";
 import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
 import { everyPrompt, knownThreads, logReplies, unknownNotes } from "./agent-notes.ts";
 import { logFeedback } from "./ledger-log.ts";
-import { reviewerHolds, stillWorking, unknownThreads } from "./turn-refusals.ts";
+import { reviewEnded, reviewerHolds, stillWorking, unknownThreads } from "./turn-refusals.ts";
 import { parseApproved, readFeedback, readReply, type ReplyRequest } from "./validate.ts";
 
 export async function handleApproved(
@@ -169,12 +169,7 @@ export async function handleAgentReply(
   // Words spoken into a review that is over reach nobody, and only the reviewer
   // asks for another round: refused rather than filed where nobody looks.
   if (session.status === "ended") {
-    sendJson(response, 409, {
-      error: {
-        code: "session_ended",
-        message: "this review is ended; its conversation is what the reviewer left",
-      },
-    });
+    sendJson(response, 409, reviewEnded(session));
     return;
   }
   const handback = handbackOf(session, "reply", reply.replies);

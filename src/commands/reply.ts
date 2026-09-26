@@ -83,5 +83,5 @@ function landed(
           replied: [...new Set(notes.map((note) => note.to))],
           message: `replied; ${waitClause(answer.turn)}`,
         };
-  return { ...turnBlock(answer), ...said, ...ifKilled(replyRerun(target, notes)) };
+  return { ...turnBlock(answer), ...said, ...ifKilled(answer.turn, replyRerun(target, notes)) };
 }

@@ -57,7 +57,7 @@ async function endedSession(url: string, store: SessionStore): Promise<string> {
   return key;
 }
 
-test("a round posted to a review the reviewer ended is refused and changes nothing", async () => {
+test("a round posted to an ended review is refused, naming who ended it, and changes nothing", async () => {
   await withServer(async ({ url, store }) => {
     const key = await endedSession(url, store);
     const before = store.get(key)!;
@@ -65,11 +65,14 @@ test("a round posted to a review the reviewer ended is refused and changes nothi
     const response = await postSessionRaw(url, sessionPayload);
 
     assert.equal(response.status, 409);
+    // Ended through `/end`, the agent's move: the reviewer did not end it.
     assert.deepEqual(await response.json(), {
       error: {
         code: "session_ended",
-        message: "the reviewer ended this review; only they ask for a new round",
+        message:
+          "`lightspeed end` ended this review, not the reviewer; a new round is still the reviewer's call",
       },
+      endedBy: "agent",
     });
     assert.deepEqual(store.get(key), before);
   });

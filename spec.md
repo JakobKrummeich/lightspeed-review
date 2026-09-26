@@ -70,7 +70,7 @@ Developer working in TUI with Pi agent:
 | #   | Principle                          | Implementation                                                                                                                                     |
 | --- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **Token-efficient output**         | All CLI output in TOON via `axi-sdk-js` — except `skill`, whose stdout is the markdown document itself; its errors stay TOON                       |
-| 2   | **Minimal default schemas**        | Session list: `{branch, base, turn, round, pending}` — 5 fields; `--all` widens it to every repository                                             |
+| 2   | **Minimal default schemas**        | Session list: `{branch, base, round, turn, pending}` — 5 fields; `--all` widens it to every repository                                             |
 | 3   | **Content truncation**             | The CLI never prints the diff — the browser shows it. `approvals` lists the first 50 paths of each list, `--full` for every one                    |
 | 4   | **Pre-computed aggregates**        | `total_files`, `total_groups`, `files_changed`, `insertions`, `deletions`, `pending_prompts` inline                                                |
 | 5   | **Definitive empty states**        | `sessions: 0` + explicit `no active sessions` message, never silent empty                                                                          |
@@ -130,7 +130,8 @@ if the agent is digesting, it is handed the same batch again.
 `publish` prints the round it published (or `rerun: true`), `open` prints the
 round or the re-attach — each closed by `next.if_killed`: the exact command to
 re-run if the wait is killed (`lightspeed open <branch> [base]`, no `--intent`,
-for `open`). The line is pasted as printed, TOON escapes included, so a `reply`
+for `open`). A command that hands back a batch the agent is digesting does not
+wait — it returns that batch at once — so its block carries no `if_killed`. The line is pasted as printed, TOON escapes included, so a `reply`
 or `publish` whose words hold an apostrophe, a double quote, a backslash or a
 line break — none of which survives that trip — names `lightspeed open <branch>
 [base]` instead: the words have landed, and re-attaching waits for the same Send. `open` on a working turn is refused `turn_still_yours` before any
@@ -203,8 +204,9 @@ suggested `--to` names an open thread of the session — never a resolved one, a
 digesting answers `turn_still_yours`; `publish` on an unmoved HEAD answers
 `nothing_to_publish`, naming `reply`; `--to` naming no thread of the session
 answers `feedback_item_unknown`. On an ended review every command that speaks
-into it is refused `session_ended`, pointing at `lightspeed approvals <branch>
-<base>` for the verdict it ended on, and a branchless command on a repository
+into it is refused `session_ended`, naming who ended it (the reviewer, or an
+agent's `lightspeed end` — the server's 409 carries `endedBy`) and pointing at
+`lightspeed approvals <branch> <base>` for the verdict it ended on, and a branchless command on a repository
 whose latest review ended is refused the same way, naming who ended it (with no
 review here at all, `session_not_found`; with several live ones,
 `ambiguous_session`); only
@@ -219,8 +221,12 @@ the command line is wrong, or the move is wrong for the review's state
 `ambiguous_session`). Exit 1 when the machine got in the way — the server, git,
 the model, the config — and the same command may work once that is fixed. Every
 server-gone failure (`server_not_running`, `server_unreachable`, a 503 mid-wait)
-names `lightspeed open <branch> [base]`, which restarts the server and
-re-attaches.
+with a live review of the target on disk names `lightspeed open <branch> [base]`,
+which restarts the server and re-attaches. `server_not_running` with no review
+of the target on disk has nothing to re-attach to, so it names the fresh open
+`lightspeed open <branch> [base] --intent '<why this branch exists>'` instead;
+with an ended one on disk the command is refused `session_ended`, naming who
+ended it, exactly as a running server would refuse it.
 
 ### Threads and items
 
@@ -302,7 +308,13 @@ lightspeed approvals [branch] [base]
   # Flags: --full (every path, not the first 50 of each list)
 
 lightspeed end [branch] [base]
-  # Agent-initiated session end
+  # Agent-initiated session end. Named explicitly, a review already ended is
+  #   answered "already ended" from the session file, contacting no server and
+  #   writing nothing; branchless with no live review it is refused like every
+  #   branchless command (`session_ended`, naming who ended the latest one);
+  #   ended while working with commits of the branch's own that no round showed
+  #   (not merges, not main's commits, not rebased copies of published ones), it
+  #   ends anyway and warns in help[] that they never reached the reviewer
 
 lightspeed serve
   # Runs the review server in the foreground until it is stopped. `open` spawns
@@ -357,7 +369,7 @@ or `skill` writes carries one stamp line (under the frontmatter, or first in the
 plain dialect and inside the `<!-- lightspeed:start -->` block):
 
 ```
-<!-- written by lightspeed 3.0.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.0.1 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 `content` hashes the skill as written. Before every command except `init`, the
@@ -400,8 +412,8 @@ Every command takes `<branch> [base]` explicitly — same pattern as lavish's `<
 bin: ~/.local/bin/lightspeed
 description: Semantic diff review with targeted agent feedback
 repo: /home/me/app
-sessions[1]{branch,base,turn,round,pending}:
-  feature-auth,main,agent digesting,1,0
+sessions[1]{branch,base,round,turn,pending}:
+  feature-auth,main,1,agent digesting,0
 next:
   reread: "Lost the batch? Run `lightspeed open feature-auth main`: it hands back the batch you are digesting at once, and posts nothing"
   talk: "Anything that needs the reviewer — an answer, a doubt about a change request, a question of your own → one call, every reply in it: lightspeed reply --to t1 '<answer>' --to t2 '<answer>' feature-auth main"
@@ -437,7 +449,7 @@ help[1]: "Run `lightspeed open <branch> [base] --intent '<why this branch exists
 ### open (the round, then the first batch)
 
 `open` prints two TOON documents, each led by `round:` — the round it opened,
-before the wait, and the batch that ended the wait. `turn` and `round` lead
+before the wait, and the batch that ended the wait. `round` and `turn` lead
 both, because they are what the next command has to be chosen against; `next:`
 closes the batch, so the decision rule is the last thing the agent reads.
 

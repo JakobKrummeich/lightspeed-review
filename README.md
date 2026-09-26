@@ -351,7 +351,7 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 3.0.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.0.1 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 Every command but `init` (the explicit install) then checks the places `init`
@@ -524,7 +524,9 @@ A review is in one of three live states:
 | Agent works   | "Working on: _plan_"                           | **Queue** anything — "queued items go into the next round"              | `publish` (new round)                 |
 
 **End** is available in every state, and `lightspeed end` closes the review from
-the agent's side. Delivery of a Send to a listening agent is what moves the turn
+the agent's side — `lightspeed end <branch>` on a review already ended just says
+so, and ending while working with the branch's own commits that no round has
+shown yet warns that the reviewer never saw them. Delivery of a Send to a listening agent is what moves the turn
 to digesting; `reply` hands it back; `work` moves it to working; `publish` opens
 the next round and hands it back, and the reviewer's queue drops into that round.
 `reply` from working is refused unless nothing has changed since `work` — HEAD
@@ -548,7 +550,8 @@ agent works. Before it waits, every waiting command prints what landed —
 `replied: [ids]`, the round it published, or `rerun: true` — closed by
 `next.if_killed`, the exact command to re-run (re-attaching with `open` when a
 word holds an apostrophe, quote, backslash or line break, which would not paste
-as printed). The newest wait wins: a second
+as printed) — except a command handing back a batch still being digested, which
+returns at once and has no wait to recover. The newest wait wins: a second
 waiting command on the same review answers the first `superseded: true`, so a
 forgotten background wait never swallows a batch. Bare `lightspeed` asks the
 server whether a wait is already parked before it suggests `open`, and says how
