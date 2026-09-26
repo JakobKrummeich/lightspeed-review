@@ -6,6 +6,7 @@ import { COLOR_SCHEME_OPTIONS, DEFAULT_SCHEME } from "./browser/color-scheme.ts"
 import { DEFAULT_FORMAT, VIEW_FORMAT_OPTIONS } from "./browser/view-format.ts";
 import type { SessionRecord } from "./session-store.ts";
 import { presenceOf } from "./turn.ts";
+import { FAVICON } from "./browser/tab-beacon.ts";
 
 /**
  * Groups and diffs are fetched from `/api/session/:key/data` by the browser
@@ -20,6 +21,7 @@ export function renderReviewPage(session: SessionRecord): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)} · lightspeed</title>
+    <link rel="icon" href="${FAVICON}" />
     <link rel="stylesheet" href="/static/app.css" />
     <script type="module" src="/static/app.js"></script>
   </head>

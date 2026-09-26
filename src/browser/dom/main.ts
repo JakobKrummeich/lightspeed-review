@@ -25,6 +25,8 @@ import { mountPanelRail, type MountedRail } from "./panel-rail.ts";
 import { mountSchemeToggle } from "./scheme-toggle.ts";
 import { fetchReplay, fetchSession, type SessionData } from "./session-api.ts";
 import { mountStatusBanner, type MountedStatusBanner } from "./status-mount.ts";
+import { mountTabBeacon, type MountedBeacon } from "./tab-beacon-mount.ts";
+import { presenceOf } from "../../turn.ts";
 import { trackReader } from "./reader-place.ts";
 import { queuedTotal, type QueueTally } from "../queued-pill.ts";
 import { wireSessionEvents, type LiveSession } from "./session-events.ts";
@@ -207,6 +209,11 @@ function roomWatch(): {
   };
 }
 
+/** Asked each time, not once: the preference can change under an open page. */
+function reducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function mountScheme(schemeSwitch: HTMLElement): void {
   mountSchemeToggle({
     root: schemeSwitch,
@@ -237,8 +244,15 @@ function mountPanelSide(
   onQueued: (queued: QueueTally) => void,
   onToggle: () => void,
   onJump: (file: string, place: LinePlace | undefined) => void,
-): { banner: MountedStatusBanner; railControl: MountedRail; panel: MountedPanel } {
+): {
+  banner: MountedStatusBanner;
+  beacon: MountedBeacon;
+  railControl: MountedRail;
+  panel: MountedPanel;
+} {
   const banner = mountStatusBanner(session);
+  // The header's word for the turn, and the tab's for a reviewer not looking at it.
+  const beacon = mountTabBeacon(document, presenceOf(session).turn, reducedMotion);
   const railControl = mountPanelRail({
     rail: page.rail,
     page: document.body,
@@ -269,7 +283,7 @@ function mountPanelSide(
     onJump,
     light: mountPanelLight(page.panelRoot, session.conversation),
   });
-  return { banner, railControl, panel };
+  return { banner, beacon, railControl, panel };
 }
 
 /**

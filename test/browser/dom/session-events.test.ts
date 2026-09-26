@@ -180,6 +180,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     },
     railControl: { setQueued: () => {}, expand: () => log.push("rail expand") },
     finish: { setTurn: () => {} },
+    beacon: { setTurn: (turn) => log.push(`beacon turn ${turn.holder}`) },
     refreshReplay: () => log.push("replay"),
     place: () => place,
   };
@@ -273,6 +274,7 @@ test("a reconnect onto the same round with missed talk draws it in place", async
 
   assert.deepEqual(log, [
     "panel turn reviewer",
+    "beacon turn reviewer",
     "diff same-round",
     "panel 1 said",
     "banner",

@@ -51,6 +51,8 @@ export interface Wired {
   banner: MountedStatusBanner;
   railControl: MountedRail;
   finish: TurnAware;
+  /** The tab's title and favicon, for a reviewer who is looking elsewhere. */
+  beacon: TurnAware;
   refreshReplay(fresh: SessionData): void;
   place(): ReviewerPlace;
 }
@@ -158,6 +160,7 @@ function openStream(
     banner.setPresence(presence);
     panel.setTurn(presence.turn, presence.items);
     wired.finish.setTurn(presence.turn);
+    wired.beacon.setTurn(presence.turn);
   });
   // A dropped stream reconnects by itself; a refused one never does. The
   // wait doubles while the server keeps refusing, and resets on an open.
