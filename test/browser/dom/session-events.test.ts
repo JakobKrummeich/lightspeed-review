@@ -136,6 +136,8 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
   const log: string[] = [];
   /** What the header was told of the stream, apart from `log`: every open says it. */
   const connections: boolean[] = [];
+  /** What the tab beacon was told of the review's end, apart from `log`: every draw says it. */
+  const endings: boolean[] = [];
   const roots = {
     review: new FakeNode("div"),
     intent: new FakeNode("div"),
@@ -182,7 +184,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     finish: { setTurn: () => {} },
     beacon: {
       setTurn: (turn) => log.push(`beacon turn ${turn.holder}`),
-      setEnded: () => log.push("beacon ended"),
+      setEnded: (ended) => void endings.push(ended),
     },
     refreshReplay: () => log.push("replay"),
     place: () => place,
@@ -193,7 +195,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     assert.ok(open, "the page opened its stream");
     return open;
   };
-  return { stream, log, live, roots, connections };
+  return { stream, log, live, roots, connections, endings };
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -329,16 +331,19 @@ test("an announced session is drawn even when nothing the page compares has move
   assert.deepEqual(log, ["diff same-round", "panel 0 said", "banner"]);
 });
 
-test("a review that ends puts the tab beacon out for good, whichever frame lands first", async (t) => {
+test("a review that ends puts the tab beacon out, and a reopen lets it light again", async (t) => {
   // Regression: `lightspeed end` hands the turn to the reviewer, and a hidden tab read that as
-  // "● Your turn" on a review nobody can act on any more.
-  const { stream, server, log } = world(t).page();
+  // "● Your turn" on a review nobody can act on any more; then `open --reopen` left it dark.
+  const { stream, server, endings } = world(t).page();
   server.serving = { ...session(0), status: "ended" };
-
   stream().emit("session");
   await settled();
 
-  assert.ok(log.includes("beacon ended"));
+  server.serving = session(1);
+  stream().emit("session");
+  await settled();
+
+  assert.deepEqual(endings, [true, false]);
 });
 
 test("an older answer landing last does not put the old round back", async (t) => {

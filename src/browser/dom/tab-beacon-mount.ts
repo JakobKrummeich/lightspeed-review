@@ -1,12 +1,12 @@
 /**
  * Writes the tab beacon into the title and the favicon. Lit when the turn
  * flips to the reviewer while the tab is hidden; dark again the moment the
- * tab is looked at, or if the turn goes back to the agent first. Dark for good
- * once the review has ended: `lightspeed end` hands the turn back to the
- * reviewer too, and a closed review is nobody's turn.
+ * tab is looked at, or if the turn goes back to the agent first. Dark while
+ * the review is ended: `lightspeed end` hands the turn back to the reviewer
+ * too, and a closed review is nobody's turn — until `open --reopen` opens it.
  */
 import { beaconState, beaconTitle, FAVICON, FAVICON_LIT, type Beacon } from "../tab-beacon.ts";
-import type { Turn } from "../../session-store.ts";
+import type { SessionRecord, Turn } from "../../session-store.ts";
 
 /** A background tab's timers run about once a second anyway: this is that second. */
 const TWINKLE_MS = 1000;
@@ -15,8 +15,12 @@ export type BeaconPage = Pick<Document, "title" | "hidden" | "addEventListener" 
 
 export interface MountedBeacon {
   setTurn(turn: Turn): void;
-  /** Terminal: the beacon goes dark and no later turn lights it. */
-  setEnded(): void;
+  /**
+   * Ended puts the beacon out, and no turn lights it while the review stays
+   * ended; the turns are still followed, so a reopened review lights only on
+   * a flip that comes after it.
+   */
+  setEnded(ended: boolean): void;
 }
 
 interface BeaconView {
@@ -31,13 +35,13 @@ interface BeaconView {
 }
 
 /**
- * `opening` is the turn the page was drawn on. Only a flip is news: the
- * presence frames restate the turn, and a tab hidden on the reviewer's own
- * turn was left by a reviewer who already knew.
+ * `opening` is the session the page was drawn on: its turn, and whether it
+ * had ended. Only a flip is news: the presence frames restate the turn, and a
+ * tab hidden on the reviewer's own turn was left by a reviewer who already knew.
  */
 export function mountTabBeacon(
   page: BeaconPage,
-  opening: Turn,
+  opening: Pick<SessionRecord, "status" | "turn">,
   still: () => boolean,
 ): MountedBeacon {
   const view: BeaconView = {
@@ -47,20 +51,20 @@ export function mountTabBeacon(
     still,
     beacon: "dark",
   };
-  let holder = opening.holder;
-  let ended = false;
+  let holder = opening.turn.holder;
+  let ended = opening.status === "ended";
   page.addEventListener("visibilitychange", () => {
     if (!page.hidden) show(view, "dark");
   });
   return {
     setTurn(turn) {
-      if (ended || turn.holder === holder) return;
+      if (turn.holder === holder) return;
       holder = turn.holder;
-      show(view, beaconState(turn, page.hidden));
+      if (!ended) show(view, beaconState(turn, page.hidden));
     },
-    setEnded() {
-      ended = true;
-      show(view, "dark");
+    setEnded(now) {
+      ended = now;
+      if (ended) show(view, "dark");
     },
   };
 }

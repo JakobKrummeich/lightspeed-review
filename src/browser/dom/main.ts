@@ -26,7 +26,6 @@ import { mountSchemeToggle } from "./scheme-toggle.ts";
 import { fetchReplay, fetchSession, type SessionData } from "./session-api.ts";
 import { mountStatusBanner, type MountedStatusBanner } from "./status-mount.ts";
 import { mountTabBeacon, type MountedBeacon } from "./tab-beacon-mount.ts";
-import { presenceOf } from "../../turn.ts";
 import { trackReader } from "./reader-place.ts";
 import { queuedTotal, type QueueTally } from "../queued-pill.ts";
 import { wireSessionEvents, type LiveSession } from "./session-events.ts";
@@ -252,8 +251,7 @@ function mountPanelSide(
 } {
   const banner = mountStatusBanner(session);
   // The header's word for the turn, and the tab's for a reviewer not looking at it.
-  const beacon = mountTabBeacon(document, presenceOf(session).turn, reducedMotion);
-  if (session.status === "ended") beacon.setEnded();
+  const beacon = mountTabBeacon(document, session, reducedMotion);
   const railControl = mountPanelRail({
     rail: page.rail,
     page: document.body,

@@ -199,8 +199,8 @@ function applyRound(wired: Wired, fresh: SessionData): void {
   // changes its standing (takes the reopen control away).
   if (change === "regrouped") openRound(wired, fresh);
   else if (fresh.status === "ended") page.replayReopen.hidden = true;
-  // The end's own presence frame says "reviewer", and may land either side of this.
-  if (fresh.status === "ended") wired.beacon.setEnded();
+  // Both ways: `open --reopen` lights the tab again on the next flip.
+  wired.beacon.setEnded(fresh.status === "ended");
   // An answer the reviewer never sees costs more than the width. Opened before
   // the panel draws it: the draw decides from what is in sight how the answer
   // is lit, and a folded panel has nothing in sight.

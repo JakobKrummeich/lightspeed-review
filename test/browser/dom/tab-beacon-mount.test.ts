@@ -30,10 +30,15 @@ class FakePage {
   }
 }
 
-function mounted(t: TestContext, opening: Turn = AGENTS, still = false) {
+function mounted(t: TestContext, opening: Turn = AGENTS, still = false, ended = false) {
   t.mock.timers.enable({ apis: ["setInterval"] });
   const page = new FakePage();
-  const beacon = mountTabBeacon(page as unknown as BeaconPage, opening, () => still);
+  const status = ended ? "ended" : "feedback";
+  const beacon = mountTabBeacon(
+    page as unknown as BeaconPage,
+    { status, turn: opening },
+    () => still,
+  );
   return { page, beacon };
 }
 
@@ -117,7 +122,11 @@ test("a page with no favicon still says it in the title", (t) => {
   t.mock.timers.enable({ apis: ["setInterval"] });
   const page = new FakePage();
   page.querySelector = () => null;
-  const beacon = mountTabBeacon(page as unknown as BeaconPage, AGENTS, () => false);
+  const beacon = mountTabBeacon(
+    page as unknown as BeaconPage,
+    { status: "feedback", turn: AGENTS },
+    () => false,
+  );
   page.show(true);
 
   beacon.setTurn(YOURS);
@@ -131,11 +140,51 @@ test("an ended review keeps the tab dark, though its end hands the turn back", (
   const { page, beacon } = mounted(t);
   page.show(true);
 
-  beacon.setEnded();
+  beacon.setEnded(true);
   beacon.setTurn(YOURS);
 
   assert.equal(page.title, TITLE);
   assert.equal(page.icon.href, FAVICON);
+});
+
+test("a page opened on an ended review keeps the tab dark from its first frame", (t) => {
+  const { page, beacon } = mounted(t, AGENTS, false, true);
+  page.show(true);
+
+  beacon.setTurn(YOURS);
+
+  assert.equal(page.title, TITLE);
+  assert.equal(page.icon.href, FAVICON);
+});
+
+test("a reopened review lights the tab again when the agent hands the turn back", (t) => {
+  // Regression: the end put the beacon out for good, and `open --reopen` left that page dark.
+  const { page, beacon } = mounted(t);
+  beacon.setTurn(YOURS);
+  beacon.setEnded(true);
+
+  beacon.setEnded(false);
+  page.show(true);
+  assert.equal(page.title, TITLE, "the reopen itself is no flip");
+  beacon.setTurn(AGENTS);
+  beacon.setTurn(YOURS);
+
+  assert.equal(page.title, `● Your turn · ${TITLE}`);
+  assert.equal(page.icon.href, FAVICON_LIT[0]);
+});
+
+test("the turns an ended review goes through are followed, so the reopen is not a flip", (t) => {
+  // The end hands the turn to the reviewer while ended; reopened, that reviewer turn restated
+  // is the one the page already knew, not news.
+  const { page, beacon } = mounted(t);
+  page.show(true);
+  beacon.setEnded(true);
+  beacon.setTurn(YOURS);
+
+  beacon.setEnded(false);
+  beacon.setTurn(YOURS);
+
+  assert.equal(page.title, TITLE);
 });
 
 test("the end puts out a beacon that was already lit, and its twinkle with it", (t) => {
@@ -143,7 +192,7 @@ test("the end puts out a beacon that was already lit, and its twinkle with it", 
   page.show(true);
   beacon.setTurn(YOURS);
 
-  beacon.setEnded();
+  beacon.setEnded(true);
   t.mock.timers.tick(3000);
 
   assert.equal(page.title, TITLE);
