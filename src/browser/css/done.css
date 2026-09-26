@@ -14,7 +14,7 @@
   z-index: 19;
 }
 
-/* Arrives, and its light is the supernova's (`light.css`): the reviewer is
+/* Arrives, and its light is the supernova's (`light-approval.css`): the reviewer is
  * about to make a decision, and nothing on the card keeps moving while they do. */
 .lsr-done-card {
   position: relative;
