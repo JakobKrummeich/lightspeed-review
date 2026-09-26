@@ -111,7 +111,8 @@ const RULES = `## Rules
   timeout. If one is killed anyway, re-run the same command: the server
   recognises it, posts nothing twice and hands you whatever the reviewer sent.
   Before it waits, each prints what landed (\`replied\`, the round, or
-  \`rerun: true\`) closed by \`next.if_killed\` — that exact command. Only
+  \`rerun: true\`) closed by \`next.if_killed\` — that exact command; one
+  that hands back a batch you are digesting returns at once, without it. Only
   one wait per review: a newer one makes the older exit \`superseded: true\`,
   which asks nothing of you.
 - Every refusal of a move — out of turn, an ended, unknown or ambiguous

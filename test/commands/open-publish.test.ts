@@ -306,6 +306,29 @@ test("a re-attach says whether it hands back the batch being digested or waits f
   });
 });
 
+/**
+ * A kill recovery is for a wait, and handing back a held batch is none: the
+ * line read as "this may block", on a command that had already returned.
+ */
+test("a re-attach that hands back the batch being digested prints no kill recovery", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    await open(harness, { intents: [] });
+    harness.store.save({
+      ...harness.store.get(KEY)!,
+      turn: agentDigesting("2025-01-01T00:00:00Z"),
+    });
+    await open(harness, { intents: ["ignored"] });
+
+    const [, onReviewers, onDigesting] = harness.announced;
+    assert.match(ifKilled(onReviewers), /lightspeed open feature-auth main$/);
+    assert.equal(onDigesting?.next, undefined);
+    assert.match(String(onDigesting?.message), /re-attached/);
+    assert.match(String(onDigesting?.note), /--intent is ignored/);
+    assert.equal((onDigesting?.session as { key: string }).key, KEY);
+  });
+});
+
 function ifKilled(block: StructuredOutput | undefined): string {
   return (block?.next as { if_killed: string }).if_killed;
 }
@@ -811,6 +834,7 @@ test("a server-recognised re-run over a batch never acknowledged says it hands t
     assert.equal(shown?.rerun, true);
     assert.equal(shown?.turn, "agent digesting");
     assert.match(String(shown?.message), /handing back the batch you are digesting/);
+    assert.equal(shown?.next, undefined, "no wait, so no kill recovery");
   });
 });
 
@@ -828,6 +852,7 @@ test("a local re-run over a batch never acknowledged says it hands that batch ba
       String(shown?.message),
       /already published; handing back the batch you are digesting/,
     );
+    assert.equal(shown?.next, undefined, "no wait, so no kill recovery");
   });
 });
 

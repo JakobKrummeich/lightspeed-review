@@ -102,7 +102,7 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
     ...publishedRound(outcome),
     message: "the review is open — give the reviewer the url; waiting for their first Send",
     ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
-    ...ifKilled(reattachCall(target)),
+    ...ifKilled(outcome.created.turn, reattachCall(target)),
   });
   return await run.listen({ ...input, port: input.config.port });
 }
@@ -118,7 +118,7 @@ function reattached(session: SessionRecord, input: OpenInput): StructuredOutput 
     },
     message: `re-attached to the live review; ${waitClause(turnLabel(session))}`,
     ...(input.intents.length === 0 ? {} : { note: intentIgnored(input) }),
-    ...ifKilled(reattachCall(`${input.branch} ${input.base}`)),
+    ...ifKilled(turnLabel(session), reattachCall(`${input.branch} ${input.base}`)),
   };
 }
 

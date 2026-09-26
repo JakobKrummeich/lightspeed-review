@@ -293,6 +293,7 @@ test("a re-run reply over a batch it never acknowledged says it hands that batch
       assert.equal(announced[0]?.turn, "agent digesting");
       assert.match(String(announced[0]?.message), /handing back the batch you are digesting/);
       assert.doesNotMatch(String(announced[0]?.message), /waiting for the reviewer's Send/);
+      assert.equal(announced[0]?.next, undefined, "no wait, so no kill recovery");
     },
   );
 });

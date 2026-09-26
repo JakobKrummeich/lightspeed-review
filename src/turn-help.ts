@@ -112,9 +112,15 @@ export function publishRerun(
 
 /**
  * Closes every block shown before a wait: the wait may outlive the agent's
- * shell, and the way back must be on screen before it begins, not after.
+ * shell, and the way back must be on screen before it begins, not after. None
+ * while the agent digests: the "wait" then hands the held batch straight back
+ * (as `waitClause` says), and a recovery line there read as a wait to come.
  */
-export function ifKilled(command: string): { next: { if_killed: string } } {
+export function ifKilled(
+  turn: TurnLabel | undefined,
+  command: string,
+): { next?: { if_killed: string } } {
+  if (turn === "agent digesting") return {};
   return {
     next: {
       if_killed: `Killed or timed out before the reviewer's Send? Re-run exactly this — it posts nothing twice: ${command}`,
