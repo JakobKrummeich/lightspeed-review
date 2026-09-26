@@ -1,7 +1,7 @@
 /**
  * Throws the caller's error at the exact token, so which mistake is reported
  * first stays per-command. No command may ignore a flag it does not know:
- * silently collecting one as a positional is how `start` came to open a browser
+ * silently collecting one as a positional is how 2.x's `start` came to open a browser
  * that `--no-opne` had asked it not to.
  */
 export interface ScanSpec {
@@ -9,11 +9,11 @@ export interface ScanSpec {
   value?: readonly string[];
   boolean?: readonly string[];
   onUnknown: (flag: string) => Error;
-  /** Absent, the hit is recorded valueless and the caller decides (`start` drops
-   * it, `say` raises errors that depend on earlier flags); a factory throws at
+  /** Absent, the hit is recorded valueless and the caller decides (`open` and
+   * `publish` drop it); a factory throws at
    * the flag itself (`feedback`). */
   onMissingValue?: (flag: string) => Error;
-  /** `"any"` (default) eats whatever comes next — a `say --for` note may be "-1 on
+  /** `"any"` (default) eats whatever comes next — a `--to` note may be "-1 on
    * that"; `"bare"` refuses, so `--since --format` is a missing value, not a value. */
   values?: "any" | "bare";
   /** The agent verbs take only `--x`, so a branch named `-x` stays positional;

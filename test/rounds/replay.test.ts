@@ -47,6 +47,26 @@ function reviewerEntry(roundIndex: number, prompts: AnnotationPrompt[]): Convers
   return { role: "reviewer", at: `2024-01-0${roundIndex + 1}T12:00:00.000Z`, roundIndex, prompts };
 }
 
+/** The agent's words in a thread — what `reply --to` and `publish --to` write. */
+function agentReply(thread: string, comment: string, roundIndex = 1): ConversationEntry {
+  return {
+    role: "agent",
+    at: `2024-01-0${roundIndex + 1}T13:00:00.000Z`,
+    roundIndex,
+    prompts: [{ type: "reply", thread, comment }],
+  };
+}
+
+/** The default comment, answered by the agent in its thread. */
+function answered(...notes: string[]): Partial<SessionRecord> {
+  return {
+    conversation: [
+      reviewerEntry(0, [annotation()]),
+      ...notes.map((note) => agentReply("evt-1", note)),
+    ],
+  };
+}
+
 function session(overrides: Partial<SessionRecord> = {}): SessionRecord {
   return {
     key: "k",
@@ -181,67 +201,49 @@ test("an anchorless comment says so with a null anchor, not a fabricated range",
   assert.equal(comments[0]?.anchor, null);
 });
 
-test("a declared comment serves the declared files' hunks and the agent's note", () => {
-  const record = session({
-    declarations: {
-      "evt-1": { note: "moved the guard", files: ["src/a.ts"], at: "t" },
-    },
-  });
+/** 3.0 has no declarations: the hunks are always the anchor's, the words the thread's. */
+test("a comment the agent answered carries its last words as the note, beside the anchor's hunks", () => {
+  const record = session(answered("looking into it", "done: moved the guard"));
 
   const { comments } = replay(record, answersWith(patchFor("src/a.ts")));
 
   const [card] = comments;
-  assert.equal(card?.declared, true);
-  assert.equal(card?.note, "moved the guard");
+  assert.notEqual(card?.note, undefined);
+  assert.equal(card?.note, "done: moved the guard");
   assert.equal(card?.state, "ok");
   assert.equal(card?.answers.length, 1);
-  assert.equal(card?.answers[0]?.file, "src/a.ts");
-  assert.equal(card?.answers[0]?.hunks.length, 2, "declared files come whole, never anchor-cut");
-  assert.match(card?.answers[0]?.hunks[0]?.body ?? "", /\+new line/);
+  assert.equal(card?.answers[0]?.hunks.length, 1, "only the hunk the anchor overlaps");
 });
 
-test("a declaration spanning files yields one labelled answer per file", () => {
-  const asked: string[][] = [];
+test("the reviewer's own replies in the thread are never read as the agent's note", () => {
   const record = session({
-    declarations: { "evt-1": { files: ["src/a.ts", "src/b.ts"], at: "t" } },
-  });
-  const readBetween: ReadBetween = (from, to, paths) => {
-    assert.equal(from, FROM, "the diff starts at last round's head — the code the comment was on");
-    assert.equal(to, TO, "and ends at the round on screen");
-    asked.push(paths);
-    const path = paths.includes("src/b.ts") ? "src/b.ts" : "src/a.ts";
-    return { state: "patch", patch: patchFor(path) };
-  };
-
-  const { comments } = replay(record, readBetween);
-
-  assert.deepEqual(
-    comments[0]?.answers.map((answer) => answer.file),
-    ["src/a.ts", "src/b.ts"],
-  );
-  assert.ok(comments[0]?.answers.every((answer) => answer.hunks.length === 2));
-});
-
-test("a note-only declaration is a valid answer: declared, no hunks, no failure state", () => {
-  const record = session({
-    declarations: { "evt-1": { note: "that is intentional, see the ADR", files: [], at: "t" } },
+    conversation: [
+      reviewerEntry(0, [annotation()]),
+      {
+        role: "reviewer",
+        at: "2024-01-01T14:00:00.000Z",
+        roundIndex: 0,
+        prompts: [{ type: "reply", thread: "evt-1", comment: "and the other one" }],
+      },
+    ],
   });
 
   const { comments } = replay(record, answersWith(patchFor("src/a.ts")));
 
-  const [card] = comments;
-  assert.equal(card?.declared, true);
-  assert.deepEqual(card?.answers, []);
-  assert.equal(card?.note, "that is intentional, see the ADR");
-  assert.equal(card?.state, "ok");
+  assert.equal(comments[0]?.note, undefined);
+  assert.equal(comments[0]?.note, undefined);
 });
 
-test("an undeclared comment falls back to the hunks its anchor overlaps", () => {
+test("an unanswered comment falls back to the hunks its anchor overlaps", () => {
   const { comments } = replay(session(), answersWith(patchFor("src/a.ts")));
 
   const [card] = comments;
-  assert.equal(card?.declared, false);
-  assert.equal(card?.note, undefined, "no declaration means no note, never an invented one");
+  assert.equal(card?.note, undefined);
+  assert.equal(
+    card?.note,
+    undefined,
+    "no answer in the thread means no note, never an invented one",
+  );
   assert.equal(card?.answers.length, 1);
   assert.equal(card?.answers[0]?.hunks.length, 1, "only the hunk the anchor overlaps");
   assert.match(card?.answers[0]?.hunks[0]?.header ?? "", /^@@ -10,3/);
@@ -339,15 +341,17 @@ test("an anchorless comment gets the whole file too", () => {
 
 test("a comment from before ids existed is served with a null id and mechanical answers", () => {
   const record = session({
-    conversation: [reviewerEntry(0, [annotation({ id: undefined })])],
-    declarations: { "evt-1": { note: "not yours", files: ["src/a.ts"], at: "t" } },
+    conversation: [
+      reviewerEntry(0, [annotation({ id: undefined })]),
+      agentReply("evt-1", "not yours"),
+    ],
   });
 
   const { comments } = replay(record, answersWith(patchFor("src/a.ts")));
 
   const [card] = comments;
   assert.equal(card?.id, null);
-  assert.equal(card?.declared, false, "no id can never match a declaration");
+  assert.equal(card?.note, undefined, "no id can never match a thread");
   assert.equal(card?.note, undefined);
   assert.equal(card?.answers[0]?.hunks.length, 1);
 });
@@ -445,7 +449,7 @@ test("a current round without a commit is unrecorded too, and blames no rebase e
 test("rounds that never recorded commits degrade to a status-only card, blaming no rebase", () => {
   const record = session({
     rounds: [round(0, { headCommit: undefined }), round(1)],
-    declarations: { "evt-1": { note: "fixed", files: [], at: "t" } },
+    ...answered("fixed"),
   });
 
   const { comments } = replay(record, neverAsked);
@@ -458,9 +462,7 @@ test("rounds that never recorded commits degrade to a status-only card, blaming 
 });
 
 test("a commit a rebase took away degrades to a status-only card marked unreachable", () => {
-  const record = session({
-    declarations: { "evt-1": { files: ["src/a.ts"], at: "t" } },
-  });
+  const record = session(answered("done"));
 
   const { comments } = replay(record, () => ({ state: "unreachable" }));
 
@@ -468,7 +470,7 @@ test("a commit a rebase took away degrades to a status-only card marked unreacha
   assert.equal(card?.state, "unreachable");
   assert.equal(card?.status, "unknown");
   assert.deepEqual(card?.answers, []);
-  assert.equal(card?.declared, true);
+  assert.notEqual(card?.note, undefined);
 });
 
 test("a between-round diff too big for git's buffer degrades to a status-only card", () => {
@@ -479,25 +481,16 @@ test("a between-round diff too big for git's buffer degrades to a status-only ca
   assert.deepEqual(comments[0]?.answers, []);
 });
 
-test("a declared card outlives the annotated file's own diff being unreadable", () => {
-  // The annotated file's patch is unreadable but the declared answer lives in a modest file:
-  // the declaration is what the card is made of; only the status degrades to unknown.
-  const record = session({
-    declarations: { "evt-1": { note: "split it out", files: ["src/b.ts"], at: "t" } },
-  });
-  const readBetween: ReadBetween = (_from, _to, paths) =>
-    paths.includes("src/b.ts")
-      ? { state: "patch", patch: patchFor("src/b.ts") }
-      : { state: "oversize" };
+test("an answered card keeps its note when the file's own diff is too big to read", () => {
+  const record = session(answered("split it out"));
 
-  const { comments } = replay(record, readBetween);
+  const { comments } = replay(record, () => ({ state: "oversize" }));
 
   const [card] = comments;
-  assert.equal(card?.state, "ok");
+  assert.equal(card?.state, "oversize");
   assert.equal(card?.status, "unknown");
-  assert.equal(card?.declared, true);
-  assert.equal(card?.answers[0]?.file, "src/b.ts");
-  assert.equal(card?.answers[0]?.hunks.length, 2);
+  assert.equal(card?.note, "split it out");
+  assert.deepEqual(card?.answers, []);
 });
 
 test("one file's patch past the render cap withholds its hunks and says so", () => {

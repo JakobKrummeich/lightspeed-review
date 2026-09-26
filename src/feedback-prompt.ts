@@ -1,4 +1,4 @@
-import type { AnnotationPrompt, FeedbackPrompt, LineAnchor } from "./session-store.ts";
+import type { AnnotationPrompt, FeedbackPrompt, LineAnchor } from "./session-types.ts";
 
 /**
  * One prompt shape, shared by both sides: the server checks the browser's
@@ -9,11 +9,37 @@ import type { AnnotationPrompt, FeedbackPrompt, LineAnchor } from "./session-sto
 export function parsePrompt(value: unknown): FeedbackPrompt | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const prompt = value as Record<string, unknown>;
+  if (prompt.type === "resolve") return parseResolve(prompt);
   const comment = prompt.comment;
   if (typeof comment !== "string") return undefined;
+  return parseWithComment(prompt, comment);
+}
+
+function parseWithComment(
+  prompt: Record<string, unknown>,
+  comment: string,
+): FeedbackPrompt | undefined {
   if (prompt.type === "message") return { type: "message", comment };
+  if (prompt.type === "reply") return parseReply(prompt, comment);
   if (prompt.type !== "annotation") return undefined;
   return parseAnnotation(prompt, comment);
+}
+
+/**
+ * Whether the thread exists is the server's to decide — only it holds the
+ * conversation; here only that one is named.
+ */
+function parseReply(prompt: Record<string, unknown>, comment: string): FeedbackPrompt | undefined {
+  const thread = prompt.thread;
+  if (typeof thread !== "string" || thread === "" || comment.trim() === "") return undefined;
+  return { type: "reply", thread, comment };
+}
+
+function parseResolve(prompt: Record<string, unknown>): FeedbackPrompt | undefined {
+  const { thread, resolved } = prompt;
+  if (typeof thread !== "string" || thread === "" || typeof resolved !== "boolean")
+    return undefined;
+  return { type: "resolve", thread, resolved };
 }
 
 function parseAnnotation(

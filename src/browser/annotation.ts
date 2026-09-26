@@ -138,11 +138,17 @@ export function selectionPreview(text: string, maxChars = 200): string {
   return text.length <= maxChars ? text : `${text.slice(0, maxChars)}…`;
 }
 
-export function renderAnnotationPopup(fragments: SelectionFragment[]): string {
+export function renderAnnotationPopup(fragments: SelectionFragment[], locked = false): string {
   const files = [...new Set(fragments.map((fragment) => fragment.file))];
   const preview = selectionPreview(fragments.map((fragment) => fragment.text).join("\n"));
-  return `<p class="lsr-popup-files">${files.map((file) => escapeHtml(file)).join("<br />")}</p>
-<pre class="lsr-popup-preview">${escapeHtml(preview)}</pre>
+  const head = `<p class="lsr-popup-files">${files.map((file) => escapeHtml(file)).join("<br />")}</p>
+<pre class="lsr-popup-preview">${escapeHtml(preview)}</pre>`;
+  // Said rather than hidden: a selection that opens nothing reads as a broken page.
+  if (locked) {
+    return `${head}
+<p class="lsr-popup-locked">Locked while the agent reads your feedback.</p>`;
+  }
+  return `${head}
 <textarea id="lsr-annotation-comment" placeholder="Type feedback, then press Enter"></textarea>
 <button type="button" id="lsr-queue-feedback">Queue Feedback</button>`;
 }

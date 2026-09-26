@@ -1,5 +1,6 @@
 import { roundOf } from "./conversation-rounds.ts";
 import type { DiffRenderer } from "./diff-renderer.ts";
+import { MAIN_THREAD } from "../threads.ts";
 import { escapeHtml } from "../escape-html.ts";
 import type {
   ReplayAnswer,
@@ -117,8 +118,9 @@ function quote(comment: ReplayComment): string {
  * passing as a per-comment answer. Neither: no section, not an empty frame.
  */
 function answerNote(comment: ReplayComment, roundReply: string | undefined): string {
-  const fallback = comment.declared ? undefined : roundReply;
-  const text = comment.note ?? fallback;
+  // A status-only card (history rewritten, commits gone) borrows nothing: the
+  // round reply beside "cannot be shown" would read as this comment's answer.
+  const text = comment.note ?? (comment.state === "ok" ? roundReply : undefined);
   if (text === undefined || text === "") return "";
   const label = comment.note !== undefined ? "The agent's answer" : "The agent's round reply";
   return `<div class="lsr-replay-answer">
@@ -129,7 +131,7 @@ function answerNote(comment: ReplayComment, roundReply: string | undefined): str
 
 /**
  * An empty answer set is a fact (answered in words, or no edit), never
- * failure-styled. The undeclared marker sits here because it qualifies this
+ * failure-styled. The unanswered marker sits here because it qualifies this
  * section: hunks matched mechanically, not vouched for.
  */
 function changes(comment: ReplayComment, renderer: DiffRenderer): string {
@@ -139,9 +141,10 @@ function changes(comment: ReplayComment, renderer: DiffRenderer): string {
       : "What changed here cannot be shown.";
     return `<p class="lsr-replay-state">${sentence}</p>`;
   }
-  const marker = comment.declared
-    ? ""
-    : `<span class="lsr-replay-unmapped">agent did not map this</span>`;
+  const marker =
+    comment.note !== undefined
+      ? ""
+      : `<span class="lsr-replay-unmapped">agent did not map this</span>`;
   if (comment.answers.length === 0) {
     return `<div class="lsr-replay-changes">
 <p class="lsr-replay-label">What changed${marker}</p>
@@ -185,8 +188,10 @@ function withNewline(text: string): string {
 
 /**
  * Read by position, not stamp alone — replies land on both sides of the round
- * boundary (a `say` carries the old stamp, one after `start` the new); what
- * they share is coming after the comments they answer.
+ * boundary (a `reply` carries the old stamp, a `publish --to` note the new);
+ * what they share is coming after the comments they answer. Only the agent's
+ * top-level words count here (`--to main`, or a 2.x message): a note in an
+ * item's thread is shown on that item's own card.
  */
 export function agentRoundReply(
   conversation: readonly ConversationEntry[],
@@ -201,8 +206,11 @@ export function agentRoundReply(
     .slice(lastComment + 1)
     .filter((entry) => entry.role === "agent" && roundOf(entry, rounds) >= made)
     .flatMap((entry) => entry.prompts)
-    .filter((prompt) => prompt.type === "message")
-    .map((prompt) => prompt.comment.trim())
+    .filter(
+      (prompt) =>
+        prompt.type === "message" || (prompt.type === "reply" && prompt.thread === MAIN_THREAD),
+    )
+    .map((prompt) => (prompt.type === "resolve" ? "" : prompt.comment.trim()))
     .filter((text) => text !== "");
   return said.length === 0 ? undefined : said.join("\n\n");
 }

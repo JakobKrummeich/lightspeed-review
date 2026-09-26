@@ -4,7 +4,7 @@ import { ledgerFor } from "../ledger/store.ts";
 import type { StructuredOutput } from "../output.ts";
 import { createReviewServer } from "../server.ts";
 import { SessionStore } from "../session-store.ts";
-import { HELP_START } from "../turn-help.ts";
+import { HELP_OPEN } from "../turn-help.ts";
 import { reviewServerIsUp } from "./server-address.ts";
 
 export interface ServeInput {
@@ -24,7 +24,7 @@ async function portInUse(error: unknown, port: number): Promise<unknown> {
       message: `a review server is already running on port ${port}`,
       detail: "it answered /health on that port, so there is nothing to start",
       suggestions: [
-        HELP_START,
+        HELP_OPEN,
         "Run `lightspeed stop` first if you meant to replace the running server",
       ],
     });
@@ -40,7 +40,7 @@ async function portInUse(error: unknown, port: number): Promise<unknown> {
   });
 }
 
-/** `start` spawns this detached; a human can run it directly to see startup
+/** `open` spawns this detached; a human can run it directly to see startup
  * failures. */
 export async function runServe(input: ServeInput): Promise<StructuredOutput> {
   const server = createReviewServer({
@@ -60,6 +60,6 @@ export async function runServe(input: ServeInput): Promise<StructuredOutput> {
   return {
     server: { port, status: "stopped" },
     message: "the review server is no longer listening",
-    help: [HELP_START],
+    help: [HELP_OPEN],
   };
 }

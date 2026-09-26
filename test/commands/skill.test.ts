@@ -52,7 +52,8 @@ test("the plain dialect keeps every shared section", () => {
 
   for (const heading of [
     "## The loop",
-    "## What a prompt says",
+    "## The turn",
+    "## What an item says",
     "## Rules",
     "## Setup",
     "## Output",

@@ -3,26 +3,17 @@
  * upstream), never an exception.
  */
 import type { IncomingMessage } from "node:http";
-import {
-  parseDeclarations,
-  type CommentDeclaration,
-  type DeclarationProblem,
-} from "../declarations.ts";
-import { parseFeedbackRequest } from "../feedback.ts";
+import { parseFeedbackRequest, type AgentNote } from "../feedback.ts";
 import type { CreateSessionRequest } from "../rounds/session-round.ts";
-import { readJsonSafely, type DomainErrorBody } from "./http.ts";
+import { readJsonSafely } from "./http.ts";
 
 export async function parseCreateSession(
   request: IncomingMessage,
 ): Promise<CreateSessionRequest | undefined> {
   const payload = await readJsonSafely<Partial<CreateSessionRequest>>(request);
-  if (payload === undefined) return undefined;
+  if (payload === undefined || !hasSessionShape(payload)) return undefined;
   const { repoRoot, branch, base, baseCommit, headCommit, groups, grouping, intents, commits } =
     payload;
-  if (typeof repoRoot !== "string" || typeof branch !== "string" || typeof base !== "string") {
-    return undefined;
-  }
-  if (!Array.isArray(groups)) return undefined;
   return {
     repoRoot,
     branch,
@@ -35,7 +26,18 @@ export async function parseCreateSession(
     intents: stringList(intents),
     commits: stringList(commits),
     reopen: payload.reopen === true,
+    verb: payload.verb === "publish" ? "publish" : "open",
+    notes: parseNotes(payload.notes) ?? [],
   };
+}
+
+function hasSessionShape(
+  payload: Partial<CreateSessionRequest>,
+): payload is Partial<CreateSessionRequest> &
+  Pick<CreateSessionRequest, "repoRoot" | "branch" | "base" | "groups"> {
+  const { repoRoot, branch, base, groups } = payload;
+  const named = [repoRoot, branch, base].every((value) => typeof value === "string");
+  return named && Array.isArray(groups);
 }
 
 function isGroupingMode(value: unknown): value is "skipped" | "llm" | "fallback" {
@@ -61,52 +63,41 @@ export async function readFeedback(request: IncomingMessage) {
 }
 
 /**
- * The agent speaking: `say` sends a comment, a pinned answer, or both; `ask`
- * sends a comment marked as a question. A body saying neither is rejected — an
- * empty turn in the conversation reads as words lost, not words never said.
+ * `reply`: every answer of the turn at once, each under the item it concerns.
+ * `head`/`tree` are the CLI's account of the working tree, which only a reply
+ * from `working` needs (W2: nothing half-written to protect).
  */
-export interface AgentReply {
-  /** Absent when the whole answer was pinned under one comment (`say --for`). */
-  comment?: string;
-  /** `ask`: the panel draws an answer box under it and the turn goes back. */
-  kind?: "question";
-  declarations: CommentDeclaration[];
+export interface ReplyRequest {
+  replies: AgentNote[];
+  head?: string;
+  tree?: string;
 }
 
-interface ReplyBody {
-  comment?: unknown;
-  kind?: unknown;
-  declarations?: unknown;
+export async function readReply(request: IncomingMessage): Promise<ReplyRequest | undefined> {
+  const body = await readJsonSafely<{
+    replies?: unknown;
+    head?: unknown;
+    tree?: unknown;
+  }>(request);
+  if (body === undefined) return undefined;
+  const replies = parseNotes(body.replies);
+  // A reply with nothing to say is not a reply (D1).
+  if (replies === undefined || replies.length === 0) return undefined;
+  return { replies, ...stringFields(body, ["head", "tree"]) };
 }
 
-export async function readReply(request: IncomingMessage): Promise<AgentReply | undefined> {
-  const body = (await readJsonSafely<ReplyBody>(request)) ?? {};
-  const comment = spokenWords(body.comment);
-  const declarations = body.declarations === undefined ? [] : parseDeclarations(body.declarations);
-  if (declarations === undefined) return undefined;
-  if (rejected(body, comment, declarations)) return undefined;
-  return {
-    ...(comment === undefined ? {} : { comment }),
-    ...(body.kind === "question" ? { kind: "question" as const } : {}),
-    declarations,
-  };
+/** All or nothing: one malformed note fails the list, since a partial post cannot be re-run safely. */
+function parseNotes(value: unknown): AgentNote[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const notes = value.map(parseNote);
+  return notes.every((note) => note !== undefined) ? notes : undefined;
 }
 
-function rejected(
-  body: ReplyBody,
-  comment: string | undefined,
-  declarations: CommentDeclaration[],
-): boolean {
-  // A comment field that says nothing is a mistake, not silence.
-  if (body.comment !== undefined && comment === undefined) return true;
-  // A question with nothing to ask is not a question; only spoken words carry it.
-  if (body.kind === "question" && comment === undefined) return true;
-  return comment === undefined && declarations.length === 0;
-}
-
-function spokenWords(value: unknown): string | undefined {
-  if (typeof value !== "string" || value.trim() === "") return undefined;
-  return value;
+function parseNote(entry: unknown): AgentNote | undefined {
+  const { to, text } = (entry ?? {}) as { to?: unknown; text?: unknown };
+  const named = typeof to === "string" && to !== "";
+  const said = typeof text === "string" && text.trim() !== "";
+  return named && said ? { to, text } : undefined;
 }
 
 export async function readDelivered(request: IncomingMessage): Promise<string | undefined> {
@@ -115,56 +106,26 @@ export async function readDelivered(request: IncomingMessage): Promise<string | 
   return delivery;
 }
 
-export async function readWork(request: IncomingMessage): Promise<string | undefined> {
-  const plan = (await readJsonSafely<{ plan?: unknown }>(request))?.plan;
+export interface WorkRequest {
+  plan: string;
+  head?: string;
+  tree?: string;
+}
+
+export async function readWork(request: IncomingMessage): Promise<WorkRequest | undefined> {
+  const body = await readJsonSafely<{ plan?: unknown; head?: unknown; tree?: unknown }>(request);
+  const plan = body?.plan;
   if (typeof plan !== "string" || plan.trim() === "") return undefined;
-  return plan;
+  return { plan, ...stringFields(body!, ["head", "tree"]) };
 }
 
-/**
- * The 422 a rejected declaration answers with: every problem named, because
- * the agent fixes them all in one retry, and the retry is safe — nothing of a
- * rejected reply is stored.
- */
-export function declarationRejection(
-  problems: DeclarationProblem[],
-  target: string,
-): DomainErrorBody {
-  return {
-    error: {
-      code: "declaration_invalid",
-      message: `the reply was rejected whole: ${problems.length} declaration problem(s)`,
-      detail: problems.map((problem) => `${problem.id}: ${problem.reason}`).join("; "),
-    },
-    help: wayOut(problems, target),
-  };
-}
-
-/**
- * The way out, and it has to be a command the CLI accepts: a rejection whose
- * escape hatch named `--note` cost the agent a second turn on `unknown flag
- * --note`. Only a rejection that is entirely about one comment's files can be
- * re-sent without them, so only that one keeps the `--for`; anything else is a
- * bad id or an empty entry, which only dropping the claim fixes.
- *
- * Neither branch restates the detail. Where an id comes from is already in the
- * problem's own reason, and a `help[]` that says it again is a line an agent
- * pays for twice and learns from once.
- */
-function wayOut(problems: DeclarationProblem[], target: string): [string, ...string[]] {
-  const ids = new Set(problems.map((problem) => problem.id));
-  const [id] = ids;
-  if (id === undefined || ids.size > 1 || problems.some((problem) => problem.kind !== "files")) {
-    return [
-      `Say it without the claim: \`lightspeed say "<text>" ${target}\``,
-      "Or re-send the whole reply with a declaration that parses; nothing of this one was stored",
-    ];
-  }
-  return [
-    `Say it without the claim now: \`lightspeed say "<text>" ${target} --for ${id}\``,
-    `Or commit, run \`lightspeed start ${target} --intent "<why>"\`,` +
-      " then re-send the same line with --files",
-  ];
+function stringFields<K extends string>(
+  body: Partial<Record<K, unknown>>,
+  keys: readonly K[],
+): Partial<Record<K, string>> {
+  return Object.fromEntries(
+    keys.flatMap((key) => (typeof body[key] === "string" ? [[key, body[key]]] : [])),
+  ) as Partial<Record<K, string>>;
 }
 
 export async function parseApproved(request: IncomingMessage): Promise<string[] | undefined> {

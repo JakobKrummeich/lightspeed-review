@@ -62,7 +62,7 @@ test("the page renders the status banner so it is right before the bundle loads"
 
 /** The turn is on the record, unlike presence — so a reviewer who reloads while
  * the agent is off working on something reads that it is working — plan in
- * the tooltip — in the first paint, rather than "No agent is waiting" until the
+ * the tooltip — in the first paint, rather than "Agent isn't listening" until the
  * first SSE frame arrives. */
 test("the served page already says what the agent is doing", () => {
   const html = renderReviewPage({
@@ -76,7 +76,32 @@ test("the served page already says what the agent is doing", () => {
   });
 
   assert.match(html, /data-turn="agent"/);
-  assert.match(html, /title="splitting the helper out">Agent is working</);
+  assert.match(html, />Working on: splitting the helper out</);
+});
+
+test("the served page counts the items a digesting agent is reading", () => {
+  const html = renderReviewPage({
+    ...session,
+    turn: { holder: "agent", mode: "digesting", at: "2025-01-01T00:07:00.000Z" },
+    batch: {
+      id: "b1",
+      at: "2025-01-01T00:07:00.000Z",
+      prompts: [
+        { type: "message", id: "t1", comment: "one" },
+        { type: "reply", thread: "t1", comment: "same thread" },
+        { type: "resolve", thread: "t2", resolved: true },
+      ],
+    },
+  });
+
+  assert.match(html, />Agent is reading your 2 items</);
+});
+
+test("the header carries a hidden connection chip for the bundle to show", () => {
+  assert.match(
+    renderReviewPage(session),
+    /<p id="lsr-connection" class="lsr-connection" role="status" hidden>Connection lost — reconnecting…<\/p>/,
+  );
 });
 
 test("the round offer waits in the header, empty until the bundle has news", () => {

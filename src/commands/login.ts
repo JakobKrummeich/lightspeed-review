@@ -6,7 +6,7 @@ import { ReviewError } from "../errors.ts";
 import { LOGIN_PROVIDERS, lightspeedAuthPath, lightspeedAuthStore } from "../llm/pi-auth.ts";
 import type { StructuredOutput } from "../output.ts";
 import { repoRootOrNone } from "../repo.ts";
-import { HELP_START } from "../turn-help.ts";
+import { HELP_OPEN } from "../turn-help.ts";
 import { loginInteraction, type InteractionIo } from "./login-interaction.ts";
 
 /** The one method of pi-ai's `Models` a login needs; a fake fits in a test. */
@@ -47,7 +47,7 @@ export async function runLogin(input: LoginInput): Promise<StructuredOutput> {
   const credential = await interactiveLogin(models, provider, deps);
   return {
     login: { provider, type: credential.type, path: lightspeedAuthPath(stateDir) },
-    help: [`Set \`model\` in .lightspeed.conf.json to \`${provider}/<model-id>\``, HELP_START],
+    help: [`Set \`model\` in .lightspeed.conf.json to \`${provider}/<model-id>\``, HELP_OPEN],
   };
 }
 

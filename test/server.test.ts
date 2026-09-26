@@ -2,77 +2,34 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
-import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
-import { legalMoves, nextMoves } from "../src/turn-help.ts";
 import { CLI_VERSION } from "../src/version.ts";
 import { SessionStore } from "../src/session-store.ts";
 import { LedgerStore } from "../src/ledger/store.ts";
 import type { AnnotationRecord } from "../src/ledger/records.ts";
-import { createReviewServer, type ReviewServer } from "../src/server.ts";
+import { createReviewServer } from "../src/server.ts";
 import { ReviewError } from "../src/errors.ts";
 import { MAX_APPROVED_FORM_BYTES } from "../src/rounds/approved-form.ts";
 import { sessionKey } from "../src/paths.ts";
 import { git, newRepo } from "./helpers/git-repo.ts";
-
-interface RunningServer {
-  server: ReviewServer;
-  url: string;
-  store: SessionStore;
-}
-
-interface ServerOptions {
-  staticDir?: string;
-  ledger?: LedgerStore;
-}
-
-async function startServer(options: ServerOptions = {}): Promise<RunningServer> {
-  const store = new SessionStore(mkdtempSync(join(tmpdir(), "lsr-server-")));
-  const server = createReviewServer({ store, port: 0, ...options });
-  const { url } = await server.start();
-  return { server, url, store };
-}
-
-async function withServer(
-  body: (running: RunningServer) => Promise<void>,
-  options: ServerOptions = {},
-): Promise<void> {
-  const running = await startServer(options);
-  try {
-    await body(running);
-  } finally {
-    await running.server.stop();
-  }
-}
-
-const sessionPayload = {
-  repoRoot: "/repo",
-  branch: "feature-auth",
-  base: "main",
-  intents: ["replace session cookies with signed tokens"],
-  commits: ["sign the tokens"],
-  groups: [
-    {
-      name: "API Handlers",
-      rationale: "request handling",
-      files: [
-        {
-          path: "src/api/users.ts",
-          status: "modified",
-          diff: "index 11ab34c..4c9f88d 100644\n@@ -1 +1 @@\n-old\n+new",
-          insertions: 1,
-          deletions: 1,
-          oversized: false,
-        },
-      ],
-    },
-  ],
-};
+import {
+  annotation,
+  openStream,
+  postFeedback,
+  postSession,
+  postSessionRaw,
+  pollOnce,
+  publishRound,
+  sessionPayload,
+  withServer,
+  type RunningServer,
+  type ServerOptions,
+} from "./helpers/review-server.ts";
 
 /** The same file, edited again by the agent: a new new-side blob sha. */
-function editedPayload(index: string): unknown {
+function editedPayload(index: string): Record<string, unknown> {
   const file = sessionPayload.groups[0]!.files[0]!;
   return {
     ...sessionPayload,
@@ -90,24 +47,6 @@ function postApproved(url: string, key: string, approved: string[]): Promise<Res
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ approved }),
-  });
-}
-
-async function postSession(url: string): Promise<{ key: string; url: string }> {
-  const response = await fetch(`${url}/api/sessions`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(sessionPayload),
-  });
-  assert.equal(response.status, 200);
-  return (await response.json()) as { key: string; url: string };
-}
-
-function postSessionRaw(url: string, body: unknown): Promise<Response> {
-  return fetch(`${url}/api/sessions`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
   });
 }
 
@@ -141,12 +80,13 @@ test("a round posted to a review the reviewer ended is refused and changes nothi
  * which is what every round written before the field does.
  */
 test("a round records how its grouping was arrived at, and only if it is a real mode", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     assert.equal(store.get(key)?.rounds.at(-1)?.grouping, undefined);
 
-    await postSessionRaw(url, { ...sessionPayload, grouping: "fallback" });
-    await postSessionRaw(url, { ...sessionPayload, grouping: "banana" });
+    await publishRound(running, { ...sessionPayload, grouping: "fallback" });
+    await publishRound(running, { ...sessionPayload, grouping: "banana" });
 
     assert.deepEqual(
       store.get(key)?.rounds.map((round) => round.grouping),
@@ -210,18 +150,23 @@ test("posting a session stores it under its session key and returns its url", as
   });
 });
 
-test("posting the same branch pair twice updates the session instead of duplicating it", async () => {
+test("opening the same branch pair twice re-attaches instead of opening a round", async () => {
   await withServer(async ({ url, store }) => {
     const first = await postSession(url);
-    const second = await postSession(url);
+    const response = await postSessionRaw(url, sessionPayload);
 
+    assert.equal(response.status, 200);
+    const second = (await response.json()) as { key: string; reattached?: boolean };
     assert.equal(first.key, second.key);
+    assert.equal(second.reattached, true);
     assert.equal(store.list().length, 1);
+    assert.equal(store.get(first.key)?.rounds.length, 1);
   });
 });
 
 test("re-posting a session preserves the conversation and the approvals it can vouch for", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     const stored = store.get(key)!;
     store.save({
@@ -230,7 +175,7 @@ test("re-posting a session preserves the conversation and the approvals it can v
       conversation: [{ role: "reviewer", at: "2025-01-01T00:00:00.000Z", prompts: [] }],
     });
 
-    await postSession(url);
+    await publishRound(running);
 
     const updated = store.get(key)!;
     // File unmoved since the tick, so the reviewer is not asked to read it again.
@@ -240,7 +185,8 @@ test("re-posting a session preserves the conversation and the approvals it can v
 });
 
 test("an approval sent to the agent without ending the round survives the next start", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     await postApproved(url, key, ["src/api/users.ts"]);
     await fetch(`${url}/api/session/${key}/feedback`, {
@@ -249,7 +195,7 @@ test("an approval sent to the agent without ending the round survives the next s
       body: JSON.stringify({ prompts: [{ type: "message", comment: "one more pass" }] }),
     });
 
-    await postSession(url);
+    await publishRound(running);
 
     const session = store.get(key)!;
     assert.deepEqual(session.approved, ["src/api/users.ts"]);
@@ -261,10 +207,11 @@ test("an approval sent to the agent without ending the round survives the next s
 });
 
 test("un-ticking a carried approval sticks, in the answer now and in the next round", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     await postApproved(url, key, ["src/api/users.ts"]);
-    await postSession(url);
+    await publishRound(running);
     assert.deepEqual(store.get(key)?.approved, ["src/api/users.ts"]);
 
     await postApproved(url, key, []);
@@ -273,17 +220,18 @@ test("un-ticking a carried approval sticks, in the answer now and in the next ro
       approval: Record<string, string>;
     };
     assert.deepEqual(data.approval, { "src/api/users.ts": "unapproved" });
-    await postSession(url);
+    await publishRound(running);
     assert.deepEqual(store.get(key)?.approved, []);
   });
 });
 
 test("every round but the one being reviewed has been closed on what was ticked", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     await postApproved(url, key, ["src/api/users.ts"]);
-    await postSession(url);
-    await postSession(url);
+    await publishRound(running);
+    await publishRound(running);
 
     const rounds = store.get(key)!.rounds;
     assert.equal(rounds.length, 3);
@@ -313,11 +261,12 @@ test("a tick posted after the reviewer ended the review is refused", async () =>
 });
 
 test("a file the agent edited after it was approved comes back needing re-approval", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     await postApproved(url, key, ["src/api/users.ts"]);
 
-    await postSessionRaw(url, editedPayload("index 4c9f88d..7d5e213 100644"));
+    await publishRound(running, editedPayload("index 4c9f88d..7d5e213 100644"));
 
     assert.deepEqual(store.get(key)?.approved, []);
     const data = (await (await fetch(`${url}/api/session/${key}/data`)).json()) as {
@@ -328,7 +277,8 @@ test("a file the agent edited after it was approved comes back needing re-approv
 });
 
 test("an approved deletion is carried into the next round", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const deletion = {
       ...sessionPayload,
       groups: [
@@ -352,7 +302,7 @@ test("an approved deletion is carried into the next round", async () => {
     const key = sessionKey("/repo", "feature-auth", "main");
     await postApproved(url, key, ["src/api/users.ts"]);
 
-    await postSessionRaw(url, deletion);
+    await publishRound(running, deletion);
 
     assert.deepEqual(store.get(key)?.approved, ["src/api/users.ts"]);
   });
@@ -458,7 +408,8 @@ test("the data endpoint calls a file of the first round unapproved", async () =>
 });
 
 test("the data endpoint calls a file approved earlier and untouched approved", async () => {
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     const first = store.get(key)!;
     store.save({
@@ -466,7 +417,7 @@ test("the data endpoint calls a file approved earlier and untouched approved", a
       approved: ["src/api/users.ts"],
       rounds: [{ ...first.rounds[0]!, approvedAtEnd: ["src/api/users.ts"] }],
     });
-    await postSession(url);
+    await publishRound(running);
 
     const data = (await (await fetch(`${url}/api/session/${key}/data`)).json()) as {
       approval: Record<string, string>;
@@ -477,9 +428,10 @@ test("the data endpoint calls a file approved earlier and untouched approved", a
 });
 
 test("the data endpoint calls a file nobody approved unapproved on its second round", async () => {
-  await withServer(async ({ url }) => {
+  await withServer(async (running) => {
+    const { url } = running;
     const { key } = await postSession(url);
-    await postSession(url);
+    await publishRound(running);
 
     const data = (await (await fetch(`${url}/api/session/${key}/data`)).json()) as {
       approval: Record<string, string>;
@@ -731,7 +683,7 @@ async function withReapprovalSession(
       await postSessionRaw(running.url, usersRound(repoRoot, baseCommit!, approvedAt!))
     ).json()) as { key: string };
     if (approve) await postApproved(running.url, key, [USERS]);
-    await postSessionRaw(running.url, usersRound(repoRoot, baseCommit!, head!));
+    await publishRound(running, usersRound(repoRoot, baseCommit!, head!));
     await body({ ...running, key, repoRoot, approvedAt: approvedAt!, head: head! });
   });
 }
@@ -801,13 +753,14 @@ test("a file edited and put back reads as identical to the form the reviewer app
   });
   const [baseCommit, approvedAt, changed, head] = commitLine(repoRoot, 4);
 
-  await withServer(async ({ url }) => {
+  await withServer(async (running) => {
+    const { url } = running;
     const { key } = (await (
       await postSessionRaw(url, usersRound(repoRoot, baseCommit!, approvedAt!))
     ).json()) as { key: string };
     await postApproved(url, key, [USERS]);
-    await postSessionRaw(url, usersRound(repoRoot, baseCommit!, changed!));
-    await postSessionRaw(url, usersRound(repoRoot, baseCommit!, head!));
+    await publishRound(running, usersRound(repoRoot, baseCommit!, changed!));
+    await publishRound(running, usersRound(repoRoot, baseCommit!, head!));
 
     const data = (await (await approvedForm(url, key, USERS)).json()) as {
       state: string;
@@ -878,10 +831,11 @@ test("a commit a rebase took away is reported as unreconstructable, never guesse
 test("a review too old to have recorded commits says so, and blames no rebase", async () => {
   // Sessions written before commits were stored never resolved one. Nothing was rewritten, and
   // claiming so would send the reviewer hunting a force-push that never happened.
-  await withServer(async ({ url, store }) => {
+  await withServer(async (running) => {
+    const { url, store } = running;
     const { key } = await postSession(url);
     await postApproved(url, key, [USERS]);
-    await postSessionRaw(url, editedPayload("index 4c9f88d..7d5e213 100644"));
+    await publishRound(running, editedPayload("index 4c9f88d..7d5e213 100644"));
     assert.equal(store.get(key)?.rounds.at(-1)?.headCommit, undefined);
 
     const data = (await (await approvedForm(url, key, USERS)).json()) as {
@@ -935,12 +889,17 @@ test("a file that stood still between the rounds has no last-round form", async 
     "Take the users handler off the old constant": "const fresh = 2;\n",
   });
   const [baseCommit, head] = commitLine(repoRoot, 2);
+  // A round only opens on a HEAD that moved, so the next one moves it elsewhere.
+  writeFileSync(join(repoRoot, "secret.env"), "TOKEN=2\n");
+  git(repoRoot, "commit", "-am", "Rotate the token");
+  const [elsewhere] = commitLine(repoRoot, 1);
 
-  await withServer(async ({ url }) => {
+  await withServer(async (running) => {
+    const { url } = running;
     const { key } = (await (
       await postSessionRaw(url, usersRound(repoRoot, baseCommit!, head!))
     ).json()) as { key: string };
-    await postSessionRaw(url, usersRound(repoRoot, baseCommit!, head!));
+    await publishRound(running, usersRound(repoRoot, baseCommit!, elsewhere!));
 
     assert.equal((await lastRoundForm(url, key, USERS)).status, 404);
   });
@@ -959,99 +918,6 @@ test("the last-round-form endpoint serves nothing but the paths this review list
     for (const path of ["secret.env", "../../../etc/passwd", ""]) {
       assert.equal((await lastRoundForm(url, key, path)).status, 404, path);
     }
-  });
-});
-
-const annotation = {
-  type: "annotation",
-  file: "src/api/users.ts",
-  group: "API Handlers",
-  selected_text: "+const user = 1;",
-  comment: "wrap in a transaction",
-};
-
-async function postFeedback(
-  url: string,
-  key: string,
-  body: unknown,
-): Promise<{ status: number; json: unknown }> {
-  const response = await fetch(`${url}/api/session/${key}/feedback`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return { status: response.status, json: await response.json() };
-}
-
-test("posted feedback is queued for the agent and recorded in the conversation", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-
-    const { status } = await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    assert.equal(status, 200);
-    const session = store.get(key)!;
-    assert.partialDeepStrictEqual(session.pending, [annotation]);
-    // The server mints the id (no ledger configured): the id is how the agent names the comment back.
-    assert.match((session.pending[0] as { id?: string }).id ?? "", /^evt_/);
-    assert.equal(session.status, "feedback");
-    assert.equal(session.conversation.at(-1)?.role, "reviewer");
-    assert.deepEqual(session.conversation.at(-1)?.prompts, session.pending);
-  });
-});
-
-test("an id the browser claims for a prompt is stripped, never trusted", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-
-    const { status } = await postFeedback(url, key, {
-      prompts: [{ ...annotation, id: "evt_forged_0001" }],
-      ended: false,
-    });
-
-    assert.equal(status, 200);
-    const id = (store.get(key)!.pending[0] as { id?: string }).id;
-    assert.notEqual(id, "evt_forged_0001");
-    assert.match(id ?? "", /^evt_/);
-  });
-});
-
-test("a poll hands the agent each annotation under its minted id", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const minted = (store.get(key)!.pending[0] as { id?: string }).id;
-
-    const payload = (await (await fetch(`${url}/api/poll?key=${key}`)).json()) as {
-      prompts: { id?: string }[];
-    };
-
-    assert.match(minted ?? "", /^evt_/);
-    assert.equal(payload.prompts[0]?.id, minted);
-  });
-});
-
-test("a tray of general and line comments reaches the agent whole, in the order queued", async () => {
-  // What one Send carries after a reviewer queued through the agent's turn: several general
-  // comments between the line comments, none of them folded into another.
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    const tray = [
-      annotation,
-      { type: "message", comment: "the migration is missing" },
-      { ...annotation, comment: "and roll it back on error" },
-      { type: "message", comment: "and the changelog" },
-      { type: "message", comment: "ship it after that" },
-    ];
-    await postFeedback(url, key, { prompts: tray, ended: false });
-
-    const payload = (await pollAndAck(url, key)) as { prompts: { comment: string }[] };
-
-    assert.deepEqual(
-      payload.prompts.map((prompt) => prompt.comment),
-      tray.map((prompt) => prompt.comment),
-    );
-    assert.deepEqual(store.get(key)?.pending, [], "handed over once, not held to go again");
   });
 });
 
@@ -1126,942 +992,12 @@ test("feedback for an unknown session is a 404", async () => {
   });
 });
 
-test("an agent reply is appended to the conversation without queueing feedback", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-
-    const response = await fetch(`${url}/api/session/${key}/reply`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ comment: "wrapped it in a transaction" }),
-    });
-
-    assert.equal(response.status, 200);
-    const session = store.get(key)!;
-    assert.deepEqual(session.conversation.at(-1), {
-      role: "agent",
-      at: session.conversation.at(-1)!.at,
-      // Stamped with the round open when said: lets the panel rule a line between rounds.
-      roundIndex: 0,
-      prompts: [{ type: "message", comment: "wrapped it in a transaction" }],
-    });
-    assert.deepEqual(session.pending, []);
-  });
-});
-
-async function postReply(url: string, key: string, body: unknown): Promise<Response> {
-  return await fetch(`${url}/api/session/${key}/reply`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-test("a reply may declare what each comment led to, stored under the comment's id", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const id = (store.get(key)!.pending[0] as { id: string }).id;
-
-    const response = await postReply(url, key, {
-      comment: "wrapped it in a transaction",
-      declarations: [{ id, note: "one transaction now", files: ["src/api/users.ts"] }],
-    });
-
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), {
-      turn: "reviewer",
-      round: 1,
-      helpForm: "full",
-      delivered: true,
-      declared: 1,
-    });
-    const declared = store.get(key)!.declarations?.[id];
-    assert.partialDeepStrictEqual(declared, {
-      note: "one transaction now",
-      files: ["src/api/users.ts"],
-    });
-  });
-});
-
-test("a declaration for an id no comment carries rejects the whole reply", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const before = store.get(key)!.conversation.length;
-
-    const response = await postReply(url, key, {
-      comment: "done",
-      declarations: [{ id: "evt_ghost", note: "fixed", files: [] }],
-    });
-
-    assert.equal(response.status, 422);
-    const body = (await response.json()) as { error: { code: string; detail: string } };
-    assert.equal(body.error.code, "declaration_invalid");
-    assert.match(body.error.detail, /evt_ghost/);
-    const session = store.get(key)!;
-    assert.equal(session.conversation.length, before);
-    assert.equal(session.declarations, undefined);
-  });
-});
-
-/**
- * The round the comment was made on is the round the agent is still on, so
- * nothing it edited is in any published diff yet. Regression: the escape hatch
- * named `--note`, which is not a flag.
- */
-test("a file claim made before the next round is carried out by its own help", async () => {
-  await withServer(async ({ url, store }) => {
-    const created = await postSessionRaw(url, { ...sessionPayload, headCommit: "0440dba9c31" });
-    const { key } = (await created.json()) as { key: string };
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const id = (store.get(key)!.pending[0] as { id: string }).id;
-
-    const response = await postReply(url, key, {
-      declarations: [{ id, note: "renamed it", files: ["src/tok.js"] }],
-    });
-
-    assert.equal(response.status, 422);
-    const body = (await response.json()) as { error: { detail: string }; help: string[] };
-    assert.equal(
-      body.error.detail,
-      `${id}: src/tok.js is not in any round yet (HEAD is still 0440dba, the commit this` +
-        " comment was made on). --files only names files a published round changed.",
-    );
-    assert.deepEqual(body.help, [
-      `Say it without the claim now: \`lightspeed say "<text>" feature-auth main --for ${id}\``,
-      'Or commit, run `lightspeed start feature-auth main --intent "<why>"`,' +
-        " then re-send the same line with --files",
-    ]);
-  });
-});
-
-/**
- * Regression: `help[0]` repeated the detail almost word for word — two lines
- * with the information of one. Help says what to run.
- */
-test("a rejection that is not about files offers commands, not its own detail again", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-
-    const response = await postReply(url, key, {
-      declarations: [{ id: "evt_ghost", note: "fixed" }],
-    });
-
-    const body = (await response.json()) as { error: { detail: string }; help: string[] };
-    assert.match(body.error.detail, /ids come from `lightspeed wait` output/);
-    assert.deepEqual(body.help, [
-      'Say it without the claim: `lightspeed say "<text>" feature-auth main`',
-      "Or re-send the whole reply with a declaration that parses; nothing of this one was stored",
-    ]);
-  });
-});
-
-test("a reply whose declarations are not even the right shape is a 400", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-
-    for (const declarations of ["evt_a", [{ note: "no id" }], [{ id: "evt_a", files: "a.ts" }]]) {
-      const response = await postReply(url, key, { comment: "done", declarations });
-      assert.equal(response.status, 400, JSON.stringify(declarations));
-    }
-  });
-});
-
-test("an agent reply with neither a comment nor declarations is a 400", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-
-    const response = await fetch(`${url}/api/session/${key}/reply`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    assert.equal(response.status, 400);
-  });
-});
-
-/**
- * `say --for <id>` pins its whole answer under the comment it answers and says
- * nothing in the open, so the reply carries declarations and no comment: the
- * same sentence in the thread and under the card would read as it said twice.
- */
-test("a reply that only declares appends no conversation entry", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const id = (store.get(key)!.pending[0] as { id: string }).id;
-    const before = store.get(key)!.conversation.length;
-
-    const response = await postReply(url, key, {
-      declarations: [{ id, note: "intentional: the index covers it", files: [] }],
-    });
-
-    assert.equal(response.status, 200);
-    assert.partialDeepStrictEqual(await response.json(), { delivered: true, declared: 1 });
-    assert.equal(store.get(key)!.conversation.length, before);
-    assert.partialDeepStrictEqual(store.get(key)!.declarations?.[id], {
-      note: "intentional: the index covers it",
-    });
-  });
-});
-
-/** A tick after the end is refused because it would rewrite the ledgered verdict;
- * words after the end are refused because nobody is there to read them. */
-test("a reply into an ended review is refused, like every other move that needs a reader", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [], ended: true });
-    const before = store.get(key)!.conversation.length;
-
-    const response = await postReply(url, key, { comment: "one more thing" });
-
-    assert.equal(response.status, 409);
-    assert.partialDeepStrictEqual(await response.json(), {
-      error: { code: "session_ended" },
-    });
-    assert.equal(store.get(key)!.conversation.length, before);
-  });
-});
-
-async function postWork(url: string, key: string, body: unknown): Promise<Response> {
-  return await fetch(`${url}/api/session/${key}/work`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-/**
- * A poll the way a healthy `wait` makes one: takes the answer, then confirms the
- * handover. Unconfirmed, the server must assume the prompts were lost and hands
- * them out again on the next poll — right for a dead agent, wrong for a test
- * pretending to be a live one.
- */
-async function pollAndAck(url: string, key: string): Promise<Record<string, unknown>> {
-  const payload = await pollOnce(url, key);
-  await ackDelivery(url, key, payload);
-  return payload;
-}
-
-/** One poll, answered and left unconfirmed — a `wait` that read the prompts and
- * died, or one this test wants to acknowledge by hand. */
-async function pollOnce(url: string, key: string): Promise<Record<string, unknown>> {
-  const answer = await fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(2_000) });
-  return (await answer.json()) as Record<string, unknown>;
-}
-
-async function ackDelivery(
-  url: string,
-  key: string,
-  payload: Record<string, unknown>,
-): Promise<void> {
-  if (typeof payload.delivery !== "string") return;
-  await postDelivered(url, key, { delivery: payload.delivery });
-}
-
-/** Delivery is the only thing that hands the turn over, so it is what every
- * `work` test has to do first. */
-async function takeTheTurn(url: string, key: string): Promise<void> {
-  await postFeedback(url, key, { prompts: [annotation], ended: false });
-  await pollAndAck(url, key);
-}
-
-test("work names the plan on the turn the agent is already holding", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await takeTheTurn(url, key);
-
-    const response = await postWork(url, key, { plan: "splitting the helper out" });
-
-    assert.equal(response.status, 200);
-    // `takeTheTurn` already carried the round's full help, so this answer is the
-    // one-line reminder rather than the same four lines again.
-    assert.deepEqual(await response.json(), {
-      turn: "agent working",
-      round: 1,
-      helpForm: "short",
-      changed: true,
-    });
-    assert.partialDeepStrictEqual(store.get(key)?.turn, {
-      holder: "agent",
-      mode: "working",
-      note: "splitting the helper out",
-    });
-  });
-});
-
-/** Saying the same thing twice changed nothing, and an agent that re-runs `work`
- * after a crash must not be told it just announced something. */
-test("redeclaring the same plan reports that nothing changed", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    await takeTheTurn(url, key);
-    await postWork(url, key, { plan: "splitting the helper out" });
-
-    const again = await postWork(url, key, { plan: "splitting the helper out" });
-    const refined = await postWork(url, key, { plan: "splitting the helper out, then the test" });
-
-    assert.partialDeepStrictEqual(await again.json(), { changed: false });
-    assert.partialDeepStrictEqual(await refined.json(), { changed: true });
-  });
-});
-
-/** The one illegal move in the protocol, and the only place `turn_not_yours`
- * comes from: an agent that declares work on feedback nobody sent it. */
-test("work without the turn is refused, with the command that earns it", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-
-    const response = await postWork(url, key, { plan: "guessing at what they want" });
-
-    assert.equal(response.status, 422);
-    const body = (await response.json()) as { error: { code: string }; help: string[] };
-    assert.equal(body.error.code, "turn_not_yours");
-    assert.match(body.help.join(" "), /lightspeed wait feature-auth main/);
-    assert.equal(store.get(key)?.turn.holder, "reviewer");
-  });
-});
-
-/**
- * Regression: the record still names whoever held the turn last, so a `work`
- * from that agent was written onto the closed session and answered
- * `turn_not_yours`. Every command answers an ended review with the same 409.
- */
-test("work on an ended review is refused as ended, and declares nothing", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    // Delivered first, so the turn on the record is the agent's when it ends.
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await pollAndAck(url, key);
-    await postFeedback(url, key, { prompts: [], ended: true });
-    const closed = store.get(key)?.turn;
-
-    const response = await postWork(url, key, { plan: "carrying on regardless" });
-
-    assert.equal(response.status, 409);
-    const body = (await response.json()) as { error: { code: string } };
-    assert.equal(body.error.code, "session_ended");
-    assert.deepEqual(store.get(key)?.turn, closed);
-    assert.equal(store.get(key)?.status, "ended");
-  });
-});
-
-/**
- * Parking is the agent handing the turn back, so a `wait` from one that is
- * mid-edit would hand sending back under it: the reviewer fires at a half-written
- * branch, and neither side ever finds out why. Refused at the door instead.
- */
-test("a wait from an agent that declared work is refused, and the turn stays put", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await takeTheTurn(url, key);
-    await postWork(url, key, { plan: "splitting the helper out" });
-
-    const response = await fetch(`${url}/api/poll?key=${key}`, {
-      signal: AbortSignal.timeout(2_000),
-    });
-
-    assert.equal(response.status, 422);
-    const body = (await response.json()) as { error: { code: string }; help: string[] };
-    assert.equal(body.error.code, "turn_still_yours");
-    // The same list the commands print: a refusal that offered the move it is
-    // refusing would send the agent straight back here. In the short form, because
-    // this round already spelt those three moves out to this agent once.
-    assert.deepEqual(body.help, [nextMoves("agent working", "feature-auth main")]);
-    assert.partialDeepStrictEqual(store.get(key)?.turn, {
-      holder: "agent",
-      mode: "working",
-      note: "splitting the helper out",
-    });
-  });
-});
-
-/** A refusal reads the round's budget but never spends it: an agent that has
- * not been told the moves is told them, and being refused is not the answer
- * those tokens were for. */
-test("a refusal on a round nobody has been told about spells the moves out", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    const record = store.get(key)!;
-    // Mid-edit, with nothing yet printed this round: the state an agent recovered
-    // in a fresh process is in.
-    store.save({ ...record, turn: { holder: "agent", mode: "working", at: record.updatedAt } });
-
-    const response = await fetch(`${url}/api/poll?key=${key}`, {
-      signal: AbortSignal.timeout(2_000),
-    });
-
-    const body = (await response.json()) as { help: string[] };
-    assert.deepEqual(body.help, legalMoves("agent working", "feature-auth main"));
-    assert.equal(store.get(key)?.helpShownRound, undefined);
-  });
-});
-
-/** The other side of the same rule: an agent that only read the feedback and
- * came back for more is listening, not editing, so parking still hands back. */
-test("a wait from an agent that only read the feedback still hands the turn back", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await takeTheTurn(url, key);
-    assert.equal(store.get(key)?.turn.holder, "agent");
-
-    const parks = await parkWatch(url, key);
-    const parked = new AbortController();
-    void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
-    await parks.until(/"waiting":true/);
-    parks.close();
-
-    assert.equal(store.get(key)?.turn.holder, "reviewer");
-    parked.abort();
-  });
-});
-
-test("work without a plan is a 400, and on an unknown session a 404", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    await takeTheTurn(url, key);
-
-    assert.equal((await postWork(url, key, {})).status, 400);
-    assert.equal((await postWork(url, key, { plan: "  " })).status, 400);
-    assert.equal((await postWork(url, "deadbeefdeadbeef", { plan: "x" })).status, 404);
-  });
-});
-
-test("work puts the plan on the wire for the reviewer's page", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-    await stream.until(/event: presence/);
-    await takeTheTurn(url, key);
-    await stream.until(/"turn":\{"holder":"agent"/);
-
-    await postWork(url, key, { plan: "splitting the helper out" });
-
-    assert.match(await stream.until(/"mode":"working"/), /splitting the helper out/);
-    stream.close();
-  });
-});
-
-interface OpenStream {
-  /**
-   * Next matching frame; earlier frames dropped, later ones kept. Frame-by-frame because the
-   * server writes several frames in one tick and they arrive as one read.
-   */
-  until(wanted: RegExp): Promise<string>;
-  close(): void;
-}
-
-async function openStream(url: string, key: string, budget = 5_000): Promise<OpenStream> {
-  const abort = new AbortController();
-  const response = await fetch(`${url}/api/session/${key}/events`, { signal: abort.signal });
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  const frames: string[] = [];
-  let partial = "";
-
-  /**
-   * The budget is spent per read, not per stream: a test holds one stream across several waits
-   * and does slow work between them — parking a poll, killing a subprocess — and a budget
-   * spanning the whole stream fails that test on a loaded machine for being slow, not wrong.
-   */
-  async function readFrames(wanted: RegExp): Promise<void> {
-    const deadline = setTimeout(() => abort.abort(), budget);
-    try {
-      const { done, value } = await reader.read();
-      if (done) assert.fail(`the stream ended before it said ${wanted}`);
-      const parts = (partial + decoder.decode(value)).split("\n\n");
-      partial = parts.pop() ?? "";
-      frames.push(...parts);
-    } finally {
-      clearTimeout(deadline);
-    }
-  }
-
-  return {
-    async until(wanted: RegExp): Promise<string> {
-      for (;;) {
-        const frame = frames.shift();
-        if (frame === undefined) {
-          await readFrames(wanted);
-          continue;
-        }
-        if (wanted.test(frame)) return frame;
-      }
-    },
-    close() {
-      abort.abort();
-    },
-  };
-}
-
-/**
- * Catches a hang rather than measuring latency: wide enough that a machine slow enough to be
- * swapping never trips it, and finite so that a poll nothing releases fails the test instead of
- * running for as long as the suite is allowed to.
- */
-const PARKED_POLL_LIMIT_MS = 30_000;
-
-/**
- * `until(/"waiting":true/)` on this is a poll parking. A test that paused a fixed moment instead
- * was — on a machine busy enough — sending the reviewer's word to a poll the server had never
- * heard of, and passing down the path where the answer was already there.
- *
- * Opened before the polls it is asked about, and primed by dropping the frame every new watcher
- * is handed: presence carries a flag rather than a count, so the frames are all that tells one
- * park from the next.
- */
-async function parkWatch(url: string, key: string): Promise<OpenStream> {
-  const stream = await openStream(url, key);
-  await stream.until(/event: presence/);
-  return stream;
-}
-
-test("ending a session closes it and releases a waiting poll", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    const parks = await parkWatch(url, key);
-    const polling = fetch(`${url}/api/poll?key=${key}`, {
-      signal: AbortSignal.timeout(PARKED_POLL_LIMIT_MS),
-    });
-    await parks.until(/"waiting":true/);
-    parks.close();
-
-    const response = await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
-
-    assert.equal(response.status, 200);
-    assert.equal(store.get(key)?.status, "ended");
-    assert.equal(store.get(key)?.endedBy, "agent");
-    assert.deepEqual(await (await polling).json(), {
-      turn: "ended",
-      round: 1,
-      status: "ended",
-      ended: true,
-      prompts: [],
-      approval: { verdict: "none", approved: 0, unapproved: 1, swept: 0, total: 1 },
-      endedBy: "agent",
-    });
-  });
-});
-
-test("an agent's `end` after the reviewer already ended does not take the credit", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postApproved(url, key, ["src/api/users.ts"]);
-    await postFeedback(url, key, { prompts: [], ended: true });
-
-    const response = await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
-
-    // `end` stays idempotent (200), but the second close decided nothing: reporting the agent
-    // would contradict the approvals sent with it.
-    assert.equal(response.status, 200);
-    assert.equal(store.get(key)?.endedBy, "reviewer");
-    assert.deepEqual(await (await fetch(`${url}/api/poll?key=${key}`)).json(), {
-      turn: "ended",
-      round: 1,
-      status: "ended",
-      ended: true,
-      prompts: [],
-      approval: { verdict: "signed-off", approved: 1, unapproved: 0, swept: 0, total: 1 },
-      endedBy: "reviewer",
-    });
-  });
-});
-
-test("a stale tab ending a session an agent already ended does not become the closer", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
-
-    const posted = await postFeedback(url, key, { prompts: [], ended: true });
-
-    assert.equal(posted.status, 200);
-    assert.equal(store.get(key)?.endedBy, "agent");
-    assert.deepEqual(await (await fetch(`${url}/api/poll?key=${key}`)).json(), {
-      turn: "ended",
-      round: 1,
-      status: "ended",
-      ended: true,
-      prompts: [],
-      approval: { verdict: "none", approved: 0, unapproved: 1, swept: 0, total: 1 },
-      endedBy: "agent",
-    });
-  });
-});
-
 test("ending an unknown session is a 404", async () => {
   await withServer(async ({ url }) => {
     assert.equal(
       (await fetch(`${url}/api/session/deadbeefdeadbeef/end`, { method: "POST" })).status,
       404,
     );
-  });
-});
-
-test("a poll with feedback already queued returns it at once and drains the queue", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    const polled = (await (await fetch(`${url}/api/poll?key=${key}`)).json()) as {
-      status: string;
-      ended: boolean;
-      prompts: unknown[];
-    };
-
-    assert.partialDeepStrictEqual(polled, {
-      status: "feedback",
-      ended: false,
-      prompts: [annotation],
-    });
-    assert.deepEqual(store.get(key)?.pending, []);
-  });
-});
-
-test("a poll after a silent ending is told the review is over, and nothing more", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [], ended: true });
-
-    const polled = await (await fetch(`${url}/api/poll?key=${key}`)).json();
-
-    // A silent ending with nothing ticked must not reach the agent looking like a sign-off.
-    assert.deepEqual(polled, {
-      turn: "ended",
-      round: 1,
-      status: "ended",
-      ended: true,
-      prompts: [],
-      approval: { verdict: "none", approved: 0, unapproved: 1, swept: 0, total: 1 },
-      endedBy: "reviewer",
-    });
-  });
-});
-
-test("a silent ending after the reviewer ticked every file says so on the wire", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    await postApproved(url, key, ["src/api/users.ts"]);
-    await postFeedback(url, key, { prompts: [], ended: true });
-
-    const polled = await (await fetch(`${url}/api/poll?key=${key}`)).json();
-
-    assert.deepEqual(polled, {
-      turn: "ended",
-      round: 1,
-      status: "ended",
-      ended: true,
-      prompts: [],
-      approval: { verdict: "signed-off", approved: 1, unapproved: 0, swept: 0, total: 1 },
-      endedBy: "reviewer",
-    });
-  });
-});
-
-test("a part-line selection reaches the agent with the characters it marked", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const clipped = {
-      ...annotation,
-      selected_text: "fetchUser(id)",
-      side: "new",
-      line_start: 12,
-      line_end: 12,
-      col_start: 14,
-      col_end: 26,
-    };
-
-    await postFeedback(url, key, { prompts: [clipped], ended: false });
-
-    const polled = (await (await fetch(`${url}/api/poll?key=${key}`)).json()) as {
-      prompts: unknown[];
-    };
-    assert.partialDeepStrictEqual(polled.prompts, [clipped]);
-  });
-});
-
-test("a poll waits for feedback that arrives later", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-
-    const parks = await parkWatch(url, key);
-    const polling = fetch(`${url}/api/poll?key=${key}`, {
-      signal: AbortSignal.timeout(PARKED_POLL_LIMIT_MS),
-    });
-    await parks.until(/"waiting":true/);
-    parks.close();
-
-    await postFeedback(url, key, { prompts: [annotation], ended: true });
-
-    const polled = (await (await polling).json()) as { ended: boolean; prompts: unknown[] };
-    assert.equal(polled.ended, true);
-    assert.partialDeepStrictEqual(polled.prompts, [annotation]);
-  });
-});
-
-/**
- * A poll parked on a connection the test can kill without telling the server, as a dying agent
- * connection does. `parked` has no default: a test that killed after a fixed pause was killing a
- * poll the server had never heard of whenever the machine was busy enough. See `parkWatch`.
- */
-async function parkedPoll(
-  url: string,
-  key: string,
-  parked: () => Promise<unknown>,
-): Promise<{ kill: () => void }> {
-  const target = new URL(`${url}/api/poll?key=${key}`);
-  const request = httpRequest({
-    host: target.hostname,
-    port: target.port,
-    path: `${target.pathname}${target.search}`,
-    agent: false,
-  });
-  // Killing the request is the point of it: the hang-up is expected, not a fault.
-  request.on("error", () => undefined);
-  request.end();
-  await parked();
-  return { kill: () => request.destroy() };
-}
-
-test("feedback drained for a poll whose connection died is still there for the next one", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-
-    // Both orders of the race: connection dies before the reviewer sends, and while the answer is written.
-    for (const killFirst of [true, false]) {
-      // A watch of its own each pass: `until` keeps the frames it walked past, so a
-      // `"waiting":true` left over from the pass before would confirm this pass's park without
-      // it having happened. Closed as soon as it has answered, to keep it out of the race below.
-      const watch = await parkWatch(url, key);
-      const poll = await parkedPoll(url, key, () => watch.until(/"waiting":true/));
-      watch.close();
-      if (killFirst) poll.kill();
-      const posting = postFeedback(url, key, { prompts: [annotation], ended: false });
-      if (!killFirst) poll.kill();
-      await posting;
-
-      const polled = await pollAndAck(url, key);
-      assert.partialDeepStrictEqual(polled.prompts, [annotation], `killFirst: ${killFirst}`);
-      // Confirmed, so nothing is in flight or queued: the next pass starts from a clean review.
-      assert.deepEqual(store.get(key)?.pending, []);
-      assert.equal(store.get(key)?.delivering, undefined);
-    }
-  });
-});
-
-/**
- * A client that asks for the feedback and throws the answer away: it never reads
- * the socket and destroys it, which is what an agent killed mid-delivery does.
- * Nothing on the server's side can tell this from an agent that read every word
- * — measured, `writableFinished`, the `end()` callback and `socket.bytesWritten`
- * are identical for both — which is why a delivery is not safe until the agent
- * says it arrived.
- */
-async function deliverIntoTheVoid(url: string, key: string): Promise<void> {
-  const target = new URL(url);
-  await new Promise<void>((resolve) => {
-    const socket = connect(Number(target.port), target.hostname, () => {
-      socket.write(
-        `GET /api/poll?key=${key} HTTP/1.1\r\nHost: ${target.host}\r\nConnection: close\r\n\r\n`,
-      );
-      socket.pause();
-      setTimeout(() => {
-        socket.destroy();
-        resolve();
-      }, 120);
-    });
-    socket.on("error", () => resolve());
-  });
-}
-
-function postDelivered(url: string, key: string, body: unknown): Promise<Response> {
-  return fetch(`${url}/api/session/${key}/delivered`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-/**
- * An agent is normally already parked when the reviewer sends, and a silently
- * dropped connection never fires `close`, so a zombie poller that was answered
- * and confirmed nothing is routine. Overwritten by the drain that answers the
- * next poller, its batch would be in neither `pending` nor `delivering`, and no
- * wait could ever find it again.
- */
-test("a batch in flight is not overwritten by the delivery that answers the next poller", async () => {
-  const later = { type: "message" as const, comment: "and one more thing" };
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    const watch = await parkWatch(url, key);
-    // Parked first, so the reviewer's word goes to it — and it never reads the
-    // answer and never confirms it, which is what a dropped connection looks like.
-    const zombie = await parkedPoll(url, key, () => watch.until(/"waiting":true/));
-    const second = fetch(`${url}/api/poll?key=${key}`, {
-      signal: AbortSignal.timeout(PARKED_POLL_LIMIT_MS),
-    });
-    await watch.until(/"waiting":true/);
-    watch.close();
-
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await postFeedback(url, key, { prompts: [later], ended: false });
-
-    const answered = (await (await second).json()) as { prompts: unknown[] };
-    assert.partialDeepStrictEqual(answered.prompts, [annotation, later]);
-    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation, later]);
-    assert.deepEqual(store.get(key)?.pending, []);
-    zombie.kill();
-  });
-});
-
-test("feedback drained onto a connection nobody read is handed out again", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    await deliverIntoTheVoid(url, key);
-
-    assert.deepEqual(store.get(key)?.pending, []);
-    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation]);
-
-    const polled = await pollAndAck(url, key);
-    assert.partialDeepStrictEqual(polled.prompts, [annotation]);
-    assert.equal(store.get(key)?.delivering, undefined);
-    assert.equal(store.get(key)?.turn.holder, "agent");
-  });
-});
-
-/**
- * A handover the agent confirmed is spent. Left unconfirmed forever it would be
- * re-delivered on every poll, and the agent would read the same comment once per
- * round for the rest of the review.
- */
-test("a delivery the agent confirmed is not handed out a second time", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const polled = await pollAndAck(url, key);
-    assert.match(String(polled.delivery), /^evt_/);
-    assert.equal(store.get(key)?.delivering, undefined);
-
-    const parks = await parkWatch(url, key);
-    const parked = new AbortController();
-    void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
-    assert.match(await parks.until(/"waiting":true/), /"waiting":true/);
-    parked.abort();
-    parks.close();
-  });
-});
-
-test("an acknowledgement that names no handover in flight confirms nothing", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const polled = await pollAndAck(url, key);
-
-    // A retried acknowledgement, or one from a process that died two rounds ago:
-    // it takes nothing away, so a delivery in flight is never cleared by a stale id.
-    const again = await postDelivered(url, key, { delivery: polled.delivery });
-
-    assert.equal(again.status, 200);
-    assert.deepEqual(await again.json(), { confirmed: false });
-    assert.equal(store.get(key)?.delivering, undefined);
-  });
-});
-
-/**
- * An acknowledgement confirms the handover it names and no other: a `wait`
- * retried from a shell, or a process two rounds out of date, would otherwise
- * clear the batch a live agent is waiting on — feedback lost for good.
- */
-test("an acknowledgement of a spent id leaves the handover in flight alone", async () => {
-  const later = { type: "message" as const, comment: "and one more thing" };
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    const first = await pollOnce(url, key);
-    await postFeedback(url, key, { prompts: [later], ended: false });
-
-    // The next poll hands both over under a new id, so the first id is spent.
-    const second = await pollOnce(url, key);
-    assert.notEqual(second.delivery, first.delivery);
-    const stale = await postDelivered(url, key, { delivery: first.delivery });
-
-    assert.deepEqual(await stale.json(), { confirmed: false });
-    assert.equal(store.get(key)?.delivering?.id, second.delivery);
-    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation, later]);
-
-    const live = await postDelivered(url, key, { delivery: second.delivery });
-    assert.deepEqual(await live.json(), { confirmed: true });
-    assert.equal(store.get(key)?.delivering, undefined);
-  });
-});
-
-test("an acknowledgement without an id is a 400, and a delivery stays in flight", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await deliverIntoTheVoid(url, key);
-
-    const refused = await postDelivered(url, key, { delivery: 7 });
-
-    assert.equal(refused.status, 400);
-    assert.partialDeepStrictEqual(store.get(key)?.delivering?.prompts, [annotation]);
-  });
-});
-
-test("a second poller keeps waiting instead of getting an empty answer", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-
-    // One at a time, each parked before the next is fired: the feedback goes to whoever parked
-    // first, so which of the two that is has to be settled rather than raced.
-    const parks = await parkWatch(url, key);
-    const poll = () =>
-      fetch(`${url}/api/poll?key=${key}`, { signal: AbortSignal.timeout(PARKED_POLL_LIMIT_MS) });
-    const first = poll();
-    await parks.until(/"waiting":true/);
-    const second = poll();
-    await parks.until(/"waiting":true/);
-    parks.close();
-
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    const drained = (await (await first).json()) as Record<string, unknown>;
-    assert.partialDeepStrictEqual(drained.prompts, [annotation]);
-    // Confirmed: an unacknowledged batch rides out again on the next drain, and
-    // the second poller would get the first poller's words.
-    await ackDelivery(url, key, drained);
-
-    await postFeedback(url, key, {
-      prompts: [{ type: "message", comment: "and one more thing" }],
-      ended: false,
-    });
-    const later = (await (await second).json()) as { prompts: unknown[] };
-    assert.deepEqual(later.prompts, [{ type: "message", comment: "and one more thing" }]);
-  });
-});
-
-test("polling an ended session returns at once instead of blocking forever", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    store.save({ ...store.get(key)!, status: "ended" });
-
-    const polled = (await (await fetch(`${url}/api/poll?key=${key}`)).json()) as {
-      ended: boolean;
-      prompts: unknown[];
-    };
-
-    // Ended in the store without either route — how a session written before `endedBy` reads.
-    assert.deepEqual(polled, {
-      turn: "ended",
-      round: 1,
-      status: "ended",
-      ended: true,
-      prompts: [],
-      approval: { verdict: "none", approved: 0, unapproved: 1, swept: 0, total: 1 },
-    });
   });
 });
 
@@ -2171,248 +1107,6 @@ test("a stream survives a test that is slow between the frames it waits for", as
   });
 });
 
-test("presence says an agent is working once a poll has carried the feedback off", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-    await stream.until(/event: presence/);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    await pollAndAck(url, key);
-
-    assert.match(
-      await stream.until(/event: presence/),
-      /"waiting":false,"turn":\{"holder":"agent"/,
-    );
-    stream.close();
-  });
-});
-
-test("a poll that parks announces the agent arriving, and says so once", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-    await stream.until(/event: presence/);
-
-    const parked = new AbortController();
-    void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
-
-    // The very next frame, not the one after: parking clears the working flag and registers the
-    // poller; if the clear goes out first, the page briefly says nobody waits just as somebody arrived.
-    assert.match(await stream.until(/event: presence/), /"waiting":true/);
-    parked.abort();
-    stream.close();
-  });
-});
-
-test("an agent asking for more feedback is an agent that is no longer working", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-    await stream.until(/event: presence/);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await pollAndAck(url, key);
-    await stream.until(/"turn":\{"holder":"agent"/);
-
-    const parked = new AbortController();
-    void fetch(`${url}/api/poll?key=${key}`, { signal: parked.signal }).catch(() => undefined);
-
-    assert.match(await stream.until(/"waiting":true/), /"turn":\{"holder":"reviewer"/);
-    parked.abort();
-    stream.close();
-  });
-});
-
-/**
- * A question is the agent handing the move back: it cannot go on without an
- * answer, so the reviewer's Send comes alive the moment the card lands.
- */
-test("the agent asking a question gives the reviewer the turn back", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-    await stream.until(/event: presence/);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await pollAndAck(url, key);
-    await stream.until(/"turn":\{"holder":"agent"/);
-
-    const response = await postReply(url, key, {
-      comment: "per-request or per-batch?",
-      kind: "question",
-    });
-
-    assert.equal(response.status, 200);
-    assert.partialDeepStrictEqual(await response.json(), { turn: "reviewer", round: 1 });
-    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
-    assert.equal(store.get(key)?.turn.holder, "reviewer");
-    stream.close();
-  });
-});
-
-/**
- * `say` is the other half of that pair, and the reason the two verbs exist: an
- * agent reporting progress mid-edit is still mid-edit, so the banner must not
- * flap back to "your move" on every sentence it speaks.
- */
-test("the agent saying something leaves the turn where it is", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await pollAndAck(url, key);
-
-    const response = await postReply(url, key, { comment: "wrapped it in a transaction" });
-
-    assert.equal(response.status, 200);
-    assert.partialDeepStrictEqual(await response.json(), { turn: "agent reading", round: 1 });
-    assert.equal(store.get(key)?.turn.holder, "agent");
-  });
-});
-
-test("a round opened on what the agent did leaves nobody working", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-    await stream.until(/event: presence/);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await pollAndAck(url, key);
-    await stream.until(/"turn":\{"holder":"agent"/);
-
-    await postSession(url);
-
-    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
-    stream.close();
-  });
-});
-
-test("a review that ends leaves nobody working, whoever ended it", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-    await stream.until(/event: presence/);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await pollAndAck(url, key);
-    await stream.until(/"turn":\{"holder":"agent"/);
-
-    await fetch(`${url}/api/session/${key}/end`, { method: "POST" });
-
-    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
-    stream.close();
-  });
-});
-
-test("a poll that died holding the feedback leaves the agent reading as working", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    // Watched on one stream of this test's own: the wait below matches `event: presence` loosely,
-    // so a frame published for a second watcher's benefit could answer it.
-    const stream = await parkWatch(url, key);
-    const poll = await parkedPoll(url, key, () => stream.until(/"waiting":true/));
-
-    // The handover first and awaited, so the work is the agent's before its connection dies: a
-    // test that posted and killed in the same breath let the machine's mood pick the scenario.
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-    await stream.until(/"turn":\{"holder":"agent"/);
-
-    poll.kill();
-
-    // A dead agent reads exactly like one thinking hard and there is no heartbeat to tell them
-    // apart, so the flag stands until the next poll, reply, round or end clears it — clearing it
-    // here would announce that nobody is acting on feedback that has already left the building.
-    assert.match(
-      await stream.until(/event: presence/),
-      /"waiting":false,"turn":\{"holder":"agent"/,
-    );
-    stream.close();
-  });
-});
-
-test("the presence frame names whose turn it is, not just that somebody is working", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    const stream = await openStream(url, key);
-
-    // The page must be able to draw the three Send states apart, and a flag
-    // saying only that somebody is working cannot say which of them it is.
-    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
-    stream.close();
-  });
-});
-
-test("delivery moves the turn to the agent, and the session file says so", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    await pollAndAck(url, key);
-
-    assert.partialDeepStrictEqual(store.get(key)?.turn, { holder: "agent", mode: "reading" });
-  });
-});
-
-test("feedback nobody is waiting for queues and leaves the turn with the reviewer", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    // The reviewer's Send never hands the turn over — only delivery to a live
-    // `wait` does — so sending into an empty room keeps Send live.
-    assert.equal(store.get(key)?.turn.holder, "reviewer");
-    assert.equal(store.get(key)?.pending.length, 1);
-  });
-});
-
-test("a delivery into a dead connection leaves the turn for the wait that follows", async () => {
-  await withServer(async ({ url, store }) => {
-    const { key } = await postSession(url);
-    const watch = await parkWatch(url, key);
-    const poll = await parkedPoll(url, key, () => watch.until(/"waiting":true/));
-    watch.close();
-
-    poll.kill();
-    await postFeedback(url, key, { prompts: [annotation], ended: false });
-
-    const polled = await pollAndAck(url, key);
-    assert.partialDeepStrictEqual(polled.prompts, [annotation]);
-    assert.equal(store.get(key)?.turn.holder, "agent");
-  });
-});
-
-test("a server restarted over the same sessions publishes the turn the last run left", async () => {
-  const { server, url, store } = await startServer();
-  const { key } = await postSession(url);
-  await postFeedback(url, key, { prompts: [annotation], ended: false });
-  await pollAndAck(url, key);
-  await server.stop();
-
-  const restarted = createReviewServer({ store, port: 0 });
-  const second = (await restarted.start()).url;
-  try {
-    const stream = await openStream(second, key);
-
-    // An in-memory flag would have handed Send back to the reviewer here, with
-    // the agent still editing and no way for either side to find out.
-    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"agent"/);
-    stream.close();
-  } finally {
-    await restarted.stop();
-  }
-});
-
-test("a poll carrying the reviewer's last word marks nobody working", async () => {
-  await withServer(async ({ url }) => {
-    const { key } = await postSession(url);
-    await postFeedback(url, key, { prompts: [annotation], ended: true });
-
-    await pollAndAck(url, key);
-
-    // Stream opened after the poll: its first frame is the state as it stands.
-    const stream = await openStream(url, key);
-    assert.match(await stream.until(/event: presence/), /"turn":\{"holder":"reviewer"/);
-    stream.close();
-  });
-});
-
 /**
  * The gate is global — one check in front of the router, not a decoration each
  * route remembers to wear. `/delivered` is here because it mutates: a page that
@@ -2440,7 +1134,8 @@ test("a page on another origin cannot drive the review API", async () => {
     });
 
     assert.equal(forged.status, 403);
-    assert.equal(store.get(key)?.delivering?.id, inFlight.delivery);
+    assert.equal(store.get(key)?.batch?.id, inFlight.delivery);
+    assert.equal(store.get(key)?.batch?.acked, false);
   });
 });
 

@@ -1,5 +1,5 @@
 import type { StructuredOutput } from "../output.ts";
-import { HELP_START } from "../turn-help.ts";
+import { HELP_OPEN } from "../turn-help.ts";
 import { requestShutdown } from "./server-address.ts";
 
 export interface StopInput {
@@ -15,6 +15,6 @@ export async function runStop(input: StopInput): Promise<StructuredOutput> {
     message: running
       ? "the review server was shut down; open sessions stay on disk"
       : `no review server was listening on port ${input.port}`,
-    help: [HELP_START],
+    help: [HELP_OPEN],
   };
 }

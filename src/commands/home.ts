@@ -1,8 +1,17 @@
 import { REACHABLE_MODELS } from "../config.ts";
 import type { StructuredOutput } from "../output.ts";
-import type { SessionRecord } from "../session-store.ts";
+import type { SessionRecord } from "../session-types.ts";
+import { openCall } from "../open-call.ts";
+import { batchItems, batchSize, openIds } from "../threads.ts";
 import { roundNumber, turnLabel, type TurnLabel } from "../turn.ts";
-import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE, legalMoves } from "../turn-help.ts";
+import {
+  HELP_END,
+  HELP_OPEN,
+  TURN_RULES,
+  WAITS_FOR_SEND,
+  nextRule,
+  reattachCall,
+} from "../turn-help.ts";
 
 export interface SessionSummary {
   /** `--all` only, where rows come from many. */
@@ -55,21 +64,24 @@ export interface HomeInput {
   config?: HomeBlocker;
   sessions: SessionRecord[];
   all?: boolean;
+  /**
+   * A waiting command is parked on this repo's one live session — read off the
+   * server, the only side that knows. Absent means nobody asked: nobody listening.
+   */
+  listening?: boolean;
 }
 
 /**
  * Names the models because `model` is the one key a fresh config cannot
  * default: a starter file with a provider the agent has no credential for fails
- * at the first `start`, one round later.
+ * at the first `open`, one round later.
  */
 const HELP_INIT_CONFIG =
   "Run `lightspeed init --config` to write .lightspeed.conf.json here, then set `model`" +
   ` to a provider/model you can reach — ${REACHABLE_MODELS.map((model) => `\`${model}\``).join(", ")}` +
   " all work";
 
-const HELP_START_ONCE_CONFIGURED =
-  'Run `lightspeed start <branch> [base] --intent "<why this branch exists>"`' +
-  " once `model` names one";
+const HELP_OPEN_ONCE_CONFIGURED = `Run \`${openCall("<branch> [base]")}\` once \`model\` names one`;
 
 /**
  * Empty means a definitive `sessions: 0` + message, never an omitted key. A
@@ -95,9 +107,9 @@ function listing(input: HomeInput, live: SessionRecord[], mine: SessionRecord[])
   const rows = sessionSummaries(all ? live : mine, { repo: all });
   const other = all || live.length === mine.length ? {} : { elsewhere: elsewhere(live, mine) };
   if (rows.length === 0) {
-    return { sessions: 0, message: "no active review sessions", ...other, help: [HELP_START] };
+    return { sessions: 0, message: "no active review sessions", ...other, help: [HELP_OPEN] };
   }
-  return { sessions: rows, ...other, help: homeHelp(mine, all) };
+  return { sessions: rows, ...other, ...homeNext(mine, input) };
 }
 
 /**
@@ -113,7 +125,7 @@ function blocked(input: HomeInput, away: number): StructuredOutput {
       message: `not inside a git repository, so no review can run here${tail}`,
       help: [
         "Run `lightspeed` from inside the repository you want reviewed",
-        HELP_START_ONCE_CONFIGURED,
+        HELP_OPEN_ONCE_CONFIGURED,
       ],
     };
   }
@@ -125,7 +137,7 @@ function blocked(input: HomeInput, away: number): StructuredOutput {
     config: input.config,
     sessions: 0,
     message: `${why}${tail}`,
-    help: [HELP_INIT_CONFIG, HELP_START_ONCE_CONFIGURED],
+    help: [HELP_INIT_CONFIG, HELP_OPEN_ONCE_CONFIGURED],
   };
 }
 
@@ -150,13 +162,58 @@ function livingElsewhere(away: number): string {
 }
 
 /**
- * With one session, the help is its own legal moves — the same list every
- * command and every refusal is built from, so the home view cannot offer a
- * `wait` the poll answers `turn_still_yours`. With several, no one set of moves
- * is the answer, and the general four stand.
+ * With one session, the answer is its `next:` rule — the same one every
+ * command ends in, so home cannot offer a move the server refuses. With
+ * several, no one rule is the answer, and the general rules stand.
  */
-function homeHelp(mine: SessionRecord[], all: boolean): [string, ...string[]] {
-  const only = mine.length === 1 && !all ? mine[0] : undefined;
-  if (only === undefined) return [TURN_RULE, HELP_START, HELP_WAIT, HELP_END];
-  return [TURN_RULE, ...legalMoves(turnLabel(only), `${only.branch} ${only.base}`)];
+function homeNext(mine: SessionRecord[], input: HomeInput): StructuredOutput {
+  const only = mine.length === 1 && input.all !== true ? mine[0] : undefined;
+  if (only === undefined) return { help: [...TURN_RULES, HELP_OPEN, HELP_END] };
+  const target = `${only.branch} ${only.base}`;
+  const label = turnLabel(only);
+  if (label === "reviewer") return { next: reviewersNext(only, target, input.listening === true) };
+  return agentsNext(only, target, label);
+}
+
+function agentsNext(only: SessionRecord, target: string, label: TurnLabel): StructuredOutput {
+  const held = only.batch?.prompts ?? [];
+  const resolved = batchItems(held, only.conversation)
+    .filter((item) => item.status === "resolved")
+    .map((item) => item.id);
+  // The same ids the batch itself offered: open ones only, never a resolved one.
+  const rule = nextRule(label, target, openIds(only.conversation, held), resolved);
+  // An agent resumed after compaction no longer holds the batch it is digesting.
+  if (label !== "agent digesting") return { next: rule };
+  return {
+    next: {
+      reread: `Lost the batch? Run \`${reattachCall(target)}\`: it hands back the batch you are digesting at once, and posts nothing`,
+      ...rule,
+    },
+  };
+}
+
+/**
+ * "Run open" only when nobody is listening: re-attaching beside a running wait
+ * supersedes it, and the agent's own command exits with nothing. Unless the
+ * wait is one the agent cannot see — a leftover from a killed shell — which it
+ * must be able to take over rather than be stranded behind.
+ */
+function reviewersNext(
+  session: SessionRecord,
+  target: string,
+  listening: boolean,
+): Record<string, string> {
+  if (listening) {
+    return {
+      listening:
+        "A waiting command is already waiting for the reviewer's Send on this review — leave it" +
+        " running; it receives the batch. If you cannot see that command's output, run" +
+        ` \`${reattachCall(target)}\` now: the newest wait takes over and the old one exits`,
+    };
+  }
+  const sent = batchSize(session.pending);
+  if (sent === 0) return nextRule("reviewer", target);
+  return {
+    receive: `the reviewer sent ${plural(sent, "item")} — \`${reattachCall(target)}\` receives them; ${WAITS_FOR_SEND}`,
+  };
 }

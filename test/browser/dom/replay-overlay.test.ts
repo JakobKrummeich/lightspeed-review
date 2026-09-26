@@ -42,7 +42,6 @@ function comment(id: string): ReplayComment {
     selected_text: "+x",
     comment: `about ${id}`,
     status: "addressed",
-    declared: true,
     state: "ok",
     answers: [],
     note: `note for ${id}`,

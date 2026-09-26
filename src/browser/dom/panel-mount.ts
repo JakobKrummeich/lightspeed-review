@@ -6,6 +6,7 @@ import {
   renderPanel,
   renderScroll,
   sendIsLocked,
+  writesLocked,
   type PanelState,
 } from "../conversation-panel.ts";
 import { currentRound } from "../conversation-rounds.ts";
@@ -13,14 +14,16 @@ import { sameTurn } from "../agent-presence.ts";
 import { submitsOnEnter } from "./enter-key.ts";
 import type { LinePlace } from "./line-numbers.ts";
 import { atBottom, placeOn, toBottom } from "./panel-dom.ts";
-import { composeFrozen, lockControls, sendRefused, type ComposeView } from "./panel-lock.ts";
+import { composeFrozen, lockControls, type ComposeView } from "./panel-lock.ts";
 import {
-  answerBox,
   clearGeneralComment,
   deliver,
   echoSent,
   generalCommentBox,
-  restoreAnswer,
+  replyBox,
+  replyBoxes,
+  restoreReplies,
+  typedReplies,
   withGeneralComment,
 } from "./panel-wire.ts";
 import { stampPills } from "../queued-pill.ts";
@@ -28,12 +31,17 @@ import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-me
 import { saveLater } from "./save-later.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
+import { threadsOf } from "../../threads.ts";
+import { presenceOf } from "../../turn.ts";
 
 export interface MountedPanel {
   queue(prompts: FeedbackPrompt[]): void;
   update(session: SessionData): void;
   setAllApproved(allApproved: boolean): void;
-  setTurn(turn: Turn): void;
+  /** `items`: how many the agent is reading, while it digests. */
+  setTurn(turn: Turn, items?: number): void;
+  /** Nothing may be written — the line popup asks before it queues. */
+  writesLocked(): boolean;
   /**
    * The same send as Send & End, queue and comment included, so there is one
    * way a review ends however the word was given.
@@ -63,7 +71,8 @@ interface PanelView extends ComposeView {
 
 /**
  * `pending` here is the browser's unsent queue; the session's `pending`
- * (server-held, awaiting a `wait`) is deliberately not shown as removable pills.
+ * (server-held, awaiting a listening agent) is deliberately not shown as
+ * removable pills.
  */
 export function mountPanel(options: PanelOptions): MountedPanel {
   const { root, key, session, storage } = options;
@@ -103,17 +112,18 @@ export function mountPanel(options: PanelOptions): MountedPanel {
   // Both guard their own box, so neither can act on the other's Enter.
   root.addEventListener("keydown", (event) => {
     handleComposeKey(view, event);
-    handleAnswerKey(view, event);
+    handleReplyKey(view, event);
   });
 
   return {
     queue(prompts: FeedbackPrompt[]) {
+      // The popup asks first; a stale one must still not write into a lock.
+      if (writesLocked(state)) return;
       enqueue(view, prompts);
     },
     update(fresh: SessionData) {
       state.conversation = fresh.conversation;
       state.rounds = fresh.rounds;
-      state.declarations = fresh.declarations;
       draw(view);
       setStatus(view, fresh.status);
     },
@@ -122,14 +132,17 @@ export function mountPanel(options: PanelOptions): MountedPanel {
       state.allApproved = allApproved;
       drawNote(view);
     },
-    setTurn(turn: Turn) {
-      if (sameTurn(turn, state.turn)) return;
+    setTurn(turn: Turn, items?: number) {
+      if (sameTurn(turn, state.turn) && items === state.items) return;
       state.turn = turn;
+      if (items === undefined) delete state.items;
+      else state.items = items;
       // Full redraw for one line at the foot: `draw` follows the panel to the
       // bottom, so the line lands where the eye already is. It re-locks the
       // controls, which is what a moved turn is about.
       draw(view);
     },
+    writesLocked: () => writesLocked(state),
     end() {
       // Not awaited, as the button's own press is not: the send reports
       // through `onEnd`, and a failure leaves the controls full to press again.
@@ -148,10 +161,9 @@ function openingState(session: SessionData, pending: PanelState["pending"]): Pan
     pending,
     conversation: session.conversation,
     rounds: session.rounds,
-    declarations: session.declarations,
     status: session.status,
     allApproved: false,
-    turn: session.turn,
+    ...presenceOf(session),
   };
 }
 
@@ -197,22 +209,29 @@ function draw(view: PanelView): void {
   const { options, state, scrollHost } = view;
   // Measured before the write: the write changes the height.
   const following = atBottom(scrollHost);
-  // The answer box lives inside the scroll, so every redraw replaces it. A pill
-  // queued mid-answer is the ordinary way that happens, and it must not cost the
-  // reviewer the sentence they were writing.
-  const answering = answerBox(options.root)?.value ?? "";
+  // The reply boxes live inside the scroll, so every redraw replaces them; a
+  // pill queued mid-reply must not cost the reviewer the sentence, nor the focus.
+  const typed = typedReplies(options.root);
+  const focused = focusedReply(options.root);
   if (scrollHost) scrollHost.innerHTML = renderScroll(state);
   announce(view, "");
-  restoreAnswer(options.root, answering);
+  restoreReplies(options.root, typed);
+  if (focused !== undefined) replyBox(options.root, focused)?.focus();
   if (following) toBottom(scrollHost);
   options.onPending(state.pending.length);
   // Queue stored on every change, no delay: a pill is one gesture, and the
   // thing a reload must not lose.
   updateMemory(options.storage, options.key, { pending: state.pending });
-  // The answer button is rendered by the scroll above, so every redraw hands
-  // back a fresh, live one. Re-locked here rather than at each call site: a
-  // draw that forgot was a live Answer on the agent's turn.
+  // The thread controls are rendered by the scroll above, so every redraw hands
+  // back fresh, live ones. Re-locked here rather than at each call site: a
+  // draw that forgot would be a live Reply while the agent digests.
   lockControls(view);
+}
+
+/** No `document` outside a browser; there is then nothing focused to keep. */
+function focusedReply(root: HTMLElement): string | undefined {
+  const active = (globalThis as { document?: Document }).document?.activeElement;
+  return replyBoxes(root).find((box) => box === active)?.dataset.thread;
 }
 
 /** The only thing that replaces the compose box, and only when it must. */
@@ -250,16 +269,7 @@ function handleClick(view: PanelView, event: Event): void {
     jumpPress(view, target);
     return;
   }
-  if (target.classList.contains("lsr-pill-remove")) {
-    const index = Number(target.dataset.index);
-    view.state.pending = view.state.pending.filter((_, position) => position !== index);
-    draw(view);
-    return;
-  }
-  if (target.classList.contains("lsr-answer-send")) {
-    void answer(view);
-    return;
-  }
+  if (threadPress(view, target) || pillPress(view, target)) return;
   if (target.id === "lsr-send") {
     press(view);
     return;
@@ -267,10 +277,61 @@ function handleClick(view: PanelView, event: Event): void {
   if (target.id === "lsr-send-end") void send(view, true);
 }
 
+/** Taking a pill back writes to the queue, so it is locked with the rest. */
+function pillPress(view: PanelView, target: HTMLElement): boolean {
+  if (!target.classList.contains("lsr-pill-remove")) return false;
+  if (composeFrozen(view)) return true;
+  const index = Number(target.dataset.index);
+  view.state.pending = view.state.pending.filter((_, position) => position !== index);
+  draw(view);
+  return true;
+}
+
+/** The thread card's own two controls; true when the press was one of them. */
+function threadPress(view: PanelView, target: HTMLElement): boolean {
+  const thread = target.dataset.thread;
+  if (thread === undefined) return false;
+  if (target.classList.contains("lsr-thread-resolve")) toggleResolve(view, thread);
+  else if (target.classList.contains("lsr-thread-reply-add")) addReply(view, thread);
+  else return false;
+  return true;
+}
+
+/**
+ * Resolving sends nothing by itself: it is a pill, and travels with the next
+ * Send. Pressed again before then, the pill is taken back rather than a
+ * second, opposite one queued — the thread is where the server has it again.
+ */
+function toggleResolve(view: PanelView, thread: string): void {
+  if (composeFrozen(view)) return;
+  const { state } = view;
+  const kept = state.pending.filter((pill) => pill.type !== "resolve" || pill.thread !== thread);
+  if (kept.length !== state.pending.length) {
+    state.pending = kept;
+    draw(view);
+    return;
+  }
+  const resolved = !threadsOf(state.conversation).some((one) => one.id === thread && one.resolved);
+  enqueue(view, [{ type: "resolve", thread, resolved }]);
+}
+
+/** A reply is one more pill in the batch; the box empties and keeps the focus. */
+function addReply(view: PanelView, thread: string): void {
+  if (composeFrozen(view)) return;
+  const box = replyBox(view.options.root, thread);
+  const comment = box?.value.trim() ?? "";
+  if (comment === "") return;
+  if (box) box.value = "";
+  enqueue(view, [{ type: "reply", thread, comment }]);
+  // After the draw, which replaced the box: the fresh one takes the focus.
+  replyBox(view.options.root, thread)?.focus();
+  announce(view, queuedAnnouncement(view.state.pending.length));
+}
+
 /** Button and Enter alike: whose turn it is decides between the two verbs. */
 function press(view: PanelView): void {
   // The button's own `disabled` says the same; a stale listener must not queue
-  // into a review that is over or under a send still on the wire.
+  // into a review that is over, locked, or under a send still on the wire.
   if (composeFrozen(view)) return;
   if (queuesInstead(view.state)) queueComment(view);
   else void send(view, false);
@@ -292,35 +353,12 @@ function handleComposeKey(view: PanelView, event: KeyboardEvent): void {
   press(view);
 }
 
-function handleAnswerKey(view: PanelView, event: KeyboardEvent): void {
-  const field = answerBox(view.options.root);
-  if (field === null || event.target !== field) return;
-  if (sendRefused(view)) return;
-  if (submitsOnEnter(event, field)) void answer(view);
-}
-
-/**
- * Only the words in the answer box go out: the queue stays queued and the
- * general comment stays typed, which is the whole reason `ask` is a verb of
- * its own. Nothing here moves the turn — the agent's blocked `wait` takes it
- * on delivery, as it takes every other send.
- */
-async function answer(view: PanelView): Promise<void> {
-  if (sendRefused(view)) return;
-  const field = answerBox(view.options.root);
-  const said = field?.value.trim() ?? "";
-  if (said === "") return;
-  const prompts: FeedbackPrompt[] = [{ type: "message", comment: said }];
-  const before = view.state.conversation;
-  setSending(view, true);
-  if (await deliver(view.options.key, prompts, false)) {
-    // Echoed like any other send, which is also what takes the box away: the
-    // answer is now the last word, so the question above it is no longer open.
-    echoSent(view.state, before, prompts);
-    if (field) field.value = "";
-    draw(view);
-  }
-  setSending(view, false);
+function handleReplyKey(view: PanelView, event: KeyboardEvent): void {
+  const field = event.target;
+  if (!(field instanceof HTMLElement) || !field.classList.contains("lsr-thread-reply-box")) return;
+  const thread = field.dataset.thread;
+  if (thread === undefined) return;
+  if (submitsOnEnter(event, field as HTMLTextAreaElement)) addReply(view, thread);
 }
 
 async function send(view: PanelView, ended: boolean): Promise<void> {
@@ -333,8 +371,10 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // still the one it was written for.
   const before = state.conversation;
   setSending(view, true);
-  if (!(await deliver(options.key, prompts, ended))) {
+  const delivery = await deliver(options.key, prompts, ended);
+  if (!delivery.sent) {
     setSending(view, false);
+    sayNotSent(view, delivery.why);
     return;
   }
   // Not a duplicate of the server's copy: this half is instant and holds even
@@ -359,6 +399,15 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // Not left to the SSE round trip: every control must stop at the moment the
   // reviewer said done.
   if (ended) options.onEnd(prompts);
+}
+
+/**
+ * Everything stays where it was — pills, box, reply boxes — and the note says
+ * why, in the live region the compose row already has.
+ */
+function sayNotSent(view: PanelView, why: string): void {
+  const note = view.composeHost?.querySelector(".lsr-complete");
+  if (note) note.textContent = `Not sent — ${why}`;
 }
 
 function setSending(view: PanelView, sending: boolean): void {

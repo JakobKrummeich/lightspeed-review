@@ -1,5 +1,6 @@
 import { renderStatusBanner, type StatusState } from "../status-banner.ts";
 import type { AgentPresence } from "../agent-presence.ts";
+import { presenceOf } from "../../turn.ts";
 import type { SessionData } from "./session-api.ts";
 import type { ConversationEntry, FeedbackPrompt } from "../../session-store.ts";
 
@@ -8,6 +9,8 @@ export interface MountedStatusBanner {
   setSession(session: SessionData): void;
   /** Closes on what the page already knows, not on the server's next word. */
   setEndedByReviewer(sent: FeedbackPrompt[]): void;
+  /** The event stream dropped or came back: presence is unknown while it is down. */
+  setConnected(connected: boolean): void;
 }
 
 /**
@@ -18,11 +21,11 @@ export interface MountedStatusBanner {
 export function mountStatusBanner(session: SessionData): MountedStatusBanner {
   const root = document.querySelector<HTMLElement>("#lsr-status-banner");
   // The turn comes off the page's own session, not off the first SSE frame: a
-  // reload mid-silence must say what the agent is doing straight away.
+  // reload mid-turn must say what the agent is doing straight away.
   let state: StatusState = {
     status: session.status,
     agentWaiting: false,
-    turn: session.turn,
+    ...presenceOf(session),
     review: session,
   };
   let drawn = renderStatusBanner(state);
@@ -34,8 +37,14 @@ export function mountStatusBanner(session: SessionData): MountedStatusBanner {
     root.innerHTML = html;
   };
   return {
-    setPresence: ({ waiting, turn }) => draw({ ...state, agentWaiting: waiting, turn }),
+    setPresence: ({ waiting, turn, items }) => {
+      const next: StatusState = { ...state, agentWaiting: waiting, turn };
+      if (items === undefined) delete next.items;
+      else next.items = items;
+      draw(next);
+    },
     setSession: (fresh) => draw({ ...state, status: fresh.status, review: fresh }),
+    setConnected: (connected) => draw({ ...state, connected }),
     setEndedByReviewer: (sent) =>
       draw({
         ...state,

@@ -1,74 +1,93 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  helpNextRound,
-  helpPublishAndWait,
+  HELP_OPEN,
+  TURN_RULES,
+  WAITS_FOR_SEND,
   helpReopen,
-  legalMoves,
-  nextMoves,
-  turnHelp,
+  nextRule,
+  publishCall,
+  replyCall,
+  workCall,
 } from "../src/turn-help.ts";
 
-/**
- * The same four-line block was printed by `wait`, `ask`, `say`, `work` and
- * every turn refusal in that state — 146 of an `ask` answer's 187 tokens, and
- * one 17-token clause 19 times in a single transcript. After the first answer
- * of a round has spelt the moves out, the reminder is one line.
- */
-test("the short form names the same moves, in the same order, on one line", () => {
-  assert.equal(
-    nextMoves("agent working", "feat/tokens main"),
-    'Next: `lightspeed start feat/tokens main --wait --intent "<why>"`' +
-      ' | `ask "<q>"` | `say "<text>"`',
+const TARGET = "feat/tokens main";
+
+/** D5: not a menu of what is legal, but what to do next, keyed by the decision. */
+test("digesting: the rule is talk or work, never both, with ambiguity asked first", () => {
+  const rule = nextRule("agent digesting", TARGET, ["t1", "t4"]);
+
+  assert.deepEqual(Object.keys(rule), ["talk", "work", "ambiguity", "rule"]);
+  assert.match(
+    rule.talk!,
+    /lightspeed reply --to t1 '<answer>' --to t4 '<answer>' feat\/tokens main/,
   );
-  assert.equal(
-    nextMoves("agent reading", "feat/tokens main"),
-    'Next: `lightspeed work "<plan>" feat/tokens main` | `say "<text>"` | `ask "<q>"`' +
-      ' | commit then `start feat/tokens main --intent "<why>"`',
-  );
-  assert.equal(
-    nextMoves("reviewer", "feat/tokens main"),
-    "Next: `lightspeed wait feat/tokens main`",
-  );
+  assert.match(rule.work!, /lightspeed work '<plan>' feat\/tokens main/);
+  assert.match(rule.work!, /clear change requests go straight here/);
+  assert.match(rule.rule!, /never both/);
 });
 
-test("no turn offers a move in one form that the other form leaves out", () => {
-  for (const turn of ["reviewer", "agent reading", "agent working", "ended"] as const) {
-    const short = nextMoves(turn, "b m");
-    const full = legalMoves(turn, "b m");
-    assert.equal(short.split(" | ").length, full.length, turn);
+test("the reply line names at most three items, and the main chat when none is open", () => {
+  const many = nextRule("agent digesting", TARGET, ["t1", "t2", "t3", "t4"]);
+  assert.doesNotMatch(many.talk!, /t4/);
+  assert.match(nextRule("agent digesting", TARGET).talk!, /--to main '<answer>'/);
+  assert.doesNotMatch(nextRule("agent digesting", TARGET).talk!, /t1/);
+});
+
+test("a line with no session to read names a placeholder id, never a made-up one", () => {
+  assert.match(replyCall(TARGET), /--to <id> '<answer>'/);
+  assert.match(publishCall(TARGET), /--to <id> 'done: /);
+});
+
+test("resolved items get their meaning spelled out: agreement, not a withdrawn request", () => {
+  const rule = nextRule("agent digesting", TARGET, ["t2"], ["t1", "t3"]);
+
+  assert.match(rule.resolved!, /^t1, t3: the reviewer agrees with your last words there/);
+  assert.match(rule.resolved!, /if that was a change, implement it \(work\)/);
+  assert.match(rule.resolved!, /not withdrawn/);
+  assert.deepEqual(Object.keys(nextRule("agent digesting", TARGET, ["t2"])), [
+    "talk",
+    "work",
+    "ambiguity",
+    "rule",
+  ]);
+});
+
+test("working: publish, waiting in the foreground; a question goes in the new round", () => {
+  const rule = nextRule("agent working", TARGET, ["t5"]);
+
+  assert.deepEqual(Object.keys(rule), ["publish", "stuck"]);
+  assert.match(rule.publish!, /lightspeed publish feat\/tokens main --intent .* --to t5 'done: /);
+  assert.ok(rule.publish!.endsWith(WAITS_FOR_SEND));
+  assert.match(rule.stuck!, /while nothing has changed since work/);
+  assert.match(nextRule("agent working", TARGET).publish!, /--to main 'done: /);
+});
+
+test("the reviewer's turn: the only move is to listen by re-running open", () => {
+  const rule = nextRule("reviewer", TARGET);
+
+  assert.deepEqual(Object.keys(rule), ["listen"]);
+  assert.match(rule.listen!, /lightspeed open feat\/tokens main`/);
+  assert.match(rule.listen!, /foreground/);
+});
+
+test("ended: done, and a new round only when the reviewer asks for one", () => {
+  const rule = nextRule("ended", TARGET);
+
+  assert.deepEqual(Object.keys(rule), ["done"]);
+  assert.equal(rule.done, `The review is over. ${helpReopen(TARGET)}`);
+  assert.match(rule.done!, /lightspeed open feat\/tokens main --reopen --intent '<why>'/);
+});
+
+/** Single quotes: an agent pastes these into a shell, where they expand nothing. */
+test("every placeholder is single-quoted, so a pasted line runs as written", () => {
+  for (const line of [HELP_OPEN, replyCall(TARGET), workCall(TARGET), publishCall(TARGET)]) {
+    assert.doesNotMatch(line, /"</, line);
   }
+  assert.match(HELP_OPEN, /--intent '<why this branch exists>'/);
 });
 
-test("the full block is what a turn's first answer carries, the short line the rest", () => {
-  assert.deepEqual(turnHelp("agent working", "b m", "full"), legalMoves("agent working", "b m"));
-  assert.deepEqual(turnHelp("agent working", "b m", "short"), [nextMoves("agent working", "b m")]);
-  // A server too old to say which is one that never heard of the short form.
-  assert.deepEqual(turnHelp("agent working", "b m", undefined), legalMoves("agent working", "b m"));
-});
-
-test("the next-round line carries the --intent start refuses to run without", () => {
-  assert.equal(
-    helpNextRound("feat/tokens main"),
-    "Address the feedback, commit, then run `lightspeed start feat/tokens main" +
-      ' --intent "<why this branch exists>"` to show the updated diff —' +
-      " --intent is required on every round",
-  );
-});
-
-test("the publish-and-block line carries --intent too", () => {
-  assert.equal(
-    helpPublishAndWait("feat/tokens main"),
-    "Run `lightspeed start feat/tokens main --wait" +
-      ' --intent "<why this branch exists>"` to publish what you changed and block on the' +
-      " next round",
-  );
-});
-
-test("the reopen line names this session and the intent a new round needs", () => {
-  assert.equal(
-    helpReopen("feat/tokens main"),
-    'Run `lightspeed start feat/tokens main --reopen --intent "<why>"`' +
-      " once the reviewer asks for one",
-  );
+test("the turn rules are the three the protocol reduces to", () => {
+  assert.equal(TURN_RULES.length, 3);
+  assert.match(TURN_RULES[1], /reply.*work.*never both/);
 });

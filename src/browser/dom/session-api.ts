@@ -3,8 +3,8 @@ import type { ApprovedFormData } from "../../rounds/approved-form.ts";
 import type { ReplayData } from "../../rounds/replay.ts";
 import type { Approval } from "../../rounds/history.ts";
 import type {
+  Batch,
   ConversationEntry,
-  DeclaredAnswer,
   FeedbackPrompt,
   ReviewCloser,
   RoundFile,
@@ -29,10 +29,10 @@ export interface SessionData {
    */
   rounds: (RoundMark & { files?: RoundFile[] })[];
   pending: FeedbackPrompt[];
-  /** Keyed by comment id (`say --for <id>`). */
-  declarations?: Record<string, DeclaredAnswer>;
   status: SessionStatus;
   turn: Turn;
+  /** What the agent holds or last held; the page counts it while the agent digests. */
+  batch?: Batch;
   /**
    * Absent reads as "not written down", not as either party — the closing
    * summary says so in words.
@@ -109,20 +109,39 @@ export async function persistApproved(key: string, approved: string[]): Promise<
  */
 const FEEDBACK_TIMEOUT_MS = 60_000;
 
+/**
+ * Undefined when the words went out; otherwise the server's own reason, which
+ * the page shows — a Send refused because the agent took the turn meanwhile is
+ * the reviewer's to understand, not a console line. Throws only when nothing
+ * answered at all.
+ */
 export async function sendFeedback(
   key: string,
   prompts: FeedbackPrompt[],
   ended: boolean,
-): Promise<void> {
-  await post(`/api/session/${key}/feedback`, { prompts, ended }, FEEDBACK_TIMEOUT_MS);
+): Promise<string | undefined> {
+  const response = await fetch(`/api/session/${key}/feedback`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ prompts, ended }),
+    signal: AbortSignal.timeout(FEEDBACK_TIMEOUT_MS),
+  });
+  if (response.ok) return undefined;
+  return await refusalOf(response);
 }
 
-async function post(path: string, body: unknown, timeoutMs?: number): Promise<void> {
+async function refusalOf(response: Response): Promise<string> {
+  const body = (await response.json().catch(() => undefined)) as
+    { error?: { message?: unknown } } | undefined;
+  const message = body?.error?.message;
+  return typeof message === "string" ? message : `the server answered ${response.status}`;
+}
+
+async function post(path: string, body: unknown): Promise<void> {
   const response = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-    ...(timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(timeoutMs) }),
   });
   if (!response.ok) throw new Error(`${path} failed with ${response.status}`);
 }

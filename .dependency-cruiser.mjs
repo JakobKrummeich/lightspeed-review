@@ -33,7 +33,7 @@ export default {
     {
       name: "commands-only-from-cli",
       comment:
-        "src/commands/ is the CLI's top layer; core code that imports it inverts the layering and is how the old import cycles formed. What core code and a command both need lives below commands/, as start-call.ts and turn-help.ts do.",
+        "src/commands/ is the CLI's top layer; core code that imports it inverts the layering and is how the old import cycles formed. What core code and a command both need lives below commands/, as open-call.ts and turn-help.ts do.",
       severity: "error",
       from: { pathNot: ["^src/cli\\.ts$", "^src/commands/"] },
       to: { path: "^src/commands/" },

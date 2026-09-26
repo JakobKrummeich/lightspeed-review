@@ -9,21 +9,19 @@ export function renderToon(output: StructuredOutput): string {
   return encode(output);
 }
 
+/** A block shown before a wait: written at once, since the answer may be hours off. */
+export function printBlock(block: StructuredOutput): void {
+  process.stdout.write(`${renderToon(block)}\n`);
+}
+
 /**
  * In characters — about fifty tokens. At 2000 a single selection cost 372
- * tokens of a `wait` answer: the selection is a pointer to code the agent has
+ * tokens of a delivered batch: the selection is a pointer to code the agent has
  * on disk, so enough of it to recognise the passage is all it is for. The
  * reviewer's `comment` is never cut — those are their own words, and the one
  * part of a prompt that exists nowhere else.
  */
 export const SELECTION_LIMIT = 200;
-
-/**
- * A round the reviewer spent an hour on can queue dozens; handing an agent all
- * of them at once is a context it cannot act on either, and the answer says how
- * many it is holding back.
- */
-export const PROMPT_LIMIT = 20;
 
 /**
  * A branch-sized review fits under it whole, and the reviews that do not are
@@ -35,7 +33,7 @@ export const DEFAULT_PATH_LIMIT = 50;
 
 export function truncateContent(value: string, limit: number, rest: string): string {
   if (value.length <= limit) return value;
-  return `${value.slice(0, limit)}\n(truncated, ${value.length} chars — use --full; ${rest})`;
+  return `${value.slice(0, limit)}\n(truncated, ${value.length} chars; ${rest})`;
 }
 
 const INTERNAL_ERROR_HELP = ["Re-run the command; if it persists this is a lightspeed bug"];

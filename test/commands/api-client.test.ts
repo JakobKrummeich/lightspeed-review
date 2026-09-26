@@ -60,6 +60,7 @@ test("a GET is retried only once, and a port that is still open is not called de
     (error: ReviewError) => {
       assert.equal(error.code, "server_unreachable");
       assert.match(error.message, /did not answer the request/);
+      assert.doesNotMatch(error.suggestions.join(" "), /--intent/);
       // "fetch failed" alone says nothing; what the socket did is on `cause`.
       assert.match(error.detail ?? "", /ECONNRESET|UND_ERR|socket/i);
       return true;
@@ -83,22 +84,20 @@ test("a POST is never retried, so a dropped reply cannot be sent twice", async (
 test("a 422 relays the server's own structured error, help and all", () => {
   const body = JSON.stringify({
     error: {
-      code: "declaration_invalid",
-      message: "the reply was rejected whole: 1 declaration problem(s)",
-      detail: "evt_a: declares nothing",
+      code: "feedback_item_unknown",
+      message: "no such item: t9 — nothing was posted",
+      detail: "items in this review: t1, main",
     },
-    help: ["Ids come from the annotations in `lightspeed wait` output"],
+    help: ["Re-run with ids from the list"],
   });
 
   const parsed = parseBody(422, body);
 
   assert.ok(parsed instanceof ReviewError);
-  assert.equal(parsed.code, "declaration_invalid");
-  assert.match(parsed.message, /rejected whole/);
-  assert.equal(parsed.detail, "evt_a: declares nothing");
-  assert.deepEqual(parsed.suggestions, [
-    "Ids come from the annotations in `lightspeed wait` output",
-  ]);
+  assert.equal(parsed.code, "feedback_item_unknown");
+  assert.match(parsed.message, /nothing was posted/);
+  assert.equal(parsed.detail, "items in this review: t1, main");
+  assert.deepEqual(parsed.suggestions, ["Re-run with ids from the list"]);
 });
 
 /** Regression: a code this client did not know about reached the agent as
@@ -168,28 +167,39 @@ test("nothing listening is still reported as no server, once retried", async () 
     (error: ReviewError) => {
       assert.equal(error.code, "server_not_running");
       assert.match(error.detail ?? "", /nothing accepts a connection on port 1/);
-      assert.match(error.suggestions.join(" "), /lightspeed start <branch> \[base\] --intent/);
+      assert.match(error.suggestions.join(" "), /`lightspeed open <branch> \[base\]` to restart/);
+      assert.doesNotMatch(error.suggestions.join(" "), /--intent/);
       return true;
     },
   );
 });
 
 /**
- * `start` exits 2 without `--intent`, so a help line that spells `start` without
- * it costs the turn it was written to save — and the review it names is the one
- * on the command line the agent already typed.
+ * A fresh `open` exits 2 without `--intent`, so a help line that spells `open`
+ * without it costs the turn it was written to save — and the review it names
+ * is the one on the command line the agent already typed.
  */
-test("every start these failures suggest names this review and carries --intent", () => {
-  const about = { key: "abc", target: "feature-auth main" };
+test("a session the server does not know is opened fresh, with --intent", () => {
+  const parsed = parseBody(404, "", { key: "abc", target: "feature-auth main" });
 
-  for (const status of [404, 503]) {
-    const parsed = parseBody(status, "", about);
+  assert.ok(parsed instanceof ReviewError);
+  assert.match(
+    parsed.suggestions.join(" "),
+    /lightspeed open feature-auth main --intent '<why this branch exists>'/,
+  );
+});
 
-    assert.ok(parsed instanceof ReviewError, String(status));
-    assert.match(
-      parsed.suggestions.join(" "),
-      /lightspeed start feature-auth main --intent "<why this branch exists>"/,
-      String(status),
-    );
-  }
+/**
+ * The review outlived its server: `open` on it restarts the server and
+ * re-attaches. A fresh-open line with `--intent` read as "open a new review".
+ */
+test("a server that shut down mid-wait is re-attached to, naming this review without --intent", () => {
+  const parsed = parseBody(503, "", { key: "abc", target: "feature-auth main" });
+
+  assert.ok(parsed instanceof ReviewError);
+  assert.match(
+    parsed.suggestions[0]!,
+    /`lightspeed open feature-auth main` to restart the review server and re-attach/,
+  );
+  assert.doesNotMatch(parsed.suggestions.join(" "), /--intent/);
 });

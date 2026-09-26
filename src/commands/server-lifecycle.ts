@@ -17,7 +17,7 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 
 const STALE_SHUTDOWN_MS = 2_000;
 
-/** The server outlives the command — that is what lets `start` hand out a URL
+/** The server outlives the command — that is what lets `open` hand out a URL
  * and exit. */
 export async function ensureServerRunning(options: EnsureServerOptions): Promise<void> {
   // Checked before spawning: into a port something else holds, spawning would
@@ -40,7 +40,7 @@ export async function ensureServerRunning(options: EnsureServerOptions): Promise
 }
 
 /**
- * A server of another version is shut down here rather than reported: `start`
+ * A server of another version is shut down here rather than reported: `open`
  * is the command that spawns servers, so an agent told to run `stop` would
  * spend a turn on a decision this command has already made. Waiting polls
  * reconnect on their own once the port answers again.
@@ -97,7 +97,7 @@ export async function assertServerCurrent(port: number, target: string): Promise
       " and no `round`, which are the facts every command is chosen against",
     suggestions: [
       "Run `lightspeed stop` to shut the old server down",
-      `Then re-run \`lightspeed wait ${target}\`; the next \`start\` brings this version up`,
+      `Then re-run \`lightspeed open ${target}\`; it brings this version up and re-attaches to the review`,
     ],
   });
 }

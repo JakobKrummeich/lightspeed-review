@@ -4,19 +4,19 @@ import { CLI_DESCRIPTION, CLI_VERSION } from "./version.ts";
 import { homeOutput } from "./commands/home.ts";
 import { homeInput } from "./commands/home-input.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
-import { parseAskArgs, runAsk } from "./commands/ask.ts";
 import { commandHelp, commandSummary } from "./commands/command-help.ts";
 import { runEnd } from "./commands/end.ts";
 import { runFeedback } from "./commands/feedback.ts";
 import { parseInitArgs, runInit } from "./commands/init.ts";
 import { authStateDir, runLogin } from "./commands/login.ts";
 import { runLogout } from "./commands/logout.ts";
-import { parseSayArgs, runSay } from "./commands/say.ts";
 import { runServe } from "./commands/serve.ts";
-import { parseWaitArgs, runWait } from "./commands/wait.ts";
 import { parseWorkArgs, runWork } from "./commands/work.ts";
 import { parseSkillArgs, runSkill } from "./commands/skill.ts";
-import { parseStartArgs, runStart } from "./commands/start.ts";
+import { parseOpenArgs, runOpen } from "./commands/open.ts";
+import { parsePublishArgs, runPublish } from "./commands/publish.ts";
+import { parseReplyArgs, runReply } from "./commands/reply.ts";
+import { removedVerb, REMOVED_VERBS } from "./commands/removed-verbs.ts";
 import { runStop } from "./commands/stop.ts";
 import {
   loadConfig,
@@ -30,10 +30,17 @@ import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
 import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
-import { missingSession, resolveSession, type ResolvedSession } from "./session-resolve.ts";
+import {
+  missingSession,
+  resolveSession,
+  textAsBranch,
+  type ResolvedSession,
+  type TextAsBranchInput,
+} from "./session-resolve.ts";
+import { isCommit } from "./git-state.ts";
 import { SessionStore } from "./session-store.ts";
 import { refreshSkills, skillNoticeOutput, type StaleSkill } from "./skill-freshness.ts";
-import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./turn-help.ts";
+import { HELP_END, HELP_OPEN, TURN_RULES } from "./turn-help.ts";
 
 const version = CLI_VERSION;
 const description = CLI_DESCRIPTION;
@@ -42,11 +49,10 @@ type Answer = StructuredOutput | string;
 
 /** The one list: top-level help and the unknown-command error are both built from it. */
 const commands: Record<string, (args: string[]) => Answer | Promise<Answer>> = {
-  start: startCommand,
-  wait: waitCommand,
-  ask: askCommand,
-  say: sayCommand,
+  open: openCommand,
+  reply: replyCommand,
   work: workCommand,
+  publish: publishCommand,
   approvals: approvalsCommand,
   end: endCommand,
   serve: serveCommand,
@@ -76,14 +82,14 @@ function topLevelHelp(notice: StructuredOutput): string {
     description,
     commands: Object.fromEntries(COMMAND_NAMES.map((name) => [name, commandSummary(name)])),
     flags: { "--all": HELP_ALL },
-    help: [TURN_RULE, HELP_START, HELP_WAIT, HELP_END],
+    help: [...TURN_RULES, HELP_OPEN, HELP_END],
     ...notice,
   })}\n`;
 }
 
 /**
  * `model` and `thinking` are read only by the one command that sends a diff to
- * a model: gating `wait` or `end` on a model they never call made a missing
+ * a model: gating `reply` or `end` on a model they never call made a missing
  * config refuse the review loop itself.
  */
 function repoContext(): { repoRoot: string; config: ServiceConfig } {
@@ -101,6 +107,11 @@ interface SessionContext extends ResolvedSession {
   config: ServiceConfig;
 }
 
+function refuseTextAsBranch(input: Omit<TextAsBranchInput, "isRef">): void {
+  const refusal = textAsBranch({ ...input, isRef: (name) => isCommit(input.repoRoot, name) });
+  if (refusal !== undefined) throw refusal;
+}
+
 /**
  * The `session_not_found` catch lives here because this is the only layer that
  * has both halves: the store knows what is open in this repository, and the
@@ -115,6 +126,7 @@ async function onSession<T>(
 ): Promise<T> {
   const { repoRoot, config } = repoContext();
   const sessions = new SessionStore(config.stateDir).list();
+  refuseTextAsBranch({ verb, repoRoot, branch, sessions });
   const target = resolveSession(sessions, repoRoot, branch, base);
   try {
     return await run({ repoRoot, config, ...target });
@@ -124,67 +136,44 @@ async function onSession<T>(
   }
 }
 
-async function startCommand(args: string[]): Promise<StructuredOutput> {
-  const { branch, base, open, model, reopen, wait, intents } = parseStartArgs(args);
-  if (branch === undefined) {
-    throw new ReviewError({
-      code: "invalid_arguments",
-      message: "start needs the branch under review",
-      suggestions: [HELP_START],
-    });
-  }
-  // Checked before repo/config/git/model: nothing else is worth doing without an intent.
-  if (intents.length === 0) {
-    throw new ReviewError({
-      code: "intent_missing",
-      message: "start needs --intent: say what this branch is for",
-      detail:
-        "you opened this review, so you are the only party that knows why the branch exists;" +
-        " repeat --intent once per reason and the reviewer reads them above the diff",
-      suggestions: [
-        HELP_START,
-        `lightspeed start ${branch} ${base ?? "main"} --intent "<why this branch exists>"`,
-      ],
-    });
-  }
+/**
+ * The branch may be left out only to re-attach: with one live session in this
+ * repository, that is the one. A fresh open names its branch.
+ */
+async function openCommand(args: string[]): Promise<StructuredOutput> {
+  const { branch, base, open, model, reopen, intents } = parseOpenArgs(args);
   const { repoRoot, config } = groupingContext();
-  return await runStart({
+  const target = resolveSession(new SessionStore(config.stateDir).list(), repoRoot, branch, base);
+  return await runOpen({
     repoRoot,
-    branch,
-    base: base ?? "main",
+    ...target,
     config: model === undefined ? config : { ...config, model },
     intents,
     open,
     reopen,
-    wait,
   });
 }
 
-async function waitCommand(args: string[]): Promise<StructuredOutput> {
-  const { branch, base, full } = parseWaitArgs(args);
-  return await onSession("wait", branch, base, ({ config, ...target }) =>
-    runWait({ ...target, port: config.port, full }),
+async function replyCommand(args: string[]): Promise<StructuredOutput> {
+  const { notes, branch, base } = parseReplyArgs(args);
+  return await onSession("reply", branch, base, ({ config, ...target }) =>
+    runReply({ ...target, port: config.port, notes }),
   );
 }
 
-async function askCommand(args: string[]): Promise<StructuredOutput> {
-  const { message, branch, base } = parseAskArgs(args);
-  return await onSession("ask", branch, base, ({ config, ...target }) =>
-    runAsk({ ...target, port: config.port, question: message }),
-  );
-}
-
-async function sayCommand(args: string[]): Promise<StructuredOutput> {
-  const parsed = parseSayArgs(args);
-  return await onSession("say", parsed.branch, parsed.base, ({ config, ...target }) =>
-    runSay({
-      ...target,
-      port: config.port,
-      text: parsed.message,
-      ...(parsed.for === undefined ? {} : { for: parsed.for }),
-      files: parsed.files,
-    }),
-  );
+async function publishCommand(args: string[]): Promise<StructuredOutput> {
+  const { branch, base, model, intents, notes } = parsePublishArgs(args);
+  const { repoRoot, config } = groupingContext();
+  const sessions = new SessionStore(config.stateDir).list();
+  refuseTextAsBranch({ verb: "publish", repoRoot, branch, sessions });
+  const target = resolveSession(sessions, repoRoot, branch, base);
+  return await runPublish({
+    repoRoot,
+    ...target,
+    config: model === undefined ? config : { ...config, model },
+    intents,
+    notes,
+  });
 }
 
 async function workCommand(args: string[]): Promise<StructuredOutput> {
@@ -294,7 +283,7 @@ const allRepos = argv.length === 1 && argv[0] === "--all";
 
 /**
  * Translated into the flag rather than registered as a command, so there is
- * one help text and `help start` is `start --help` exactly — including the
+ * one help text and `help open` is `open --help` exactly — including the
  * unknown-command error a name that is not a command still earns.
  */
 function withHelpAlias(given: string[]): string[] {
@@ -352,12 +341,17 @@ function withSkillNotice(output: Answer): Answer {
   return typeof output === "string" ? output : { ...output, ...skillNotice };
 }
 
+/** Answered, not unknown: an agent on a 2.x skill is told where the verb went. */
+function removedCommands(): Record<string, () => never> {
+  return Object.fromEntries(REMOVED_VERBS.map((verb) => [verb, () => removedVerb(verb)]));
+}
+
 function renderFailure(error: unknown): string {
   return `${renderToon({ ...errorOutput(error), ...skillNotice })}\n`;
 }
 
 const noticedCommands = Object.fromEntries(
-  Object.entries(commands).map(([name, run]) => [
+  Object.entries({ ...commands, ...removedCommands() }).map(([name, run]) => [
     name,
     async (args: string[]) => withSkillNotice(await run(args)),
   ]),
@@ -382,6 +376,6 @@ if (leadingProblem !== undefined) {
     getCommandHelp: (command) => commandHelp(command, skillNotice),
     renderUnknownCommand: unknownCommandOutput,
     commands: noticedCommands,
-    home: () => withSkillNotice(homeOutput(homeInput(allRepos))),
+    home: async () => withSkillNotice(homeOutput(await homeInput(allRepos))),
   });
 }

@@ -4,7 +4,7 @@ import { repoRows, selectItems, verdictCounts, type ExportItem } from "../ledger
 import { ledgerFor, type LedgerReadResult } from "../ledger/store.ts";
 import type { StructuredOutput } from "../output.ts";
 import { feedbackDirPath } from "../paths.ts";
-import { HELP_START } from "../turn-help.ts";
+import { HELP_OPEN } from "../turn-help.ts";
 import { listFeedback } from "./feedback/list.ts";
 import { pruneFeedback } from "./feedback/prune.ts";
 import {
@@ -70,7 +70,7 @@ function disabledSummary(path: string): StructuredOutput {
     ledger: { path, status: "off" },
     items: 0,
     message: "the feedback ledger is off in .lightspeed.conf.json",
-    help: [HELP_ENABLE, HELP_START],
+    help: [HELP_ENABLE, HELP_OPEN],
   };
 }
 
@@ -79,7 +79,7 @@ function emptySummary(path: string, records: number): StructuredOutput {
     ledger: { path, status: "on", records },
     items: 0,
     message: "no feedback recorded yet",
-    help: [HELP_START, HELP_LIST],
+    help: [HELP_OPEN, HELP_LIST],
   };
 }
 

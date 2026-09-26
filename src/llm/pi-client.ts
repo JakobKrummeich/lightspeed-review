@@ -17,7 +17,7 @@ import {
 import { loadPiProviders } from "./pi-models.ts";
 import { applyConfiguredProviders, applyPiProviders } from "./providers.ts";
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
-import { startCall } from "../start-call.ts";
+import { openCall } from "../open-call.ts";
 
 export interface GroupingCallInput {
   /** `provider/model-id`, exactly as written in `.lightspeed.conf.json`. */
@@ -139,7 +139,7 @@ function authError(detail: string, reference: string, endpoint?: string): Review
       endpoint,
       suggestions: withLoginSuggestion(reference, [
         "Export the provider's credential, e.g. `export ANTHROPIC_OAUTH_TOKEN=…` or `export ANTHROPIC_API_KEY=…`",
-        "Then re-run `lightspeed start <branch> [base]`",
+        "Then re-run the `lightspeed open` or `lightspeed publish` that fell back",
       ]),
     });
   }
@@ -149,7 +149,7 @@ function authError(detail: string, reference: string, endpoint?: string): Review
       endpoint,
       suggestions: withLoginSuggestion(reference, [
         "Authenticate the provider: `pi auth login <provider>` for one pi knows, or `providers.<id>.apiKey`/`headers` in .lightspeed.conf.json",
-        "Then re-run `lightspeed start <branch> [base]`",
+        "Then re-run the `lightspeed open` or `lightspeed publish` that fell back",
       ]),
     });
   }
@@ -193,7 +193,7 @@ function piError(
 ): ReviewError {
   const suggestions: [string, ...string[]] = options.suggestions ?? [
     "Check `model` and `thinking` in .lightspeed.conf.json",
-    `Then re-run \`${startCall("<branch> [base]")}\``,
+    `Then re-run \`${openCall("<branch> [base]")}\``,
   ];
   return new ReviewError({
     code,

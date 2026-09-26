@@ -230,7 +230,7 @@ export interface ServiceConfig extends LedgerConfig {
 }
 
 /**
- * `wait`, `ask`, `say`, `work`, `approvals`, `end`, `serve` and `stop` talk to a
+ * `reply`, `work`, `approvals`, `end`, `serve` and `stop` talk to a
  * port and a store and to nothing else, so requiring `model` of them made a
  * missing config refuse the commands an agent needs exactly when it cannot
  * write one — mid-review, on a machine that is not its own. A file that exists

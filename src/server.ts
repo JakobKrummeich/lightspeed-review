@@ -20,18 +20,28 @@ import {
   handleStatic,
 } from "./server/handlers-review.ts";
 import { handleCreateSession, handleEnd } from "./server/handlers-session.ts";
-import { handleDelivered, handleEvents, handlePoll } from "./server/handlers-stream.ts";
+import {
+  handleDelivered,
+  handleEvents,
+  handlePoll,
+  handlePresence,
+} from "./server/handlers-stream.ts";
 import { handleWork } from "./server/handlers-turn.ts";
 import { messageOf, sendJson } from "./server/http.ts";
 import type { LedgerReport } from "./server/ledger-log.ts";
 import { hostIsAllowed, originIsAllowed } from "./server/security.ts";
 import { SessionTransport } from "./server/streams.ts";
+import { presenceOf } from "./turn.ts";
 import type { SessionStore } from "./session-store.ts";
 import { DEFAULT_STATIC_DIR, loadAssets } from "./static-assets.ts";
 import { CLI_VERSION } from "./version.ts";
 
 export type { CreateSessionRequest };
 export type { LedgerReport };
+export type { DomainErrorBody } from "./server/http.ts";
+/** The rules a CLI checks before paying for a model call the server would refuse. */
+export { publishRefusal } from "./server/publish-rules.ts";
+export { stillWorking } from "./server/turn-refusals.ts";
 
 export interface ReviewServerOptions {
   store: SessionStore;
@@ -61,7 +71,10 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   const assets = loadAssets(staticDir);
   // Reads the turn off the store rather than holding one: the presence frame is
   // then whatever the last write said, restart or no restart.
-  const transport = new SessionTransport((key) => options.store.get(key)?.turn);
+  const transport = new SessionTransport((key) => {
+    const session = options.store.get(key);
+    return session === undefined ? undefined : presenceOf(session);
+  });
   /** One id source per server: it orders every record this run writes. */
   const nextId = createIdSource();
   let server: Server | undefined;
@@ -148,6 +161,7 @@ function buildRoutes(context: ServerContext): Route[] {
     },
     { method: "GET", pattern: "/api/session/:key/replay", handler: bind(handleReplay) },
     { method: "GET", pattern: "/api/session/:key/events", handler: bind(handleEvents) },
+    { method: "GET", pattern: "/api/session/:key/presence", handler: bind(handlePresence) },
     { method: "POST", pattern: "/api/session/:key/approved", handler: bind(handleApproved) },
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
     { method: "POST", pattern: "/api/session/:key/reply", handler: bind(handleAgentReply) },

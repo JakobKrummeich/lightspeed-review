@@ -16,7 +16,7 @@ import { readMemory, updateMemory } from "../../../src/browser/review-memory.ts"
 import { SAVE_DELAY_MS } from "../../../src/browser/dom/save-later.ts";
 
 const REVIEWERS: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" };
-const READING: Turn = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" };
+const READING: Turn = { holder: "agent", mode: "digesting", at: "2025-01-01T00:06:00.000Z" };
 
 const working = (note: string): Turn => ({
   holder: "agent",
@@ -24,6 +24,8 @@ const working = (note: string): Turn => ({
   at: "2025-01-01T00:07:00.000Z",
   note,
 });
+
+const WORKING = working("rewriting the parser");
 
 const annotation: FeedbackPrompt = {
   type: "annotation",
@@ -142,9 +144,9 @@ test("an agent reply leaves the half-written comment and its textarea untouched"
   );
 });
 
-test("a per-comment answer arriving with an update lands under its comment", (t) => {
-  // `say --for` publishes a session change; the redraw must show the declaration live,
-  // not only on the next visit's mount.
+test("a reply arriving with an update is drawn live", (t) => {
+  // `reply` publishes a session change; the redraw must show it live, not only
+  // on the next visit's mount.
   const { root, panel } = mount(t);
   const asked: ConversationEntry = {
     role: "reviewer",
@@ -153,7 +155,7 @@ test("a per-comment answer arriving with an update lands under its comment", (t)
     prompts: [
       {
         type: "annotation",
-        id: "evt_7",
+        id: "t7",
         file: "src/api/users.ts",
         group: "API",
         selected_text: "+const user = 1;",
@@ -162,17 +164,16 @@ test("a per-comment answer arriving with an update lands under its comment", (t)
     ],
   };
 
-  panel.update(
-    session({
-      conversation: [asked],
-      declarations: {
-        evt_7: { note: "held as designed", files: [], at: "2025-01-01T01:00:00.000Z" },
-      },
-    }),
-  );
+  const answered: ConversationEntry = {
+    role: "agent",
+    at: "2025-01-01T01:00:00.000Z",
+    roundIndex: 0,
+    prompts: [{ type: "reply", thread: "t7", comment: "held as designed" }],
+  };
+
+  panel.update(session({ conversation: [asked, answered] }));
 
   const scroll = root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "";
-  assert.match(scroll, /lsr-prompt-answer/);
   assert.match(scroll, /held as designed/);
 });
 
@@ -195,11 +196,11 @@ test("a reply arriving while the reviewer reads the live end keeps them at it", 
 test("an agent taking the feedback away is said at the foot of the conversation", (t) => {
   const { root, panel } = mount(t);
 
-  panel.setTurn(READING);
+  panel.setTurn(READING, 2);
 
   assert.match(
     root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "",
-    /the agent has your feedback/,
+    /Agent is reading your 2 items/,
     "the marker stands where the answer will be written",
   );
 
@@ -217,11 +218,9 @@ test("the agent's declared plan is what the foot of the conversation says", (t) 
 
   panel.setTurn(working("splitting the transaction helper out"));
 
-  // `reading` and `working` gate identically; the difference is only ever this
-  // sentence, which is the reason `work` takes a plan at all.
   assert.match(
     root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "",
-    /<\/span>\s*splitting the transaction helper out\s*<\/p>/,
+    /<\/span>\s*Working on: splitting the transaction helper out\s*<\/p>/,
   );
 });
 
@@ -243,10 +242,10 @@ test("the working marker arrives on screen rather than just below the fold", (t)
   assert.equal(host.scrollTop, host.scrollHeight);
 });
 
-test("the agent's turn turns Send into Queue and leaves everything pressable", (t) => {
+test("the agent's working turn turns Send into Queue and leaves everything pressable", (t) => {
   const { root, panel } = mount(t);
 
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
 
   // Queue always: the primary button keeps working, it just parks the words in the tray
   // instead of sending them onto somebody else's turn.
@@ -290,7 +289,7 @@ test("the turn coming back hands Send back without replacing the compose box", (
 });
 
 test("a session that opens on the agent's turn queues before any SSE frame", (t) => {
-  const { root } = mount(t, session({ turn: READING }));
+  const { root } = mount(t, session({ turn: WORKING }));
 
   // A reload is not an escape: the turn is server truth, and the page draws it
   // from the session it was handed rather than waiting to be told.
@@ -301,7 +300,7 @@ test("a press on Queue sends nothing to the agent", (t) => {
   const { root, panel } = mount(t, session({ pending: [] }));
   const sent = stubFetch(t);
   panel.queue([annotation]);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
 
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
 
@@ -315,7 +314,7 @@ test("Enter on the agent's turn queues the comment, like the button beneath it",
   const { root, panel, box } = mount(t);
   const sent = stubFetch(t);
   box()!.value = "one more thing";
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
 
   const event = keydown(box(), { key: "Enter" });
   root.dispatch("keydown", event);
@@ -361,7 +360,7 @@ test("general comments queue on the agent's turn one after another, beside the p
   await stored();
   const remembered = readMemory(storage, "key");
   assert.deepEqual(
-    remembered.pending.map((pill) => pill.comment),
+    remembered.pending.map((pill) => ("comment" in pill ? pill.comment : undefined)),
     [
       "wrap in a transaction",
       "the migration is missing",
@@ -375,7 +374,7 @@ test("general comments queue on the agent's turn one after another, beside the p
 test("everything queued on the agent's turn goes out in order on the next Send", async (t) => {
   const { root, panel, box } = mount(t);
   const sent = stubFetch(t);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
   panel.queue([annotation]);
   type(root, box()!, "the migration is missing");
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
@@ -407,7 +406,7 @@ test("everything queued on the agent's turn goes out in order on the next Send",
 test("text in the box and a Queue press on the agent's turn put nothing on the wire", async (t) => {
   const { root, panel, box } = mount(t);
   const sent = stubFetch(t);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
   type(root, box()!, "the migration is missing");
 
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
@@ -419,7 +418,7 @@ test("text in the box and a Queue press on the agent's turn put nothing on the w
 
 test("a Queue press says what it did to a screen reader, politely", (t) => {
   const { root, panel, box } = mount(t);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
   panel.queue([annotation]);
   const status = () => root.querySelector("#lsr-queue-status")?.textContent;
 
@@ -436,7 +435,7 @@ test("a Queue press says what it did to a screen reader, politely", (t) => {
 
 test("a Queue press hands the box back, so the next comment is typed straight away", (t) => {
   const { root, panel, box } = mount(t);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
   type(root, box()!, "one");
 
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
@@ -451,7 +450,7 @@ test("a Queue press hands the box back, so the next comment is typed straight aw
 test("a Queue press while an end is on the wire queues nothing", async (t) => {
   const flight = heldFetch(t);
   const { root, panel, box } = mount(t);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
   type(root, box()!, "one more thing");
 
   root.dispatch("click", { target: root.querySelector("#lsr-send-end") });
@@ -471,7 +470,7 @@ test("a Queue press while an end is on the wire queues nothing", async (t) => {
 test("the turn coming back counts the queue on the button, and a send clears the count", async (t) => {
   const { root, panel, box } = mount(t);
   const sent = stubFetch(t);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
   panel.queue([annotation]);
   type(root, box()!, "the migration is missing");
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
@@ -508,7 +507,7 @@ test("a general comment restored from a reload in a later round wears no stale b
 
 test("a queued general comment comes out of the tray like any pill", (t) => {
   const { root, panel, box } = mount(t);
-  panel.setTurn(READING);
+  panel.setTurn(WORKING);
   type(root, box()!, "never mind this one");
   root.dispatch("click", { target: root.querySelector("#lsr-send") });
   assert.match(shown(root), /never mind this one/, "queued first");
@@ -767,7 +766,7 @@ test("the word given elsewhere ends the review exactly as the panel's own button
   assert.equal(sent.length, 1);
   assert.equal(sent[0]?.ended, true);
   assert.deepEqual(
-    sent[0]?.prompts.map((prompt) => prompt.comment),
+    sent[0]?.prompts.map((prompt) => ("comment" in prompt ? prompt.comment : undefined)),
     ["one last thing"],
     "the comment box is sent, not dropped",
   );
@@ -974,6 +973,72 @@ test("feedback the server refused is still queued for the next try", async (t) =
   assert.deepEqual(
     readMemory(storage, "key").pending,
     queued.map((prompt) => ({ ...prompt, round: 0 })),
+  );
+});
+
+test("a Send the server refuses because the agent took the turn keeps everything and says why", async (t) => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        error: {
+          code: "agent_holds_turn",
+          message: "the agent is reading your last batch; wait for its answer",
+        },
+      },
+      { status: 409 },
+    );
+  t.after(() => {
+    globalThis.fetch = real;
+  });
+  const { root, panel, box, storage } = mount(t);
+  panel.queue(queued);
+  type(root, box()!, "and one more thing");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+
+  assert.equal(box()!.value, "and one more thing");
+  assert.equal(readMemory(storage, "key").pending.length, queued.length);
+  assert.match(
+    root.querySelector(".lsr-complete")?.textContent ?? "",
+    /Not sent — the agent is reading your last batch; wait for its answer/,
+  );
+});
+
+/**
+ * The page believed the turn was the reviewer's, but the agent took it on the
+ * wire: the end is refused whole, so the review stays open and every word stays.
+ */
+test("a Send & End refused because the agent took the turn ends nothing and keeps every word", async (t) => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        error: {
+          code: "agent_holds_turn",
+          message: "the agent holds the turn, so words sent with the end would never be read",
+        },
+      },
+      { status: 409 },
+    );
+  t.after(() => {
+    globalThis.fetch = real;
+  });
+  const { root, panel, box, storage, ended } = mount(t);
+  panel.queue(queued);
+  type(root, box()!, "and one more thing");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send-end") });
+  await tick(0);
+
+  assert.equal(ended(), false);
+  assert.equal(root.querySelector("#lsr-send-end")?.disabled, false);
+  assert.equal(box()!.value, "and one more thing");
+  assert.equal(readMemory(storage, "key").pending.length, queued.length);
+  assert.match(
+    root.querySelector(".lsr-complete")?.textContent ?? "",
+    /Not sent — the agent holds the turn, so words sent with the end would never be read/,
   );
 });
 
@@ -1283,115 +1348,189 @@ test("a press on a comment without an anchor still names the file", (t) => {
   assert.deepEqual(jumps, [{ file: "src/api.ts", anchor: undefined }]);
 });
 
-const asked: ConversationEntry = {
-  role: "agent",
-  at: "2025-01-01T00:05:00.000Z",
+const opened: ConversationEntry = {
+  role: "reviewer",
+  at: "2025-01-01T00:01:00.000Z",
   roundIndex: 0,
-  prompts: [{ type: "message", comment: "per-request or per-batch?", kind: "question" }],
+  prompts: [{ type: "message", id: "t1", comment: "per-request or per-batch?" }],
 };
 
-function answerOf(root: FakeNode): FakeNode | null {
-  return root.querySelector(".lsr-answer-box");
+function replyBoxOf(root: FakeNode, thread = "t1"): FakeNode | undefined {
+  return root
+    .querySelectorAll(".lsr-thread-reply-box")
+    .find((box) => box.dataset.thread === thread);
 }
 
-test("answering the question sends that text and nothing else", async (t) => {
-  const { root, panel } = mount(t, session({ conversation: [asked] }));
-  const sent = stubFetch(t);
-  // A queue and a half-typed general comment, both of which must survive: the
-  // reviewer was answering a question, not finishing their review.
-  panel.queue([annotation]);
-  root.querySelector("#lsr-general-comment")!.value = "still writing this one";
-  answerOf(root)!.value = "per-batch";
+function pressIn(root: FakeNode, selector: string, thread = "t1"): void {
+  const target = root.querySelectorAll(selector).find((node) => node.dataset.thread === thread);
+  assert.ok(target, `no ${selector} for ${thread}`);
+  root.dispatch("click", { target });
+}
 
-  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
+test("a reply in a thread is one more pill, and goes out with the rest on Send", async (t) => {
+  const { root, panel } = mount(t, session({ conversation: [opened] }));
+  const sent = stubFetch(t);
+  panel.queue([annotation]);
+  replyBoxOf(root)!.value = "  per-batch  ";
+
+  pressIn(root, ".lsr-thread-reply-add");
+
+  assert.equal(replyBoxOf(root)?.value, "", "the box empties for the next reply");
+  assert.equal(replyBoxOf(root)?.focused, true, "and keeps the reviewer in it");
+  assert.equal(
+    root.querySelector("#lsr-queue-status")?.textContent,
+    "Queued — 2 waiting for your next Send",
+  );
+  assert.equal(sent.length, 0, "replying is not sending");
+
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
   await tick(0);
 
-  assert.deepEqual(sent, [
-    {
-      path: "/api/session/key/feedback",
-      prompts: [{ type: "message", comment: "per-batch" }],
-      ended: false,
-    },
+  assert.deepEqual(sent[0]?.prompts, [
+    annotation,
+    { type: "reply", thread: "t1", comment: "per-batch" },
   ]);
-  assert.equal(root.querySelectorAll(".lsr-pill").length, 1, "the queue is still queued");
-  assert.equal(root.querySelector("#lsr-general-comment")?.value, "still writing this one");
 });
 
-test("Enter in the answer box is the same one press", async (t) => {
-  const { root } = mount(t, session({ conversation: [asked] }));
-  const sent = stubFetch(t);
-  const field = answerOf(root)!;
-  field.value = "per-batch";
-
+test("Enter in a reply box adds the reply, as its button does; an empty one adds nothing", (t) => {
+  const { root } = mount(t, session({ conversation: [opened] }));
+  const field = replyBoxOf(root)!;
+  field.value = "   ";
   root.dispatch("keydown", keydown(field, { key: "Enter" }));
-  await tick(0);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
 
-  assert.equal(sent.length, 1);
-  assert.deepEqual(sent[0]?.prompts, [{ type: "message", comment: "per-batch" }]);
+  replyBoxOf(root)!.value = "per-batch";
+  const event = keydown(replyBoxOf(root), { key: "Enter" });
+  root.dispatch("keydown", event);
+
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
+  assert.match(shown(root), /reply in t1/);
 });
 
-test("an empty answer box sends nothing, as an empty compose box does", async (t) => {
-  const { root } = mount(t, session({ conversation: [asked] }));
-  const sent = stubFetch(t);
-  answerOf(root)!.value = "   ";
+test("a key in anything but a reply box is not a reply", (t) => {
+  const { root } = mount(t, session({ conversation: [opened] }));
+  replyBoxOf(root)!.value = "per-batch";
 
-  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
-  await tick(0);
+  root.dispatch("keydown", keydown(root.querySelector(".lsr-thread-reply-add"), { key: "Enter" }));
+  root.dispatch("keydown", keydown(new FakeNode("textarea"), { key: "Enter" }));
 
-  assert.deepEqual(sent, []);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 0);
 });
 
-/** The answer is the last word, so the question above it is answered — and the
- * box goes without waiting for the server's own copy to come back over SSE. */
-test("the box goes once the answer is on the wire", async (t) => {
-  const { root } = mount(t, session({ conversation: [asked] }));
-  stubFetch(t);
-  answerOf(root)!.value = "per-batch";
-
-  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
-  await tick(0);
-
-  assert.equal(answerOf(root), null);
-  assert.match(root.querySelector(".lsr-panel-scroll")?.innerHTML ?? "", /per-batch/);
-});
-
-/** Every redraw replaces the scroll, and queueing a pill mid-answer is the ordinary way that happens. */
-test("a pill queued mid-answer does not cost the reviewer their sentence", (t) => {
-  const { root, panel } = mount(t, session({ conversation: [asked] }));
-  answerOf(root)!.value = "per-batch, becau";
+/** Every redraw replaces the scroll, and a pill queued mid-reply is the ordinary way that happens. */
+test("a pill queued mid-reply does not cost the reviewer their sentence", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [opened] }));
+  replyBoxOf(root)!.value = "per-batch, becau";
 
   panel.queue([annotation]);
 
-  assert.equal(answerOf(root)?.value, "per-batch, becau");
+  assert.equal(replyBoxOf(root)?.value, "per-batch, becau");
+});
+
+test("resolve folds the thread at once and travels as a pill; pressed again it is taken back", async (t) => {
+  const { root } = mount(t, session({ conversation: [opened] }));
+  const sent = stubFetch(t);
+
+  pressIn(root, ".lsr-thread-resolve");
+
+  assert.match(shown(root), /data-resolved="true"/);
+  assert.match(shown(root), /resolves on your next Send/);
+  assert.equal(sent.length, 0, "resolving sends nothing by itself");
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
+
+  pressIn(root, ".lsr-thread-resolve");
+  assert.match(shown(root), /data-resolved="false"/);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 0, "no second, opposite pill");
+
+  pressIn(root, ".lsr-thread-resolve");
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+  assert.deepEqual(sent[0]?.prompts, [{ type: "resolve", thread: "t1", resolved: true }]);
+});
+
+test("a resolved thread's toggle queues the reopen", (t) => {
+  const resolved: ConversationEntry = {
+    role: "reviewer",
+    at: "2025-01-01T00:02:00.000Z",
+    roundIndex: 0,
+    prompts: [{ type: "resolve", thread: "t1", resolved: true }],
+  };
+  const { root } = mount(t, session({ conversation: [opened, resolved] }));
+
+  pressIn(root, ".lsr-thread-resolve");
+
+  assert.match(shown(root), /reopens on your next Send/);
+  assert.match(shown(root), /reopen t1/);
 });
 
 /**
- * Every redraw replaces the scroll, and the Answer button with it, so a button
- * rendered fresh is a live one. The lock has to be re-applied by the draw
- * itself; left to the call sites, the first one that forgot put a live Answer
- * in front of the reviewer on the agent's turn.
+ * The lock matrix. Digesting: nothing that writes is live — compose, thread
+ * replies, resolve, taking a pill back — and every redraw re-applies it.
+ * Working: all of it queues. End is never locked by the turn.
  */
-test("a redraw on the agent's turn hands back an Answer that is still disabled", (t) => {
-  const { root, panel } = mount(t, session({ conversation: [asked] }));
-  panel.setTurn(READING);
-  assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);
-
+test("while the agent digests everything that writes is locked, redraw after redraw", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [opened] }));
   panel.queue([annotation]);
+  panel.setTurn(READING, 1);
 
-  assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);
+  const locked = (): boolean[] =>
+    [
+      "#lsr-send",
+      "#lsr-general-comment",
+      ".lsr-thread-reply-box",
+      ".lsr-thread-reply-add",
+      ".lsr-thread-resolve",
+      ".lsr-pill-remove",
+    ].map((selector) => root.querySelector(selector)?.disabled ?? false);
+  assert.deepEqual(locked(), [true, true, true, true, true, true]);
+  assert.equal(root.querySelector("#lsr-send-end")?.disabled, false);
+  assert.match(
+    root.querySelector(".lsr-complete")?.textContent ?? "",
+    /Locked while the agent reads/,
+  );
+
+  panel.update(session({ conversation: [opened] }));
+  assert.deepEqual(locked(), [true, true, true, true, true, true]);
+
+  panel.setTurn(WORKING);
+  assert.deepEqual(locked(), [false, false, false, false, false, false]);
+  assert.equal(
+    root.querySelector(".lsr-complete")?.textContent,
+    "Queued items go into the next round.",
+  );
 });
 
-/** One gate over everything that sends. The turn cannot move under an open
- * question in practice, but the press must read the same answer Send does. */
-test("the answer press obeys the one rule the rest of the panel obeys", async (t) => {
-  const { root, panel } = mount(t, session({ conversation: [asked] }));
+test("a stale press while the agent digests writes nothing", (t) => {
+  const { root, panel, box } = mount(t, session({ conversation: [opened] }));
   const sent = stubFetch(t);
-  answerOf(root)!.value = "per-batch";
+  panel.queue([annotation]);
   panel.setTurn(READING);
+  replyBoxOf(root)!.value = "per-batch";
+  box()!.value = "one more";
 
-  root.dispatch("click", { target: root.querySelector(".lsr-answer-send") });
-  await tick(0);
+  pressIn(root, ".lsr-thread-reply-add");
+  pressIn(root, ".lsr-thread-resolve");
+  root.dispatch("click", { target: root.querySelector(".lsr-pill-remove") });
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  panel.queue([annotation]);
 
   assert.deepEqual(sent, []);
-  assert.equal(root.querySelector(".lsr-answer-send")?.disabled, true);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 1);
+  assert.equal(panel.writesLocked(), true);
+  panel.setTurn(WORKING);
+  assert.equal(panel.writesLocked(), false);
+});
+
+test("while the agent works a thread reply and a resolve queue like everything else", (t) => {
+  const { root, panel } = mount(t, session({ conversation: [opened] }));
+  const sent = stubFetch(t);
+  panel.setTurn(WORKING);
+  replyBoxOf(root)!.value = "per-batch";
+
+  pressIn(root, ".lsr-thread-reply-add");
+  pressIn(root, ".lsr-thread-resolve");
+
+  assert.deepEqual(sent, []);
+  assert.equal(root.querySelectorAll(".lsr-pill").length, 2);
 });

@@ -14,7 +14,6 @@ function dataOf(id: string): ReplayData {
     selected_text: "+const x = 1;",
     comment: "this name says nothing",
     status: "addressed",
-    declared: true,
     state: "ok",
     answers: [],
     note: "renamed it",

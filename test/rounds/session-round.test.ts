@@ -53,26 +53,32 @@ function firstRound(files: DiffFile[], approvedPaths: string[]): SessionRecord {
   return { ...opened, approved: approvedPaths };
 }
 
-test("declarations survive the next start: the agent's word crosses rounds", () => {
+/** A `publish` killed after its round opened is recognised by these when it is re-run. */
+test("the batch and the last hand-back survive the next round", () => {
   const first = firstRound([diffFile("src/a.ts", "aaa1111")], []);
-  const declared = {
+  const held = {
     ...first,
-    declarations: {
-      evt_a: { note: "one transaction now", files: ["src/a.ts"], at: "2026-03-01T01:00:00.000Z" },
+    batch: { id: "dlv_1", at: "2026-03-01T01:00:00.000Z", prompts: [], acked: true },
+    lastHandback: {
+      verb: "publish" as const,
+      fingerprint: "f",
+      batch: "dlv_1",
     },
   };
 
-  const second = nextSessionRecord(declared, payload([diffFile("src/a.ts", "aaa2222")]), stamp(1));
+  const second = nextSessionRecord(held, payload([diffFile("src/a.ts", "aaa2222")]), stamp(1));
 
-  assert.deepEqual(second.declarations, declared.declarations);
+  assert.deepEqual(second.batch, held.batch);
+  assert.deepEqual(second.lastHandback, held.lastHandback);
 });
 
-test("a session that never declared stays without the field after a start", () => {
+test("a session that never held a batch stays without the fields after a round", () => {
   const first = firstRound([diffFile("src/a.ts", "aaa1111")], []);
 
   const second = nextSessionRecord(first, payload([diffFile("src/a.ts", "aaa1111")]), stamp(1));
 
-  assert.equal("declarations" in second, false);
+  assert.equal("batch" in second, false);
+  assert.equal("lastHandback" in second, false);
 });
 
 test("a first round has nothing approved yet", () => {

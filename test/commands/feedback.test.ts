@@ -210,7 +210,7 @@ test("an empty ledger answers with a definitive zero and how to produce data", (
 
   assert.equal(output.items, 0);
   assert.match(String(output.message), /no feedback/i);
-  assert.match(JSON.stringify(output.help), /lightspeed start/);
+  assert.match(JSON.stringify(output.help), /lightspeed open/);
 });
 
 test("a ledger switched off says so instead of reporting an empty one", () => {

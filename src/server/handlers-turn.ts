@@ -1,13 +1,15 @@
 /**
- * The only endpoint gated on the turn, because it is the only one that claims
- * to hold it — speaking, waiting and ending are legal from either side.
+ * `lightspeed work`: the discussion is over and the agent starts changing code.
+ * It hands nothing back and waits for nothing, so it is the one turn move that
+ * returns at once.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { SessionRecord } from "../session-store.ts";
-import { agentWorking, budgetHelp, helpFormFor, turnFacts, turnLabel } from "../turn.ts";
-import { turnHelp } from "../turn-help.ts";
+import type { AgentTurn, SessionRecord } from "../session-types.ts";
+import { openIds } from "../threads.ts";
+import { agentWorking, turnFacts } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
+import { badRequest, sendJson } from "./http.ts";
+import { reviewerHolds } from "./turn-refusals.ts";
 import { readWork } from "./validate.ts";
 
 export async function handleWork(
@@ -16,64 +18,50 @@ export async function handleWork(
   response: ServerResponse,
   params: Record<string, string>,
 ) {
+  const work = await readWork(request);
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  const plan = await readWork(request);
-  if (plan === undefined) {
-    badRequest(response, "expected JSON {plan: string}");
+  if (work === undefined) {
+    badRequest(response, "expected JSON {plan: string, head?: string}");
     return;
   }
-  // Before the turn, because an ended review has no turn to hold: the record
-  // still names whoever held it last, and reading that first wrote a plan onto
-  // an ended session — and told the agent it did not hold the turn. Answered the
-  // way `reply` and `approved` answer, so one ended review reads the same from
-  // every command.
-  if (session.status === "ended") {
-    sendJson(response, 409, {
-      error: {
-        code: "session_ended",
-        message: "this review is ended; there is no silence left to declare",
-      },
-    });
-    return;
-  }
-  if (session.turn.holder !== "agent") {
-    sendJson(response, 422, turnRejection(session));
-    return;
-  }
+  const turn = workableTurn(session, response);
+  if (!turn) return;
   const now = new Date().toISOString();
-  // Redeclaring is a no-op that still rewrites the note: an agent that says the
-  // same thing twice has changed nothing, and one that refines its plan has.
-  const changed = session.turn.mode !== "working" || session.turn.note !== plan;
-  const spoken = budgetHelp(session);
+  // Redeclaring rewrites the plan and keeps the HEAD the work started from:
+  // that HEAD is what a later `reply` from working is measured against.
+  const changed = turn.mode !== "working" || turn.note !== work.plan;
+  const found = turn.mode === "working" ? { head: turn.head, tree: turn.tree } : work;
   const updated: SessionRecord = {
-    ...spoken.session,
-    turn: agentWorking(now, plan),
+    ...session,
+    turn: agentWorking(now, work.plan, found),
     updatedAt: now,
   };
   context.store.save(updated);
   context.transport.publishPresence(session.key);
-  sendJson(response, 200, { ...turnFacts(updated), helpForm: spoken.form, changed });
+  // The ids the agent's `publish --to` may name: it has the batch, not the thread list.
+  const open = openIds(updated.conversation, updated.batch?.prompts);
+  sendJson(response, 200, { ...turnFacts(updated), changed, open });
 }
 
 /**
- * An illegal move answered with the move that makes it legal. Structured rather
- * than prose because the agent reads failures the way it reads results, and the
- * fixing command names this session so nothing has to be guessed from the error.
+ * Ended before the turn, because an ended review has no turn to hold: the record
+ * still names whoever held it last, and reading that first wrote a plan onto an
+ * ended session — and told the agent it did not hold the turn. Answered the way
+ * `reply` and `approved` answer, so one ended review reads the same from every
+ * command.
  */
-function turnRejection(session: SessionRecord): DomainErrorBody {
-  return {
-    error: {
-      code: "turn_not_yours",
-      message: `you do not hold the turn (turn: ${turnLabel(session)}) — nothing has been sent to you yet`,
-      detail:
-        "the turn moves to you when the reviewer's feedback is delivered to a blocking" +
-        " `lightspeed wait`, and never before",
-    },
-    // The same list the commands print: a refusal must not name a move another
-    // answer calls illegal. An ended review never reaches here — it is a 409.
-    // Read short where the round has already spelt the moves out, but never
-    // spent: a refusal is not the answer those tokens were for.
-    help: turnHelp("reviewer", `${session.branch} ${session.base}`, helpFormFor(session)),
-  };
+function workableTurn(session: SessionRecord, response: ServerResponse): AgentTurn | undefined {
+  if (session.status === "ended") {
+    sendJson(response, 409, {
+      error: {
+        code: "session_ended",
+        message: "this review is ended; there is no turn left to work in",
+      },
+    });
+    return undefined;
+  }
+  if (session.turn.holder === "agent") return session.turn;
+  sendJson(response, 422, reviewerHolds(session, "work"));
+  return undefined;
 }

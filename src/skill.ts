@@ -1,6 +1,6 @@
 import { REACHABLE_MODELS } from "./config.ts";
-import { DEFAULT_PATH_LIMIT, PROMPT_LIMIT, SELECTION_LIMIT } from "./output.ts";
-import { HELP_END, HELP_START, HELP_WAIT, TURN_RULE } from "./turn-help.ts";
+import { DEFAULT_PATH_LIMIT, SELECTION_LIMIT } from "./output.ts";
+import { HELP_END, HELP_OPEN, TURN_RULES, WAITS_FOR_SEND, nextRule } from "./turn-help.ts";
 
 export const SKILL_PATH = "skills/lightspeed/SKILL.md";
 
@@ -21,180 +21,120 @@ const USE_WHEN =
 
 const DESCRIPTION = `Get a human review of a branch diff. ${USE_WHEN.replaceAll("\n", " ")}`;
 
-const INTRO = `Semantic diff review: a reviewer reads your branch diff in a browser, selects
-the lines they care about and sends comments back to you, one round at a time.`;
+const INTRO = `Semantic diff review: a reviewer reads your branch diff in a browser, comments
+on the lines they care about and sends the batch to you. You answer in threads,
+change the code, and publish the next round.`;
+
+const DIGESTING = nextRule("agent digesting", "<branch>", ["t4", "t2"]);
+
+const WORKING = nextRule("agent working", "<branch>", ["t4"]);
 
 const THE_TURN = `## The turn
 
-> ${TURN_RULE}
+${TURN_RULES.map((rule) => `> ${rule}`).join("\n>\n")}
 
-A review has exactly one turn holder. It is the reviewer's until your
-\`wait\` is handed their feedback; it is yours from that moment until you
-\`ask\`, \`start\` or \`end\`. While you hold it the reviewer's Send only
-queues, so a round cannot change under you mid-edit; what they queue meanwhile,
-general and line comments alike, goes out in order with their next Send once
-the turn is theirs again. Their End is never disabled, so they are never stuck
-behind you.
+The review has three live states. The reviewer composes (their turn); you
+digest the batch they sent (your turn, short: they are locked out until you
+hand back); you work (your turn: they can only queue, and what they queue
+goes into your next round).
 
-Do not \`wait\` twice on one turn. A \`wait\` that parks gives the turn
-back — it says you are listening, not editing — so once you have declared
-\`work\`, a second \`wait\` is refused with \`turn_still_yours\` and exit 2
-rather than handing the reviewer's Send back while you are still editing. Give the turn up
-deliberately instead: \`start <branch> [base] --wait\` to publish what you
-changed and block on the next round, or \`ask\` to hand it back with a
-question.
+| command | legal when | waits for the reviewer's Send | turn after |
+| --- | --- | --- | --- |
+| \`open\` | no review yet, a live one (re-attach), or an ended one with \`--reopen\` | yes | yours, digesting |
+| \`reply --to <id> '…'\` | digesting (from working only if nothing changed since \`work\`) | yes | the reviewer's |
+| \`work '<plan>'\` | digesting | no | yours, working |
+| \`publish --intent '…'\` | working, with new commits | yes | the reviewer's |
+| \`end\` | always | no | ended |
 
-Every answer this CLI prints carries \`turn\` and \`round\`. Read \`turn\`
-before choosing the next command; the \`help[]\` under it lists the moves that
-are legal from where you are. The first answer of each round spells them out;
-every answer after it in the same round gives the same list as a one-line
-\`Next:\` reminder, because by then you have the long form above in your own
-transcript.
-
-| command | turn after | blocks |
-| --- | --- | --- |
-| \`start\` | reviewer | no, unless \`--wait\` |
-| \`wait\` | yours, on delivery | **yes** |
-| \`ask\` | reviewer, then yours on their answer | **yes** |
-| \`say\` | unchanged | no |
-| \`work\` | yours, and the banner names your plan | no |
-| \`end\` | ended | no |`;
+\`open\`, \`reply\` and \`publish\` hand the turn back **and** wait for the
+next Send, so one call is one turn: ${WAITS_FOR_SEND}. There is no separate
+\`wait\` to forget. Plain \`lightspeed\` (no arguments) shows where you are
+and the one command to run next.`;
 
 const THE_LOOP = `## The loop
 
-1. **Show the diff.**
-   > ${HELP_START}
+1. **Open the review.**
+   > ${HELP_OPEN}
 
    It extracts \`git diff <base>...<branch>\`, groups the files, opens the
-   reviewer's browser and prints the session URL.
+   reviewer's browser, prints the session URL and waits for their first Send.
+   \`--intent\` is **required** when opening fresh: you are the only party that
+   knows why the branch exists. Omitting it fails with \`intent_missing\`
+   before any git or model work.
+2. **Digest the batch.** It lists one item per thread (\`t1\`, \`t2\`…): new
+   items, replies in threads you answered, and threads the reviewer resolved.
+   End the turn with exactly one of:
+   - talk — ${DIGESTING.talk}
+   - work — ${DIGESTING.work}
 
-   \`--intent\` is **required**. You opened the review, so you are the only party
-   that knows why the branch exists — the reviewer reads it above the diff and
-   the grouping model reads it as the strongest signal it gets. Repeat the flag
-   once per reason:
-
-   \`\`\`sh
-   lightspeed start feature-auth main \\
-     --intent "replace session cookies with signed tokens" \\
-     --intent "drop the legacy /login handler"
-   \`\`\`
-
-   Omitting it fails with \`intent_missing\` before any git or model work.
-2. **Wait for the turn.**
-   > ${HELP_WAIT}
-
-   A \`wait\` that is backgrounded or timed out loses the reviewer's feedback.
-   It returns when they send, and the turn is yours from that moment.
-3. **Say what you are doing, before you go quiet.**
-   \`lightspeed work "<plan>" <branch> [base]\` puts your plan in the
-   reviewer's banner for as long as the silence lasts. It is not a lock you
-   take — you already hold the turn — it is the reason they are waiting.
-4. **Address what came back.** Each prompt names the file, the group and the
-   exact text the reviewer selected — see **What a prompt says** below for the
-   fields that pin it down. Answer a single comment by name, without blocking
-   and without giving the turn up:
-
-   \`\`\`sh
-   lightspeed say "now one transaction" --for evt_0abc123de_0007
-   \`\`\`
-
-   \`--files\` may be added to that line, but only for files a round you have
-   already published changed — it is a claim the server checks against the
-   between-round diff, not a note. Naming a file you have only just edited is
-   refused with \`declaration_invalid\`: say it without \`--files\` now, or
-   commit, run \`start\` again and re-send the same line with it.
-
-   If something is unclear, \`lightspeed ask "<question>"\` hands the turn back
-   and blocks on the answer — cheaper than guessing and rewriting a round.
-5. **Publish the next round.** Fix, commit, then run \`start\` again: it is
-   idempotent, re-groups the fresh diff and keeps the conversation. Files the
-   reviewer already approved come back ticked and dimmed unless you touched
-   them, so each round shows the reviewer only what is new work.
-6. **Close it.**
+   ${DIGESTING.ambiguity} ${DIGESTING.rule}
+3. **Work.** Edit, test, commit. ${WORKING.stuck}
+4. **Publish.** ${WORKING.publish}
+   Files the reviewer already approved come back ticked unless you touched them.
+5. **Close it** when the reviewer is done.
    > ${HELP_END}`;
 
-const WHAT_A_PROMPT_SAYS = `## What a prompt says
+const WHAT_AN_ITEM_SAYS = `## What an item says
 
-An \`annotation\` prompt points at code, a \`message\` prompt is a general
-comment. An annotation carries:
-
-\`\`\`json
-{
-  "type": "annotation",
-  "file": "src/server.ts",
-  "group": "Ledger write path",
-  "side": "new",
-  "line_start": 214,
-  "line_end": 214,
-  "col_start": 12,
-  "col_end": 29,
-  "selected_text": "throw new Error(…)",
-  "comment": "Return a ReviewError instead"
-}
+\`\`\`
+items[2]:
+  - id: t4
+    status: new
+    at: src/turn.ts:20
+    selected: "note?: string"
+    reviewer: why is note optional here?
+  - id: t2
+    status: reply
+    at: src/poll.ts:40
+    you: it retries 3x
+    reviewer: and on a 503?
 \`\`\`
 
-- \`side\` says which version the lines are numbered in: \`new\` is your branch,
-  \`old\` is the base. \`line_start\`/\`line_end\` are 1-based and inclusive.
-- \`col_start\`/\`col_end\` appear when the reviewer selected part of a line
-  rather than whole lines. They are 1-based, inclusive columns into that line as
-  the file has it — counted in UTF-16 code units, and the diff's \`+\`/\`-\`
-  marker is not one of them. \`col_start\` belongs to \`line_start\`,
-  \`col_end\` to \`line_end\`, and an absent one means that line was taken whole.
-  Read them as "this is the exact text I mean", not as a range to edit blindly.
-- \`selected_text\` quotes exactly those characters. Whole lines keep their
-  \`+\`/\`-\` marker; a clipped line is quoted as the file has it.
-- The anchor can be missing entirely when the diff printed no line numbers for
-  the selection; \`selected_text\` is then all you have.
-- A long \`selected_text\` is cut at ${SELECTION_LIMIT} characters and says
-  where the rest is — the anchor above points into your own checkout. The
-  \`comment\` is never cut. A round that queues more than ${PROMPT_LIMIT}
-  prompts reports \`omitted\`; read the rest with \`--full\` before you act.`;
+- \`id\` is what \`--to\` takes; \`main\` is the main chat, where your own
+  top-level remarks go — each \`--to main\` is its own card on the page.
+- \`status\`: \`new\` (a new item), \`reply\` (the reviewer answered in a
+  thread; \`you\` is what you said last there), \`resolved\` or
+  \`reopened\`. Resolving a question means "no further questions"; resolving
+  a change request means "I agree with what you last said" — implement that
+  agreed version, it is not withdrawn. A batch holding resolves says so on a
+  \`resolved:\` line of \`next:\`. Every \`--to\` a line suggests names an
+  open thread; never answer into one the reviewer resolved unless you must —
+  doing so reopens it.
+- \`at\` is \`file:line\` (or \`file:start-end\`) in your branch; \`(base)\`
+  marks lines numbered in the base. \`selected\` quotes the reviewer's
+  selection, cut at ${SELECTION_LIMIT} characters with a pointer to the rest.
+  General items have neither.`;
 
 const RULES = `## Rules
 
-- Run \`wait\` and \`ask\` in the foreground, every time. They have no timeout
-  by design.
-- \`work\` is the only command that requires the turn. Running it without one
-  answers \`turn_not_yours\` and exits 2, with the fixing command in its
-  \`help[]\` — read it rather than retrying. \`wait\` is the mirror of it:
-  run while you hold the turn and are working, it answers
-  \`turn_still_yours\` and exits 2 the same way.
-- \`Send & End\` from the reviewer ends the review; \`wait\` reports
-  \`ended: true\`. \`start\`, \`say\`, \`ask\` and \`work\` on an ended review
-  are all refused with \`session_ended\`: there is nobody left to read the
-  words, and an ended review holds no turn to declare work on. When
-  the reviewer asks for another round — and only then — run
-  \`lightspeed start <branch> [base] --reopen --intent "<why>"\`.
-- An ended \`wait\` is not by itself an approval. Read \`approval.verdict\`:
-  \`signed-off\` (every file approved), \`partial\` (some approved, some not),
-  \`none\` (nothing approved) or \`empty\` (the review held no files). Only
-  \`signed-off\` is a sign-off; a review may be ended with nothing approved at
-  all. The counts \`approved\`, \`unapproved\`, \`swept\` and \`total\` are the
-  detail behind that word, and an \`approval\` block absent altogether means the
-  server did not report one — never that nothing was approved.
-  \`swept\` is the part of \`approved\` that came out of a sweep lane: files the
-  review filed as bulk with nothing to decide and approved in one press. Treat
-  those as accepted, never as read — \`signed-off\` over a sweep still means
-  nobody was asked to read those files, so if something you changed there needs
-  a human behind it, say so and ask for that file to be read.
-- \`lightspeed approvals [branch] [base]\` names those files — which were
-  approved, which were swept, which nobody signed off on. Run it only when
-  something turns on which file; the verdict and counts answer most reviews on
-  their own. It prints the first ${DEFAULT_PATH_LIMIT} paths of each list, and
-  only the lists that name something; the \`counts\` block beside them is read
-  off the whole review either way, and \`--full\` prints every path when a list
-  was cut. \`endedBy\` is
-  \`reviewer\` or \`agent\` — whether a person closed it or an agent's own
-  \`lightspeed end\` did — and is absent when the session does not say.
-  The \`help[]\` line echoes the verdict and otherwise adds only what those
-  fields cannot say: who closed it, and
-  whether approvals were swept. It does not repeat the counts — read them.
+- Run \`open\`, \`reply\` and \`publish\` in the foreground, never under a
+  timeout. If one is killed anyway, re-run the same command: the server
+  recognises it, posts nothing twice and hands you whatever the reviewer sent.
+  Before it waits, each prints what landed (\`replied\`, the round, or
+  \`rerun: true\`) closed by \`next.if_killed\` — that exact command. Only
+  one wait per review: a newer one makes the older exit \`superseded: true\`,
+  which asks nothing of you.
+- Every refusal of a move — out of turn, an ended, unknown or ambiguous
+  review — names the one right command in its \`help[]\` and exits 2: read
+  it rather than retrying. \`turn_not_yours\`: the reviewer holds the turn.
+  \`turn_still_yours\`: you are working, so publish. \`nothing_to_publish\`:
+  HEAD has not moved since the last round, so commit or reply.
+- \`wait\`, \`ask\`, \`say\` and \`start\` were removed in 3.0 and answer
+  \`removed_verb\`.
+- An ended review answers \`ended: true\`. It is not by itself an approval:
+  read \`approval.verdict\` — \`signed-off\` (every file approved),
+  \`partial\`, \`none\` or \`empty\`. \`swept\` counts approvals that came out
+  of a sweep lane: accepted, never read. \`lightspeed approvals [branch] [base]\`
+  names the files (first ${DEFAULT_PATH_LIMIT} per list; \`--full\` for all).
+  \`endedBy\` says whether the reviewer or an agent's \`end\` closed it. A
+  plain \`open\` on it is refused with \`session_ended\`. Only when the
+  reviewer asks for another round:
+  \`lightspeed open <branch> [base] --reopen --intent '<why>'\`.
 - Every command takes \`<branch> [base]\` explicitly, which is what makes
   concurrent reviews unambiguous. Omit the branch only when the repository has
-  exactly one live session.
-- \`base\` defaults to \`main\`.
+  exactly one live session. \`base\` defaults to \`main\`.
 - State the intent in the reviewer's terms — what the branch is for, not a list
-  of the files you touched. They can already see the files.`;
+  of the files you touched.`;
 
 const SETUP = `## Setup
 
@@ -224,18 +164,21 @@ their own terminal; an agent must never run it.`;
 
 const OUTPUT = `## Output
 
-Every command answers TOON on stdout, led by \`turn\` and \`round\` and closed
-by a \`help[]\` block naming the moves that are legal from there. Every failure
-answers \`error: {code, message, detail}\` plus \`help[]\` — exit 2 when the
-command line itself is wrong (unknown command, subcommand or flag, a missing or
-unparseable argument), exit 1 for everything else. Run
+Every command answers TOON on stdout, led by \`round\` and \`turn\` and closed
+by \`next:\`: the rule for what to do next, keyed by what you decide. Every failure
+answers \`error: {code, message, detail}\` plus \`help[]\` — exit 2 when
+re-running the same command cannot help: the command line is wrong, or the move
+is wrong for the review's state (out of turn, ended, not found, ambiguous), and
+\`help[]\` names the right one. Exit 1 when the machine got in the way — the
+server, git, the model, the config — and the same command may work once that is
+fixed. Run
 \`lightspeed <command> --help\` for a command's flags and two worked examples.`;
 
 const SECTIONS = `${THE_TURN}
 
 ${THE_LOOP}
 
-${WHAT_A_PROMPT_SAYS}
+${WHAT_AN_ITEM_SAYS}
 
 ${RULES}
 

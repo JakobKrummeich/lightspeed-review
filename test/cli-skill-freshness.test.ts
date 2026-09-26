@@ -56,10 +56,10 @@ test("an unknown command answers with skill_stale while the installed skill has 
 test("a failed command carries skill_stale beside its error", async () => {
   const { home } = homeWithPiSkill(PRE_STAMP_SKILL);
 
-  const { stdout, code } = await runCli(["start"], home);
+  const { stdout, code } = await runCli(["reply"], home);
 
   assert.equal(code, 2);
-  assert.match(stdout, /code: invalid_arguments/);
+  assert.match(stdout, /code: argument_missing/);
   assert.match(stdout, /^skill_stale\[1\]/m);
 });
 
@@ -126,13 +126,13 @@ test("a command's help carries skill_stale, asked for either way", async () => {
   const { home } = homeWithPiSkill(PRE_STAMP_SKILL);
 
   for (const args of [
-    ["start", "--help"],
-    ["help", "start"],
+    ["open", "--help"],
+    ["help", "open"],
   ]) {
     const { stdout, code } = await runCli(args, home);
 
     assert.equal(code, 0, args.join(" "));
-    assert.match(stdout, /^command: start$/m, args.join(" "));
+    assert.match(stdout, /^command: open$/m, args.join(" "));
     assert.match(stdout, /^skill_stale\[1\]\{path,problem,fix\}:$/m, args.join(" "));
   }
 });
@@ -140,7 +140,7 @@ test("a command's help carries skill_stale, asked for either way", async () => {
 test("help reads as before when no installed skill is stale", async () => {
   const { home } = homeWithPiSkill(stampedSkillFor("pi", CLI_VERSION));
 
-  for (const args of [["--help"], ["start", "--help"]]) {
+  for (const args of [["--help"], ["open", "--help"]]) {
     const { stdout } = await runCli(args, home);
 
     assert.doesNotMatch(stdout, /skill_stale/, args.join(" "));

@@ -91,7 +91,7 @@ test("groups, conversation, pending feedback and approved flags all survive a ro
         prompts: [{ type: "message", comment: "done" }],
       },
     ],
-    pending: [{ type: "message", comment: "looks good overall" }],
+    pending: [{ type: "message", id: "t1", comment: "looks good overall" }],
     approved: ["src/api/users.ts"],
   });
   new SessionStore(dir).save(record);
@@ -253,7 +253,7 @@ test("the delete-and-restart line spells the start that would actually run", () 
     () => store.get("a3f8c21b9e4d5f60"),
     (error: unknown) =>
       error instanceof ReviewError &&
-      error.suggestions.some((line) => /lightspeed start <branch> \[base\] --intent/.test(line)),
+      error.suggestions.some((line) => /lightspeed open <branch> \[base\] --intent/.test(line)),
   );
 });
 

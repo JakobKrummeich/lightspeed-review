@@ -133,12 +133,15 @@ function world(t: TestContext) {
 /** Every mount stubbed to write what it was told into one log. */
 function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSource | undefined) {
   const log: string[] = [];
+  /** What the header was told of the stream, apart from `log`: every open says it. */
+  const connections: boolean[] = [];
   const roots = {
     review: new FakeNode("div"),
     intent: new FakeNode("div"),
     reopen: new FakeNode("button"),
     offer: new FakeNode("button", 'id="lsr-round-offer" hidden'),
     popup: new FakeNode("div", 'id="lsr-round-popup" hidden'),
+    connection: new FakeNode("p", 'id="lsr-connection" hidden'),
   };
   roots.review.scrollTop = 500;
   roots.intent.innerHTML = "as the reviewer left it";
@@ -152,6 +155,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       replayReopen: asPanelRoot(roots.reopen),
       roundOffer: asPanelRoot(roots.offer),
       roundPopup: asPanelRoot(roots.popup),
+      connection: asPanelRoot(roots.connection),
     },
     live,
     diff: {
@@ -164,12 +168,14 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       update: (fresh) => log.push(`panel ${fresh.conversation.length} said`),
       setAllApproved: () => {},
       setTurn: (turn) => log.push(`panel turn ${turn.holder}`),
+      writesLocked: () => false,
       end: () => {},
     },
     banner: {
       setPresence: () => {},
       setSession: () => log.push("banner"),
       setEndedByReviewer: () => {},
+      setConnected: (connected) => void connections.push(connected),
     },
     railControl: { setQueued: () => {}, expand: () => log.push("rail expand") },
     finish: { setTurn: () => {} },
@@ -182,7 +188,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     assert.ok(open, "the page opened its stream");
     return open;
   };
-  return { stream, log, live, roots };
+  return { stream, log, live, roots, connections };
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -374,6 +380,29 @@ test("a stream the browser gave up on is opened again, and a dropped one is left
   stream().emit("open");
   await settled();
   assert.equal(server.fetched, 1);
+});
+
+test("a dropped stream shows the connection chip until it opens again", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { stream, roots, connections } = world(t).page();
+  stream().emit("open");
+  assert.equal(roots.connection.hidden, true);
+
+  // Dropped and retrying by itself: said all the same — by the header too.
+  stream().emit("error");
+  assert.equal(roots.connection.hidden, false);
+  assert.equal(connections.at(-1), false);
+  stream().emit("open");
+  assert.equal(roots.connection.hidden, true);
+  assert.equal(connections.at(-1), true);
+
+  // Refused and reopened by the page: said until the new stream opens.
+  stream().readyState = FakeEventSource.CLOSED;
+  stream().emit("error");
+  assert.equal(roots.connection.hidden, false);
+  t.mock.timers.tick(REOPEN_MS);
+  stream().emit("open");
+  assert.equal(roots.connection.hidden, true);
 });
 
 test("a server that keeps refusing is asked ever more slowly, and an open resets the wait", (t) => {

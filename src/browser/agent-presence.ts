@@ -8,6 +8,8 @@ import type { Turn } from "../session-store.ts";
 export interface AgentPresence {
   waiting: boolean;
   turn: Turn;
+  /** How many items the agent is reading; only while it digests. */
+  items?: number;
 }
 
 /**
@@ -17,8 +19,13 @@ export interface AgentPresence {
  */
 export function readPresence(data: string): AgentPresence {
   try {
-    const frame = JSON.parse(data) as { waiting?: unknown; turn?: unknown } | null;
-    return { waiting: frame?.waiting === true, turn: readTurn(frame?.turn) };
+    const frame = JSON.parse(data) as { waiting?: unknown; turn?: unknown; items?: unknown } | null;
+    const items = frame?.items;
+    return {
+      waiting: frame?.waiting === true,
+      turn: readTurn(frame?.turn),
+      ...(Number.isInteger(items) && (items as number) > 0 ? { items: items as number } : {}),
+    };
   } catch {
     return { waiting: false, turn: reviewerHolds() };
   }
@@ -37,10 +44,9 @@ function readTurn(value: unknown): Turn {
   const plan = text(note);
   return {
     holder: "agent",
-    // A mode nobody knows reads as `reading`, not as a hole: `mode` only decides
-    // which sentence the panel writes, the holder beside it still turns Send
-    // into Queue, and "the agent has your feedback" is the claim that assumes least.
-    mode: mode === "working" ? "working" : "reading",
+    // A mode nobody knows reads as `digesting`, not as a hole: it is the
+    // strictest lock, and "the agent is reading" is the claim that assumes least.
+    mode: mode === "working" ? "working" : "digesting",
     at: stamped,
     ...(plan === undefined ? {} : { note: plan }),
   };

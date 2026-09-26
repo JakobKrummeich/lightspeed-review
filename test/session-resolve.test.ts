@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ReviewError } from "../src/errors.ts";
-import { missingSession, resolveSession } from "../src/session-resolve.ts";
+import { missingSession, resolveSession, textAsBranch } from "../src/session-resolve.ts";
 import type { SessionRecord } from "../src/session-store.ts";
 
 function session(overrides: Partial<SessionRecord>): SessionRecord {
@@ -40,7 +40,7 @@ test("a review nothing holds is named by its branch pair and its repository", ()
   assert.equal(error.message, "no review session for other/branch against main in /repo");
   assert.equal(error.detail, "1 live session in this repo: feature/greeting against main");
   assert.deepEqual(error.suggestions, [
-    'Run `lightspeed start other/branch main --intent "<why this branch exists>"` to open it',
+    "Run `lightspeed open other/branch main --intent '<why this branch exists>'` to open it",
     "Or run `lightspeed wait feature/greeting main` for the session that exists",
   ]);
 });
@@ -115,12 +115,14 @@ test("with one live session in this repository the branch may be omitted", () =>
   });
 });
 
-test("no session in this repository is an ambiguous_session error", () => {
+/** Nothing to choose between is not a choice: the code says what the message says. */
+test("no session in this repository is a session_not_found error", () => {
   assert.throws(
     () => resolveSession([session({ repoRoot: "/elsewhere" })], "/repo", undefined, undefined),
     (error: unknown) => {
       assert.ok(error instanceof ReviewError);
-      assert.equal(error.code, "ambiguous_session");
+      assert.equal(error.code, "session_not_found");
+      assert.equal(error.message, "no live review session for /repo");
       return true;
     },
   );
@@ -142,4 +144,85 @@ test("several live sessions list the candidates instead of guessing", () => {
       return true;
     },
   );
+});
+
+/**
+ * No live session, and the last one here is ended: "no live session" read as
+ * "open one", and agents reopened reviews the reviewer had closed.
+ */
+test("a repository whose latest review ended says who ended it and reopens only on request", () => {
+  const sessions = [
+    session({ branch: "older", status: "ended", updatedAt: "2025-01-01T00:00:00.000Z" }),
+    session({
+      branch: "feature-auth",
+      status: "ended",
+      endedBy: "reviewer",
+      updatedAt: "2025-01-03T00:00:00.000Z",
+    }),
+  ];
+
+  assert.throws(
+    () => resolveSession(sessions, "/repo", undefined, undefined),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "session_ended");
+      assert.match(error.message, /the reviewer ended the review of feature-auth against main/);
+      assert.match(error.suggestions[0]!, /Only if the reviewer asks/);
+      assert.match(error.suggestions[0]!, /lightspeed open feature-auth main --reopen/);
+      return true;
+    },
+  );
+});
+
+test("a review the agent ended is said to be the agent's doing", () => {
+  const sessions = [session({ status: "ended", endedBy: "agent" })];
+
+  assert.throws(
+    () => resolveSession(sessions, "/repo", undefined, undefined),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.match(error.message, /you ended the review of feature-auth against main/);
+      return true;
+    },
+  );
+});
+
+/** Only a word that could be nothing but text is called text: every other case keeps its own answer. */
+test("a would-be branch is read as spilled text only when nothing else explains it", () => {
+  const live = session({ branch: "feature/greeting" });
+  const ask = (overrides: Partial<Parameters<typeof textAsBranch>[0]>) =>
+    textAsBranch({
+      verb: "reply",
+      repoRoot: "/repo",
+      branch: "it",
+      sessions: [live],
+      isRef: () => false,
+      ...overrides,
+    })?.code;
+
+  assert.equal(ask({}), "invalid_arguments");
+  assert.equal(ask({ verb: "approvals" }), undefined, "a verb that takes no text");
+  assert.equal(ask({ branch: undefined }), undefined, "left to the store");
+  assert.equal(ask({ isRef: () => true }), undefined, "a real branch with no review");
+  assert.equal(ask({ sessions: [session({ status: "ended" })] }), undefined, "no live review");
+  assert.equal(
+    ask({ sessions: [live, session({ branch: "it", status: "ended" })] }),
+    undefined,
+    "a review of that name exists",
+  );
+});
+
+test("with several live reviews, spilled text is answered with the general form", () => {
+  const error = textAsBranch({
+    verb: "work",
+    repoRoot: "/repo",
+    branch: "the",
+    sessions: [session({ branch: "a" }), session({ branch: "b" })],
+    isRef: () => false,
+  });
+
+  assert.equal(error?.message, "'the' is not a branch — quote the whole plan");
+  assert.deepEqual(error?.suggestions, [
+    "Run `lightspeed work '<plan>' <branch> [base]`, each text in one pair of quotes",
+  ]);
 });

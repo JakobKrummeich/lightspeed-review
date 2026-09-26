@@ -222,7 +222,7 @@ test("extractDiff reports git_ref_not_found naming both refs and the way back", 
       );
       assert.deepEqual(error.suggestions, [
         "Check both refs exist: `git rev-parse no/such/branch` and `git rev-parse main`",
-        'Then re-run `lightspeed start no/such/branch main --intent "<why this branch exists>"`',
+        "Then re-run `lightspeed open no/such/branch main --intent '<why this branch exists>'`",
       ]);
       return true;
     },

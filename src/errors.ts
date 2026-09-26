@@ -19,9 +19,11 @@ export type ReviewErrorCode =
   | "session_corrupt"
   | "session_not_found"
   | "session_ended"
-  | "declaration_invalid"
+  | "nothing_to_publish"
+  | "removed_verb"
   | "turn_not_yours"
   | "turn_still_yours"
+  | "agent_holds_turn"
   | "ambiguous_session"
   | "unknown_command"
   | "unknown_flag"
@@ -80,23 +82,34 @@ export function invocationError(
 }
 
 /**
- * Exit 2 = "the command line was wrong". The SDK knows only its own
- * `VALIDATION_ERROR`, so the codes that mean the same thing are listed here,
- * beside the codes themselves rather than in the CLI entry point — which runs
- * the whole CLI on import and so cannot be asked what an error would exit with.
+ * One rule: exit 2 when re-running the same command cannot help — the command
+ * line was wrong, or the move was wrong for the session's state, and `help[]`
+ * names the command that is right. Exit 1 when the world got in the way (a
+ * server, git, a model, a config) and the same command may work once that is
+ * fixed. The SDK knows only its own `VALIDATION_ERROR`, so the codes are listed
+ * here, beside the codes themselves rather than in the CLI entry point — which
+ * runs the whole CLI on import and so cannot be asked what an error would exit
+ * with.
  */
 const ARGUMENT_ERROR_CODES: readonly string[] = [
+  // The command line itself.
   "unknown_command",
   "unknown_flag",
   "argument_missing",
   "invalid_arguments",
   "intent_missing",
   "agent_missing",
-  // A move made out of turn is a wrong command line like any other: the fixing
-  // command is in the error's own `help[]`, and exit 2 says "read it, don't retry".
+  // A 2.x verb: the command line is wrong for this version.
+  "removed_verb",
+  // The move, for the turn: out of turn, or still holding it.
   "turn_not_yours",
-  // Waiting while still holding the turn is the same mistake from the other end.
   "turn_still_yours",
+  "nothing_to_publish",
+  "feedback_item_unknown",
+  // The move, for the session: over, never opened, or not the one named.
+  "session_ended",
+  "session_not_found",
+  "ambiguous_session",
 ];
 
 export function exitCodeFor(error: unknown): number {

@@ -3,7 +3,7 @@ import { DEFAULT_PATH_LIMIT, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { approvalPaths, type ApprovalPaths } from "../review-files.ts";
 import { SessionStore } from "../session-store.ts";
-import { HELP_START } from "../turn-help.ts";
+import { HELP_OPEN } from "../turn-help.ts";
 import { hasFlag, scanArgs } from "./args.ts";
 
 export interface ApprovalsArgs {
@@ -49,7 +49,7 @@ function unknownApprovalsFlag(flag: string): Error {
 }
 
 /**
- * The only place that prints the paths behind `wait`'s counts: `wait` runs on
+ * The only place that prints the paths behind the waiting commands' counts: they run on
  * every round and its payload is read whether or not anyone needs a file list.
  * Read off the store rather than the server: a review is worth asking about
  * after it ended, and the server may already be stopped.
@@ -62,7 +62,7 @@ export function runApprovals(input: ApprovalsInput): StructuredOutput {
       code: "session_not_found",
       message: `no review session ${key}`,
       detail: `nothing on disk holds a review of ${input.branch} against ${input.base}`,
-      suggestions: [HELP_START],
+      suggestions: [HELP_OPEN],
     });
   }
   const paths = approvalPaths(session.groups, session.approved);
@@ -125,7 +125,7 @@ function listing(paths: ApprovalPaths, full: boolean): Listing {
 
 /**
  * Never cut: the numbers an agent decides on are read off the whole review, and
- * they are the same four counts `wait` reports under its verdict, which is why
+ * they are the same four counts a waiting command reports under its verdict, which is why
  * the two can be compared at all.
  */
 function countBlock(paths: ApprovalPaths, omitted: number): StructuredOutput {

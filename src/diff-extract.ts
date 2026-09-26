@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { ReviewError } from "./errors.ts";
-import { startCall } from "./start-call.ts";
+import { openCall } from "./open-call.ts";
 import type { GroupTier } from "./group-tier.ts";
 
 export type DiffFileStatus = "added" | "modified" | "deleted" | "renamed" | "binary";
@@ -173,7 +173,7 @@ function runGitDiff(repoRoot: string, branch: string, base: string): string {
       detail: firstLine(error),
       suggestions: [
         `Check both refs exist: \`git rev-parse ${branch}\` and \`git rev-parse ${base}\``,
-        `Then re-run \`${startCall(`${branch} ${base}`)}\``,
+        `Then re-run \`${openCall(`${branch} ${base}`)}\``,
       ],
     });
   }

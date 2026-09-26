@@ -41,7 +41,7 @@ function said(role: "reviewer" | "agent", comments: number): ConversationEntry {
 }
 
 const REVIEWERS_TURN = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" } as const;
-const AGENTS_TURN = { holder: "agent", mode: "reading", at: "2025-01-01T00:06:00.000Z" } as const;
+const AGENTS_TURN = { holder: "agent", mode: "digesting", at: "2025-01-01T00:06:00.000Z" } as const;
 
 function session(over: Partial<SessionData> = {}): SessionData {
   const base: SessionData = {
@@ -66,24 +66,27 @@ function figure(html: string, label: string): string | undefined {
   return found?.[1];
 }
 
-test("the presence frame decides which of the three the banner says", (t) => {
+test("the presence frame decides what the banner says", (t) => {
   const root = stubDocument(t);
   const banner = mountStatusBanner(session());
 
   banner.setPresence({ waiting: true, turn: REVIEWERS_TURN });
-  assert.match(root.innerHTML, />Waiting for your feedback</);
+  assert.match(root.innerHTML, />Agent is listening</);
 
+  banner.setPresence({ waiting: false, turn: AGENTS_TURN, items: 4 });
+  assert.match(root.innerHTML, />Agent is reading your 4 items</);
+
+  // A frame without the count is not the old count restated.
   banner.setPresence({ waiting: false, turn: AGENTS_TURN });
-  assert.match(root.innerHTML, />Agent is working</);
+  assert.match(root.innerHTML, />Agent is reading your feedback</);
 
   banner.setPresence({ waiting: false, turn: REVIEWERS_TURN });
-  assert.match(root.innerHTML, />No agent is waiting</);
+  assert.match(root.innerHTML, />Agent isn&#39;t listening</);
 });
 
 /** `work` publishes a presence frame and nothing else — no session event, no
- * round — so the banner has to hear the plan off that frame. The plan is the
- * tooltip; the header text stays short. */
-test("a plan declared mid-silence reaches the header's tooltip without a reload", (t) => {
+ * round — so the banner has to hear the plan off that frame. */
+test("a plan declared mid-turn reaches the header without a reload", (t) => {
   const root = stubDocument(t);
   const banner = mountStatusBanner(session());
 
@@ -97,7 +100,7 @@ test("a plan declared mid-silence reaches the header's tooltip without a reload"
     },
   });
 
-  assert.match(root.innerHTML, /title="splitting the helper out">Agent is working</);
+  assert.match(root.innerHTML, />Working on: splitting the helper out</);
 });
 
 test("a session that ended draws the summary of what the fresh read says", (t) => {
@@ -155,4 +158,17 @@ test("an end that carried no words counts none, and says none were delivered", (
   assert.equal(figure(root.innerHTML, "comments sent"), undefined);
   assert.doesNotMatch(root.innerHTML, /has left this page/);
   assert.match(root.innerHTML, /You ended this review\./);
+});
+
+test("the header greys to connection lost while the stream is down, and comes back on reconnect", (t) => {
+  const root = stubDocument(t);
+  const banner = mountStatusBanner(session());
+  banner.setPresence({ waiting: true, turn: REVIEWERS_TURN });
+
+  banner.setConnected(false);
+  assert.match(root.innerHTML, /data-connection="lost"[^>]*>Connection lost</);
+
+  banner.setConnected(true);
+  assert.doesNotMatch(root.innerHTML, /Connection lost/);
+  assert.match(root.innerHTML, /Agent is listening/);
 });

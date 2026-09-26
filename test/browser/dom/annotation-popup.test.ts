@@ -16,6 +16,8 @@ import {
 interface Drag {
   rect?: Partial<FakeSelectionRect>;
   screen?: Partial<FakeScreen>;
+  /** The panel's lock, read at each selection and each queue. */
+  locked?: () => boolean;
 }
 
 /** Every test starts here: the popup only exists once a selection put it on screen. */
@@ -48,7 +50,11 @@ async function popupOverSelection(
       drag.rect,
     );
 
-  mountAnnotationPopup({ diffRoot: asDiffRoot(root), onQueue: (prompts) => queued.push(prompts) });
+  mountAnnotationPopup({
+    diffRoot: asDiffRoot(root),
+    locked: drag.locked ?? (() => false),
+    onQueue: (prompts) => queued.push(prompts),
+  });
   await dom.select(selection());
 
   return { dom, queued, root, selection };
@@ -203,4 +209,25 @@ test("Enter from anywhere but the comment box is not a queue", async (t) => {
 
   assert.deepEqual(queued, []);
   assert.equal(event.defaultPrevented, false);
+});
+
+test("while the agent digests a selection says the lock instead of offering a box", async (t) => {
+  const { dom } = await popupOverSelection(t, { locked: () => true });
+
+  assert.equal(dom.popup.hidden, false, "a selection that opens nothing reads as a broken page");
+  assert.equal(dom.commentBox(), null);
+  assert.match(dom.popup.innerHTML, /Locked while the agent reads your feedback\./);
+});
+
+test("a popup opened before the lock queues nothing once it holds", async (t) => {
+  let locked = false;
+  const { dom, queued } = await popupOverSelection(t, { locked: () => locked });
+  const box = dom.commentBox();
+  assert.ok(box);
+  box.value = "this reads the user twice";
+  locked = true;
+
+  dom.popup.dispatch("keydown", keydown(box));
+
+  assert.deepEqual(queued, []);
 });

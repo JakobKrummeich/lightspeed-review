@@ -58,8 +58,8 @@ export function createSyncAsks(): SyncAsks {
  * compare cheaply. The round is named by its opening time as well as its
  * number: a session deleted and started again (`session_corrupt` recovery)
  * reopens at round 0 with a different diff. Intents, commits, groups and round
- * files are left out: they only change with a new round (every `start` opens
- * one). Approvals too: the page is their only writer, so the server's copy
+ * files are left out: they only change with a new round (every `open` and
+ * `publish` makes one). Approvals too: the page is their only writer, so the server's copy
  * trails the ticks on screen and would read as news after every tick. The
  * turn is presence's.
  */
@@ -71,7 +71,6 @@ export function shownOf(session: SessionData): string {
     status: session.status,
     endedBy: session.endedBy,
     talk: [session.conversation.length, last?.role, last?.at],
-    declarations: session.declarations,
   });
 }
 
@@ -97,7 +96,6 @@ export function drawnAfterFeedback(drawn: SessionData, fresh: SessionData): Sess
   return {
     ...drawn,
     conversation: fresh.conversation,
-    declarations: fresh.declarations,
     ...(fresh.status === "ended" ? {} : { status: fresh.status }),
   };
 }

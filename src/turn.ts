@@ -1,72 +1,53 @@
 /**
- * One holder per session, one rule: Queue always. End always. Send only on
- * your turn. The turn moves to the agent on delivery alone, never on the
- * reviewer's Send: words nobody is waiting for queue server-side and the
- * reviewer keeps sending. No timer, no staleness unlock and no override — an
- * agent that died holding the turn is recovered in the terminal it was started from.
+ * One holder per session, three live states: the reviewer composes, the agent
+ * digests a batch, the agent works. Discussion strictly alternates — the
+ * reviewer's Send hands the turn over only when it is delivered to an agent
+ * that is waiting for it, and the agent hands it back only with a command that
+ * also waits for the next Send (`reply`, `publish`). No timer, no staleness
+ * unlock and no override: an agent that died holding the turn is recovered by
+ * re-running the command it died in.
  */
 import type { StructuredOutput } from "./output.ts";
-import type { SessionRecord, Turn } from "./session-store.ts";
+import type { SessionRecord, Turn } from "./session-types.ts";
+import { batchSize } from "./threads.ts";
 
 export function reviewerTurn(now: string): Turn {
   return { holder: "reviewer", at: now };
 }
 
-export function agentReading(now: string): Turn {
-  return { holder: "agent", mode: "reading", at: now };
+export function agentDigesting(now: string): Turn {
+  return { holder: "agent", mode: "digesting", at: now };
 }
 
-export function agentWorking(now: string, note: string): Turn {
-  return { holder: "agent", mode: "working", at: now, note };
+/** `at` is where `work` found the branch: its tip and its tree. */
+export function agentWorking(
+  now: string,
+  note: string,
+  at: { head?: string; tree?: string } = {},
+): Turn {
+  return {
+    holder: "agent",
+    mode: "working",
+    at: now,
+    note,
+    ...(at.head === undefined ? {} : { head: at.head }),
+    ...(at.tree === undefined ? {} : { tree: at.tree }),
+  };
 }
 
 /**
  * One closed set of words an agent can branch on without reading two fields;
  * an ended review says so instead of naming a holder.
  */
-export type TurnLabel = "reviewer" | "agent reading" | "agent working" | "ended";
-
-/**
- * The full block is how an agent learns the protocol from a single answer;
- * every repeat of it inside one round is bytes the agent already has.
- */
-export type HelpForm = "full" | "short";
+export type TurnLabel = "reviewer" | "agent digesting" | "agent working" | "ended";
 
 export interface TurnFacts {
   turn: TurnLabel;
   round: number;
-  /** Absent from an old server. */
-  helpForm?: HelpForm;
 }
 
 export function turnFacts(session: Pick<SessionRecord, "status" | "turn" | "rounds">): TurnFacts {
   return { turn: turnLabel(session), round: roundNumber(session) };
-}
-
-/**
- * Kept on the session rather than worked out from `turn.at` or held in memory,
- * because every CLI invocation is a fresh process and a `serve` restart must
- * not re-start the reader's education mid-round. Keyed on the round because a
- * new round is exactly when the moves change and the full block earns its
- * tokens again — and because that makes `start` reset it without writing
- * anything: the round number it compares against has simply moved on.
- */
-export function budgetHelp(session: SessionRecord): { form: HelpForm; session: SessionRecord } {
-  const round = roundNumber(session);
-  if (session.helpShownRound === round) return { form: "short", session };
-  return { form: "full", session: { ...session, helpShownRound: round } };
-}
-
-/** The same reading without spending it: a refusal tells an agent what it may
- * do instead, and telling it that is not the answer a round's help was for. */
-export function helpFormFor(session: SessionRecord): HelpForm {
-  return session.helpShownRound === roundNumber(session) ? "short" : "full";
-}
-
-/** The wire field, present only where there is a form to state — an answer
- * nobody prints states none, and a reader that finds none prints in full. */
-export function helpFormField(form: HelpForm | undefined): { helpForm?: HelpForm } {
-  return form === undefined ? {} : { helpForm: form };
 }
 
 /**
@@ -75,19 +56,35 @@ export function helpFormField(form: HelpForm | undefined): { helpForm?: HelpForm
  */
 export function turnBlock(facts: Partial<TurnFacts>): StructuredOutput {
   return {
-    ...(facts.turn === undefined ? {} : { turn: facts.turn }),
     ...(facts.round === undefined ? {} : { round: facts.round }),
+    ...(facts.turn === undefined ? {} : { turn: facts.turn }),
   };
 }
 
 export function turnLabel(session: Pick<SessionRecord, "status" | "turn">): TurnLabel {
   if (session.status === "ended") return "ended";
   if (session.turn.holder === "reviewer") return "reviewer";
-  return session.turn.mode === "working" ? "agent working" : "agent reading";
+  return session.turn.mode === "working" ? "agent working" : "agent digesting";
 }
 
 /** As a reviewer counts it, from one; a session holding no rounds is round 0, not round one. */
 export function roundNumber(session: Pick<SessionRecord, "rounds">): number {
   const index = session.rounds.at(-1)?.index;
   return index === undefined ? 0 : index + 1;
+}
+
+/**
+ * What the page says about the agent off the record: whose turn, and — while
+ * the agent digests — how many items it is reading. Browser-safe: the served
+ * page, the presence frame and the bundle's first paint all read it here.
+ */
+export interface PresenceFacts {
+  turn: Turn;
+  items?: number;
+}
+
+export function presenceOf(session: Pick<SessionRecord, "turn" | "batch">): PresenceFacts {
+  const { turn, batch } = session;
+  const digesting = turn.holder === "agent" && turn.mode === "digesting";
+  return digesting && batch !== undefined ? { turn, items: batchSize(batch.prompts) } : { turn };
 }

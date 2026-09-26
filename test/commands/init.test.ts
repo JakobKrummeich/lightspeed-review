@@ -370,7 +370,7 @@ test("help says to restart the agent before the skill counts", () => {
   const help = run(roots(), { agent: "pi" }).help as string[];
 
   assert.ok(help.some((line) => /restart/i.test(line) && line.includes("/reload")));
-  assert.ok(help.some((line) => line.includes("lightspeed start")));
+  assert.ok(help.some((line) => line.includes("lightspeed open")));
 });
 
 test("the report names the agent and the scope it wrote for", () => {

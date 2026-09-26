@@ -4,10 +4,10 @@
  * the other half is read off the stored turn.
  */
 import type { ServerResponse } from "node:http";
-import type { Turn } from "../session-store.ts";
+import type { PresenceFacts } from "../turn.ts";
 import { sseFrame } from "./http.ts";
 
-export type WakeReason = "feedback" | "shutdown";
+export type WakeReason = "feedback" | "shutdown" | "superseded";
 
 /**
  * A parked poller. Answering takes what was queued, so it says whether it did:
@@ -15,7 +15,7 @@ export type WakeReason = "feedback" | "shutdown";
  */
 export type Waker = (reason: WakeReason) => boolean;
 
-export type TurnReader = (key: string) => Turn | undefined;
+export type PresenceReader = (key: string) => PresenceFacts | undefined;
 
 export class SessionTransport {
   private readonly streams = new Map<string, Set<ServerResponse>>();
@@ -26,10 +26,10 @@ export class SessionTransport {
    * held here so a `serve` restart publishes the lock the last run left, and so
    * no handler has to remember to announce a turn it just wrote.
    */
-  private readonly turnOf: TurnReader;
+  private readonly presenceOf: PresenceReader;
 
-  constructor(turnOf: TurnReader) {
-    this.turnOf = turnOf;
+  constructor(presenceOf: PresenceReader) {
+    this.presenceOf = presenceOf;
   }
 
   subscribe(key: string, response: ServerResponse): void {
@@ -45,7 +45,15 @@ export class SessionTransport {
     this.streams.get(key)?.delete(response);
   }
 
+  /**
+   * The newest poll wins: every poller already parked on the session is
+   * answered `superseded` first. An agent that re-ran its waiting command left
+   * the old one behind — a background job, a harness that lost track of it —
+   * and that orphan would otherwise take the next batch into a terminal nobody
+   * reads, leaving the agent digesting nothing and the reviewer locked out.
+   */
   addPoller(key: string, wake: Waker): void {
+    for (const older of [...(this.pollers.get(key) ?? [])]) older("superseded");
     const waiting = this.pollers.get(key) ?? new Set<Waker>();
     waiting.add(wake);
     this.pollers.set(key, waiting);
@@ -58,10 +66,10 @@ export class SessionTransport {
   /**
    * Copied first: a woken poller removes itself from the set as it answers. The
    * loop stops at the one that takes the feedback, and goes on past the ones
-   * that cannot — a poller whose connection died takes nothing. Stopping is the
-   * whole of "whoever loses the race stays parked": a delivery is not spent
-   * until the agent confirms it, so a second poller woken after the first would
-   * otherwise be handed the batch that is still in flight to the first.
+   * that cannot — a poller whose connection died takes nothing. `addPoller`
+   * keeps at most one live poller per session, so the loop is a guard, not a
+   * race: a delivery is not spent until the agent confirms it, and a second
+   * poller must never be handed the batch still in flight to the first.
    */
   wakePollers(key: string): void {
     for (const wake of [...(this.pollers.get(key) ?? [])]) {
@@ -78,25 +86,23 @@ export class SessionTransport {
   }
 
   /**
-   * Two facts, and no third derived from them: `waiting` is a live connection
-   * and can only be counted here, `turn` is read off the record so the banner
-   * and the gate on Send cannot disagree about who holds the review. A dead
+   * Two facts, and nothing derived from them: `waiting` is a live connection
+   * and can only be counted here, `turn` (with the batch size while the agent
+   * digests) is read off the record so the banner and the lock on Send cannot
+   * disagree about who holds the review. A dead
    * agent leaves the turn standing — indistinguishable from thinking hard, and
    * there is no heartbeat to tell them apart; recovery is out of band.
    */
   private presenceFrame(key: string): string {
-    const turn = this.turnOf(key);
     return sseFrame("presence", {
-      waiting: (this.pollers.get(key)?.size ?? 0) > 0,
-      ...(turn === undefined ? {} : { turn }),
+      waiting: this.isWaiting(key),
+      ...this.presenceOf(key),
     });
   }
 
-  watcherCount(): number {
-    return [...this.streams.values(), ...this.pollers.values()].reduce(
-      (total, set) => total + set.size,
-      0,
-    );
+  /** A waiting command is parked on the session: its next Send has a receiver. */
+  isWaiting(key: string): boolean {
+    return (this.pollers.get(key)?.size ?? 0) > 0;
   }
 
   closeAll(): void {

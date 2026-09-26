@@ -1,0 +1,137 @@
+{
+  "key": "e15d256afad7b96f",
+  "repoRoot": "/repo",
+  "branch": "feature",
+  "base": "main",
+  "baseCommit": "5ef2e84996d9428c5bc053c1bedf05ec6f747061",
+  "headCommit": "c9c5bd387a7ade3f21c853922c4e9a819d51d953",
+  "status": "feedback",
+  "createdAt": "2026-09-25T22:10:49.098Z",
+  "conversation": [
+    {
+      "role": "reviewer",
+      "at": "2026-09-25T22:10:53.572Z",
+      "roundIndex": 0,
+      "prompts": [
+        {
+          "type": "annotation",
+          "file": "app.ts",
+          "group": "All Changes",
+          "selected_text": "const a = 2;",
+          "comment": "why 2?",
+          "side": "new",
+          "line_start": 1,
+          "line_end": 1,
+          "id": "evt_0muhilres_0004"
+        },
+        {
+          "type": "message",
+          "comment": "general v2 q"
+        }
+      ]
+    },
+    {
+      "role": "agent",
+      "at": "2026-09-25T22:10:58.289Z",
+      "roundIndex": 0,
+      "prompts": [
+        {
+          "type": "message",
+          "comment": "plain chat answer"
+        }
+      ]
+    },
+    {
+      "role": "reviewer",
+      "at": "2026-09-25T22:10:58.339Z",
+      "roundIndex": 0,
+      "prompts": [
+        {
+          "type": "message",
+          "comment": "queued while reading"
+        },
+        {
+          "type": "annotation",
+          "file": "app.ts",
+          "group": "All Changes",
+          "selected_text": "a",
+          "comment": "queued line",
+          "side": "new",
+          "line_start": 1,
+          "line_end": 1,
+          "id": "evt_0muhilv37_0009"
+        }
+      ]
+    }
+  ],
+  "pending": [
+    {
+      "type": "message",
+      "comment": "queued while reading"
+    },
+    {
+      "type": "annotation",
+      "file": "app.ts",
+      "group": "All Changes",
+      "selected_text": "a",
+      "comment": "queued line",
+      "side": "new",
+      "line_start": 1,
+      "line_end": 1,
+      "id": "evt_0muhilv37_0009"
+    }
+  ],
+  "turn": {
+    "holder": "agent",
+    "mode": "reading",
+    "at": "2026-09-25T22:10:54.083Z"
+  },
+  "updatedAt": "2026-09-25T22:10:58.339Z",
+  "groups": [
+    {
+      "name": "All Changes",
+      "rationale": "Not ordered by a model: the files are in the order git listed them.",
+      "tier": "study",
+      "files": [
+        {
+          "path": "app.ts",
+          "status": "modified",
+          "diff": "diff --git a/app.ts b/app.ts\nindex 54b82a09ad5431219cd9c720b852a1cb57ba956d..dd2bcc611274e801dea75ad3cf4b633b592f24ce 100644\n--- a/app.ts\n+++ b/app.ts\n@@ -1 +1 @@\n-const a = 1;\n+const a = 2;",
+          "insertions": 1,
+          "deletions": 1,
+          "oversized": false
+        }
+      ]
+    }
+  ],
+  "approved": [],
+  "round": "rnd_0muhilnyi_0001",
+  "rounds": [
+    {
+      "index": 0,
+      "round": "rnd_0muhilnyi_0001",
+      "at": "2026-09-25T22:10:49.098Z",
+      "baseCommit": "5ef2e84996d9428c5bc053c1bedf05ec6f747061",
+      "headCommit": "c9c5bd387a7ade3f21c853922c4e9a819d51d953",
+      "intents": ["v2 session"],
+      "commits": ["change"],
+      "grouping": "skipped",
+      "files": [
+        {
+          "path": "app.ts",
+          "status": "modified",
+          "blob": "dd2bcc611274e801dea75ad3cf4b633b592f24ce"
+        }
+      ],
+      "approvedAtEnd": []
+    }
+  ],
+  "helpShownRound": 1,
+  "declarations": {
+    "evt_0muhilres_0004": {
+      "note": "because spec",
+      "files": [],
+      "at": "2026-09-25T22:10:57.747Z"
+    }
+  }
+}

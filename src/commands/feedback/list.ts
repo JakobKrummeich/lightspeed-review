@@ -10,7 +10,7 @@ import {
 } from "../../ledger/export.ts";
 import { VERDICTS, type Verdict } from "../../ledger/records.ts";
 import type { StructuredOutput } from "../../output.ts";
-import { HELP_START } from "../../turn-help.ts";
+import { HELP_OPEN } from "../../turn-help.ts";
 import {
   DEFAULT_LIST_LIMIT,
   DEFAULT_LIST_MAX_BYTES,
@@ -157,7 +157,7 @@ function emptyList(
     message: budgetCut
       ? "every matching item was larger than --max-bytes"
       : emptyMatchMessage(filters),
-    help: budgetCut ? [HELP_BUDGET, HELP_SHOW] : [HELP_START, HELP_LIST],
+    help: budgetCut ? [HELP_BUDGET, HELP_SHOW] : [HELP_OPEN, HELP_LIST],
   };
 }
 
