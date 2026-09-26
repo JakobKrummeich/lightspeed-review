@@ -73,6 +73,24 @@ test("the box's words fly as the bubble they become, never as a second compose b
   assert.equal(page.body.querySelector("#lsr-general-comment"), null);
 });
 
+test("the copies are out of reach: an inert layer, and no id the live panel still holds", (t) => {
+  // Regression: a pill's cloned Remove button took Tab focus inside the aria-hidden layer, which
+  // then dropped focus to the body when the layer went.
+  const { page, root, card } = panel(t);
+  card.setAttribute("id", "lsr-pill-0");
+  card.append(new FakeBox("button", "lsr-pill-remove", { id: "lsr-pill-remove-0" }));
+
+  warpSend(asElement(root), false);
+
+  const [layer] = page.body.querySelectorAll(".lsr-warp-layer");
+  assert.equal((layer as unknown as { inert?: boolean }).inert, true);
+  const copy = ghostsIn(page)[0]!.children[0]!;
+  assert.equal(copy.querySelectorAll(".lsr-pill-remove").length, 1, "the copy is whole");
+  assert.deepEqual(page.body.querySelectorAll("[id]"), []);
+  assert.equal(copy.getAttribute("id"), null);
+  assert.equal(card.getAttribute("id"), "lsr-pill-0", "the live card keeps its own");
+});
+
 test("Send & End flares its own button", (t) => {
   const { root, send, end } = panel(t);
 

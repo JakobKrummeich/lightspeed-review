@@ -94,15 +94,17 @@ export class FakeBox {
     this.parentElement = null;
   }
 
+  /** Always deep, attributes and all, as `cloneNode(true)` is. */
   cloneNode(): FakeBox {
-    const copy = new FakeBox(this.tagName, this.className);
+    const copy = new FakeBox(this.tagName, this.className, Object.fromEntries(this.attributes));
     copy.textContent = this.textContent;
-    return copy;
+    return copy.append(...this.children.map((child) => child.cloneNode()));
   }
 
-  /** `#id`, `.class` or a tag: the selectors the light modules ask. */
+  /** `#id`, `.class`, `[attribute]` or a tag: the selectors the light modules ask. */
   matches(selector: string): boolean {
     if (selector.startsWith("#")) return this.id === selector.slice(1);
+    if (selector.startsWith("[")) return this.attributes.has(selector.slice(1, -1));
     if (selector.startsWith(".")) return this.className.split(" ").includes(selector.slice(1));
     return this.tagName === selector;
   }
