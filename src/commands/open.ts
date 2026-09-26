@@ -10,6 +10,7 @@ import {
   endedMessage,
   helpReopen,
   ifKilled,
+  openRerun,
   publishCall,
   reattachCall,
   waitClause,
@@ -100,7 +101,8 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
     return await run.listen({ ...input, port: input.config.port });
   }
   refuseFreshOpen(existing, input, target);
-  const outcome = await makeRound({ ...input, verb: "open" }, run);
+  const rerun = openRerun(target, input.intents, input);
+  const outcome = await makeRound({ ...input, verb: "open", rerun }, run);
   if (input.open !== false) run.openBrowser(outcome.created.url);
   const ledger = ledgerReport(outcome.created);
   // Written out before the wait rather than returned after it: the reviewer's

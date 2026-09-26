@@ -8,7 +8,7 @@ import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { turnFacts, turnLabel } from "../turn.ts";
 import { handbackOf, isRerun } from "../turn-moves.ts";
-import { ifKilled, publishCall, publishRerun, waitClause } from "../turn-help.ts";
+import { ifKilled, publishCall, publishLine, publishRerun, waitClause } from "../turn-help.ts";
 import { publishRefusal } from "../server.ts";
 import { refusalError, sessionGone, type SessionRef } from "./api-client.ts";
 import { allValues, lastValue, scanArgs } from "./args.ts";
@@ -96,7 +96,12 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
     return await run.listen({ ...input, port: input.config.port });
   }
   refuseLocally(existing, input, { key, target }, head);
-  const outcome = await makeRound({ ...input, verb: "publish" }, run);
+  // The re-run line, never its re-attach fallback: mid-grouping the turn is
+  // still the agent's working one, and `open` refuses to wait on that.
+  const outcome = await makeRound(
+    { ...input, verb: "publish", rerun: publishLine(target, input.intents, input.notes) },
+    run,
+  );
   const ledger = ledgerReport(outcome.created);
   run.announce({
     ...publishedRound(outcome),

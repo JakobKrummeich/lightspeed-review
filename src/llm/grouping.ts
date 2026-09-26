@@ -48,6 +48,11 @@ export interface GroupDiffInput {
   models?: MutableModels;
 }
 
+/** One file has no order to find; every other diff goes to the model. */
+export function groupingCallsModel(files: readonly unknown[]): boolean {
+  return files.length > 1;
+}
+
 /**
  * A bad model answer degrades to one group rather than blocking the review.
  * Missing credentials are the exception — an unfinished install, not weather —
@@ -56,7 +61,7 @@ export interface GroupDiffInput {
  */
 export async function groupDiff(input: GroupDiffInput): Promise<GroupingResult> {
   const { files } = input;
-  if (files.length <= 1) {
+  if (!groupingCallsModel(files)) {
     return {
       ...singleGroup(files),
       mode: "skipped",

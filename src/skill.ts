@@ -116,9 +116,11 @@ const RULES = `## Rules
   Never open another review, \`end\` or \`--reopen\` to recover.
 - Before it waits, each of the three prints what landed (\`replied\`, the round, or
   \`rerun: true\`) closed by \`next.if_killed\` — that exact command; one
-  that hands back a batch you are digesting returns at once, without it. Only
-  one wait per review: a newer one makes the older exit \`superseded: true\`,
-  which asks nothing of you.
+  that hands back a batch you are digesting returns at once, without it. An
+  \`open\` or \`publish\` with files to group says so first, on a
+  \`status:\` line with its own \`next.if_killed\`: grouping can take
+  minutes. Only one wait per review: a newer one makes the older exit
+  \`superseded: true\`, which asks nothing of you.
 - Every refusal of a move — out of turn, an ended, unknown or ambiguous
   review — names the one right command in its \`help[]\` and exits 2: read
   it rather than retrying. \`turn_not_yours\`: the reviewer holds the turn.

@@ -7,7 +7,9 @@ import {
   endedClause,
   endedMessage,
   helpReopen,
+  groupingNotice,
   ifKilled,
+  openRerun,
   nextRule,
   publishCall,
   replyCall,
@@ -140,4 +142,21 @@ test("the kill recovery says the review survived, forbids a second review, and e
 
 test("a hand-back of a batch being digested has no wait to recover, so no kill line", () => {
   assert.deepEqual(ifKilled("agent digesting", "lightspeed open feat main"), {});
+});
+
+test("the grouping notice counts the files and closes on the command that recovers it", () => {
+  const notice = groupingNotice(12, "lightspeed open feat main --intent 'why'");
+
+  assert.deepEqual(Object.keys(notice), ["status", "next"]);
+  assert.equal(notice.status, "grouping 12 files — can take minutes");
+  assert.ok(notice.next.if_killed.endsWith(": lightspeed open feat main --intent 'why'"));
+});
+
+test("a fresh open's re-run repeats every intent and the switches, and gives up on an apostrophe", () => {
+  assert.equal(
+    openRerun("feat main", ["a", "b"], { open: false, reopen: true }),
+    "lightspeed open feat main --intent 'a' --intent 'b' --no-open --reopen",
+  );
+  assert.equal(openRerun("feat main", ["a"], {}), "lightspeed open feat main --intent 'a'");
+  assert.equal(openRerun("feat main", ["it's"], {}), undefined);
 });

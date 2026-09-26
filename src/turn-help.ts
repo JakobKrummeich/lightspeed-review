@@ -118,10 +118,65 @@ export function publishRerun(
   intents: readonly string[],
   notes: readonly { to: string; text: string }[],
 ): string {
+  return publishLine(target, intents, notes) ?? reattachCall(target);
+}
+
+/** The publish as typed, or `undefined` when a word would not paste as printed. */
+export function publishLine(
+  target: string,
+  intents: readonly string[],
+  notes: readonly { to: string; text: string }[],
+): string | undefined {
   const words = [...intents, ...notes.map((note) => note.text)];
-  if (!words.every(pastesAsPrinted)) return reattachCall(target);
-  const flags = intents.map((intent) => `--intent '${intent}'`);
-  return ["lightspeed publish", target, ...flags, ...toPairs(notes)].join(" ");
+  if (!words.every(pastesAsPrinted)) return undefined;
+  return ["lightspeed publish", target, ...intentFlags(intents), ...toPairs(notes)].join(" ");
+}
+
+function intentFlags(intents: readonly string[]): string[] {
+  return intents.map((intent) => `--intent '${intent}'`);
+}
+
+/**
+ * A fresh `open` as typed, for a kill before its round exists: nothing is on
+ * the server yet, so the re-attach line would fail on its missing --intent,
+ * and one without `--reopen` would be refused as ended. `undefined` when an
+ * intent would not paste as printed — there is no re-attach to fall back on.
+ */
+export function openRerun(
+  target: string,
+  intents: readonly string[],
+  switches: { open?: boolean; reopen?: boolean },
+): string | undefined {
+  if (!intents.every(pastesAsPrinted)) return undefined;
+  const flags = [
+    ...intentFlags(intents),
+    ...(switches.open === false ? ["--no-open"] : []),
+    ...(switches.reopen === true ? ["--reopen"] : []),
+  ];
+  return ["lightspeed open", target, ...flags].join(" ");
+}
+
+/**
+ * Printed before the model call, which can take minutes and is the step a
+ * short shell timeout lands in: a command killed there had printed nothing,
+ * so the agent had no recovery line and read the silence as a dead review.
+ * No bound on the call itself — any number would be arbitrary for a diff
+ * whose size nobody knows in advance.
+ */
+export function groupingNotice(
+  files: number,
+  command: string | undefined,
+): { status: string; next: { if_killed: string } } {
+  const rerun =
+    command === undefined
+      ? "Re-run the same command, unchanged, with NO timeout parameter — it posts nothing twice"
+      : `${RERUN_THIS}: ${command}`;
+  return {
+    status: `grouping ${files} files — can take minutes`,
+    next: {
+      if_killed: `Killed or timed out? Only this command died, and the review is unharmed; ${NEVER_RESTART}. ${rerun}`,
+    },
+  };
 }
 
 /**

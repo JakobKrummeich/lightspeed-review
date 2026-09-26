@@ -43,6 +43,10 @@ test("the skill's rules name the shell tool's timeout and forbid a second review
   assert.match(rules, /only that command died: the server and the review stay live/);
   assert.match(rules, /Re-run exactly the same command with NO timeout/);
   assert.match(rules, /Never open another review, `end` or `--reopen` to recover/);
+  assert.match(
+    rules,
+    /on a `status:` line with its own `next.if_killed`: grouping can take minutes/,
+  );
   assert.doesNotMatch(skill, /foreground/);
 });
 

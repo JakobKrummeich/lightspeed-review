@@ -69,6 +69,9 @@ interface Harness {
   ledger: LedgerStore | undefined;
   opened: string[];
   grouped: GroupDiffInput[];
+  /** The grouping notices, and each seam's turn, in the order they happened. */
+  steps: string[];
+  notices: StructuredOutput[];
 }
 
 /** A real review server on a real port: only the diff and the LLM are faked. */
@@ -93,10 +96,17 @@ async function withHarness(
   };
   const grouped: GroupDiffInput[] = [];
   const announced: StructuredOutput[] = [];
+  const steps: string[] = [];
+  const notices: StructuredOutput[] = [];
   let extractions = 0;
   const deps: RoundDeps = {
     extractDiff: () => extractedAt((extractions += 1)),
+    announceGrouping: (block) => {
+      steps.push("notice");
+      notices.push(block);
+    },
     groupDiff: async (input) => {
+      steps.push("group");
       grouped.push(input);
       return {
         groups: [
@@ -112,7 +122,7 @@ async function withHarness(
     listen: async () => LISTENED,
   };
   try {
-    await body({ config, deps, announced, store, ledger, opened, grouped });
+    await body({ config, deps, announced, store, ledger, opened, grouped, steps, notices });
   } finally {
     await server.stop();
   }
@@ -343,6 +353,86 @@ test("before it waits, open names the command that recovers a kill: open, no int
     assert.match(ifKilled(fresh), /`?lightspeed open feature-auth main`?$/);
     assert.match(ifKilled(again), /`?lightspeed open feature-auth main`?$/);
     assert.equal(Object.keys(fresh!).at(-1), "next");
+  });
+});
+
+/**
+ * Grouping is the one slow step before anything is printed. An agent killed
+ * there saw no output at all and no way back, so the notice goes out first,
+ * with the command that recovers it.
+ */
+test("open says it is grouping before the model call, naming the open to re-run", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, { intents: ["sign the tokens", "drop the cookie"], open: false });
+
+    assert.deepEqual(harness.steps, ["notice", "group"]);
+    const [notice] = harness.notices;
+    assert.equal(notice?.status, "grouping 2 files — can take minutes");
+    assert.match(ifKilled(notice), /Only this command died, and the review is unharmed/);
+    assert.match(ifKilled(notice), /never open another review, end or reopen to recover/);
+    assert.ok(
+      ifKilled(notice).endsWith(
+        ": lightspeed open feature-auth main --intent 'sign the tokens' --intent 'drop the cookie' --no-open",
+      ),
+      ifKilled(notice),
+    );
+  });
+});
+
+test("an --reopen being grouped is re-run with --reopen, or it would be refused as ended", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.store.save({ ...harness.store.get(KEY)!, status: "ended", endedBy: "reviewer" });
+
+    await open(harness, { reopen: true });
+
+    assert.match(ifKilled(harness.notices[1]), /--intent '[^']+' --reopen$/);
+  });
+});
+
+/** An apostrophe cannot be printed so it pastes as shown; a wrong command would be worse than none. */
+test("a grouping notice whose intent will not paste says to re-run the same command unchanged", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, { intents: ["the user's tokens"] });
+
+    assert.match(
+      ifKilled(harness.notices[0]),
+      /Re-run the same command, unchanged, with NO timeout parameter/,
+    );
+    assert.doesNotMatch(ifKilled(harness.notices[0]), /lightspeed open/);
+  });
+});
+
+test("a one-file diff calls no model, so nothing announces grouping", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, {
+      deps: {
+        ...harness.deps,
+        extractDiff: () => ({ ...extractedAt(1), files: [diffFile("src/api/users.ts")] }),
+      },
+    });
+
+    assert.deepEqual(harness.notices, []);
+  });
+});
+
+test("publish says it is grouping before the model call, naming the publish to re-run", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+    harness.steps.length = 0;
+
+    await publishNext(harness, {
+      intents: ["retry on 503"],
+      notes: [{ to: "main", text: "done" }],
+    });
+
+    assert.deepEqual(harness.steps, ["notice", "group"]);
+    assert.ok(
+      ifKilled(harness.notices[1]).endsWith(
+        ": lightspeed publish feature-auth main --intent 'retry on 503' --to main 'done'",
+      ),
+      ifKilled(harness.notices[1]),
+    );
   });
 });
 

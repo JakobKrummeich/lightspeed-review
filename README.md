@@ -557,7 +557,10 @@ agent works. Before it waits, every waiting command prints what landed —
 `next.if_killed`, the exact command to re-run (re-attaching with `open` when a
 word holds an apostrophe, quote, backslash or line break, which would not paste
 as printed) — except a command handing back a batch still being digested, which
-returns at once and has no wait to recover. The newest wait wins: a second
+returns at once and has no wait to recover. An `open` or `publish` with more
+than one file to group prints `status: grouping N files — can take minutes` and
+its own `next.if_killed` before the model call, so a command killed while
+grouping has already said how to recover. The newest wait wins: a second
 waiting command on the same review answers the first `superseded: true`, so a
 forgotten background wait never swallows a batch. Bare `lightspeed` asks the
 server whether a wait is already parked before it suggests `open`, and says how
