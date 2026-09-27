@@ -332,9 +332,10 @@ test("the names come once the figures have formed, and the button 1.5 s after th
   assert.equal(button?.focused, true);
 });
 
-test("no caret move scrolls the room: the sky stays centred under a tall reason", (t) => {
-  // The room is full-bleed and fixed; a focus() that scrolls it drags the sky, the names and
-  // the flash off centre. Every sheet, the held sky sheet and the revealed button included.
+test("every caret move may scroll its own sheet, so a button under a tall reason is seen", (t) => {
+  // The room clips (`overflow: clip`), so it cannot scroll whatever focus does; the sheet does
+  // scroll (`overflow-y: auto`), and a `preventScroll` focus left its button below the fold
+  // on a short screen (WCAG 2.4.11). Every sheet, the held sky sheet and the revealed button.
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { root } = mounted(t, ["one", "two"], { chapters: CHAPTERS });
   press(root, 0);
@@ -346,7 +347,7 @@ test("no caret move scrolls the room: the sky stays centred under a tall reason"
     (node) => node.focusCalls,
   );
   assert.ok(moved.length >= 5, "every sheet and the revealed button took the caret");
-  for (const options of moved) assert.deepEqual(options, { preventScroll: true });
+  for (const options of moved) assert.notEqual(options?.preventScroll, true);
 });
 
 test("the names are laid in from the layout, one per chapter it could name", (t) => {

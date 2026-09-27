@@ -125,21 +125,19 @@ function lay(sheets: HTMLElement[], dots: HTMLElement[], step: number): void {
 }
 
 /**
- * Focus never scrolls the room: it is fixed and full-bleed, and a scrolled
- * room drags the sky, its names and the flash off centre.
+ * A held button cannot take the caret, so the sheet holds it until the button
+ * is shown. Plain `focus()`: the room clips and cannot scroll, but the sheet
+ * scrolls, and must, to bring its button into view under a tall reason.
  */
-const STAY = { preventScroll: true } as const;
-
-/** A held button cannot take the caret, so the sheet holds it until the button is shown. */
 function caretTo(sheet: HTMLElement | undefined): void {
   const button = sheet?.querySelector<HTMLElement>(".lsr-opening-press");
-  if (button?.dataset.held === "true") sheet?.focus(STAY);
-  else button?.focus(STAY);
+  if (button?.dataset.held === "true") sheet?.focus();
+  else button?.focus();
 }
 
 function reveal(sheet: HTMLElement): void {
   const button = sheet.querySelector<HTMLElement>(".lsr-opening-press");
   if (!button) return;
   button.dataset.held = "false";
-  button.focus(STAY);
+  button.focus();
 }

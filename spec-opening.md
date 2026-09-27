@@ -180,9 +180,10 @@ round has none of.
 - It never lets the page behind it be reached. While it is up every other
   child of `body` is `inert` (released on close), sheets not on top are
   `inert` too, so `Tab` only ever finds the top sheet's button.
-- It never scrolls. The room clips instead of scrolling, and focus moves with
-  `preventScroll`, so a long reason on a short screen cannot drag the sky or
-  the flash off centre.
+- It never scrolls the room. The room clips (`overflow: clip`) rather than
+  scrolling, so a long reason on a short screen cannot drag the sky or the
+  flash off centre. The sheet inside it does scroll: focus moves plainly, so
+  a button below a tall reason is scrolled into view within its sheet.
 
 ## How it is built
 
