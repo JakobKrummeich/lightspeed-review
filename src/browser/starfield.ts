@@ -166,7 +166,10 @@ function byWeight(a: SkyFile, b: SkyFile): number {
  * room. Centred on the sky's middle whatever shape they make.
  */
 function centres(count: number, box: SkyBox): [number, number][] {
-  const [cx, cy, rx, ry] = [box.width / 2, box.height / 2, box.width * 0.38, box.height * 0.36];
+  // A few chapters sit closer in: spread across the whole width they read as
+  // three strangers, not one sky.
+  const reach = count <= 3 ? 0.28 : 0.38;
+  const [cx, cy, rx, ry] = [box.width / 2, box.height / 2, box.width * reach, box.height * 0.36];
   if (count === 1) return [[cx, cy]];
   const ring = count > 6;
   const [from, to] = count <= 3 ? [0.18, 0.82] : [0.02, 0.98];
@@ -244,7 +247,7 @@ function spanningTree(points: { x: number; y: number }[]): [number, number][] {
 
 /** Wide enough for the longer of its two lines, capped where the stylesheet ellipsizes. */
 function labelWidth(name: string, files: number): number {
-  return Math.min(200, Math.max(name.length, `${files} files`.length) * 8.2 + 12);
+  return Math.min(200, Math.max(name.length, `${files} files`.length) * 9 + 12);
 }
 
 function overlaps(a: SkyLabel, b: SkyLabel): boolean {
@@ -305,7 +308,7 @@ export function layoutSky(chapters: readonly SkyChapter[], box: SkyBox): Sky {
   for (const [chapter, { name, files }] of chapters.entries()) {
     const mine = kept.filter((file) => file.chapter === chapter);
     const centre = points[chapter] ?? [box.width / 2, box.height / 2];
-    const spread = 16 + 8.8 * Math.sqrt(mine.length) * Math.min(1, box.width / 700);
+    const spread = 24 + 11 * Math.sqrt(mine.length) * Math.min(1, box.width / 700);
     const radius = Math.min(gap * 0.42, spread);
     const placed = cluster(mine, centre, radius, scope);
     const offset = stars.length;

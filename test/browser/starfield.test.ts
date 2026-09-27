@@ -258,11 +258,16 @@ test("the jump starts from where the stars stand, plus a deep field around them"
 test("the jump slows in, then races: the speed only ever grows", () => {
   let before = -1;
   for (let ms = 0; ms <= SKY_TIMES.jumpMs; ms += 25) {
-    const speed = warpSpeed(ms);
+    const speed = warpSpeed(ms, BOX);
     assert.ok(speed >= before, `slower at ${ms}ms`);
     before = speed;
   }
-  assert.ok(warpSpeed(SKY_TIMES.jumpMs) > warpSpeed(0) * 20);
+  assert.ok(warpSpeed(SKY_TIMES.jumpMs, BOX) > warpSpeed(0, BOX) * 20);
+  // Depth is measured in view widths: a wider view rushes as fast to the eye.
+  assert.equal(
+    warpSpeed(500, { width: 1140, height: 1 }),
+    warpSpeed(500, { width: 570, height: 1 }) * 2,
+  );
 });
 
 test("streaks come in three batches by depth, and a star past the eye is gone", () => {

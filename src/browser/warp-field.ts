@@ -40,9 +40,14 @@ export function warpField(
   return [...near, ...far];
 }
 
-/** Depth units per 60 Hz frame: a slow first beat, then a cubic rush. */
-export function warpSpeed(ms: number): number {
-  return ms < 150 ? 0.6 : 0.6 + ((ms - 150) / 750) ** 3 * 38;
+/**
+ * Depth units per 60 Hz frame: a slow first beat, then a cubic rush. Scaled
+ * to the view, because depth is measured in its widths: tuned on a 570 px
+ * stage, the same numbers crawl across a 1440 px window.
+ */
+export function warpSpeed(ms: number, box: SkyBox): number {
+  const rush = ms < 150 ? 0.6 : 0.6 + ((ms - 150) / 750) ** 3 * 38;
+  return rush * (box.width / 570);
 }
 
 /**

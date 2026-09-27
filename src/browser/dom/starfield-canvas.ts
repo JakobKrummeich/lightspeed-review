@@ -29,7 +29,7 @@ export interface SkyPainter {
 }
 
 /** Deep stars around the files, so the jump fills the view however small the review. */
-const JUMP_EXTRA = 240;
+const JUMP_EXTRA = 320;
 const SPRITE_RADIUS = 24;
 
 interface Ink {
@@ -236,7 +236,7 @@ export function paintSky(
       return true;
     }
     field ??= warpField(scene.places, view, "jump", JUMP_EXTRA);
-    const step = warpSpeed(now - jumpAt) * Math.min(3, (now - last) / 16.7);
+    const step = warpSpeed(now - jumpAt, view) * Math.min(3, (now - last) / 16.7);
     drawStreaks(scene, warpStreaks(field, step, view));
     return now - jumpAt < SKY_TIMES.jumpMs;
   };
