@@ -8,6 +8,8 @@ import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts"
 /** Listeners removed by identity, so a leak shows as a second close. */
 class FakeDocument {
   activeElement: FakeNode | null = null;
+  /** The page behind the room, and the room's root among it. */
+  body: { children: FakeNode[] } = { children: [] };
   private listeners = new Map<string, ((event: unknown) => void)[]>();
 
   addEventListener(type: string, handler: (event: unknown) => void): void {
@@ -33,6 +35,10 @@ class FakeDocument {
 interface Mounted {
   root: FakeNode;
   page: FakeDocument;
+  /** The review behind the room. */
+  behind: FakeNode;
+  /** A sibling something else already made inert. */
+  away: FakeNode & { inert?: boolean };
   opens: number;
   closes: number;
 }
@@ -60,7 +66,11 @@ function mounted(t: TestContext, intents: string[], room: Room = {}): Mounted {
   // Whatever held the caret at load — where the close must put it back.
   page.activeElement = held ?? null;
   const root = new FakeNode("div", 'id="lsr-opening"');
-  const state: Mounted = { root, page, opens: 0, closes: 0 };
+  const behind = new FakeNode("main", 'id="lsr-review"');
+  const away: FakeNode & { inert?: boolean } = new FakeNode("div", 'id="lsr-done-popup"');
+  away.inert = true;
+  page.body.children = [behind, root, away];
+  const state: Mounted = { root, page, behind, away, opens: 0, closes: 0 };
   mountOpening({
     root: asPanelRoot(root),
     intents,
@@ -402,4 +412,65 @@ test("Esc leaves the sky before its button shows, and nothing it started runs on
   assert.equal(state.root.innerHTML, "");
   assert.equal(state.closes, 1);
   assert.equal(button?.dataset.held, "true", "the held button was never revealed");
+});
+
+test("the page behind the room is inert while it is up, so Tab cannot wander into it", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const state = mounted(t, ["one"], { chapters: CHAPTERS });
+  const behind = state.behind as FakeNode & { inert?: boolean };
+
+  assert.equal(behind.inert, true, "the review is out of reach while the room is up");
+  assert.equal((state.root as FakeNode & { inert?: boolean }).inert, undefined, "the room is not");
+
+  press(state.root, 0);
+  press(state.root, 1);
+  t.mock.timers.tick(SKY_TIMES.namesAtMs + SKY_TIMES.heldAfterNamesMs);
+  press(state.root, 2);
+  assert.equal(behind.inert, true, "still out of reach mid-jump");
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.equal(behind.inert, false, "the landing hands the page back");
+  assert.equal(state.away.inert, true, "what something else made inert stays so");
+});
+
+test("Esc hands the page back too, before the caret goes home", (t) => {
+  const held = new FakeNode("button");
+  const state = mounted(t, ["one", "two"], { held });
+  const behind = state.behind as FakeNode & { inert?: boolean };
+  let inertAtFocus: boolean | undefined;
+  const focus = held.focus.bind(held);
+  held.focus = (options) => {
+    inertAtFocus = behind.inert;
+    focus(options);
+  };
+
+  state.page.press("Escape");
+
+  assert.equal(behind.inert, false);
+  assert.equal(inertAtFocus, false, "an inert page cannot take the caret back");
+});
+
+test("a strike still lit when the room closes is put out with it, not after", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const state = mounted(t, ["one", "two"]);
+  const field = room(state.root);
+
+  press(state.root, 0);
+  state.page.press("Escape");
+  t.mock.timers.tick(160);
+
+  // The room is gone; a timer left behind would still be writing to it.
+  assert.equal(field.dataset.flare, "true", "nothing the room started runs after it");
+});
+
+test("only the sheet on top can be reached: the invisible ones are inert, not just faded", (t) => {
+  const { root } = mounted(t, ["one", "two"]);
+  const reachable = (): (boolean | undefined)[] =>
+    root
+      .querySelectorAll(".lsr-opening-sheet")
+      .map((sheet) => !(sheet as FakeNode & { inert?: boolean }).inert);
+
+  assert.deepEqual(reachable(), [true, false, false]);
+  press(root, 0);
+  assert.deepEqual(reachable(), [false, true, false], "a peeled sheet's button is out of Tab");
 });
