@@ -45,27 +45,6 @@ export type DiffBetween =
   { state: "patch"; patch: string } | { state: "oversize" } | { state: "unreachable" };
 
 /**
- * Under the newer commit's names. The list is complete when given at all: a
- * path not in it was verifiably untouched, which is what lets a caller reject it.
- */
-export type DiffNames = { state: "files"; files: string[] } | { state: "unknowable" };
-
-export function listDiffNames(repoRoot: string, from: string, to: string): DiffNames {
-  if (!COMMIT_PATTERN.test(from) || !COMMIT_PATTERN.test(to)) return { state: "unknowable" };
-  try {
-    // `-z`: raw NUL-separated paths, so names with spaces/non-ASCII arrive unquoted.
-    const out = execFileSync("git", ["diff", "--name-only", "--find-renames", "-z", from, to], {
-      cwd: repoRoot,
-      maxBuffer: MAX_FILE_BYTES + 1,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return { state: "files", files: out.toString("utf8").split("\0").filter(Boolean) };
-  } catch {
-    return { state: "unknowable" };
-  }
-}
-
-/**
  * Renames are followed, which is why a caller passes every name the file has
  * had rather than only today's.
  */
