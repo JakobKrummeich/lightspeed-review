@@ -7,6 +7,12 @@
   with a star gets its name and file count. When the spots round a figure
   are taken, its name goes to the nearest clear spot close to its stars, and
   names still never overlap each other or the button.
+- The general comment box has no border and is one line taller; while it
+  has the caret an accent ring says so, and under forced colours its edge
+  still shows. **Send & End** now stands at the right edge, apart from
+  **Send to Agent**.
+- An expanded diff no longer shows a dark strip above its first hunk header:
+  the header is the top band of the block, in both schemes.
 
 ## 3.5.0
 

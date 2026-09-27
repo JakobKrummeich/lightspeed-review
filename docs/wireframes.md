@@ -357,7 +357,8 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ ┌ section.lsr-compose (pinned) ──────────┐ │
 │ │ Every file is approved — Send & End    │ │ .lsr-complete (conditional)
 │ │ when you are ready.                    │ │
-│ │ [General comment — Enter sends…      ] │ │ #lsr-general-comment
+│ │ [General comment — Enter sends…      ] │ │ #lsr-general-comment (no
+│ │                                        │ │  border; accent ring on focus)
 │ │ [Send to Agent]         [Send & End]   │ │ #lsr-send (.lsr-primary;
 │ │  or while the agent works:             │ │  "Queue" while it works,
 │ │ [Queue]         [End without Sending]  │ │  disabled while it reads)
