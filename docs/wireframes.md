@@ -484,8 +484,10 @@ constellation sheet (last; no text; section aria-label "3 chapters: …"):
 - Reduced motion: still sky, figures formed, names at once, no jump. Forced
   colours: canvas hidden, names only.
 - Rounds 2+: `.lsr-jump-overlay` (canvas + tunnel + `.lsr-jump-bloom`, drawn
-  into `#lsr-opening`, `aria-hidden`) plays the same 1 s jump before the
-  replay's automatic open (z20, above the replay's z18). The page behind is
+  into `#lsr-opening`, `aria-hidden`, z20 above the replay's z18) starts the
+  same 1 s jump as soon as a round whose replay will open on its own is
+  known, before it is drawn; the room is opaque from its first frame, the
+  round swaps under it, and the replay opens on landing. The page behind is
   inert and keys are captured while it plays; Esc lands at once.
 - Long chapter names wrap to two lines (`.lsr-sky-title`, line-clamp 2); a
   resize lays the sky out again. The room clips, never scrolls; Tab stays on
@@ -553,8 +555,8 @@ For rounds > 0: what became of each comment from the previous round, one card
 at a time, before the new diff is read. Never shown together with §7: a round
 arriving under a live opening closes it first (`dom/room-claim.ts`). When it
 opens on its own for a new round, §7's 1 s hyperspace jump
-(`.lsr-jump-overlay`, dom/jump-overlay.ts) plays first and the replay opens
-under its flash.
+(`.lsr-jump-overlay`, dom/jump-overlay.ts) starts before the new round is
+drawn, the round swaps under it, and the replay opens as it lands.
 
 ```
 ┌ .lsr-replay-overlay (z18) ─────────────────────────────────┐

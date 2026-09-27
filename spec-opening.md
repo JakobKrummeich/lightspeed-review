@@ -106,10 +106,15 @@ The ceremony costs presses, so every press pays something back:
 
 ### Later rounds: the jump alone
 
-Rounds 2 and later have no opening, but they arrive the same way: when the
-replay opens on its own for a new round, the same jump plays first — about a
-second, no sheets, all deep stars — and the replay overlay opens under the
-flash. It is `aria-hidden` and holds the page still while it plays: the page
+Rounds 2 and later have no opening, but they arrive the same way: a new round
+whose replay will open on its own (the round before it was commented on, the
+review is live, and this browser has not replayed it yet — `arrivesByJump` in
+`src/browser/round-arrival.ts`) starts the same jump the moment the page learns
+of the round, before any of it is drawn — about a second, no sheets, all deep
+stars. The room is opaque from its first frame, so the new round is drawn
+under it rather than in front of the reviewer, and the replay overlay opens as
+the jump lands (at once, if its cards come back after the landing). A page
+opened on such a round jumps the same way. It is `aria-hidden` and holds the page still while it plays: the page
 behind is `inert`, and keys are caught before anything on the page hears them —
 `Esc` lands at once, nothing typed reaches a text box, and a hand reopen of the
 replay mid-jump is ignored. The caret goes back where it was, without
@@ -213,7 +218,10 @@ round has none of.
   (`src/browser/warp-field.ts`), inside a 4 ms frame at 600 stars, reusing
   its arrays so a frame makes next to no garbage.
 - `playJump` in `src/browser/dom/jump-overlay.ts` — the later rounds' jump,
-  drawn into `#lsr-opening`, called from the replay's automatic open. Both
+  drawn into `#lsr-opening`. `arrivals()` there numbers each jump and holds
+  what follows the landing (the replay's automatic open); `replay-wiring.ts`
+  starts it from `applyRound` in `session-events.ts` before the round is
+  drawn, and on load. Both
   the opening and the jump claim that root through
   `src/browser/dom/room-claim.ts`: a claim evicts whoever holds it (running
   their close), so a round that arrives under a live opening closes it first.
@@ -226,8 +234,7 @@ round has none of.
   `.lsr-jump-overlay`: nothing else on the page is in this room.
 - `#lsr-opening` in `src/html-template.ts`, beside `#lsr-replay`. The opening
   sits at the replay's overlay layer (z-index 18); the jump overlay sits above
-  it at z-index 20, so the replay opening under its flash stays hidden until
-  the flash fades.
+  it at z-index 20, over everything a round draws or opens beneath it.
 - `unwrapped` on `ReviewMemory` — a plain flag, like `replayed`, untouched by
   the round-change reset.
 - The sheets' motion is CSS transitions and keyframes; the sky's is the

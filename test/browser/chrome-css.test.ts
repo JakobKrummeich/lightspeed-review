@@ -860,6 +860,15 @@ test("no room scrolls: focus inside it must not push the sky off centre", () => 
   }
 });
 
+test("the round jump's room is opaque from its first frame: the new round swaps under it", () => {
+  // The page draws the new round in the same task the jump starts in; a room that faded in
+  // showed that draw through it for 250 ms. Only the stars come in on their own clock.
+  const room = rulesFor(".lsr-jump-overlay").join("");
+  assert.doesNotMatch(room, /animation:/, "the room itself never fades in");
+  assert.doesNotMatch(room, /opacity:/);
+  assert.match(rulesFor(".lsr-jump-overlay .lsr-sky-canvas").join(""), /animation: lsr-jump-in /);
+});
+
 test("the opening is painted for both schemes at once, never for one of them", () => {
   // A hand-picked scheme overrides the machine's: prefers-color-scheme would follow the machine
   // while the page follows the pick, so every local uses light-dark().

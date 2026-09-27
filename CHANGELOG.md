@@ -21,8 +21,10 @@ round arrives by a jump into hyperspace.
 - The last press jumps into the review: the stars streak outward, the edges
   close in and a flash covers the swap, a second in all. This replaces the
   flood of light.
-- Rounds 2 and later arrive the same way: when the replay opens on its own for
-  a new round, the same one-second jump plays first. `Esc` lands at once;
+- Rounds 2 and later arrive the same way: when the replay will open on its
+  own for a new round, the same one-second jump starts before the round is
+  drawn, the new diff swaps in under it, and the replay opens as it lands.
+  `Esc` lands at once;
   nothing else on the page hears a key while it plays. A round that arrives
   while the first round's opening is still up closes the opening first.
 - While the opening is up the page behind it is inert, so `Tab` stays on the

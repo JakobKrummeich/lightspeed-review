@@ -2,8 +2,10 @@
  * 08 Hyperspace for rounds 2 and later (`dom/jump-overlay.ts`): the opening's
  * room over the whole window for about a second. Its colours, light, canvas,
  * vignette and flash are the opening's own (`opening.css`); only what the
- * round jump does differently lives here. Fades in on its own clock, so the page
- * never waits for a frame to start it.
+ * round jump does differently lives here. The room is opaque from its first
+ * frame: the page draws the new round in the same task the jump starts in, so
+ * a room that faded in would show that draw through it. Only the stars come
+ * in, on their own clock, so the page never waits for a frame to start them.
  */
 .lsr-jump-overlay {
   position: fixed;
@@ -11,6 +13,9 @@
   z-index: 20;
   overflow: clip;
   background: var(--lsr-opening-room);
+}
+
+.lsr-jump-overlay .lsr-sky-canvas {
   animation: lsr-jump-in 250ms ease-out both;
 }
 

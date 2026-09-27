@@ -335,16 +335,90 @@ test("the page's arrivals say a jump is in flight until it lands, so a reopen ca
     asked += 1;
     return MOVING;
   });
-  let landed = 0;
+  let opened = 0;
 
   assert.equal(arrival.jumping(), false);
-  arrival.play(() => (landed += 1));
+  arrival.jump();
   assert.equal(arrival.jumping(), true, "mid-jump: the landing will open the replay");
+  arrival.onLanding(() => (opened += 1));
+  assert.equal(opened, 0, "the replay waits for the landing");
   t.mock.timers.tick(SKY_TIMES.jumpMs);
   assert.equal(arrival.jumping(), false);
-  assert.equal(landed, 1);
+  assert.equal(opened, 1);
 
-  arrival.play(() => (landed += 1));
+  arrival.jump();
   assert.equal(asked, 2, "stillness is asked per jump, not once");
   assert.equal(root.querySelector(".lsr-sky-canvas") !== null, true);
+});
+
+test("with no jump in flight, what follows a landing runs at once", (t) => {
+  const { root } = page(t);
+  const arrival = arrivals(asPanelRoot(root), () => MOVING);
+  let opened = 0;
+
+  arrival.onLanding(() => (opened += 1));
+
+  assert.equal(opened, 1);
+});
+
+test("still, the arrival lands at once and what follows it runs at once", (t) => {
+  const { root } = page(t);
+  const arrival = arrivals(asPanelRoot(root), () => ({ reducedMotion: true, forcedColors: false }));
+  let opened = 0;
+
+  arrival.jump();
+  arrival.onLanding(() => (opened += 1));
+
+  assert.equal(arrival.jumping(), false);
+  assert.equal(opened, 1);
+  assert.equal(root.innerHTML, "");
+});
+
+test("a second arrival mid-jump keeps the page jumping until the second lands", (t) => {
+  const { root } = page(t);
+  const arrival = arrivals(asPanelRoot(root), () => MOVING);
+  const opened: string[] = [];
+
+  arrival.jump();
+  arrival.onLanding(() => opened.push("first"));
+  t.mock.timers.tick(SKY_TIMES.flashAtMs);
+  arrival.jump();
+
+  assert.equal(arrival.jumping(), true, "the first's landing does not end the second's flight");
+  assert.equal(opened.length, 0, "the replay waits for the jump the page is still in");
+  arrival.onLanding(() => opened.push("second"));
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.equal(arrival.jumping(), false);
+  assert.deepEqual(opened, ["second"], "only the latest round's replay opens");
+});
+
+test("a painter that throws lands the jump at once and hands the page back", (t) => {
+  const { page: doc, root, behind } = page(t);
+  const errors = t.mock.method(console, "error", () => {});
+  let lands = 0;
+
+  playJump({
+    root: asPanelRoot(root),
+    still: MOVING,
+    land: () => (lands += 1),
+    paint: () => {
+      throw new Error("no canvas today");
+    },
+  });
+
+  assert.equal(lands, 1, "the round is not held back by its decoration");
+  assert.equal(root.innerHTML, "");
+  assert.equal(behind.inert, false, "the page is not left inert");
+  assert.equal(doc.keydownCount(), 0);
+  assert.equal(errors.mock.callCount(), 1, "said, not swallowed");
+
+  // The root is free: the next room's claim evicts nothing that throws.
+  playJump({
+    root: asPanelRoot(root),
+    still: MOVING,
+    land: () => (lands += 1),
+    paint: fakePaint().paint,
+  });
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.equal(lands, 2);
 });

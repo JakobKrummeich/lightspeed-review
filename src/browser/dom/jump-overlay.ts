@@ -1,7 +1,9 @@
 /**
  * 08 Hyperspace, rounds 2 and later: the opening's room takes the whole
- * window, the stars jump, a flash covers the swap, and the reviewer lands on
- * the new round — where the replay overlay then opens as it always has.
+ * window before the new round is drawn (`arrivals().jump()`, from the round's
+ * arrival in `session-events.ts`), the round swaps in under it, the stars
+ * jump, a flash, and the reviewer lands on the new round — where the replay
+ * overlay then opens (`onLanding`).
  * About a second, decorative from end to end (`aria-hidden`, no focus taken),
  * and skipped outright for a reviewer who asked for stillness or forced
  * colours: they land at once. Esc lands at once too.
@@ -14,7 +16,7 @@
 import { SKY_TIMES, layoutSky } from "../starfield.ts";
 import { holdPageBehind } from "./page-hold.ts";
 import { claimRoom, evictRoom, leaveRoom } from "./room-claim.ts";
-import { paintSky } from "./starfield-canvas.ts";
+import { paintSky, type SkyPainter } from "./starfield-canvas.ts";
 import type { Stillness } from "./stillness.ts";
 
 export interface JumpHost {
@@ -46,63 +48,92 @@ export function playJump(host: JumpHost): void {
     evictRoom(host.root);
     return host.land();
   }
-  const leave = (): void => land();
-  claimRoom(host.root, leave);
   const before = document.activeElement;
-  host.root.innerHTML = ROOM;
-  const release = holdPageBehind(host.root);
-  const field = host.root.querySelector<HTMLElement>(".lsr-jump-overlay");
-  const painter = jumpStars(host.root, host.paint ?? paintSky);
-  // Runs once: every way in — the timer, Esc, the next room — is taken down
-  // here before the page gets anything back.
-  function land(): void {
+  let release = (): void => {};
+  let painter: SkyPainter | undefined;
+  let flash: ReturnType<typeof setTimeout> | undefined = undefined;
+  let done: ReturnType<typeof setTimeout> | undefined = undefined;
+  // Runs once: every way in — the timer, Esc, the next room, a mount that
+  // failed — is taken down here before the page gets anything back. Declared
+  // before anything that can throw, so every way in finds it whole.
+  const land = (): void => {
     clearTimeout(flash);
     clearTimeout(done);
     painter?.stop();
     document.removeEventListener("keydown", onKey, true);
-    leaveRoom(host.root, leave);
+    leaveRoom(host.root, land);
     host.root.innerHTML = "";
     release();
     if (before instanceof HTMLElement) before.focus({ preventScroll: true });
     host.land();
-  }
+  };
   // Captured and kept: the page is out of reach, so no key of its own may act either.
   const onKey = (event: KeyboardEvent): void => {
     event.stopPropagation();
     if (event.key === "Escape") land();
   };
-  const flash = setTimeout(() => {
+  claimRoom(host.root, land);
+  host.root.innerHTML = ROOM;
+  release = holdPageBehind(host.root);
+  document.addEventListener("keydown", onKey, true);
+  try {
+    painter = jumpStars(host.root, host.paint ?? paintSky);
+  } catch (error) {
+    // The round is not held back by its decoration.
+    console.error("lightspeed: the round jump could not start", error);
+    return land();
+  }
+  const field = host.root.querySelector<HTMLElement>(".lsr-jump-overlay");
+  flash = setTimeout(() => {
     if (field) field.dataset.bloom = "true";
   }, SKY_TIMES.flashAtMs);
-  const done = setTimeout(land, SKY_TIMES.jumpMs);
-  document.addEventListener("keydown", onKey, true);
+  done = setTimeout(land, SKY_TIMES.jumpMs);
 }
 
 export interface Arrivals {
-  /** Jumps into the new round, then `land`s — at once for a still reviewer. */
-  play(land: () => void): void;
+  /**
+   * A new round is arriving: the jump starts now, before the page draws the
+   * round, so the swap happens under the room. At once for a still reviewer.
+   */
+  jump(): void;
+  /**
+   * Runs `next` as the jump in flight lands — the latest asked wins, since a
+   * newer round's replay supersedes an older one's — or at once with none.
+   */
+  onLanding(next: () => void): void;
   /** A jump is in flight: its landing will open what follows it. */
   jumping(): boolean;
 }
 
 /**
  * The page's rounds arriving through `root`. Stillness is asked on every
- * jump, since the preference can change under an open page.
+ * jump, since the preference can change under an open page. Each jump is
+ * numbered: a jump the next one evicts lands too, and must not end the
+ * newer one's flight.
  */
 export function arrivals(root: HTMLElement, still: () => Stillness): Arrivals {
-  let inFlight = false;
+  let flights = 0;
+  /** The flight the page is in, or 0 when it is on the ground. */
+  let inFlight = 0;
+  let next: (() => void) | undefined;
+  const landed = (flight: number): void => {
+    if (flight !== inFlight) return;
+    inFlight = 0;
+    const then = next;
+    next = undefined;
+    then?.();
+  };
   return {
-    play(land) {
-      inFlight = true;
-      playJump({
-        root,
-        still: still(),
-        land: () => {
-          inFlight = false;
-          land();
-        },
-      });
+    jump() {
+      flights += 1;
+      const flight = flights;
+      inFlight = flight;
+      playJump({ root, still: still(), land: () => landed(flight) });
     },
-    jumping: () => inFlight,
+    onLanding(then) {
+      if (inFlight === 0) then();
+      else next = then;
+    },
+    jumping: () => inFlight !== 0,
   };
 }
