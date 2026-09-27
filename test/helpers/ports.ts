@@ -19,6 +19,12 @@ const PORT_COUNT = 6_000;
 const LAST_CLAIM = FIRST_PORT + 2 * PORT_COUNT - 1;
 
 /**
+ * Where this process's next freePort call looks first. Every port below it is
+ * claimed by this process or was found taken, so no call rescans them.
+ */
+let nextPort = FIRST_PORT;
+
+/**
  * A port for a server that does not exist yet, and that stays this test
  * process's after its server is gone. Only for a test that needs the number
  * before anything listens on it, or needs it to stay free after a server
@@ -37,7 +43,8 @@ const LAST_CLAIM = FIRST_PORT + 2 * PORT_COUNT - 1;
  */
 export async function freePort(): Promise<number> {
   assertOutsideEphemeralRange();
-  for (let port = FIRST_PORT; port < FIRST_PORT + PORT_COUNT; port += 1) {
+  for (; nextPort < FIRST_PORT + PORT_COUNT; nextPort += 1) {
+    const port = nextPort;
     const claim = await listenIfFree(port + PORT_COUNT);
     if (claim === undefined) continue;
     claim.unref();
@@ -46,6 +53,7 @@ export async function freePort(): Promise<number> {
     const probe = await listenIfFree(port);
     if (probe === undefined) continue;
     await new Promise<void>((resolve) => probe.close(() => resolve()));
+    nextPort += 1;
     return port;
   }
   throw new Error(`freePort: every port in ${FIRST_PORT}..${FIRST_PORT + PORT_COUNT - 1} is taken`);
