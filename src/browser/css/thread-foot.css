@@ -1,0 +1,88 @@
+/*
+ * A thread's foot (`thread-foot.ts`): the reply box, the waiting line and the
+ * presses under them. Split from the conversation column, which paints the
+ * cards they sit in.
+ */
+
+/*
+ * The thread's foot, in reading order: the box on its own row, then Resolve
+ * at the left and Reply at the right, under the box it sends. It shows no
+ * control the reviewer cannot use. A folded thread's Reopen sits alone.
+ */
+.lsr-thread-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsr-space-2);
+  margin-top: var(--lsr-space-2);
+}
+
+.lsr-thread-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--lsr-space-2);
+}
+
+/*
+ * One family for every press in a card: a soft pill a size down from the
+ * compose box's Send, which stays the page's one loud button. The border is
+ * transparent rather than gone: forced colours paint it, and there the fill
+ * is gone.
+ */
+.lsr-thread-action {
+  background: color-mix(in oklab, var(--lsr-muted) 14%, transparent);
+  color: var(--lsr-text);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: var(--lsr-space-1) var(--lsr-space-4);
+  font-size: var(--lsr-size-meta);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 120ms ease;
+}
+
+.lsr-thread-action:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--lsr-muted) 26%, transparent);
+  color: var(--lsr-strong);
+}
+
+/* Reply answers the thread, so it takes the accent's hue. */
+.lsr-thread-reply-add {
+  background: color-mix(in oklab, var(--lsr-accent) 18%, transparent);
+  color: var(--lsr-lead-ink);
+}
+
+.lsr-thread-reply-add:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--lsr-accent) 30%, transparent);
+  color: var(--lsr-lead-ink);
+}
+
+.lsr-thread-action:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 2px;
+}
+
+/* The reviewer spoke last on the agent's turn: said without asking anything. */
+.lsr-thread-waiting {
+  margin: var(--lsr-space-2) 0 0;
+  font-size: var(--lsr-size-label);
+  color: var(--lsr-muted);
+  font-style: italic;
+}
+
+/*
+ * Two lines, shorter than the compose box: a tall box in every card would push
+ * the threads under it off the screen. Grown to its placeholder where the
+ * browser can, so a narrow card wraps the hint rather than clipping it.
+ */
+.lsr-thread-reply-box {
+  min-height: calc(2lh + 2 * var(--lsr-space-2) + 2px);
+  field-sizing: content;
+  border-color: transparent;
+}
+
+/* The compose box's ring (`conversation.css`): the box has no border to light. */
+.lsr-thread-reply-box:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 0;
+}
