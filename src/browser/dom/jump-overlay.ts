@@ -1,17 +1,9 @@
 /**
- * 08 Hyperspace, rounds 2 and later: the opening's room takes the whole
- * window before the new round is drawn (`arrivals().jump()`, from the round's
- * arrival in `session-events.ts`), the round swaps in under it, the stars
- * jump, a flash, and the reviewer lands on the new round — where the replay
- * overlay then opens (`onLanding`).
- * About a second, decorative from end to end (`aria-hidden`, no focus taken),
- * and skipped outright for a reviewer who asked for stillness or forced
- * colours: they land at once. Esc lands at once too.
- *
- * Drawn into the opening's root, which a round can reach while the opening is
- * still up (another tab moved the review on): the opening is closed by its
- * own way out first (`room-claim.ts`), never wiped. While the jump plays the
- * page behind it is inert and no key reaches it — a popup's Esc included.
+ * The jump for rounds 2 and later: the room covers the window before the new
+ * round is drawn, the round swaps in under it, and the replay opens as it
+ * lands (`onLanding`). Decorative (`aria-hidden`, no focus taken); reduced
+ * motion, forced colours and Esc land at once. While it plays the page
+ * behind is inert and no key reaches it.
  */
 import { SKY_TIMES, layoutSky } from "../starfield.ts";
 import { caretReturn } from "./caret-return.ts";

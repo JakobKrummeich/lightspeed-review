@@ -1,15 +1,10 @@
 /**
  * Where a room hands the caret back when it closes. The page can redraw under
- * the room — a round arriving replaces every thread reply box — so the element
- * that had the caret may be gone by then. Its twin is found by what names it:
- * its id, or else its tag, classes and the data attributes that say which
- * thing it is (`NAMES`: a reply box's `data-thread`). Attributes that say where
- * a thing sits or how it looks (`data-index`, `data-group-index`, `data-form`,
- * `data-state`) name nothing: after a redraw the same place can hold another
- * thing. An element with no name is not guessed at: any other control would
- * be a wrong place, and the caret stays where it falls.
- *
- * Taken when the room opens: the names are read then, not after a redraw.
+ * the room, so the element that had the caret may be gone: its twin is found
+ * by id, or by tag, classes and the data attributes that name it (`NAMES`).
+ * Attributes of place or look (`data-index`, `data-state`, …) are ignored — after
+ * a redraw the same place can hold another thing — and an element with no
+ * name is not guessed at. Call it when the room opens, before any redraw.
  */
 export function caretReturn(before: Element | null): (options?: FocusOptions) => void {
   if (!(before instanceof HTMLElement)) return () => undefined;
@@ -20,11 +15,7 @@ export function caretReturn(before: Element | null): (options?: FocusOptions) =>
   };
 }
 
-/**
- * The data attributes that name a thing in this page's markup: a thread (its
- * reply box and buttons), a card and its fold, a file (with the line a prompt
- * points at in it).
- */
+/** The data attributes that name a thread, a card and its fold, a file and a line. */
 const NAMES = ["thread", "key", "fold", "file", "side", "line"] as const;
 
 function twinOf(gone: HTMLElement): (() => HTMLElement | undefined) | undefined {

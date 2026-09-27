@@ -86,7 +86,7 @@
 }
 
 /*
- * 01 Warp Send: what went out squeezes into streaks that shoot into the
+ * Warp Send: what went out squeezes into streaks that shoot into the
  * button that sent it, and the button flares as they land. The streaks are
  * ghosts laid over the page (`dom/warp-send.ts`), so the send and the redraw
  * never wait on them: the sent words are already drawn underneath.
@@ -180,7 +180,7 @@
 }
 
 /*
- * 03 Return beam: the agent answered. The header's turn dot sends a beam down
+ * Return beam: the agent answered. The header's turn dot sends a beam down
  * to the new card, a spark runs once round the card's edge and the answer
  * fades in. A card out of sight gets no beam; the dot's pulse alone says it.
  */

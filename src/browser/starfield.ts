@@ -1,9 +1,7 @@
 /**
- * The sky the first round opens on (07 Constellations) and the field the jump
- * flies through (08 Hyperspace): every file is a star, every chapter a
- * constellation. Pure layout and nothing else — no DOM, no clock, no
- * `Math.random` — so the same review draws the same sky on every reload and a
- * test can say where every star stands. `dom/starfield-canvas.ts` paints it.
+ * The opening's sky: every file a star, every chapter a constellation. Pure
+ * and seeded — no DOM, no clock, no `Math.random` — so the same review draws
+ * the same sky on every reload. `dom/starfield-canvas.ts` paints it.
  */
 import type { DiffGroup } from "../diff-extract.ts";
 import { spanningTree } from "./sky-figure.ts";
@@ -76,17 +74,16 @@ export function skyChapters(groups: readonly DiffGroup[]): SkyChapter[] {
   }));
 }
 
-/** Past this a sky is a crowd, and the painter's 4 ms budget was measured at it. */
+/** The painter's 4 ms frame budget holds up to this many. */
 export const MOST_STARS = 600;
 /** Real constellations skip their faint stars: 40 files read as a cluster with a figure in it. */
 export const FIGURE_STARS = 7;
 export const MOST_NAMES = 8;
 
 /**
- * One clock for the painter and the overlay, in ms from the moment each phase
- * starts: gathering from the constellation sheet's arrival, the jump from the
- * last press. The names wait for the figures to finish forming; the button
- * waits 1.5 s more, so the chapters are looked at before they are left.
+ * One clock for the painter and the overlay, in ms: gathering from the sky
+ * sheet's arrival, the jump from the last press. The button waits after the
+ * names so the chapters are looked at before they are left.
  */
 export const SKY_TIMES = {
   gatherMs: 1700,
@@ -99,10 +96,7 @@ export const SKY_TIMES = {
 } as const;
 
 const EDGE = 12;
-/**
- * The dimmest a star gets. A file that changed no lines is still a file: at
- * 0 a chapter of renames or binaries was a figure with no stars on it.
- */
+/** The dimmest a star gets: a file with no changed lines (a rename, a binary) still shows. */
 const FAINTEST = 0.15;
 /** A one-line name and its count, px; each further line of the name adds `NAME_LINE`. */
 const NAME_HEIGHT = 38;
@@ -168,9 +162,8 @@ function wrap(value: number, span: number): number {
 }
 
 /**
- * Wraps round the sky, so a drifting field never empties. Written into
- * `into` when given: the painter places every star every frame, and keeps
- * one object per star for it rather than making 600 new ones.
+ * Wraps round the sky, so a drifting field never empties. Written into `into`
+ * when given, so the painter reuses one object per star every frame.
  */
 export function driftAt(
   star: Star,
@@ -201,13 +194,11 @@ function byWeight(a: SkyFile, b: SkyFile): number {
 }
 
 /**
- * Chapter centres in review order, left to right: one in the middle, a few
- * along an arc, a crowd clockwise round a ring — past six an arc runs out of
- * room. Centred on the sky's middle whatever shape they make.
+ * Chapter centres in review order: one in the middle, up to six along an arc,
+ * more clockwise round a ring. Centred on the sky's middle.
  */
 function centres(count: number, box: SkyBox): [number, number][] {
-  // A few chapters sit closer in: spread across the whole width they read as
-  // three strangers, not one sky.
+  // Spread across the whole width, three chapters read as strangers, not one sky.
   const reach = count <= 3 ? 0.28 : 0.38;
   const [cx, cy, rx, ry] = [box.width / 2, box.height / 2, box.width * reach, box.height * 0.36];
   if (count === 1) return [[cx, cy]];

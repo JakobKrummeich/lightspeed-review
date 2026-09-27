@@ -1,5 +1,5 @@
 /**
- * 06 Tab beacon: a reviewer who left for another tab while the agent worked
+ * Tab beacon: a reviewer who left for another tab while the agent worked
  * is told from the tab strip that the turn came back to them — the title
  * says so and the favicon lights. Pure: what the tab should say, never how it
  * is written (`dom/tab-beacon-mount.ts`).

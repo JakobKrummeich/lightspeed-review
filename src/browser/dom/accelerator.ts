@@ -1,5 +1,5 @@
 /**
- * 05 Accelerator: the light that answers a tick (`css/light-approval.css`). A
+ * Accelerator: the light that answers a tick (`css/light-approval.css`). A
  * particle runs along the bar to the grown fill's new edge and a spark marks
  * where it stopped; a finished chapter flashes and a glint crosses it; the
  * last one sends a glint down every segment. The tick's own box glows.
