@@ -410,7 +410,11 @@ message itself is the voice's bubble, as in a chat: the reviewer's is
 toward the ink, no hue, and every label on either bubble is stepped toward the
 text to stay AA. No message wears a stripe down its left edge: the bubble is
 the glance, the label the word. Messages stack flat, oldest first, never
-nested deeper than the thread.
+nested deeper than the thread. A settled card (`data-resolved="true"`) is
+history: unfolded, its messages drop the bubble's inset and fill and step down
+to `--lsr-size-meta`, a transcript at the card's full width; the labels keep
+their hue, and an unsent draft keeps its bubble. Folded, any card's gist sits
+on its own line under the anchor, at the card's full width.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 

@@ -1034,3 +1034,26 @@ test("the round's announcement and the replay card lift off the page on a shadow
     assert.match(body, /box-shadow: var\(--lsr-shadow-lift\);/, `${card} has nothing to lift it`);
   }
 });
+
+test("a folded card's gist takes a line of its own at the card's full width", () => {
+  // Regression: the gist shared one line with the file press, and each ellipsised the
+  // other down to "FILE…" and three words.
+  assert.match(rulesFor(".lsr-thread-head").join(""), /flex-wrap: wrap;/);
+  const gist = rulesFor(".lsr-thread-gist").join("");
+  assert.match(gist, /flex: 1 0 100%;/);
+  assert.match(gist, /order: 1;/);
+  assert.match(gist, /white-space: normal;/);
+});
+
+test("an unfolded resolved card reads as a transcript, not a column of bubbles", () => {
+  // Three insets (panel, card, bubble) left a 272 px measure in the 352 px panel: a settled
+  // exchange drops the bubble's inset and fill, and a step of type, so it takes the card's width.
+  const said = rulesFor(
+    '.lsr-thread[data-resolved="true"] .lsr-message[data-role]:not(.lsr-draft)',
+  );
+  const body = said.join("");
+
+  assert.match(body, /padding: 0;/);
+  assert.match(body, /background: none;/);
+  assert.match(body, /font-size: var\(--lsr-size-meta\);/);
+});
