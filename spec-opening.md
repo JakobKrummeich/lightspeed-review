@@ -139,10 +139,8 @@ round as replayed at once, and only that page opens the replay as it lands.
 Another tab on the same review reads the round as taken, so it neither jumps
 nor opens — the replay is there to open by hand. Two tabs that learn of the
 round in the same instant can both read it free (`localStorage` reaches other
-tabs a moment late), so the claim also takes a Web Lock named for the review
-and round, held for five seconds: the tab that does not get it lands at once
-and gives its claim up. Its room is up only until the lock answers — a frame
-or two in a tab on screen, nothing in a background tab. If the cards cannot be
+tabs a moment late); both then jump and both open, as every tab did in v3.4.0.
+That race is accepted. If the cards cannot be
 fetched, the jump has played to no replay; the claim stands, so a reload
 neither jumps nor opens again, and the replay stays reachable by hand once it
 loads. A newer round arriving drops whatever an older round queued for the

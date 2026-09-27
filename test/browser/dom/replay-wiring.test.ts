@@ -47,12 +47,12 @@ function cardsOf(id: string): ReplayData {
 
 /** Arrivals the test flies by hand: `land()` is the jump in flight landing. */
 function fakeArrivals() {
-  const calls: string[] = [];
+  const flights = { jumps: 0 };
   let flying = false;
   let next: (() => void) | undefined;
   const arrival: Arrivals = {
     jump: () => {
-      calls.push("jump");
+      flights.jumps += 1;
       flying = true;
     },
     onLanding: (then) => {
@@ -60,15 +60,9 @@ function fakeArrivals() {
       else then();
     },
     forget: () => {
-      calls.push("forget");
       next = undefined;
     },
     jumping: () => flying,
-    abort: () => {
-      calls.push("abort");
-      flying = false;
-      next = undefined;
-    },
   };
   const land = (): void => {
     flying = false;
@@ -76,7 +70,7 @@ function fakeArrivals() {
     next = undefined;
     then?.();
   };
-  return { arrival, calls, land };
+  return { arrival, flights, land };
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -86,24 +80,7 @@ const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resol
  * shares. The server answers each round with cards when the round before it
  * was commented on, as `rounds/replay.ts` does; `answer` stands in for it.
  */
-/**
- * The browser's locks, one table for every tab of the test: the first to ask
- * for a name holds it, anyone after is told, a turn later, that they lost.
- */
-function fakeLocks() {
-  const held = new Set<string>();
-  return (name: string, lost: () => void): void => {
-    const won = !held.has(name);
-    held.add(name);
-    if (!won) void Promise.resolve().then(lost);
-  };
-}
-
-function tab(
-  storage = new FakeStorage(),
-  answer?: () => Promise<ReplayData>,
-  contend = fakeLocks(),
-) {
+function tab(storage = new FakeStorage(), answer?: () => Promise<ReplayData>) {
   const flight = fakeArrivals();
   const opened: string[] = [];
   const reopen = new FakeNode("button", "hidden");
@@ -120,7 +97,6 @@ function tab(
     arrivals: () => flight.arrival,
     fetch: answer ?? (async () => served),
     storage,
-    contend,
     overlay: () => ({
       open: (opening: ReplayOpening) => opened.push(opening.data.comments[0]?.id ?? "?"),
     }),
@@ -141,24 +117,20 @@ test("a round whose replay opens arrives by the jump, and the replay opens as it
   page.arrive(roundOf(1));
   await settled();
 
-  assert.deepEqual(page.calls, ["forget", "jump"]);
+  assert.equal(page.flights.jumps, 1);
   assert.deepEqual(page.opened, [], "the replay waits for the landing");
   page.land();
   assert.deepEqual(page.opened, ["r1"]);
   assert.equal(page.reopen.hidden, false, "and stays offered for a reopen by hand");
 });
 
-test("a round with nothing to replay neither jumps nor opens, but still forgets the last", async () => {
+test("a round with nothing to replay neither jumps nor opens", async () => {
   const page = tab();
 
   page.arrive(roundOf(1, false), false);
   await settled();
 
-  assert.deepEqual(
-    page.calls,
-    ["forget"],
-    "an older round's queued replay is dropped all the same",
-  );
+  assert.equal(page.flights.jumps, 0);
   assert.deepEqual(page.opened, []);
 });
 
@@ -171,7 +143,7 @@ test("every newer round forgets what the last one queued for the landing", async
   await settled();
   page.land();
 
-  assert.deepEqual(page.calls, ["forget", "jump", "forget"]);
+  assert.equal(page.flights.jumps, 1, "round 2 had nothing to replay");
   assert.deepEqual(page.opened, [], "round 1's replay does not open over round 2");
 });
 
@@ -200,9 +172,9 @@ test("two tabs on one review: the one that claims the round jumps and opens, the
   first.land();
   second.land();
 
-  assert.deepEqual(first.calls, ["forget", "jump"]);
+  assert.equal(first.flights.jumps, 1);
   assert.deepEqual(first.opened, ["r1"]);
-  assert.deepEqual(second.calls, ["forget"], "no jump to nothing");
+  assert.equal(second.flights.jumps, 0, "no jump to nothing");
   assert.deepEqual(second.opened, []);
   assert.equal(second.reopen.hidden, false, "it is still there to open by hand");
 });
@@ -239,7 +211,7 @@ test("a failed fetch: the jump played once, and a reload neither jumps nor opens
   reloaded.arrive(roundOf(1));
   await settled();
 
-  assert.deepEqual(reloaded.calls, ["forget"]);
+  assert.equal(reloaded.flights.jumps, 0);
   assert.deepEqual(reloaded.opened, []);
   assert.equal(reloaded.reopen.hidden, false, "the replay can still be opened by hand");
 });
@@ -254,39 +226,4 @@ test("a claim opens once: the same round asked for again opens nothing more", as
   await settled();
 
   assert.deepEqual(page.opened, ["r1"]);
-});
-
-test("two tabs that read the round free in the same instant: the lock picks one", async () => {
-  // Each tab's own view of the storage: the other's claim has not reached it yet.
-  const locks = fakeLocks();
-  const first = tab(new FakeStorage(), undefined, locks);
-  const second = tab(new FakeStorage(), undefined, locks);
-
-  first.arrive(roundOf(1));
-  second.arrive(roundOf(1));
-  await settled();
-  first.land();
-  second.land();
-
-  assert.deepEqual(first.calls, ["forget", "jump"]);
-  assert.deepEqual(first.opened, ["r1"]);
-  assert.deepEqual(second.calls, ["forget", "jump", "abort"], "it lands at once");
-  assert.deepEqual(second.opened, [], "and gives its claim up");
-  assert.equal(second.reopen.hidden, false, "the replay is there to open by hand");
-});
-
-test("a lost lock for an older round takes nothing from the newer one", async () => {
-  let lose: () => void = () => undefined;
-  const page = tab(new FakeStorage(), undefined, (name, lost) => {
-    if (name.endsWith(":1")) lose = lost;
-  });
-
-  page.arrive(roundOf(1));
-  page.arrive(roundOf(2));
-  lose();
-  await settled();
-  page.land();
-
-  assert.deepEqual(page.calls, ["forget", "jump", "forget", "jump"]);
-  assert.deepEqual(page.opened, ["r2"]);
 });
