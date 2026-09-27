@@ -957,3 +957,7 @@ test("the round's announcement holds still too: no fold flight, no orbiting spar
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\] \{\s*animation: none;/);
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\]::after \{\s*display: none;/);
 });
+
+test("a diff's hunk header is the top band of its block, with no strip of ground above it", () => {
+  assert.match(rulesFor(".lsr-file-diff:has(> .d2h-wrapper)").join(""), /padding-top: 0;/);
+});
