@@ -61,16 +61,38 @@ async function listenIfFree(port: number): Promise<Server | undefined> {
   });
 }
 
-/** A machine whose ephemeral range reaches down into ours would bring the race back: say so. */
+/**
+ * A machine whose ephemeral range reaches into ours would bring the race back:
+ * say so. Ports reserved through ip_local_reserved_ports are never handed out
+ * by the kernel, so an overlap they cover is no overlap.
+ */
 function assertOutsideEphemeralRange(): void {
   const range = "/proc/sys/net/ipv4/ip_local_port_range";
   if (!existsSync(range)) return;
   const [low = 0, high = 0] = readFileSync(range, "utf8").trim().split(/\s+/).map(Number);
-  if (low <= LAST_CLAIM && high >= FIRST_PORT) {
+  const reserved = reservedPorts();
+  for (let port = Math.max(low, FIRST_PORT); port <= Math.min(high, LAST_CLAIM); port += 1) {
+    if (reserved.some(([from, to]) => port >= from && port <= to)) continue;
     throw new Error(
-      `freePort: the ephemeral range starts at ${low}, inside ${FIRST_PORT}..${LAST_CLAIM}; move FIRST_PORT below it`,
+      `freePort: the ephemeral range ${low}..${high} overlaps ${FIRST_PORT}..${LAST_CLAIM}; ` +
+        "narrow net.ipv4.ip_local_port_range, reserve the block through " +
+        "net.ipv4.ip_local_reserved_ports, or move FIRST_PORT out of the range",
     );
   }
+}
+
+/** `net.ipv4.ip_local_reserved_ports` as ranges: "20000-31999,40000" reads as [[20000, 31999], [40000, 40000]]. */
+function reservedPorts(): [number, number][] {
+  const path = "/proc/sys/net/ipv4/ip_local_reserved_ports";
+  if (!existsSync(path)) return [];
+  return readFileSync(path, "utf8")
+    .trim()
+    .split(",")
+    .filter((entry) => entry !== "")
+    .map((entry) => {
+      const [from = 0, to = from] = entry.split("-").map(Number);
+      return [from, to];
+    });
 }
 
 export interface OccupiedPort {
