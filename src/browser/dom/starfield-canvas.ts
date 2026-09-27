@@ -140,7 +140,9 @@ interface Scene {
 
 /** Each star's place this frame: drifting, or `formed` of the way into its figure. */
 function placeStars({ view, places }: Scene, seconds: number, formed: number): void {
-  for (const place of places) {
+  // Indexed, not `for…of`: an iterator is garbage until the loop is optimised.
+  for (let index = 0; index < places.length; index += 1) {
+    const place = places[index]!;
     driftAt(place.star, seconds, view, place);
     place.x += (place.star.x - place.x) * formed;
     place.y += (place.star.y - place.y) * formed;
@@ -153,7 +155,9 @@ function drawSky(scene: Scene, seconds: number, ms: number): void {
   placeStars(scene, seconds, formed);
   const lines = ms < 0 ? 0 : figureShown(ms);
   if (lines > 0) drawFigures(scene, lines);
-  for (const place of scene.places) drawStar(scene, place, seconds, formed);
+  for (let index = 0; index < scene.places.length; index += 1) {
+    drawStar(scene, scene.places[index]!, seconds, formed);
+  }
   scene.context.globalAlpha = 1;
 }
 
@@ -177,7 +181,8 @@ function drawFigures({ context, ink, lines }: Scene, shown: number): void {
   context.lineWidth = 1;
   context.globalAlpha = (ink.night ? 0.7 : 0.55) * shown;
   context.beginPath();
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!;
     context.moveTo(line[0].x, line[0].y);
     context.lineTo(line[1].x, line[1].y);
   }
@@ -238,11 +243,6 @@ function strokeBatch(
     context.lineTo(run[at + 2]! + 0.3, run[at + 3]! + 0.3);
   }
   context.stroke();
-}
-
-/** The page's 2D context for `canvas`, if it will give one. */
-function contextOf(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
-  return typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
 }
 
 /**
@@ -339,7 +339,8 @@ export function paintSky(
   view: SkyBox,
   still: boolean,
 ): SkyPainter | undefined {
-  const context = contextOf(canvas);
+  // The page's 2D context for `canvas`, if it will give one.
+  const context = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
   if (!context) return undefined;
   let scene = sceneOf(canvas, context, sky, view);
   const started = performance.now();
@@ -354,9 +355,8 @@ export function paintSky(
     return true;
   };
   /** A still sky shows its latest state: drifting, or formed once gathering began. */
-  const drawStill = (): void => {
+  const drawStill = (): boolean =>
     draw(gatherAt === undefined ? started : gatherAt + SKY_TIMES.namesAtMs);
-  };
   const rebuild = (nextSky: Sky, nextView: SkyBox): void => {
     if (stopped) return;
     scene = sceneOf(canvas, context, nextSky, nextView);
