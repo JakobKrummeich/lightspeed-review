@@ -19,7 +19,7 @@ round arrives by a jump into hyperspace.
   overlap gives its place to the next chapter's). Its **Open the review**
   button waits 1.5 s after the names; `Esc` still skips.
   A screen reader hears the chapter names in the sheet's label. The last
-  reason's button now reads **Show the chapters**.
+  reason's button now reads **Enlighten me**.
 - The last press jumps into the review: the stars streak outward, the edges
   close in and a flash covers the swap, a second in all. This replaces the
   flood of light.

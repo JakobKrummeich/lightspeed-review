@@ -73,7 +73,7 @@ function cover(): Sheet {
 
 /** "Reason n of m" is the section's aria-label, not a visible line: the dots say it to the eye. */
 function reasonSheet(total: number, sky: boolean): (intent: string, index: number) => Sheet {
-  const last = sky ? "Show the chapters" : "Open the review";
+  const last = sky ? "Enlighten me" : "Open the review";
   return (intent, index) => ({
     label: `reason ${index + 1} of ${total}`,
     body: escapeHtml(intent),

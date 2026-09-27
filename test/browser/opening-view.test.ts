@@ -134,7 +134,7 @@ test("the last reason leads to the chapters when there is a sky to show", () => 
   assert.deepEqual(buttons(renderOpening(["one", "two"], CHAPTERS)), [
     "Unwrap",
     "Next reason",
-    "Show the chapters",
+    "Enlighten me",
     "Open the review",
   ]);
 });

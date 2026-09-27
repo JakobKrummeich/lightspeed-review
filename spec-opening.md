@@ -27,7 +27,7 @@ there is nothing to look at instead of the reason being read.
   read before the first reason could be.
 - **One sheet per intent.** In the order the intents were given, each carrying
   one intent and the button, and nothing else at all. The button moves to the
-  next; on the last reason it reads **Show the chapters**.
+  next; on the last reason it reads **Enlighten me**.
 - **The constellation sheet.** Last, and with no words on it at all: the
   round's files, which drifted behind the reasons as stars, gather into one
   constellation per chapter, and the chapter names come up under their

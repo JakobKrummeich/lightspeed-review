@@ -455,7 +455,7 @@ reason sheets (one per intent, same room):
 │           The intent text, set large,          .lsr-opening-body
 │           nearly headline size, ≤30ch          (reason size)
 │                                                            │
-│          ( Next reason │ Show the chapters )   last reason
+│          ( Next reason │ Enlighten me )        last reason
 
 constellation sheet (last; no text; section aria-label "3 chapters: …"):
 ┌ .lsr-opening-overlay[data-sky="true"] ─────────────────────┐
