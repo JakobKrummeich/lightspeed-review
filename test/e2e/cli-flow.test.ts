@@ -104,13 +104,27 @@ interface Answer {
 }
 
 /**
- * The answer a waiting command printed last. `open` and `publish` print the
- * round they opened before the wait and the batch after it — two TOON
- * documents, each led by `round:`.
+ * `open` and `publish` print the round they opened before the wait and the
+ * batch after it — two TOON documents, each led by `round:`.
  */
-function answerOf(stdout: string): Answer {
+function documentsOf(stdout: string): string[] {
   const starts = [...stdout.matchAll(/^round: /gm)].map((match) => match.index);
-  return decode(stdout.slice(starts.at(-1) ?? 0)) as Answer;
+  if (starts.length === 0) return [stdout];
+  return starts.map((start, index) => stdout.slice(start, starts[index + 1]));
+}
+
+/** The answer a waiting command printed last. */
+function answerOf(stdout: string): Answer {
+  return decode(documentsOf(stdout).at(-1)!) as Answer;
+}
+
+/**
+ * What a waiting command showed before it began to wait. Decoded, not matched:
+ * TOON quotes a string that reads as a number, and a session key such as
+ * `6582e00777036441` does.
+ */
+function shownOf(stdout: string): { session?: { key?: string } } {
+  return decode(documentsOf(stdout)[0]!) as { session?: { key?: string } };
 }
 
 function item(answer: Answer, id: string): Item {
@@ -218,7 +232,7 @@ test("a whole session: questions, replies, resolve, work, publish, end", async (
     const opened = await openAnsweredWith(loop, [question, changeRequest]);
     assert.equal(opened.code, 0, opened.stdout);
     assert.match(opened.stdout, /^ {2}mode: skipped$/m, "no model was consulted");
-    assert.match(opened.stdout, new RegExp(`^ {2}key: ${key}$`, "m"));
+    assert.equal(shownOf(opened.stdout).session?.key, key);
     const first = answerOf(opened.stdout);
     assert.equal(first.turn, "agent digesting");
     assert.partialDeepStrictEqual(item(first, "t1"), {
