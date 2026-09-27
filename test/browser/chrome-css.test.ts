@@ -997,3 +997,11 @@ test("a thread's presses stand on a soft fill with no border, Resolve at one end
     /outline: 2px solid var\(--lsr-accent\);/,
   );
 });
+
+test("a thread's reply box stands on its fill like the compose box, with the same focus ring", () => {
+  assert.match(rulesFor(".lsr-thread-reply-box").join(""), /border-color: transparent;/);
+  assert.match(
+    rulesFor(".lsr-thread-reply-box:focus-visible").join(""),
+    /outline: 2px solid var\(--lsr-accent\);/,
+  );
+});

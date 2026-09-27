@@ -374,6 +374,7 @@
 .lsr-thread-reply-box {
   min-height: calc(2lh + 2 * var(--lsr-space-2) + 2px);
   field-sizing: content;
+  border-color: transparent;
 }
 
 /*
@@ -413,7 +414,8 @@
   border-color: transparent;
 }
 
-#lsr-general-comment:focus-visible {
+#lsr-general-comment:focus-visible,
+.lsr-thread-reply-box:focus-visible {
   outline: 2px solid var(--lsr-accent);
   outline-offset: 0;
 }
