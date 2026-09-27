@@ -140,13 +140,24 @@ export function figureShown(ms: number): number {
   return clamp((ms - SKY_TIMES.figureAtMs) / SKY_TIMES.figureFadeMs);
 }
 
-/** Wraps round the sky, so a drifting field never empties. */
-export function driftAt(star: Star, seconds: number, box: SkyBox): { x: number; y: number } {
-  const wrap = (value: number, span: number): number => ((value % span) + span) % span;
-  return {
-    x: wrap(star.fromX + star.driftX * seconds, box.width),
-    y: wrap(star.fromY + star.driftY * seconds, box.height),
-  };
+function wrap(value: number, span: number): number {
+  return ((value % span) + span) % span;
+}
+
+/**
+ * Wraps round the sky, so a drifting field never empties. Written into
+ * `into` when given: the painter places every star every frame, and keeps
+ * one object per star for it rather than making 600 new ones.
+ */
+export function driftAt(
+  star: Star,
+  seconds: number,
+  box: SkyBox,
+  into: { x: number; y: number } = { x: 0, y: 0 },
+): { x: number; y: number } {
+  into.x = wrap(star.fromX + star.driftX * seconds, box.width);
+  into.y = wrap(star.fromY + star.driftY * seconds, box.height);
+  return into;
 }
 
 interface Kept extends SkyFile {

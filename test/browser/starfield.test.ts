@@ -14,7 +14,14 @@ import {
   type SkyChapter,
   type SkyLabel,
 } from "../../src/browser/starfield.ts";
-import { warpField, warpSpeed, warpStreaks } from "../../src/browser/warp-field.ts";
+import {
+  PAST_EYE,
+  streakBatches,
+  warpField,
+  warpSpeed,
+  warpStreaks,
+  type WarpField,
+} from "../../src/browser/warp-field.ts";
 
 const BOX = { width: 1440, height: 770 };
 
@@ -307,11 +314,17 @@ test("the names come once the figures have formed, and the button after them", (
   assert.ok(SKY_TIMES.flashAtMs < SKY_TIMES.jumpMs, "the flash covers the swap");
 });
 
+/** Stars still ahead of the eye. */
+function flying(field: WarpField): number {
+  return field.z.filter((z) => z >= PAST_EYE).length;
+}
+
 test("the jump starts from where the stars stand, plus a deep field around them", () => {
   const field = warpField([{ x: 720, y: 385 }], BOX, "seed", 10);
 
-  assert.equal(field.length, 11);
-  assert.deepEqual(field[0], { x: 0, y: 0, z: BOX.width / 2, alive: true });
+  assert.equal(field.z.length, 11);
+  assert.deepEqual([field.x[0], field.y[0], field.z[0]], [0, 0, BOX.width / 2]);
+  assert.equal(flying(field), 11);
   assert.deepEqual(warpField([], BOX, "seed", 10), warpField([], BOX, "seed", 10));
 });
 
@@ -334,17 +347,45 @@ test("streaks come in three batches by depth, and a star past the eye is gone", 
   const field = warpField([], BOX, "streaks", 200);
   const streaks = warpStreaks(field, 4, BOX);
 
-  assert.equal(streaks.length, 3);
-  for (const batch of streaks) assert.equal(batch.length % 4, 0, "four numbers a streak");
-  const drawn = streaks.reduce((sum, batch) => sum + batch.length / 4, 0);
-  assert.equal(drawn, field.filter((star) => star.alive).length);
+  assert.equal(streaks.runs.length, 3);
+  for (const end of streaks.ends) assert.equal(end % 4, 0, "four numbers a streak");
+  const drawn = streaks.ends.reduce((sum, end) => sum + end / 4, 0);
+  assert.equal(drawn, flying(field));
 
-  for (let frame = 0; frame < 400; frame += 1) warpStreaks(field, 40, BOX);
+  for (let frame = 0; frame < 400; frame += 1) warpStreaks(field, 40, BOX, streaks);
+  assert.equal(flying(field), 0, "every star flew past");
+  assert.deepEqual(warpStreaks(field, 40, BOX).ends, [0, 0, 0]);
+});
+
+test("the streaks of every frame are written into the same buffers, never new ones", () => {
+  // 60 frames a second of fresh arrays was 5.7 MB/s of garbage at 780 stars.
+  const field = warpField([{ x: 10, y: 10 }], BOX, "reuse", 300);
+  const batches = streakBatches(field.z.length);
+  const runs = [...batches.runs];
+
+  const first = warpStreaks(field, 4, BOX, batches);
+  const second = warpStreaks(field, 4, BOX, batches);
+
+  assert.equal(first, batches);
+  assert.equal(second, batches);
+  assert.deepEqual(batches.runs, runs, "the same three buffers");
   assert.ok(
-    field.every((star) => !star.alive),
-    "every star flew past",
+    runs.every((run) => run.length >= field.z.length * 4),
+    "room for every star",
   );
-  assert.deepEqual(warpStreaks(field, 40, BOX), [[], [], []]);
+  const [x1, y1, x2, y2] = [...batches.runs[2].slice(0, 4)];
+  assert.ok([x1, y1, x2, y2].every(Number.isFinite), "a near streak reads as numbers");
+});
+
+test("a drifting star can be placed into an object the painter keeps", () => {
+  const [star] = layoutSky(chapters([1]), BOX).stars;
+  assert.ok(star);
+  const kept = { x: -1, y: -1 };
+
+  const placed = driftAt(star, 12.5, BOX, kept);
+
+  assert.equal(placed, kept, "no new object a frame");
+  assert.deepEqual(kept, driftAt(star, 12.5, BOX));
 });
 
 test("the page's chapters become the sky's: a file weighs every line it changed", () => {
