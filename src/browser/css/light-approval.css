@@ -113,10 +113,7 @@
   }
 }
 
-/*
- * The box's own glow: a layer over it that fades, so only opacity moves.
- * `::before`, because the drawn box's `::after` is its tick mark (`index.css`).
- */
+/* The box's own glow: a layer over it that fades, so only opacity moves. */
 .lsr-tick input[data-light="tick"]:checked {
   position: relative;
 }

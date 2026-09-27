@@ -218,6 +218,12 @@
   /* The `@@` row states its line numbers; it does not need a band to be found. */
   --d2h-info-bg-color: var(--lsr-code-quiet);
   --d2h-info-border-color: var(--lsr-border);
+  /*
+   * The system's own colours, for forced-colours mode only: there the page's
+   * palette is replaced, and what must still read is said in the reader's.
+   */
+  --lsr-system-text: CanvasText;
+  --lsr-system-mark: Highlight;
 }
 
 /* An explicit pick overrides the OS; `light-dark()` re-resolves every token. */

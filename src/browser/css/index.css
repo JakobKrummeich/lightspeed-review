@@ -221,8 +221,13 @@
   color: var(--lsr-strong);
 }
 
-/* Drawn rather than native: the browser's own box is painted from the OS theme,
- * a plain grey square in the middle of the palette. */
+/*
+ * Drawn rather than native: the browser's own box is painted from the OS theme,
+ * a plain grey square in the middle of the palette. No mark inside: approved is
+ * a box filled with the accent, not approved an empty outline, and the fill
+ * alone is the difference — a native checkbox under it tells assistive
+ * technology the rest.
+ */
 .lsr-tick input[type="checkbox"] {
   appearance: none;
   width: 1.5rem;
@@ -243,21 +248,35 @@
   box-shadow: none;
 }
 
-/* Two borders of an empty box, rotated: a tick with no font and no image. */
-.lsr-tick input[type="checkbox"]:checked::after {
-  content: "";
-  display: block;
-  width: 0.75rem;
-  height: 0.4rem;
-  margin: var(--lsr-space-1) auto;
-  border-left: 2px solid var(--lsr-on-accent);
-  border-bottom: 2px solid var(--lsr-on-accent);
-  transform: rotate(-45deg);
-}
-
 .lsr-tick input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--lsr-accent);
   outline-offset: 2px;
+}
+
+/*
+ * Forced colours drop the box-shadow outline and repaint the fill as Canvas,
+ * which would leave both states the same blank square. The outline becomes a
+ * system-coloured border, and a checked box keeps a Highlight fill of its own.
+ */
+@media (forced-colors: active) {
+  .lsr-tick input[type="checkbox"] {
+    border: 1px solid var(--lsr-system-text);
+  }
+
+  .lsr-tick input[type="checkbox"]:hover {
+    border-color: var(--lsr-system-mark);
+  }
+
+  .lsr-tick input[type="checkbox"]:checked {
+    forced-color-adjust: none;
+    border-color: var(--lsr-system-mark);
+    background: var(--lsr-system-mark);
+  }
+
+  /* Out of forced colours' reach on a checked box, so named in system colours here. */
+  .lsr-tick input[type="checkbox"]:checked:focus-visible {
+    outline-color: var(--lsr-system-text);
+  }
 }
 
 .lsr-file-path,
