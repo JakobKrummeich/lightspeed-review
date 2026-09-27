@@ -218,7 +218,7 @@ test("the page is inert while the jump plays and handed back, caret and all, on 
 });
 
 /** The page with two thread reply boxes, the second holding the caret, as a round starts to arrive. */
-function replyingThenJump(t: TestContext, boxes: string) {
+function replyingThenJump(t: TestContext, boxes: string, redrawn = boxes) {
   const { page: doc, root, behind } = page(t);
   behind.innerHTML = boxes;
   const writing = behind.querySelectorAll("textarea")[1];
@@ -232,7 +232,7 @@ function replyingThenJump(t: TestContext, boxes: string) {
     paint: fakePaint().paint,
   });
   // The round is drawn under the room: the panel replaces every reply box.
-  behind.innerHTML = boxes;
+  behind.innerHTML = redrawn;
   const [other, again] = behind.querySelectorAll("textarea");
   return { doc, writing, other, again, lands: () => lands };
 }
@@ -260,6 +260,29 @@ test("a gone element with nothing that names it is not guessed at", (t) => {
   assert.equal(state.other?.focusCalls.length, 0);
   assert.equal(state.again?.focusCalls.length, 0);
   assert.equal(state.writing.focusCalls.length, 0, "nor focused where nobody sees it");
+});
+
+test("a place on the page is not a name: a twin by position alone is not guessed at", (t) => {
+  const box = (at: number) =>
+    `<textarea class="lsr-note" data-index="${at}" data-state="open"></textarea>`;
+  const state = replyingThenJump(t, box(0) + box(1));
+
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.equal(state.other?.focusCalls.length, 0);
+  assert.equal(state.again?.focusCalls.length, 0, "index 1 after the redraw may be another thing");
+});
+
+test("a name beside a place: the twin is found by its name though its place moved", (t) => {
+  const box = (thread: string, at: number) =>
+    `<textarea class="lsr-thread-reply-box" data-thread="${thread}" data-group-index="${at}"></textarea>`;
+  // t1 was second; the round put a new thread before it, so it is third now.
+  const state = replyingThenJump(t, box("t0", 0) + box("t1", 1), box("t1", 2) + box("t0", 0));
+
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.deepEqual(state.other?.focusCalls, [{ preventScroll: true }], "t1, at its new place");
+  assert.equal(state.again?.focusCalls.length, 0);
 });
 
 test("no canvas to paint: the tunnel and the flash still carry the jump", (t) => {
