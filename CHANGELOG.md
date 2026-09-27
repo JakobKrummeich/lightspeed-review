@@ -13,9 +13,10 @@ round arrives by a jump into hyperspace.
 - A new last sheet, with no words on it: the stars gather into one
   constellation per chapter and the chapter names come up under their
   figures, with each chapter's file count (at most eight names; a long name
-  wraps to a second line, and a name that would overlap gives its place to
-  the next chapter's). Its
-  **Open the review** button waits 1.5 s after the names; `Esc` still skips.
+  wraps to a second line and ends in an ellipsis past two; names are measured
+  in their own font, so CJK and wide ones keep apart too; a name that would
+  overlap gives its place to the next chapter's). Its **Open the review**
+  button waits 1.5 s after the names; `Esc` still skips.
   A screen reader hears the chapter names in the sheet's label. The last
   reason's button now reads **Show the chapters**.
 - The last press jumps into the review: the stars streak outward, the edges

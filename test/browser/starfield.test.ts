@@ -253,6 +253,48 @@ test("a long chapter name takes a second line rather than an ellipsis at 24 char
   assert.equal(phone?.width, 200 - 24, "never wider than the sky it stands in");
 });
 
+test("a name is as wide as the page measures it, not as its letter count guesses", () => {
+  // CJK glyphs are near a full em each: 13 of them guessed at 9px apiece came out 70px narrow,
+  // and two such names overlapped at 375×667.
+  const name = "会话状态持久化与恢复机制啊";
+  const full = (text: string): number => [...text].length * 14;
+  const named = (measure?: (text: string) => number) =>
+    layoutSky([{ name, files: [{ path: "a.ts", lines: 3 }] }], BOX, measure).labels[0];
+
+  assert.equal(named(full)?.width, 13 * 14 + 12, "the measured width, and one line");
+  assert.equal(named(full)?.height, 38);
+  assert.equal(named()?.width, 13 * 9 + 12, "no measure: the estimate");
+  const twice = layoutSky([{ name: name + name, files: [{ path: "a.ts", lines: 3 }] }], BOX, full);
+  assert.equal(twice.labels[0]?.width, 240, "wider than a name may be: the widest, two lines");
+  assert.equal(twice.labels[0]?.height, 56);
+});
+
+test("measured wide names still keep off each other on a phone", () => {
+  const cjk = [
+    "用户界面更新与改进用户界面",
+    "会话状态持久化与恢复机制啊",
+    "命令行动词一致性修复工作",
+  ];
+  const full = (text: string): number => [...text].length * 14;
+  const sky = layoutSky(
+    [...cjk, "进度条显示与更新逻辑", "文档全部新功能说明书", "测试覆盖所有边界情况"].map(
+      (name, chapter) => ({
+        name,
+        files: Array.from({ length: 20 - chapter }, (_unused, index) => ({
+          path: `c${chapter}/f${index}`,
+          lines: index + 1,
+        })),
+      }),
+    ),
+    { width: 375, height: 539 },
+    full,
+  );
+
+  assert.ok(sky.labels.length > 1);
+  for (const label of sky.labels) assert.ok(label.width >= Math.min(240, full(label.name) + 12));
+  assertApart(sky.labels);
+});
+
 test("two-line names still keep off each other and inside the sky", () => {
   const sizes = [30, 25, 20, 18, 15, 12];
   const sky = layoutSky(

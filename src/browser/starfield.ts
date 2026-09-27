@@ -100,8 +100,21 @@ const NAME_LINE = 18;
 const NAME_GAP = 6;
 /** The widest a name may be; a longer one takes a second line, then an ellipsis. */
 const NAME_WIDEST = 240;
-/** A bold meta-size character, generously: a name wider than its box is clipped. */
+/** A bold meta-size Latin character, generously; only for when nothing can measure. */
 const CHAR_WIDTH = 9;
+/** Room round a measured name, px: subpixel rounding and the glow of its shadow. */
+const NAME_SLACK = 12;
+
+/**
+ * The width `text` takes on one line in the names' own font, px. The page
+ * measures it (`opening-sky.ts`); this module stays pure and only asks.
+ */
+export type MeasureName = (text: string) => number;
+
+/** Without a canvas to measure in: a Latin guess — CJK and wide letters run over it. */
+export function estimateName(text: string): number {
+  return text.length * CHAR_WIDTH;
+}
 
 /** Park–Miller: tiny, repeatable, and good enough to scatter stars. */
 export function seeded(seed: number): () => number {
@@ -267,10 +280,15 @@ function spanningTree(points: { x: number; y: number }[]): [number, number][] {
  * may be (the stylesheet clamps it there and ends a longer one in an
  * ellipsis). The count's line decides the width only when it is the longer.
  */
-function nameBox(name: string, files: number, box: SkyBox): { width: number; height: number } {
+function nameBox(
+  { name, files }: Constellation,
+  box: SkyBox,
+  measure: MeasureName,
+): { width: number; height: number } {
   const widest = Math.min(NAME_WIDEST, box.width - EDGE * 2);
-  const nameWidth = name.length * CHAR_WIDTH + 12;
-  const width = Math.min(widest, Math.max(nameWidth, `${files} files`.length * CHAR_WIDTH + 12));
+  const nameWidth = measure(name) + NAME_SLACK;
+  const countWidth = estimateName(`${files} files`) + NAME_SLACK;
+  const width = Math.min(widest, Math.max(nameWidth, countWidth));
   const lines = nameWidth > width ? 2 : 1;
   return { width, height: NAME_HEIGHT + (lines - 1) * NAME_LINE };
 }
@@ -295,14 +313,14 @@ interface Constellation {
  * would overlap one already placed is left off — the stars still say it — and
  * the next largest is asked instead, until `MOST_NAMES` are up.
  */
-function names(constellations: Constellation[], box: SkyBox): SkyLabel[] {
+function names(constellations: Constellation[], box: SkyBox, measure: MeasureName): SkyLabel[] {
   const placed: SkyLabel[] = [];
   const ranked = constellations
     .filter((one) => one.stars > 0)
     .sort((a, b) => b.stars - a.stars || a.chapter - b.chapter);
   for (const one of ranked) {
     if (placed.length === MOST_NAMES) break;
-    const { width, height } = nameBox(one.name, one.files, box);
+    const { width, height } = nameBox(one, box, measure);
     const label = {
       chapter: one.chapter,
       name: one.name,
@@ -319,9 +337,14 @@ function names(constellations: Constellation[], box: SkyBox): SkyLabel[] {
 
 /**
  * Stars, figures and names for `chapters` inside `box`. Seeded from the
- * chapter names and file paths, so the layout belongs to the review.
+ * chapter names and file paths, so the layout belongs to the review. `measure`
+ * gives each name's width as the page will set it; without one, a guess.
  */
-export function layoutSky(chapters: readonly SkyChapter[], box: SkyBox): Sky {
+export function layoutSky(
+  chapters: readonly SkyChapter[],
+  box: SkyBox,
+  measure: MeasureName = estimateName,
+): Sky {
   const seedText = chapters
     .map((c) => [c.name, ...c.files.map((f) => f.path)].join("\n"))
     .join("\n\n");
@@ -352,5 +375,5 @@ export function layoutSky(chapters: readonly SkyChapter[], box: SkyBox): Sky {
       radius,
     });
   }
-  return { box, stars, figures, labels: names(constellations, box) };
+  return { box, stars, figures, labels: names(constellations, box, measure) };
 }

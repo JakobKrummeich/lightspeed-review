@@ -489,7 +489,8 @@ constellation sheet (last; no text; section aria-label "3 chapters: …"):
   known, before it is drawn; the room is opaque from its first frame, the
   round swaps under it, and the replay opens on landing. The page behind is
   inert and keys are captured while it plays; Esc lands at once.
-- Long chapter names wrap to two lines (`.lsr-sky-title`, line-clamp 2); a
+- Long chapter names wrap to two lines (`.lsr-sky-title`, line-clamp 2, then
+  an ellipsis), measured with canvas `measureText` in their own font; a
   resize lays the sky out again. The room clips, never scrolls; Tab stays on
   the top sheet (rest of the page `inert`).
 - The stack grows with the longest reason (floor 19rem, ceiling = viewport);

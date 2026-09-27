@@ -11,7 +11,14 @@
  * resize lays the sky out again once the window settles, until the jump.
  */
 import { renderSkyNames } from "../opening-view.ts";
-import { SKY_TIMES, layoutSky, type SkyBox, type SkyChapter } from "../starfield.ts";
+import {
+  SKY_TIMES,
+  estimateName,
+  layoutSky,
+  type MeasureName,
+  type SkyBox,
+  type SkyChapter,
+} from "../starfield.ts";
 import { paintSky } from "./starfield-canvas.ts";
 import type { Stillness } from "./stillness.ts";
 
@@ -55,6 +62,33 @@ function onSettledResize(changed: () => void): () => void {
   };
 }
 
+/**
+ * Names measured as the stylesheet will set them: the sky's own canvas
+ * measures in the font a probe title computes to (the painter draws no text,
+ * and a resize resets the context's font, so it is set on every ask). The
+ * estimate when there is no 2D context to ask.
+ */
+function measureNames(field: HTMLElement, names: HTMLElement | null): MeasureName {
+  const canvas = field.querySelector<HTMLCanvasElement>(".lsr-sky-canvas");
+  const context =
+    canvas && typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+  if (!context || !names) return estimateName;
+  names.innerHTML = '<span class="lsr-sky-name"><span class="lsr-sky-title">M</span></span>';
+  const title = names.querySelector<HTMLElement>(".lsr-sky-title");
+  // Read before the probe goes: a computed style is live, and empty once detached.
+  const font = title && fontOf(getComputedStyle(title));
+  names.innerHTML = "";
+  if (!font) return estimateName;
+  return (text) => {
+    context.font = font;
+    return context.measureText(text).width;
+  };
+}
+
+function fontOf(style: CSSStyleDeclaration): string {
+  return `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+}
+
 export function mountOpeningSky(
   field: HTMLElement,
   chapters: readonly SkyChapter[],
@@ -62,7 +96,9 @@ export function mountOpeningSky(
   paint: typeof paintSky = paintSky,
 ): OpeningSky {
   const { view, box } = viewOf();
-  const sky = layoutSky(chapters, box);
+  const names = field.querySelector<HTMLElement>(".lsr-sky-names");
+  const measure = measureNames(field, names);
+  const sky = layoutSky(chapters, box, measure);
   const canvas = field.querySelector<HTMLCanvasElement>(".lsr-sky-canvas");
   // Forced colours paint no decoration: the stylesheet hides the canvas, and
   // nothing is drawn into it either.
@@ -71,7 +107,6 @@ export function mountOpeningSky(
       ? undefined
       : paint(canvas, sky, view, still.reducedMotion);
   const moving = !still.reducedMotion && !still.forcedColors;
-  const names = field.querySelector<HTMLElement>(".lsr-sky-names");
   if (names) names.innerHTML = renderSkyNames(sky.labels);
   const timers: ReturnType<typeof setTimeout>[] = [];
   const later = (ms: number, run: () => void): void => {
@@ -81,7 +116,7 @@ export function mountOpeningSky(
   // of another density): the layout, the canvas and the names all again.
   const unwatch = onSettledResize(() => {
     const next = viewOf();
-    const laid = layoutSky(chapters, next.box);
+    const laid = layoutSky(chapters, next.box, measure);
     painter?.resize(laid, next.view);
     if (names) names.innerHTML = renderSkyNames(laid.labels);
   });

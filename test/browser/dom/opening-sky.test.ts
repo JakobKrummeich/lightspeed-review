@@ -108,6 +108,74 @@ test("a resize lays the sky out again once the window settles, names and all", (
   assert.notEqual(names(field), before, "the names stand under the new layout");
 });
 
+/** Gives the room's canvas a 2D context that measures `perChar` px a character in any font. */
+function measuring(t: TestContext, field: FakeNode, perChar: number): string[] {
+  const fonts: string[] = [];
+  const context = {
+    font: "",
+    measureText(text: string) {
+      fonts.push(this.font);
+      return { width: [...text].length * perChar };
+    },
+  };
+  const canvas = field.querySelector(".lsr-sky-canvas") as FakeNode & Record<string, unknown>;
+  canvas.getContext = () => context;
+  const globals = globalThis as Record<string, unknown>;
+  const before = globals.getComputedStyle;
+  // Live, as the browser's is: a detached element's computed style reads empty.
+  globals.getComputedStyle = (element: FakeNode) => {
+    const attached = () => field.querySelector(".lsr-sky-title") === element;
+    return {
+      get fontStyle() {
+        return attached() ? "normal" : "";
+      },
+      fontWeight: "700",
+      fontSize: "14px",
+      fontFamily: "system-ui",
+    };
+  };
+  t.after(() => {
+    globals.getComputedStyle = before;
+  });
+  return fonts;
+}
+
+test("names are measured on the sky's canvas, in the font a name is set in", (t) => {
+  const { field, window } = room(t);
+  const fonts = measuring(t, field, 20);
+  const painter = fakePaint();
+
+  mountOpeningSky(asPanelRoot(field), CHAPTERS, MOVING, painter.paint);
+
+  const docs = painter.skies[0]?.labels.find((label) => label.name === "Docs");
+  assert.equal(docs?.width, 4 * 20 + 12, "measured, not guessed");
+  const session = painter.skies[0]?.labels.find((label) => label.name === "Session state");
+  assert.equal(session?.width, 240, "13 × 20 px is past the widest a name may be");
+  assert.equal(session?.height, 56, "measured past the widest: two lines");
+  assert.ok(
+    fonts.every((font) => font === "normal 700 14px system-ui"),
+    "the name's own font",
+  );
+  assert.doesNotMatch(names(field), /lsr-sky-title">M</, "the probe is gone");
+
+  window.innerWidth = 700;
+  window.fire("resize");
+  t.mock.timers.tick(150);
+  assert.equal(painter.skies.at(-1)?.labels[0]?.height, 56, "measured again on the relayout");
+});
+
+test("with no canvas context to measure in, names fall back to the estimate", (t) => {
+  const { field } = room(t);
+  const canvas = field.querySelector(".lsr-sky-canvas") as FakeNode & Record<string, unknown>;
+  canvas.getContext = () => null;
+  const painter = fakePaint();
+
+  mountOpeningSky(asPanelRoot(field), CHAPTERS, MOVING, painter.paint);
+
+  const session = painter.skies[0]?.labels.find((label) => label.name === "Session state");
+  assert.equal(session?.width, 13 * 9 + 12);
+});
+
 test("from the jump on, and after the room closes, a resize changes nothing", (t) => {
   const { field, window } = room(t);
   const painter = fakePaint();

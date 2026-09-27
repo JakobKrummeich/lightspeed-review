@@ -31,10 +31,10 @@ there is nothing to look at instead of the reason being read.
 - **The constellation sheet.** Last, and with no words on it at all: the
   round's files, which drifted behind the reasons as stars, gather into one
   constellation per chapter, and the chapter names come up under their
-  figures; a long name wraps onto a second line rather than being cut. Its
-  button, **Open the review**, is held back until the names have
-  been up for 1.5 s — the sheet takes the caret meanwhile, so `Esc` still
-  works. A screen reader hears every chapter name in the sheet's
+  figures; a long name wraps onto a second line (at most 240 px wide), and
+  one longer than two lines ends in an ellipsis. Its button, **Open the
+  review**, is held back until the names have been up for 1.5 s — the sheet
+  takes the caret meanwhile, so `Esc` still works. A screen reader hears every chapter name in the sheet's
   `aria-label` ("3 chapters: …"); the names on screen are eye-only.
 
 The reason is set nearly as large as the cover's headline and no wider than a
@@ -68,7 +68,10 @@ names and file paths, so the same round draws the same sky every time:
   seven brightest stars, and the rest of its files stay loose around it;
 - a name is placed under its figure and kept clear of the others and of the
   strip the button stands in; the box it is checked in is the whole name, two
-  lines of it when it wraps, not a guess at one;
+  lines of it when it wraps. The page measures each name with the canvas's
+  `measureText` in the font the names are set in (`opening-sky.ts`) and hands
+  the widths to `layoutSky`, which stays pure; only with no canvas context
+  does it fall back to a Latin estimate, which CJK and wide letters overrun;
 - at most eight names: a chapter whose name would overlap is skipped and the
   next one is asked, so the eight are the first eight that fit, and the rest
   keep their figures unnamed.
