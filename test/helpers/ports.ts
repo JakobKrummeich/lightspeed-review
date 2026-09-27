@@ -51,11 +51,12 @@ export async function freePort(): Promise<number> {
   throw new Error(`freePort: every port in ${FIRST_PORT}..${FIRST_PORT + PORT_COUNT - 1} is taken`);
 }
 
+/** EACCES is taken too: a sandbox or security policy may forbid a port that nothing holds. */
 async function listenIfFree(port: number): Promise<Server | undefined> {
   const server = createServer();
   return await new Promise<Server | undefined>((resolve, reject) => {
     server.once("error", (error: NodeJS.ErrnoException) =>
-      error.code === "EADDRINUSE" ? resolve(undefined) : reject(error),
+      error.code === "EADDRINUSE" || error.code === "EACCES" ? resolve(undefined) : reject(error),
     );
     server.listen(port, "127.0.0.1", () => resolve(server));
   });
