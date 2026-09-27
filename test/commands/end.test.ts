@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { git, newRepo } from "../helpers/git-repo.ts";
-import { freePort } from "../helpers/ports.ts";
+import { NO_SERVER_PORT } from "../helpers/ports.ts";
 import type { StructuredOutput } from "../../src/output.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -231,7 +231,7 @@ test("ending a review the session file shows as ended needs no server", async ()
     repoRoot: REPO,
     branch: BRANCH,
     base: BASE,
-    port: await freePort(),
+    port: NO_SERVER_PORT,
     stateDir,
   });
 

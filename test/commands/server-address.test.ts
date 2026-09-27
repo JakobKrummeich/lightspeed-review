@@ -11,7 +11,7 @@ import {
 } from "../../src/commands/server-address.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore } from "../../src/session-store.ts";
-import { freePort, occupyPort } from "../helpers/ports.ts";
+import { freePort, NO_SERVER_PORT, occupyPort } from "../helpers/ports.ts";
 
 /**
  * `diagnosePort` is the liveness verdict four modules trust, so its states are
@@ -28,26 +28,24 @@ test("serverOrigin is always loopback: the server binds no other address", () =>
 });
 
 test("probePort tells a listening port from one nothing holds", async () => {
-  const port = await freePort();
-  assert.equal(await probePort(port), "refused");
+  assert.equal(await probePort(NO_SERVER_PORT), "refused");
 
-  const squatter = await occupyPort(port);
+  const squatter = await occupyPort();
   try {
-    assert.equal(await probePort(port), "open");
+    assert.equal(await probePort(squatter.port), "open");
   } finally {
     await squatter.release();
   }
 });
 
 test("diagnosePort with no backoff answers with the first probe's state", async () => {
-  const port = await freePort();
-
-  assert.equal(await diagnosePort(port, []), "refused");
+  assert.equal(await diagnosePort(NO_SERVER_PORT, []), "refused");
 });
 
 test("diagnosePort believes refused only after the retries also find nothing", async () => {
   // A single refused connection is a moment, not a diagnosis: a server that
-  // comes up between probes must flip the verdict to open.
+  // comes up between probes must flip the verdict to open. freePort, not port
+  // 0: the port is probed before anything listens on it.
   const port = await freePort();
   const server = reviewServerOn(port);
   setTimeout(() => void server.start(), 20);
@@ -59,11 +57,10 @@ test("diagnosePort believes refused only after the retries also find nothing", a
 });
 
 test("diagnosePort returns at the first open probe instead of sitting out the backoff", async () => {
-  const port = await freePort();
-  const squatter = await occupyPort(port);
+  const squatter = await occupyPort();
   try {
     const begun = Date.now();
-    assert.equal(await diagnosePort(port, [5_000]), "open");
+    assert.equal(await diagnosePort(squatter.port, [5_000]), "open");
     assert.ok(Date.now() - begun < 2_500, "an open port must not wait the backoff out");
   } finally {
     await squatter.release();
@@ -71,11 +68,10 @@ test("diagnosePort returns at the first open probe instead of sitting out the ba
 });
 
 test("reviewServerIsUp recognises our server and only our server", async () => {
-  const port = await freePort();
-  assert.equal(await reviewServerIsUp(port), false);
+  assert.equal(await reviewServerIsUp(NO_SERVER_PORT), false);
 
-  const server = reviewServerOn(port);
-  await server.start();
+  const server = reviewServerOn(0);
+  const { port } = await server.start();
   try {
     assert.equal(await reviewServerIsUp(port), true);
   } finally {
@@ -85,10 +81,9 @@ test("reviewServerIsUp recognises our server and only our server", async () => {
 
 test("a process that holds the port without speaking HTTP is not our server", async () => {
   // The bounded /health request is what keeps this from waiting forever.
-  const port = await freePort();
-  const squatter = await occupyPort(port);
+  const squatter = await occupyPort();
   try {
-    assert.equal(await reviewServerIsUp(port), false);
+    assert.equal(await reviewServerIsUp(squatter.port), false);
   } finally {
     await squatter.release();
   }

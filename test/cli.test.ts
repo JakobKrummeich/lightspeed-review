@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { git, newRepo } from "./helpers/git-repo.ts";
-import { freePort } from "./helpers/ports.ts";
+import { NO_SERVER_PORT } from "./helpers/ports.ts";
 import { sessionKey } from "../src/paths.ts";
 import { SessionStore } from "../src/session-store.ts";
 
@@ -22,9 +22,21 @@ const cliPath = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
  */
 const isolatedHome = mkdtempSync(join(tmpdir(), "lsr-cli-isolated-home-"));
 
+/**
+ * Where a test that names no directory runs: not this checkout, whose own
+ * config (gitignored, so present only on a developer's machine) would decide
+ * the port and the state dir. Its config names no server, so a command that
+ * got as far as asking one would find nothing rather than the real one.
+ */
+const isolatedCwd = mkdtempSync(join(tmpdir(), "lsr-cli-isolated-cwd-"));
+writeFileSync(
+  join(isolatedCwd, ".lightspeed.conf.json"),
+  JSON.stringify({ stateDir: join(isolatedCwd, "state"), port: NO_SERVER_PORT }),
+);
+
 async function runCli(
   args: string[],
-  cwd?: string,
+  cwd: string = isolatedCwd,
   env: NodeJS.ProcessEnv = { ...process.env, HOME: isolatedHome },
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   try {
@@ -54,8 +66,11 @@ async function servePlain404(): Promise<number> {
 }
 
 /**
- * A repository of its own, with its own `stateDir`: run from this checkout the
- * home view would list whatever reviews the developer has open.
+ * A repository of its own, with its own `stateDir` and a port no server holds:
+ * run from this checkout the home view would list whatever reviews the
+ * developer has open, and on the default port every command asks the
+ * machine's real review server, which keeps its reviews elsewhere and so
+ * refuses it `server_state_mismatch`.
  */
 function emptyRepo(): string {
   const repoRoot = newRepo("lsr-cli-home-");
@@ -65,6 +80,7 @@ function emptyRepo(): string {
       model: "anthropic/claude-haiku-4-5",
       thinking: "off",
       stateDir: join(repoRoot, "state"),
+      port: NO_SERVER_PORT,
     }),
   );
   git(repoRoot, "add", ".");
@@ -151,7 +167,10 @@ test("a presence check the server never answers reads as nobody listening, answe
  */
 test("bare invocation in a repo with no config reports the config, not an empty review list", async () => {
   const repoRoot = newRepo("lsr-cli-noconf-");
-  // No config names a state directory, so the view reads the default one.
+  // No config names a state directory, so the view reads the default one. No
+  // config names a port either, and none can without defeating the test: home
+  // asks no server once the config is missing (home-input.ts), so the machine's
+  // real one on the default port is never reached.
   const home = mkdtempSync(join(tmpdir(), "lsr-cli-home-dir-"));
   storeSession(join(home, ".lightspeed"), "/somewhere/else", "feat/tokens");
 
@@ -231,27 +250,12 @@ test("a session the server does not know is named the same way as one on disk", 
   assert.match(stdout, /lightspeed work '<plan>' feature\/greeting main/);
 });
 
-/** A repository whose config names a port nothing listens on: no review server. */
-async function repoWithoutServer(): Promise<string> {
-  const repoRoot = emptyRepo();
-  writeFileSync(
-    join(repoRoot, ".lightspeed.conf.json"),
-    JSON.stringify({
-      model: "anthropic/claude-haiku-4-5",
-      thinking: "off",
-      stateDir: join(repoRoot, "state"),
-      port: await freePort(),
-    }),
-  );
-  return repoRoot;
-}
-
 /**
  * No server and no review: "restart the server and re-attach" pointed at a
  * review that never existed, and the `open` it named failed on --intent.
  */
 test("with no server and no review, a command's way out is a fresh open with --intent", async () => {
-  const repoRoot = await repoWithoutServer();
+  const repoRoot = emptyRepo();
 
   const { stdout, code } = await runCli(["reply", "--to", "t1", "hello", "feat", "main"], repoRoot);
 
@@ -262,7 +266,7 @@ test("with no server and no review, a command's way out is a fresh open with --i
 });
 
 test("with no server but a live review on disk, the way out is still to re-attach", async () => {
-  const repoRoot = await repoWithoutServer();
+  const repoRoot = emptyRepo();
   storeSession(join(repoRoot, "state"), repoRoot, "feat");
 
   const { stdout, code } = await runCli(["reply", "--to", "t1", "hello", "feat", "main"], repoRoot);
@@ -281,7 +285,7 @@ test("with no server but a live review on disk, the way out is still to re-attac
  * `session_ended`. The review's own answer comes first, naming who ended it.
  */
 test("with no server and an ended review on disk, a command is refused session_ended", async () => {
-  const repoRoot = await repoWithoutServer();
+  const repoRoot = emptyRepo();
   storeSession(join(repoRoot, "state"), repoRoot, "feat");
   const store = new SessionStore(join(repoRoot, "state"));
   const key = sessionKey(repoRoot, "feat", "main");
@@ -342,19 +346,26 @@ test("a publish whose --to text spilled into the branch is refused before any gi
   assert.match(stdout, /message: 'signed' is not a branch — quote the whole text after --to$/m);
 });
 
-/** Regression: the strict config load gated `approvals` on a `model` it never uses. */
-test("a command that needs no model answers in a repository with no config", async () => {
+/**
+ * Regression: the strict config load gated `approvals` on a `model` it never
+ * uses. A config that names no model is that gate. No config at all would put
+ * the command on the default port, where the machine's real review server may
+ * be listening; that loadServiceConfig reads an absent file is proven in
+ * config.test.ts.
+ */
+test("a command that needs no model answers in a repository whose config names none", async () => {
   const repoRoot = newRepo("lsr-cli-nomodel-");
-  const home = mkdtempSync(join(tmpdir(), "lsr-cli-nomodel-home-"));
-  storeSession(join(home, ".lightspeed"), repoRoot, "feature/greeting");
+  const stateDir = join(repoRoot, "state");
+  writeFileSync(
+    join(repoRoot, ".lightspeed.conf.json"),
+    JSON.stringify({ stateDir, port: NO_SERVER_PORT }),
+  );
+  storeSession(stateDir, repoRoot, "feature/greeting");
 
-  const { stdout, code } = await runCli(["approvals", "feature/greeting", "main"], repoRoot, {
-    ...process.env,
-    HOME: home,
-  });
+  const { stdout, code } = await runCli(["approvals", "feature/greeting", "main"], repoRoot);
 
-  assert.equal(code, 0);
-  assert.doesNotMatch(stdout, /config_missing/);
+  assert.equal(code, 0, stdout);
+  assert.doesNotMatch(stdout, /config_(missing|invalid)/);
   assert.match(stdout, /^ {2}branch: feature\/greeting$/m);
 });
 
@@ -542,6 +553,7 @@ test("feedback reads a ledger outside any repository, with no model configured",
   assert.match(stdout, new RegExp(`path: ${nowhere}/state/feedback$`, "m"));
 });
 
+/** No config, so no port: `feedback` reads files and never asks a server. */
 test("feedback with no config file reads the default ledger", async () => {
   const { stdout, code } = await runCli(["feedback"], mkdtempSync(join(tmpdir(), "lsr-cli-bare-")));
 

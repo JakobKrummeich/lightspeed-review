@@ -17,6 +17,13 @@ const cliPath = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const PRE_STAMP_SKILL =
   "---\nname: lightspeed\ndescription: old\n---\n\nRun `lightspeed poll --agent-reply`.\n";
 
+/**
+ * Runs in a repository with no config. None names a port, so the default one
+ * stands, yet nothing here reaches the machine's real server there: `poll` and
+ * a bare `reply` fail before any config is read, `init` and `skill` ask no
+ * server, and the bare home view asks none once the config is missing (the
+ * "missing" branch in src/commands/home-input.ts).
+ */
 async function runCli(args: string[], home: string): Promise<{ stdout: string; code: number }> {
   try {
     const { stdout } = await execFileAsync(process.execPath, [cliPath, ...args], {

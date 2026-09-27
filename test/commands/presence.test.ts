@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listening } from "../../src/commands/presence.ts";
-import { freePort } from "../helpers/ports.ts";
+import { NO_SERVER_PORT } from "../helpers/ports.ts";
 import { parkedFetch, postSession, withServer } from "../helpers/review-server.ts";
 
 function portOf(url: string): number {
@@ -23,7 +23,7 @@ test("a session is listened to only while a waiting command is parked on it", as
 test("no server running is nobody listening, answered at once", async () => {
   const started = Date.now();
 
-  assert.equal(await listening(await freePort(), "any-key"), false);
+  assert.equal(await listening(NO_SERVER_PORT, "any-key"), false);
   assert.ok(Date.now() - started < 1_500);
 });
 
