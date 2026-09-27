@@ -110,6 +110,8 @@ export function wireReplay(
 ): WiredReplay {
   const replayOverlay = deps.overlay(page);
   let replay: ReplayOpening | undefined;
+  /** The round's cards could not be fetched: the reopen asks for them again. */
+  let unread = false;
   const arrival = deps.arrivals(page.openingRoot);
   const claims = roundClaims(deps.storage, page.key);
   /** Waiting for a hidden tab to come back to a round it left unclaimed. */
@@ -129,7 +131,9 @@ export function wireReplay(
   page.replayReopen.addEventListener("click", () => {
     // Manual reopen ignores the once-per-round memory on purpose. Not mid-jump:
     // the landing opens the replay itself, and would reset one opened now.
-    if (replay !== undefined && !arrival.jumping()) replayOverlay.open(replay);
+    if (arrival.jumping()) return;
+    if (replay !== undefined) replayOverlay.open(replay);
+    else if (unread) replayRefresh.retry();
   });
   // Ordering (which round a response belongs to, what failed fetches leave)
   // lives in the refresher.
@@ -139,7 +143,12 @@ export function wireReplay(
     open: show,
     offer: (opening) => {
       replay = opening;
+      unread = false;
       page.replayReopen.hidden = opening === undefined;
+    },
+    failed: () => {
+      unread = true;
+      page.replayReopen.hidden = false;
     },
   });
   return {
@@ -162,7 +171,7 @@ export function wireReplay(
       arrival.jump();
     },
     refreshReplay: (fresh) =>
-      replayRefresh({
+      replayRefresh.refresh({
         round: live.round,
         roundReply: agentRoundReply(fresh.conversation, fresh.rounds),
         ended: fresh.status === "ended",

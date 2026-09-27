@@ -29,6 +29,14 @@ round arrives by a jump into hyperspace.
   `Esc` lands at once;
   nothing else on the page hears a key while it plays. A round that arrives
   while the first round's opening is still up closes the opening first.
+- A round's replay is claimed for one tab the moment the round arrives, not
+  when its cards come back: the tab on screen that jumps is the one that
+  opens it, and other tabs on the review neither jump nor open (two tabs that
+  hear of the round in the same instant may both show it, as before). A tab
+  in the background leaves the round to the tab on screen, and claims it when
+  it comes back only if nobody did. A replay whose cards could not be fetched
+  does not open on its own after a reload either, but its reopen control
+  stays and fetches them again.
 - While the opening is up the page behind it is inert, so `Tab` stays on the
   top sheet, and the room never scrolls: a long reason on a short screen
   keeps the sky and the flash centred.

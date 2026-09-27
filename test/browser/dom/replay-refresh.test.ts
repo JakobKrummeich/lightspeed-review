@@ -30,7 +30,8 @@ function harness(claims: number[] = []) {
   const pending: Array<{ resolve(data: ReplayData): void; reject(error: Error): void }> = [];
   const offers: Array<string | undefined> = [];
   const opened: Array<string | undefined> = [];
-  const refresh = createReplayRefresher({
+  const failures = { count: 0 };
+  const refresher = createReplayRefresher({
     fetch: () =>
       new Promise<ReplayData>((resolve, reject) => {
         pending.push({ resolve, reject });
@@ -42,8 +43,9 @@ function harness(claims: number[] = []) {
     },
     open: (opening) => opened.push(idOf(opening)),
     offer: (opening) => offers.push(idOf(opening)),
+    failed: () => (failures.count += 1),
   });
-  return { refresh, pending, offers, opened, claims };
+  return { ...refresher, pending, offers, opened, claims, failures };
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -127,4 +129,63 @@ test("a failed re-group fetch withdraws the previous round's cards", async () =>
 
   assert.equal(h.offers.at(-1), undefined, "nothing of round 4 is left to reopen");
   assert.deepEqual(h.opened, ["shown"], "the failure itself shows nothing");
+});
+
+test("a failed fetch says so, so the reopen can stay and ask again", async () => {
+  const h = harness([4]);
+
+  h.refresh({ round: 4, roundReply: undefined, ended: false });
+  h.pending[0]?.reject(new Error("boom"));
+  await settled();
+
+  assert.equal(h.failures.count, 1);
+  assert.deepEqual(h.opened, []);
+});
+
+test("a retry fetches the same round again and opens it: asked by hand, no claim needed", async () => {
+  const h = harness();
+  h.refresh({ round: 4, roundReply: "said", ended: false });
+  h.pending[0]?.reject(new Error("boom"));
+  await settled();
+
+  h.retry();
+  h.pending[1]?.resolve(dataOf("again"));
+  await settled();
+
+  assert.deepEqual(h.offers, [undefined, undefined, "again"], "withdrawn while it asks");
+  assert.deepEqual(h.opened, ["again"]);
+});
+
+test("a retry spends the round's claim, so nothing opens it twice", async () => {
+  const h = harness([4]);
+  h.refresh({ round: 4, roundReply: undefined, ended: false });
+  h.pending[0]?.reject(new Error("boom"));
+  await settled();
+
+  h.retry();
+  h.pending[1]?.resolve(dataOf("again"));
+  await settled();
+
+  assert.deepEqual(h.opened, ["again"]);
+  assert.equal(h.claims.length, 0);
+});
+
+test("a failure the newer round superseded, or one on an ended review, offers no retry", async () => {
+  const h = harness();
+
+  h.refresh({ round: 4, roundReply: undefined, ended: false });
+  h.refresh({ round: 5, roundReply: undefined, ended: true });
+  h.pending[0]?.reject(new Error("stale"));
+  h.pending[1]?.reject(new Error("ended"));
+  await settled();
+
+  assert.equal(h.failures.count, 0);
+});
+
+test("with nothing asked yet, a retry asks nothing", () => {
+  const h = harness();
+
+  h.retry();
+
+  assert.equal(h.pending.length, 0);
 });

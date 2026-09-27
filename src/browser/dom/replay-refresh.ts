@@ -15,6 +15,8 @@ export interface ReplayRefresherHost {
   claimed(round: number): boolean;
   open(opening: ReplayOpening): void;
   offer(opening: ReplayOpening | undefined): void;
+  /** The round's cards could not be fetched: the reopen stays, and asks again. */
+  failed(): void;
 }
 
 /** Captured at the moment of asking. */
@@ -24,16 +26,26 @@ export interface ReplayRoundView {
   ended: boolean;
 }
 
+export interface ReplayRefresher {
+  /** Fetches the replay for `view`'s round; run on load and every re-group. */
+  refresh(view: ReplayRoundView): void;
+  /** Asked by hand after `failed`: fetches the last round's replay again and opens it. */
+  retry(): void;
+}
+
 /**
  * Auto-shows once per round, in the page that claimed it. Each call supersedes
  * the last: a slow pre-regroup fetch can neither show the wrong round's cards
- * nor spend the new round's claim. Offer withdrawn on refresh start; failures swallowed whole — the
- * replay never blocks the diff.
+ * nor spend the new round's claim. Offer withdrawn on refresh start. A failure
+ * never blocks the diff: the page reads on without the replay, and the reopen
+ * stays to fetch it again by hand.
  */
-export function createReplayRefresher(host: ReplayRefresherHost): (view: ReplayRoundView) => void {
+export function createReplayRefresher(host: ReplayRefresherHost): ReplayRefresher {
   let generation = 0;
-  return (view) => {
+  let last: ReplayRoundView | undefined;
+  const ask = (view: ReplayRoundView, byHand: boolean): void => {
     const mine = ++generation;
+    last = view;
     host.offer(undefined);
     void host
       .fetch()
@@ -42,10 +54,17 @@ export function createReplayRefresher(host: ReplayRefresherHost): (view: ReplayR
         if (data.comments.length === 0 || view.ended) return;
         const opening: ReplayOpening = { data, roundReply: view.roundReply };
         host.offer(opening);
-        if (host.claimed(view.round)) host.open(opening);
+        // The claim is spent either way: a round opens on its own at most once.
+        if (host.claimed(view.round) || byHand) host.open(opening);
       })
       .catch(() => {
-        // No overlay, no retry: an unreadable replay just opens on the diff.
+        if (mine === generation && !view.ended) host.failed();
       });
+  };
+  return {
+    refresh: (view) => ask(view, false),
+    retry: () => {
+      if (last !== undefined) ask(last, true);
+    },
   };
 }

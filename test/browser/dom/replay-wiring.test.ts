@@ -230,6 +230,7 @@ test("a failed fetch: the jump played once, and a reload neither jumps nor opens
   await settled();
   failing.land();
   assert.deepEqual(failing.opened, [], "nothing to open");
+  assert.equal(failing.reopen.hidden, false, "the reopen stays, to ask again");
   assert.equal(readMemory(shared, KEY).replayed, 1, "the round's turn is spent");
 
   const reloaded = tab(shared);
@@ -359,4 +360,38 @@ test("a review that ended while the tab was hidden opens no replay on the return
 
   assert.deepEqual(page.opened, []);
   assert.equal(readMemory(page.storage, KEY).replayed, undefined);
+});
+
+test("after a failed fetch, the reopen asks again and opens what comes back", async () => {
+  let healthy = false;
+  const page = tab(new FakeStorage(), async () => {
+    if (!healthy) throw new Error("boom");
+    return cardsOf("r1");
+  });
+  page.arrive(roundOf(1));
+  await settled();
+  page.land();
+
+  healthy = true;
+  page.reopen.dispatch("click", {});
+  assert.equal(page.reopen.hidden, true, "withdrawn while it asks");
+  await settled();
+
+  assert.deepEqual(page.opened, ["r1"]);
+  assert.equal(page.reopen.hidden, false);
+  page.reopen.dispatch("click", {});
+  assert.deepEqual(page.opened, ["r1", "r1"], "and opens from what it has after that");
+});
+
+test("a reopen that fails again stays offered", async () => {
+  const page = tab(new FakeStorage(), () => Promise.reject(new Error("still down")));
+  page.arrive(roundOf(1));
+  await settled();
+  page.land();
+
+  page.reopen.dispatch("click", {});
+  await settled();
+
+  assert.deepEqual(page.opened, []);
+  assert.equal(page.reopen.hidden, false);
 });
