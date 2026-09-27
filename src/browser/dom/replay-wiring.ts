@@ -1,10 +1,15 @@
 import { createDiff2HtmlRenderer } from "../diff2html-adapter.ts";
-import { readMemory, updateMemory } from "../review-memory.ts";
+import type { ReplayData } from "../../rounds/replay.ts";
+import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
 import { arrivesByJump } from "../round-arrival.ts";
 import { agentRoundReply } from "../round-replay.ts";
-import { arrivals } from "./jump-overlay.ts";
+import { arrivals, type Arrivals } from "./jump-overlay.ts";
 import { createReplayRefresher } from "./replay-refresh.ts";
-import { mountReplayOverlay, type ReplayOpening } from "./replay-overlay.ts";
+import {
+  mountReplayOverlay,
+  type ReplayOpening,
+  type ReplayOverlayControl,
+} from "./replay-overlay.ts";
 import { fetchReplay, type SessionData } from "./session-api.ts";
 import type { LiveSession } from "./session-events.ts";
 import { stillness } from "./stillness.ts";
@@ -28,18 +33,44 @@ export interface WiredReplay {
   refreshReplay(fresh: SessionData): void;
 }
 
+/** What the wiring reaches outside itself for; a test hands in its own. */
+export interface ReplayDeps {
+  arrivals(root: HTMLElement): Arrivals;
+  fetch(key: string): Promise<ReplayData>;
+  storage: ReviewMemoryStorage;
+  overlay(page: ReplayHosts): ReplayOverlayControl;
+}
+
 /** Closing the replay lands at the top of the diff, where a new round starts anyway. */
-export function wireReplay(page: ReplayHosts, live: LiveSession): WiredReplay {
-  const replayOverlay = mountReplayOverlay({
+function mountOverlay(page: ReplayHosts): ReplayOverlayControl {
+  return mountReplayOverlay({
     root: page.replayRoot,
     renderer: createDiff2HtmlRenderer(),
     onClose: () => {
       page.reviewRoot.scrollTop = 0;
     },
   });
+}
+
+/** The page's own: read when wired, so a test never touches the browser's. */
+function browserDeps(): ReplayDeps {
+  return {
+    arrivals: (root) => arrivals(root, stillness),
+    fetch: fetchReplay,
+    storage: localStorage,
+    overlay: mountOverlay,
+  };
+}
+
+export function wireReplay(
+  page: ReplayHosts,
+  live: LiveSession,
+  deps: ReplayDeps = browserDeps(),
+): WiredReplay {
+  const replayOverlay = deps.overlay(page);
   let replay: ReplayOpening | undefined;
-  const arrival = arrivals(page.openingRoot, stillness);
-  const replayed = (): number | undefined => readMemory(localStorage, page.key).replayed;
+  const arrival = deps.arrivals(page.openingRoot);
+  const replayed = (): number | undefined => readMemory(deps.storage, page.key).replayed;
   page.replayReopen.addEventListener("click", () => {
     // Manual reopen ignores the once-per-round memory on purpose. Not mid-jump:
     // the landing opens the replay itself, and would reset one opened now.
@@ -48,9 +79,9 @@ export function wireReplay(page: ReplayHosts, live: LiveSession): WiredReplay {
   // Ordering (which round a response belongs to, what failed fetches leave)
   // lives in the refresher.
   const replayRefresh = createReplayRefresher({
-    fetch: () => fetchReplay(page.key),
+    fetch: () => deps.fetch(page.key),
     wasReplayed: (shown) => replayed() === shown,
-    markReplayed: (shown) => updateMemory(localStorage, page.key, { replayed: shown }),
+    markReplayed: (shown) => updateMemory(deps.storage, page.key, { replayed: shown }),
     // Opened as the arrival's jump lands, or at once when there was none. A
     // manual reopen is not an arrival, so it opens straight away.
     open: (opening) => arrival.onLanding(() => replayOverlay.open(opening)),
