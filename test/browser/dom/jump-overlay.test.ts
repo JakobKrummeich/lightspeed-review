@@ -290,6 +290,17 @@ test("a round arriving under the opening closes it properly before the jump take
   assert.equal(state.behind.inert, false);
 });
 
+test("the caret lands where the closed opening handed it back, not on its gone sheet", (t) => {
+  const state = openingThenJump(t);
+  assert.equal(state.page.activeElement, state.cover, "the opening's close put it back");
+  const calls = state.cover.focusCalls.length;
+
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.equal(state.cover.focusCalls.length, calls + 1, "the landing hands it back there");
+  assert.deepEqual(state.cover.focusCalls.at(-1), { preventScroll: true });
+});
+
 test("after that landing, Esc runs no orphaned close: the caret stays where it landed", (t) => {
   const state = openingThenJump(t);
   t.mock.timers.tick(SKY_TIMES.jumpMs);

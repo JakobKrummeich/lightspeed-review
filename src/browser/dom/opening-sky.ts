@@ -98,11 +98,10 @@ function measureNames(field: HTMLElement, names: HTMLElement | null): MeasureNam
     canvas && typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
   if (!context || !names) return estimateName;
   names.innerHTML = '<span class="lsr-sky-name"><span class="lsr-sky-title">M</span></span>';
-  const title = names.querySelector<HTMLElement>(".lsr-sky-title");
-  // Read before the probe goes: a computed style is live, and empty once detached.
-  const font = title && fontOf(getComputedStyle(title));
+  // Just written, so there. Read before the probe goes: a computed style is
+  // live, and empty once detached.
+  const font = fontOf(getComputedStyle(names.querySelector<HTMLElement>(".lsr-sky-title")!));
   names.innerHTML = "";
-  if (!font) return estimateName;
   return (text) => {
     context.font = font;
     return context.measureText(text).width;

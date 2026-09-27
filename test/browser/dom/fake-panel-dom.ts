@@ -88,12 +88,15 @@ export class FakeNode {
   }
 
   focused = false;
-  /** Every `focus()` call's options, in order: the opening must never let focus scroll its room. */
+  /** Every `focus()` call's options, in order. */
   readonly focusCalls: (FocusOptions | undefined)[] = [];
 
+  /** Takes the caret, and — under a fake document that tracks one — becomes its active element. */
   focus(options?: FocusOptions): void {
     this.focused = true;
     this.focusCalls.push(options);
+    const page = (globalThis as { document?: { activeElement?: unknown } }).document;
+    if (page && "activeElement" in page) page.activeElement = this;
   }
 
   setSelectionRange(start: number, end: number): void {

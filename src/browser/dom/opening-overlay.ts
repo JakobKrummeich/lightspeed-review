@@ -2,7 +2,7 @@ import { renderOpening } from "../opening-view.ts";
 import type { SkyChapter } from "../starfield.ts";
 import { mountOpeningSky, type OpeningSky } from "./opening-sky.ts";
 import { holdPageBehind } from "./page-hold.ts";
-import { claimRoom, leaveRoom } from "./room-claim.ts";
+import { claimRoom, evictRoom, leaveRoom } from "./room-claim.ts";
 import type { paintSky } from "./starfield-canvas.ts";
 import type { Stillness } from "./stillness.ts";
 
@@ -49,8 +49,13 @@ export function mountOpening(host: OpeningHost): void {
   // rounds, and an empty dialog holding focus would be the worse failure.
   if (stack === "") return;
 
+  // The root is shared with the round jump: whichever room comes second
+  // closes the first by its own way out (`room-claim.ts`), which hands the
+  // page and the caret back before this room takes them.
+  evictRoom(host.root);
   const before = document.activeElement;
-  let release = (): void => {};
+  host.root.innerHTML = stack;
+  const release = holdPageBehind(host.root);
   let sky: OpeningSky | undefined = undefined;
   let step = 0;
   let open = true;
@@ -62,7 +67,7 @@ export function mountOpening(host: OpeningHost): void {
   };
 
   // Declared before anything that can throw: the next room's claim, Esc and
-  // a mount that failed halfway all leave by it.
+  // a sky that failed to mount all leave by it.
   const close = (): void => {
     if (!open) return;
     open = false;
@@ -76,11 +81,7 @@ export function mountOpening(host: OpeningHost): void {
     host.onClose();
   };
 
-  // The root is shared with the round jump: whichever room comes second
-  // closes the first by its own way out (`room-claim.ts`).
   claimRoom(host.root, close);
-  host.root.innerHTML = stack;
-  release = holdPageBehind(host.root);
   document.addEventListener("keydown", onKey);
   const field = host.root.querySelector<HTMLElement>(".lsr-opening-overlay");
   const mountedSky = skyOf(field, host);

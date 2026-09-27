@@ -44,12 +44,13 @@ function jumpStars(root: HTMLElement, paint: typeof paintSky): ReturnType<typeof
 }
 
 export function playJump(host: JumpHost): void {
-  if (host.still.reducedMotion || host.still.forcedColors) {
-    evictRoom(host.root);
-    return host.land();
-  }
+  // The room before this one leaves first, by its own way out: it hands the
+  // page and the caret back, and only then is either taken.
+  evictRoom(host.root);
+  if (host.still.reducedMotion || host.still.forcedColors) return host.land();
   const before = document.activeElement;
-  let release = (): void => {};
+  host.root.innerHTML = ROOM;
+  const release = holdPageBehind(host.root);
   let painter: SkyPainter | undefined;
   let flash: ReturnType<typeof setTimeout> | undefined = undefined;
   let done: ReturnType<typeof setTimeout> | undefined = undefined;
@@ -73,8 +74,6 @@ export function playJump(host: JumpHost): void {
     if (event.key === "Escape") land();
   };
   claimRoom(host.root, land);
-  host.root.innerHTML = ROOM;
-  release = holdPageBehind(host.root);
   document.addEventListener("keydown", onKey, true);
   try {
     painter = jumpStars(host.root, host.paint ?? paintSky);
