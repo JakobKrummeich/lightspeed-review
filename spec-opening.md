@@ -75,16 +75,18 @@ names and file paths, so the same round draws the same sky every time:
   minimum spanning tree over the chapter's seven brightest stars, with no
   line crossing the box (`src/browser/sky-figure.ts`; the tree splits into a
   forest when it must), and the rest of its files stay loose around it;
-- a name is placed under its figure's lowest star — or under and aside,
-  over, or over and aside when that spot is taken — and kept clear of the others
-  and of the middle box; the box it is checked in is the whole name, two
-  lines of it when it wraps. The page measures each name with the canvas's
-  `measureText` in the font the names are set in (`opening-sky.ts`) and hands
-  the widths to `layoutSky`, which stays pure; only with no canvas context
-  does it fall back to a Latin estimate, which CJK and wide letters overrun;
-- at most eight names: a chapter whose name would overlap is skipped and the
-  next one is asked, so the eight are the first eight that fit, and the rest
-  keep their figures unnamed.
+- every chapter with a star is named, largest first
+  (`src/browser/sky-names.ts`): under its figure, over it, beside it, or
+  beside the middle box, whichever is first clear of the button, the names
+  already placed and every figure's stars; failing those, the nearest clear
+  spot on a 12 px grid within 48 px of its stars; failing that, the nearest
+  spot that at least overlaps no name, anywhere on the sky; and with no free
+  spot left at all, under its figure regardless — a name is never dropped.
+  The box it is checked in is the whole name, two lines of it when it wraps.
+  The page measures each name with the canvas's `measureText` in the font
+  the names are set in (`opening-sky.ts`) and hands the widths to
+  `layoutSky`, which stays pure; only with no canvas context does it fall
+  back to a Latin estimate, which CJK and wide letters overrun.
 
 When the window is resized the sky is laid out again for the new size (after
 the resize has settled for 150 ms), so the figures and names stay inside the

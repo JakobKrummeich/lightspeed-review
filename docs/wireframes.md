@@ -494,7 +494,10 @@ constellation sheet (last; no text; section aria-label "3 chapters: …"):
   inert and keys are captured while it plays; Esc lands at once.
 - Long chapter names wrap to two lines (`.lsr-sky-title`, line-clamp 2, then
   an ellipsis), measured with canvas `measureText` in their own font; a
-  resize lays the sky out again. The room clips, never scrolls; Tab stays on
+  resize lays the sky out again.
+- Every chapter with a star is named (`sky-names.ts`): under, over or beside
+  its figure, else the nearest clear grid spot within 48 px of its stars,
+  else the nearest spot overlapping no name; never dropped. The room clips, never scrolls; Tab stays on
   the top sheet (rest of the page `inert`).
 - The stack grows with the longest reason (floor 19rem, ceiling = viewport);
   the button is pushed down rather than the text scrolling.

@@ -5,7 +5,16 @@
  */
 import type { DiffGroup } from "../diff-extract.ts";
 import { spanningTree } from "./sky-figure.ts";
-import { clearCentre, coversRect, keepOut, outOf, type SkyRect } from "./sky-keep-out.ts";
+import { clearCentre, keepOut, outOf, type SkyRect } from "./sky-keep-out.ts";
+import {
+  estimateName,
+  placeNames,
+  type MeasureName,
+  type NameSite,
+  type SkyLabel,
+} from "./sky-names.ts";
+
+export { estimateName, type MeasureName, type SkyLabel } from "./sky-names.ts";
 
 export interface SkyFile {
   path: string;
@@ -44,17 +53,6 @@ export interface Star {
   twinkle: number;
 }
 
-/** `x` is the name's centre, `y` its top; `width`/`height` the box it may not share. */
-export interface SkyLabel {
-  chapter: number;
-  name: string;
-  files: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 export interface Sky {
   box: SkyBox;
   stars: Star[];
@@ -78,7 +76,6 @@ export function skyChapters(groups: readonly DiffGroup[]): SkyChapter[] {
 export const MOST_STARS = 600;
 /** Real constellations skip their faint stars: 40 files read as a cluster with a figure in it. */
 export const FIGURE_STARS = 7;
-export const MOST_NAMES = 8;
 
 /**
  * One clock for the painter and the overlay, in ms: gathering from the sky
@@ -98,28 +95,6 @@ export const SKY_TIMES = {
 const EDGE = 12;
 /** The dimmest a star gets: a file with no changed lines (a rename, a binary) still shows. */
 const FAINTEST = 0.15;
-/** A one-line name and its count, px; each further line of the name adds `NAME_LINE`. */
-const NAME_HEIGHT = 38;
-const NAME_LINE = 18;
-const NAME_GAP = 6;
-/** The widest a name may be; a longer one takes a second line, then an ellipsis. */
-const NAME_WIDEST = 240;
-/** A bold meta-size Latin character, generously; only for when nothing can measure. */
-const CHAR_WIDTH = 9;
-/** Room round a measured name, px: subpixel rounding and the glow of its shadow. */
-const NAME_SLACK = 12;
-
-/**
- * The width `text` takes on one line in the names' own font, px. The page
- * measures it (`opening-sky.ts`); this module stays pure and only asks.
- */
-export type MeasureName = (text: string) => number;
-
-/** Without a canvas to measure in: a Latin guess — CJK and wide letters run over it. */
-export function estimateName(text: string): number {
-  return text.length * CHAR_WIDTH;
-}
-
 /** Park–Miller: tiny, repeatable, and good enough to scatter stars. */
 export function seeded(seed: number): () => number {
   let state = seed;
@@ -264,91 +239,6 @@ function cluster(files: Kept[], centre: [number, number], radius: number, scope:
 }
 
 /**
- * The box a name takes: one line while it fits, then two at the widest a name
- * may be (the stylesheet clamps it there and ends a longer one in an
- * ellipsis). The count's line decides the width only when it is the longer.
- */
-function nameBox(
-  { name, files }: Constellation,
-  box: SkyBox,
-  measure: MeasureName,
-): { width: number; height: number } {
-  const widest = Math.min(NAME_WIDEST, box.width - EDGE * 2);
-  const nameWidth = measure(name) + NAME_SLACK;
-  const countWidth = estimateName(`${files} files`) + NAME_SLACK;
-  const width = Math.min(widest, Math.max(nameWidth, countWidth));
-  const lines = nameWidth > width ? 2 : 1;
-  return { width, height: NAME_HEIGHT + (lines - 1) * NAME_LINE };
-}
-
-/** Side by side with a gap between them, or one wholly above the other. */
-function overlaps(a: SkyLabel, b: SkyLabel): boolean {
-  const across = Math.abs(a.x - b.x) < (a.width + b.width) / 2 + NAME_GAP;
-  return across && a.y < b.y + b.height && b.y < a.y + a.height;
-}
-
-interface Constellation {
-  chapter: number;
-  name: string;
-  files: number;
-  stars: number;
-  centre: [number, number];
-  radius: number;
-  /** How far its placed stars reach up and down: a lone chapter rings the button. */
-  top: number;
-  bottom: number;
-}
-
-/**
- * Where a name may stand: under its stars; beside the button's box, still
- * under them, when that would cover the button; then over them, and beside
- * again. The first that keeps off the button, or none.
- */
-function nameSpot(
-  one: Constellation,
-  size: { width: number; height: number },
-  box: SkyBox,
-  keep: SkyRect,
-): SkyLabel | undefined {
-  const { width, height } = size;
-  const place = (x: number, y: number): SkyLabel => ({
-    ...{ chapter: one.chapter, name: one.name, files: one.files, width, height },
-    x: clamp(x, width / 2 + EDGE, box.width - width / 2 - EDGE),
-    y: clamp(y, EDGE, box.height - height - EDGE),
-  });
-  const [x] = one.centre;
-  const aside = x < box.width / 2 ? keep.x - width / 2 : keep.x + keep.width + width / 2;
-  const under = Math.max(one.centre[1] + one.radius * 0.8, one.bottom) + 10;
-  const over = Math.min(one.centre[1] - one.radius * 0.8, one.top) - 10 - height;
-  return [place(x, under), place(aside, under), place(x, over), place(aside, over)].find(
-    (spot) => !coversRect(keep, spot),
-  );
-}
-
-/**
- * The largest chapters by stars get a name, under their cluster; a name that
- * would overlap one already placed is left off — the stars still say it — and
- * the next largest is asked instead, until `MOST_NAMES` are up.
- */
-function names(
-  constellations: Constellation[],
-  box: SkyBox,
-  measure: MeasureName,
-  keep: SkyRect,
-): SkyLabel[] {
-  const placed: SkyLabel[] = [];
-  const ranked = constellations
-    .filter((one) => one.stars > 0)
-    .sort((a, b) => b.stars - a.stars || a.chapter - b.chapter);
-  for (const one of ranked) {
-    if (placed.length === MOST_NAMES) break;
-    const label = nameSpot(one, nameBox(one, box, measure), box, keep);
-    if (label && !placed.some((other) => overlaps(label, other))) placed.push(label);
-  }
-  return placed.sort((a, b) => a.chapter - b.chapter);
-}
-
-/**
  * Stars, figures and names for `chapters` inside `box`. Seeded from the
  * chapter names and file paths, so the layout belongs to the review. `measure`
  * gives each name's width as the page will set it; without one, a guess.
@@ -369,7 +259,7 @@ export function layoutSky(
   const gap = closestGap(points, box);
   const stars: Star[] = [];
   const figures: [number, number][][] = [];
-  const constellations: Constellation[] = [];
+  const sites: NameSite[] = [];
   for (const [chapter, { name, files }] of chapters.entries()) {
     const mine = kept.filter((file) => file.chapter === chapter);
     const spread = 24 + 11 * Math.sqrt(mine.length) * Math.min(1, box.width / 700);
@@ -385,16 +275,18 @@ export function layoutSky(
     stars.push(...placed);
     const tree = spanningTree(placed.slice(0, FIGURE_STARS), keep);
     figures.push(tree.map(([a, b]) => [a + offset, b + offset]));
-    constellations.push({
+    sites.push({
       chapter,
       name,
       files: files.length,
       stars: placed.length,
       centre,
       radius,
+      left: Math.min(...placed.map((star) => star.x)),
+      right: Math.max(...placed.map((star) => star.x)),
       top: Math.min(...placed.map((star) => star.y)),
       bottom: Math.max(...placed.map((star) => star.y)),
     });
   }
-  return { box, stars, figures, labels: names(constellations, box, measure, keep) };
+  return { box, stars, figures, labels: placeNames(sites, box, measure, keep) };
 }

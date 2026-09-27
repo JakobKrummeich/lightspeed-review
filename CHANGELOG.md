@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.5.1 (unreleased)
+
+- The constellation sheet names every chapter. Names were capped at eight,
+  so a review of 16 chapters showed figures with no name; now every chapter
+  with a star gets its name and file count. When the spots round a figure
+  are taken, its name goes to the nearest clear spot close to its stars, and
+  names still never overlap each other or the button.
+
 ## 3.5.0
 
 The opening shows the review's shape before it hands it over, and every new
