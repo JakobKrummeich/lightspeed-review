@@ -198,9 +198,18 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
   // `.lsr-gate-path`: one path on the chapter's card, a leaf with no diff under it.
   // `.lsr-file-path`: the path on a file's header row — two paths and an arrow
   // for a moved file — a span in the header button, a sibling of the diff, never over it.
+  // `.lsr-done-title`: the done card's heading, a leaf on an overlay, which must wrap before it
+  // reaches the ✓ beside it.
   assert.deepEqual(
     wrapping,
-    [".lsr-file-path", ".lsr-gate-path", ".lsr-panel-scroll", ".lsr-popup", "textarea"],
+    [
+      ".lsr-done-title",
+      ".lsr-file-path",
+      ".lsr-gate-path",
+      ".lsr-panel-scroll",
+      ".lsr-popup",
+      "textarea",
+    ],
     "a new mid-token wrap is a deliberate choice: say so here, and check it cannot reach the diff",
   );
 });

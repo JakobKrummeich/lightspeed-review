@@ -38,9 +38,26 @@
   }
 }
 
-/* At the card's right edge: the eye lands there, and the buttons end there too. */
+/*
+ * The news and its mark on one line at the top: the heading on the left, the
+ * ✓ on the right edge, where the buttons end too. The heading wraps before it
+ * ever reaches the mark, and the gap keeps them apart when it does.
+ */
+.lsr-done-head {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lsr-space-4);
+}
+
+/* The supernova's frame (`light-approval.css`): the nova is laid over the mark from here. */
+.lsr-done-badge {
+  position: relative;
+  flex: none;
+}
+
 .lsr-done-mark {
-  align-self: end;
   display: grid;
   place-items: center;
   width: var(--lsr-space-8);
@@ -54,7 +71,9 @@
 }
 
 .lsr-done-title {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--lsr-strong);
   font-size: var(--lsr-size-title);
   line-height: var(--lsr-leading-tight);

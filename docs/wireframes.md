@@ -497,8 +497,8 @@ ended overlay, whose word is last.
 ```
 ┌ .lsr-done-overlay (scrim, z19) ────────────────────┐
 │          ┌ .lsr-done-card ──────────────────┐      │
-│          │                              (✓) │      │ .lsr-done-mark (accent badge, right)
-│          │ Every file is approved           │      │ .lsr-done-title
+│          │ Every file is approved       (✓) │      │ .lsr-done-head: .lsr-done-title,
+│          │                                  │      │  .lsr-done-mark (accent badge, right)
 │          │ End the review to hand it back   │      │ .lsr-done-note
 │          │ to the agent, or keep looking.   │      │  (+ "Your 2 queued notes
 │          │                                  │      │    go with it." when queued)

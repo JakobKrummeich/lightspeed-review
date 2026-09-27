@@ -14,10 +14,10 @@ agent's answer, each approval and the last one.
   untick takes the light down and its width applies at once.
 - Every file approved opens the done card with a supernova — a point of
   light, two rings and a flare — and the ✓ settles out of it. Nothing on the
-  card moves after that. The ✓ now stands at the card's top right, and the
-  buttons span the card: **End review** on the left, **Keep looking** on the
-  right. The card drops its "Nothing left to read" line, and its note ends at
-  "or keep looking.".
+  card moves after that. The heading now opens the card, with the ✓ beside
+  it at the right edge, and the buttons span the card: **End review** on the
+  left, **Keep looking** on the right. The card drops its "Nothing left to
+  read" line, and its note ends at "or keep looking.".
 - An approve box, per file or per chapter, no longer draws a tick mark: an
   approved box is filled with the accent, one still to approve is an empty
   outline, drawn darker in the light scheme so it holds 3:1 against the page.

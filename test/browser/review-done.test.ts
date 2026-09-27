@@ -36,3 +36,13 @@ test("the note offers both ways out and nothing more", () => {
     "the queue is still said after it",
   );
 });
+
+test("the heading opens the card, its mark beside it on the same line", () => {
+  const html = renderReviewDone(0);
+
+  const head = /<div class="lsr-done-head">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? "";
+  // First in reading order, so a screen reader meets the news before anything else.
+  assert.match(head, /^\s*<h2 class="lsr-done-title">Every file is approved<\/h2>/);
+  assert.match(head, /<span class="lsr-done-mark" aria-hidden="true">✓<\/span>/);
+  assert.ok(html.indexOf("lsr-done-head") < html.indexOf("lsr-done-note"), "the note follows");
+});
