@@ -18,7 +18,6 @@ import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore } from "../../src/session-store.ts";
 import { LedgerStore } from "../../src/ledger/store.ts";
-import { freePort } from "../helpers/ports.ts";
 import { git, newRepo } from "../helpers/git-repo.ts";
 
 /** `undefined` stands for `feedbackLog: "off"`; a blocked path for a broken disk. */
@@ -74,17 +73,20 @@ interface Harness {
   notices: StructuredOutput[];
 }
 
-/** A real review server on a real port: only the diff and the LLM are faked. */
+/**
+ * A real review server on a real port: only the diff and the LLM are faked.
+ * Port 0, read back once listening: a port picked first and listened on later
+ * could be handed to another test file's server in between (EADDRINUSE).
+ */
 async function withHarness(
   body: (harness: Harness) => Promise<void>,
   ledgerKind: "on" | "off" | "broken" = "off",
 ): Promise<void> {
-  const port = await freePort();
   const stateDir = mkdtempSync(join(tmpdir(), "lsr-open-"));
   const store = new SessionStore(stateDir);
   const ledger = harnessLedger(ledgerKind);
-  const server: ReviewServer = createReviewServer({ store, ledger, port });
-  await server.start();
+  const server: ReviewServer = createReviewServer({ store, ledger, port: 0 });
+  const { port } = await server.start();
   const opened: string[] = [];
   const config: LightspeedConfig = {
     model: "test/model",
