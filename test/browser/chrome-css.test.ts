@@ -980,3 +980,20 @@ test("the borderless compose box still shows where the caret is", () => {
 test("Send & End stands at the right edge, apart from Send", () => {
   assert.match(rulesFor(".lsr-compose-actions").join(""), /justify-content: space-between;/);
 });
+
+test("a thread's presses stand on a soft fill with no border, Resolve at one end and Reply at the other", () => {
+  const press = rulesFor(".lsr-thread-action").join("");
+
+  // Transparent, not none: forced colours paint it, so they still read as buttons there.
+  assert.match(press, /border: 1px solid transparent;/);
+  assert.match(press, /background: color-mix\(/);
+  assert.match(
+    rulesFor(".lsr-thread-reply-add").join(""),
+    /background: color-mix\(in oklab, var\(--lsr-accent\)/,
+  );
+  assert.match(rulesFor(".lsr-thread-actions").join(""), /justify-content: space-between;/);
+  assert.match(
+    rulesFor(".lsr-thread-action:focus-visible").join(""),
+    /outline: 2px solid var\(--lsr-accent\);/,
+  );
+});
