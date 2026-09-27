@@ -2,8 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
 /**
- * A port nothing listens on and no test can take: it is privileged, so a
- * command pointed here finds no server — never the machine's real one.
+ * A port nothing listens on: nothing in the suite ever binds it, and no normal
+ * machine runs a service on it, so a command pointed here finds no server —
+ * never the machine's real one. Not because it is privileged: root, Docker
+ * 20.10+ and macOS 10.14+ all let an ordinary process bind it.
  */
 export const NO_SERVER_PORT = 1;
 
@@ -23,7 +25,7 @@ const LAST_CLAIM = FIRST_PORT + 2 * PORT_COUNT - 1;
  * stops. Everywhere else, listen on port 0 and read the port back; for "no
  * server here", use NO_SERVER_PORT.
  *
- * Why not listen on 0, read the port and close (what this did until 3.6.0):
+ * Why not listen on 0, read the port and close (what this did through 3.6.0):
  * the port is released, so any bind(0) in a test file running concurrently —
  * `node --test` runs files in parallel, and most start servers on port 0 — can
  * be handed it before the test listens, which fails `EADDRINUSE`. Instead the
