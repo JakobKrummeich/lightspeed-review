@@ -103,7 +103,8 @@ export function warpStreaks(
   into.ends[1] = 0;
   into.ends[2] = 0;
   for (let index = 0; index < field.z.length; index += 1) {
-    if ((field.z[index] ?? 0) >= PAST_EYE) fly(field, index, speed, lens, into);
+    // In bounds: `index` runs over the field it indexes.
+    if (field.z[index]! >= PAST_EYE) fly(field, index, speed, lens, into);
   }
   return into;
 }
@@ -123,13 +124,14 @@ interface Lens {
  * optimised, and until then every intermediate number is a heap object.
  */
 function fly(field: WarpField, at: number, speed: number, lens: Lens, into: StreakBatches): void {
-  const before = field.z[at] ?? 0;
+  // In bounds: `at` comes from the loop over this field.
+  const before = field.z[at]!;
   const z = before - speed;
   field.z[at] = z;
   if (z < PAST_EYE) return;
   const batch = z < lens.near ? 2 : z < lens.middle ? 1 : 0;
-  const x = field.x[at] ?? 0;
-  const y = field.y[at] ?? 0;
+  const x = field.x[at]!;
+  const y = field.y[at]!;
   const from = lens.focal / before;
   const to = lens.focal / z;
   const run = into.runs[batch];

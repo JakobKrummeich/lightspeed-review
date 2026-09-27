@@ -117,28 +117,33 @@ function sprite(ink: Ink): HTMLCanvasElement {
 
 type StreakStyle = [colour: string, alpha: number, width: number];
 
+/** A star and where it was last drawn: one kept object per star, written in place. */
+interface Place {
+  star: Star;
+  x: number;
+  y: number;
+}
+
 interface Scene {
   context: CanvasRenderingContext2D;
   sky: Sky;
   view: SkyBox;
   ink: Ink;
-  star: HTMLCanvasElement;
+  sprite: HTMLCanvasElement;
   /** Far, middle, near: worked out once, not per frame. */
   streaks: [StreakStyle, StreakStyle, StreakStyle];
-  /** Where each star was last drawn, the jump's starting points. One kept object per star. */
-  places: { x: number; y: number }[];
+  /** Every star's place, the jump's starting points. */
+  places: Place[];
+  /** Every figure edge as the two places it joins, looked up once. */
+  lines: [Place, Place][];
 }
 
 /** Each star's place this frame: drifting, or `formed` of the way into its figure. */
-function placeStars({ sky, view, places }: Scene, seconds: number, formed: number): void {
-  const stars = sky.stars;
-  for (let index = 0; index < stars.length; index += 1) {
-    const one = stars[index];
-    const place = places[index];
-    if (one === undefined || place === undefined) continue;
-    driftAt(one, seconds, view, place);
-    place.x += (one.x - place.x) * formed;
-    place.y += (one.y - place.y) * formed;
+function placeStars({ view, places }: Scene, seconds: number, formed: number): void {
+  for (const place of places) {
+    driftAt(place.star, seconds, view, place);
+    place.x += (place.star.x - place.x) * formed;
+    place.y += (place.star.y - place.y) * formed;
   }
 }
 
@@ -148,58 +153,46 @@ function drawSky(scene: Scene, seconds: number, ms: number): void {
   placeStars(scene, seconds, formed);
   const lines = ms < 0 ? 0 : figureShown(ms);
   if (lines > 0) drawFigures(scene, lines);
-  const { stars } = scene.sky;
-  for (let index = 0; index < stars.length; index += 1) {
-    drawStar(scene, stars[index], scene.places[index], seconds, formed);
-  }
+  for (const place of scene.places) drawStar(scene, place, seconds, formed);
   scene.context.globalAlpha = 1;
 }
 
 function drawStar(
-  { context, ink, star }: Scene,
-  one: Star | undefined,
-  place: { x: number; y: number } | undefined,
+  { context, ink, sprite }: Scene,
+  place: Place,
   seconds: number,
   formed: number,
 ): void {
-  if (one === undefined || place === undefined) return;
-  const twinkle = 0.6 + 0.4 * Math.sin(one.twinkle + seconds * 4.2);
-  const size = 7 + one.magnitude * (ink.night ? 17 : 13) + formed * 3;
+  const { star } = place;
+  const twinkle = 0.6 + 0.4 * Math.sin(star.twinkle + seconds * 4.2);
+  const size = 7 + star.magnitude * (ink.night ? 17 : 13) + formed * 3;
   context.globalAlpha = clamp(
-    (0.25 + 0.75 * one.magnitude) * Math.max(twinkle, formed * 0.9 + 0.1),
+    (0.25 + 0.75 * star.magnitude) * Math.max(twinkle, formed * 0.9 + 0.1),
   );
-  context.drawImage(star, place.x - size / 2, place.y - size / 2, size, size);
+  context.drawImage(sprite, place.x - size / 2, place.y - size / 2, size, size);
 }
 
-function drawFigures({ context, sky, ink, places }: Scene, shown: number): void {
+function drawFigures({ context, ink, lines }: Scene, shown: number): void {
   context.strokeStyle = ink.accent;
   context.lineWidth = 1;
   context.globalAlpha = (ink.night ? 0.7 : 0.55) * shown;
   context.beginPath();
-  for (let figure = 0; figure < sky.figures.length; figure += 1) {
-    traceEdges(context, sky.figures[figure] ?? [], places);
+  for (const line of lines) {
+    context.moveTo(line[0].x, line[0].y);
+    context.lineTo(line[1].x, line[1].y);
   }
   context.stroke();
   context.globalAlpha = 1;
 }
 
-function traceEdges(
-  context: CanvasRenderingContext2D,
-  edges: [number, number][],
-  places: { x: number; y: number }[],
-): void {
-  for (let edge = 0; edge < edges.length; edge += 1) {
-    const pair = edges[edge] ?? NO_EDGE;
-    const from = places[pair[0]];
-    const to = places[pair[1]];
-    if (!from || !to) continue;
-    context.moveTo(from.x, from.y);
-    context.lineTo(to.x, to.y);
-  }
+/** The figures' edges as pairs of places; an edge naming a star the sky lacks is left out. */
+function figureLines(sky: Sky, places: Place[]): [Place, Place][] {
+  return sky.figures.flat().flatMap(([a, b]): [Place, Place][] => {
+    const from = places[a];
+    const to = places[b];
+    return from && to ? [[from, to]] : [];
+  });
 }
-
-/** Indexes no star has, so a missing edge draws nothing. */
-const NO_EDGE: [number, number] = [-1, -1];
 
 /** Far, middle, near: fainter and thinner far off, the near batch in the core colour. */
 function streakStyles(ink: Ink): [StreakStyle, StreakStyle, StreakStyle] {
@@ -216,51 +209,70 @@ function streakStyles(ink: Ink): [StreakStyle, StreakStyle, StreakStyle] {
       ];
 }
 
-function drawStreaks({ context, streaks }: Scene, batches: StreakBatches): void {
+function drawStreaks({ context, streaks }: Scene, { runs, ends }: StreakBatches): void {
   context.lineCap = "round";
-  for (let batch = 0; batch < 3; batch += 1) {
-    const end = batches.ends[batch] ?? 0;
-    const style = streaks[batch];
-    const run = batches.runs[batch];
-    if (end === 0 || !style || !run) continue;
-    context.strokeStyle = style[0];
-    context.globalAlpha = style[1];
-    context.lineWidth = style[2];
-    context.beginPath();
-    tracePath(context, run, end);
-    context.stroke();
-  }
+  strokeBatch(context, streaks[0], runs[0], ends[0]);
+  strokeBatch(context, streaks[1], runs[1], ends[1]);
+  strokeBatch(context, streaks[2], runs[2], ends[2]);
   context.globalAlpha = 1;
 }
 
-/** One sub-path per `x1 y1 x2 y2` run; the nudge gives a standing star a dot, not nothing. */
-function tracePath(context: CanvasRenderingContext2D, run: Float32Array, end: number): void {
+/**
+ * One path for a batch: a sub-path per `x1 y1 x2 y2` run up to `end`, the
+ * nudge giving a standing star a dot rather than nothing.
+ */
+function strokeBatch(
+  context: CanvasRenderingContext2D,
+  [colour, alpha, width]: StreakStyle,
+  run: Float32Array,
+  end: number,
+): void {
+  if (end === 0) return;
+  context.strokeStyle = colour;
+  context.globalAlpha = alpha;
+  context.lineWidth = width;
+  context.beginPath();
+  // In bounds by construction: `end` never passes what the batch was written to.
   for (let at = 0; at < end; at += 4) {
-    context.moveTo(run[at] ?? 0, run[at + 1] ?? 0);
-    context.lineTo((run[at + 2] ?? 0) + 0.3, (run[at + 3] ?? 0) + 0.3);
+    context.moveTo(run[at]!, run[at + 1]!);
+    context.lineTo(run[at + 2]! + 0.3, run[at + 3]! + 0.3);
   }
+  context.stroke();
 }
 
-/** Sized in device pixels and drawn in CSS ones, so a star is as sharp on a 2× screen. */
-function sceneOf(canvas: HTMLCanvasElement, sky: Sky, view: SkyBox): Scene | undefined {
-  const context = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
-  if (!context) return undefined;
+/** The page's 2D context for `canvas`, if it will give one. */
+function contextOf(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
+  return typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+}
+
+/**
+ * Sized in device pixels and drawn in CSS ones, so a star is as sharp on a 2×
+ * screen; the inks read from the page as it is painted now.
+ */
+function sceneOf(
+  canvas: HTMLCanvasElement,
+  context: CanvasRenderingContext2D,
+  sky: Sky,
+  view: SkyBox,
+): Scene {
   const ratio = window.devicePixelRatio || 1;
   canvas.width = Math.round(view.width * ratio);
   canvas.height = Math.round(view.height * ratio);
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
   const ink = inkOf(canvas);
+  // Doubles from the first write: fields that start as small integers change
+  // representation on the first fractional place and throw away the
+  // optimised frame code that read them.
+  const places = sky.stars.map((star) => ({ star, x: Number.NaN, y: Number.NaN }));
   return {
     context,
     sky,
     view,
     ink,
-    star: sprite(ink),
+    sprite: sprite(ink),
     streaks: streakStyles(ink),
-    // Doubles from the first write: fields that start as small integers change
-    // representation on the first fractional place and throw away the
-    // optimised frame code that read them.
-    places: sky.stars.map(() => ({ x: Number.NaN, y: Number.NaN })),
+    places,
+    lines: figureLines(sky, places),
   };
 }
 
@@ -288,7 +300,6 @@ function loop(step: (now: number) => boolean): { stop(): void } {
  * machine's own change alike — so that one attribute is all there is to watch.
  */
 function watchScheme(changed: () => void): () => void {
-  if (typeof MutationObserver !== "function") return () => undefined;
   const observer = new MutationObserver(changed);
   observer.observe(document.documentElement, {
     attributes: true,
@@ -328,9 +339,9 @@ export function paintSky(
   view: SkyBox,
   still: boolean,
 ): SkyPainter | undefined {
-  const first = sceneOf(canvas, sky, view);
-  if (!first) return undefined;
-  let scene = first;
+  const context = contextOf(canvas);
+  if (!context) return undefined;
+  let scene = sceneOf(canvas, context, sky, view);
   const started = performance.now();
   let gatherAt: number | undefined;
   let flight: Flight | undefined;
@@ -348,7 +359,7 @@ export function paintSky(
   };
   const rebuild = (nextSky: Sky, nextView: SkyBox): void => {
     if (stopped) return;
-    scene = sceneOf(canvas, nextSky, nextView) ?? scene;
+    scene = sceneOf(canvas, context, nextSky, nextView);
     if (still) drawStill();
   };
   const unwatch = watchScheme(() => rebuild(scene.sky, scene.view));

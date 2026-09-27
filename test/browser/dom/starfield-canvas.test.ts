@@ -330,3 +330,61 @@ test("still, a resize redraws at once, formed if the files had gathered", (t) =>
   assert.equal(context.count("stroke"), 1, "still formed, figures and all");
   assert.equal(page.pending(), 0, "and still no loop");
 });
+
+for (const [scheme, alpha] of [
+  ["dark", 0.7],
+  ["light", 0.55],
+] as const) {
+  test(`the ${scheme} figures are drawn at their own weight once formed`, (t) => {
+    const page = fakePage(t, scheme);
+    const context = new FakeContext();
+    const { painter } = mount(context);
+    const now = performance.now();
+    painter?.gather();
+
+    context.clear();
+    page.run(now + 5000);
+
+    assert.ok(context.sets("globalAlpha").includes(String(alpha)), `lines at ${alpha}`);
+    painter?.stop();
+  });
+}
+
+test("a window that does not say its pixel density is drawn at 1×", (t) => {
+  const page = fakePage(t);
+  delete (page.window as { devicePixelRatio?: number }).devicePixelRatio;
+
+  const { canvas } = mount(new FakeContext());
+
+  assert.deepEqual([canvas.width, canvas.height], [1200, 800]);
+});
+
+test("a stopped painter lays nothing out again on a late resize", (t) => {
+  const page = fakePage(t);
+  const context = new FakeContext();
+  const { canvas, painter } = mount(context, true);
+  painter?.stop();
+  context.clear();
+
+  painter?.resize(layoutSky(chapters([1]), { width: 300, height: 300 }), {
+    width: 300,
+    height: 300,
+  });
+
+  assert.deepEqual([canvas.width, canvas.height], [2400, 1600]);
+  assert.equal(context.calls.length, 0);
+  assert.equal(page.pending(), 0);
+});
+
+test("no context for the star sprite: the stars are still placed, drawn from a blank sprite", (t) => {
+  const page = fakePage(t);
+  const globals = globalThis as { document: { createElement: (tag: string) => unknown } };
+  globals.document.createElement = (tag: string) =>
+    tag === "canvas" ? new FakeCanvas(null) : { style: {}, remove: () => undefined };
+  const context = new FakeContext();
+  const { sky } = mount(context);
+
+  page.run(performance.now());
+
+  assert.equal(context.count("drawImage"), sky.stars.length);
+});

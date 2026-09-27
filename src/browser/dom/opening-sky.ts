@@ -34,7 +34,7 @@ const RESIZE_SETTLE_MS = 150;
  * off the strip the sky sheet's button stands in.
  */
 function viewOf(): { view: SkyBox; box: SkyBox } {
-  const view = { width: window.innerWidth || 0, height: window.innerHeight || 0 };
+  const view = { width: window.innerWidth, height: window.innerHeight };
   return {
     view,
     box: { width: view.width, height: Math.max(view.height / 2, view.height - BUTTON_BAND) },

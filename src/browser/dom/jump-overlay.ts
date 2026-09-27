@@ -35,7 +35,7 @@ const ROOM = `<div class="lsr-jump-overlay" aria-hidden="true" data-bloom="false
 /** Mounts the room's stars: no files of its own, the field is all deep stars rushing past. */
 function jumpStars(root: HTMLElement, paint: typeof paintSky): ReturnType<typeof paintSky> {
   const canvas = root.querySelector<HTMLCanvasElement>(".lsr-sky-canvas");
-  const view = { width: window.innerWidth || 0, height: window.innerHeight || 0 };
+  const view = { width: window.innerWidth, height: window.innerHeight };
   const painter = canvas ? paint(canvas, layoutSky([], view), view, false) : undefined;
   painter?.jump();
   return painter;
@@ -53,11 +53,9 @@ export function playJump(host: JumpHost): void {
   const release = holdPageBehind(host.root);
   const field = host.root.querySelector<HTMLElement>(".lsr-jump-overlay");
   const painter = jumpStars(host.root, host.paint ?? paintSky);
-  let landed = false;
-
+  // Runs once: every way in — the timer, Esc, the next room — is taken down
+  // here before the page gets anything back.
   function land(): void {
-    if (landed) return;
-    landed = true;
     clearTimeout(flash);
     clearTimeout(done);
     painter?.stop();
