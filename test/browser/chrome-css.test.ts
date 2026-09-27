@@ -1024,3 +1024,13 @@ test("the firefly's spark stays lit in forced colours, in the system's text colo
   assert.match(spark, /forced-color-adjust: none;/);
   assert.match(spark, /background: var\(--lsr-system-text\);/);
 });
+
+test("the round's announcement and the replay card lift off the page on a shadow, not a border", () => {
+  for (const card of [".lsr-round-card", ".lsr-replay"]) {
+    const body = rulesFor(card).join("");
+
+    // Transparent, not none: forced colours paint the edge the shadow cannot draw there.
+    assert.match(body, /border: 1px solid transparent;/, `${card} draws a border`);
+    assert.match(body, /box-shadow: var\(--lsr-shadow-lift\);/, `${card} has nothing to lift it`);
+  }
+});
