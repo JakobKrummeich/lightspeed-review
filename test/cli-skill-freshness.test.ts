@@ -7,7 +7,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { newRepo } from "./helpers/git-repo.ts";
-import { NO_SERVER_PORT } from "./helpers/ports.ts";
 import { stampedSkillFor, stampSkill } from "../src/skill-stamp.ts";
 import { CLI_VERSION } from "../src/version.ts";
 
@@ -18,20 +17,17 @@ const cliPath = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const PRE_STAMP_SKILL =
   "---\nname: lightspeed\ndescription: old\n---\n\nRun `lightspeed poll --agent-reply`.\n";
 
-/** Its own state dir and a port no server holds: never the machine's real review server. */
-function isolatedRepo(): string {
-  const repoRoot = newRepo("lsr-cli-fresh-");
-  writeFileSync(
-    join(repoRoot, ".lightspeed.conf.json"),
-    JSON.stringify({ stateDir: join(repoRoot, "state"), port: NO_SERVER_PORT }),
-  );
-  return repoRoot;
-}
-
+/**
+ * Runs in a repository with no config. None names a port, so the default one
+ * stands, yet nothing here reaches the machine's real server there: `poll` and
+ * a bare `reply` fail before any config is read, `init` and `skill` ask no
+ * server, and the bare home view asks none once the config is missing (the
+ * "missing" branch in src/commands/home-input.ts).
+ */
 async function runCli(args: string[], home: string): Promise<{ stdout: string; code: number }> {
   try {
     const { stdout } = await execFileAsync(process.execPath, [cliPath, ...args], {
-      cwd: isolatedRepo(),
+      cwd: newRepo("lsr-cli-fresh-"),
       env: { ...process.env, HOME: home },
     });
     return { stdout, code: 0 };
