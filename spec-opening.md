@@ -224,8 +224,10 @@ round has none of.
 - `paintSky` in `src/browser/dom/starfield-canvas.ts` — the only canvas code in
   the page. Every star is one `drawImage` of a sprite rendered once, the
   figures are one path, and the jump strokes three batched paths a frame
-  (`src/browser/warp-field.ts`), inside a 4 ms frame at 600 stars, reusing
-  its arrays so a frame makes next to no garbage.
+  (`src/browser/warp-field.ts`), inside a 4 ms frame at 600 stars. It reuses
+  its arrays and place objects, so the garbage left is the engine boxing the
+  numbers handed to the canvas: about 2.7 MB per 2 s of gathering and about
+  5 MB over a first jump at 600 stars, under 1 MB a jump once optimised.
 - `playJump` in `src/browser/dom/jump-overlay.ts` — the later rounds' jump,
   drawn into `#lsr-opening`. `arrivals()` there numbers each jump and holds
   what follows the landing (the replay's automatic open); `replay-wiring.ts`

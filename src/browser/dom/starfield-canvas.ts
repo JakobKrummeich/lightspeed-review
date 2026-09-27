@@ -6,12 +6,14 @@
  * Cheap by construction, for the 4 ms-a-frame budget at 600 stars: every star
  * is one `drawImage` of a sprite rendered once, the figure lines are one path,
  * and the jump strokes three batched paths a frame. No per-star `shadowBlur` —
- * that alone cost more than the budget in the prototype. And no garbage of
- * its own a frame: each star keeps one place object, the streaks are written
- * into buffers made once per jump, and every loop is indexed rather than
- * iterated. What a frame still allocates is the engine's: the fractional
- * numbers handed to `drawImage` and `globalAlpha` are boxed on the way into
- * the canvas, about 30 bytes a star.
+ * that alone cost more than the budget in the prototype. Little garbage of
+ * its own: each star keeps one place object, the streaks are written into
+ * buffers made once per jump, and every loop is indexed rather than
+ * iterated. It is not none: the engine boxes fractional numbers — those
+ * handed to `drawImage`, `globalAlpha`, `moveTo` and `lineTo`, and, until it
+ * is optimised, those `fly` in `warp-field.ts` works with. Measured at 600
+ * stars: about 2.7 MB per 2 s of gathering, and about 5 MB over a first jump
+ * (3 MB of it in `fly`), under 1 MB a jump once the code is warm.
  */
 import {
   SKY_TIMES,

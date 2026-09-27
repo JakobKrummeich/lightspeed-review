@@ -81,8 +81,11 @@ export function streakBatches(stars: number): StreakBatches {
 /**
  * Moves every star `speed` closer and writes the streak each drew into
  * `into` — the painter strokes one path per batch. Mutates `field` and
- * `into` and makes nothing of its own: at 780 stars and 60 frames a second,
- * fresh arrays every frame were 5.7 MB of garbage a second.
+ * `into` and makes no arrays of its own: at 780 stars and 60 frames a
+ * second, fresh arrays every frame were 5.7 MB of garbage a second. Not no
+ * allocation, though: until the engine optimises `fly`, the doubles it works
+ * with are boxed — about 3 MB over a first jump at 600 stars, a small part of
+ * that once warm (see `starfield-canvas.ts`).
  */
 export function warpStreaks(
   field: WarpField,
