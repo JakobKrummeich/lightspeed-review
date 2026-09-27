@@ -7,9 +7,9 @@ simply there.
 ## Why
 
 A review is somebody handing over work they built. Dropping straight into the
-review states the facts and loses the occasion — and, more practically, an intent
-list of eight lines shown all at once is read by nobody. One reason on screen,
-with nothing else on it, is read.
+review states the facts and loses the occasion — and, more practically, an
+intent list of eight lines shown all at once is read by nobody. One reason on
+screen, with nothing else on it, is read.
 
 The cost of the ceremony is presses, so it is spent where it buys the most:
 the first round of a review, once, and never again.
@@ -34,8 +34,9 @@ there is nothing to look at instead of the reason being read.
   figures; a long name wraps onto a second line (at most 240 px wide), and
   one longer than two lines ends in an ellipsis. Its button, **Open the
   review**, is held back until the names have been up for 1.5 s — the sheet
-  takes the caret meanwhile, so `Esc` still works. A screen reader hears every chapter name in the sheet's
-  `aria-label` ("3 chapters: …"); the names on screen are eye-only.
+  takes the caret meanwhile, so `Esc` still works. A screen reader hears every
+  chapter name in the sheet's `aria-label` ("3 chapters: …"); the names on
+  screen are eye-only.
 
 The reason is set nearly as large as the cover's headline and no wider than a
 sentence: the size is what stops it being skimmed. The opening is the one
@@ -65,8 +66,9 @@ names and file paths, so the same round draws the same sky every time:
   the lines it changed, from a floor of 0.15, so a file that changed no lines
   (a rename, a binary) is still a faint star rather than nothing;
 - each chapter's stars cluster round a point on an arc (a closer arc for three
-  chapters or fewer, a ring past six); the figure is the minimum spanning tree over the chapter's
-  seven brightest stars, and the rest of its files stay loose around it;
+  chapters or fewer, a ring past six); the figure is the minimum spanning tree
+  over the chapter's seven brightest stars, and the rest of its files stay
+  loose around it;
 - a name is placed under its figure and kept clear of the others and of the
   strip the button stands in; the box it is checked in is the whole name, two
   lines of it when it wraps. The page measures each name with the canvas's
@@ -218,9 +220,9 @@ round has none of.
   one HTML string for the whole room, no DOM: the sky's canvas, tunnel and
   names layer, every sheet (the constellation sheet only when there are
   chapters), the dots and the flash layer. `renderSkyNames` draws the names at
-  the places `layoutSky` gave them. Every sheet is in the markup from the start; peeling
-  moves a `data-at` attribute (`gone` / `top` / `under`), so a press is one
-  attribute write and the animation is the stylesheet's business.
+  the places `layoutSky` gave them. Every sheet is in the markup from the
+  start; peeling moves a `data-at` attribute (`gone` / `top` / `under`), so a
+  press is one attribute write and the animation is the stylesheet's business.
 - `mountOpening` in `src/browser/dom/opening-overlay.ts` — the mount, modelled
   on `mountReplayOverlay`: `Escape` closes, focus moves to the top sheet's
   button on every peel and is restored to the page on close. It also writes the
