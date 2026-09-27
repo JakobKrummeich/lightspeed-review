@@ -7,7 +7,7 @@ import { runStop } from "../../src/commands/stop.ts";
 import { probePort } from "../../src/commands/server-address.ts";
 import { createReviewServer, type ReviewServer } from "../../src/server.ts";
 import { SessionStore } from "../../src/session-store.ts";
-import { freePort } from "../helpers/ports.ts";
+import { freePort, NO_SERVER_PORT } from "../helpers/ports.ts";
 
 function reviewServerOn(port: number): ReviewServer {
   const store = new SessionStore(mkdtempSync(join(tmpdir(), "lsr-stop-")));
@@ -23,6 +23,7 @@ async function untilRefused(port: number): Promise<void> {
   assert.fail(`port ${port} still answers after stop`);
 }
 
+/** freePort, not port 0: the port is watched until refused, so nothing else may take it once the server lets go. */
 test("stop takes a running server down and says the sessions survive it", async () => {
   const port = await freePort();
   const server = reviewServerOn(port);
@@ -42,7 +43,7 @@ test("stop takes a running server down and says the sessions survive it", async 
 });
 
 test("stopping a server that is not there is success and names the port", async () => {
-  const port = await freePort();
+  const port = NO_SERVER_PORT;
 
   const output = await runStop({ port });
 

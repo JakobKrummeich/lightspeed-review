@@ -198,6 +198,8 @@ interface Loop {
 }
 
 async function withLoop(body: (loop: Loop) => Promise<void>): Promise<void> {
+  // freePort, not port 0: the config names the port the CLI's detached
+  // `lightspeed serve` will listen on, before anything does.
   const port = await freePort();
   const repoRoot = repoWithOneFileDiff(port);
   const loop = {

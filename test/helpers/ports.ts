@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { createServer, type Server, type Socket } from "node:net";
+import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
 /**
  * A port nothing listens on and no test can take: it is privileged, so a
@@ -17,9 +17,11 @@ const PORT_COUNT = 6_000;
 const LAST_CLAIM = FIRST_PORT + 2 * PORT_COUNT - 1;
 
 /**
- * A port for a server that does not exist yet — "is a server running?" tests,
- * and a `lightspeed serve` a spawned CLI starts, both need the number first.
- * Where the test starts the server itself, listen on port 0 instead.
+ * A port for a server that does not exist yet, and that stays this test
+ * process's after its server is gone. Only for a test that needs the number
+ * before anything listens on it, or needs it to stay free after a server
+ * stops. Everywhere else, listen on port 0 and read the port back; for "no
+ * server here", use NO_SERVER_PORT.
  *
  * Why not listen on 0, read the port and close (what this did until 3.6.0):
  * the port is released, so any bind(0) in a test file running concurrently —
@@ -70,15 +72,17 @@ function assertOutsideEphemeralRange(): void {
 }
 
 export interface OccupiedPort {
+  port: number;
   release(): Promise<void>;
 }
 
-/** A plain TCP listener that never speaks HTTP: the "someone else" case. */
-export async function occupyPort(port: number): Promise<OccupiedPort> {
+/** A plain TCP listener that never speaks HTTP: the "someone else" case. On port 0, held until released. */
+export async function occupyPort(): Promise<OccupiedPort> {
   const accepted: Socket[] = [];
   const squatter = createServer((socket) => accepted.push(socket));
-  await new Promise<void>((resolve) => squatter.listen(port, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => squatter.listen(0, "127.0.0.1", resolve));
   return {
+    port: (squatter.address() as AddressInfo).port,
     release: async () => {
       // Sockets opened by health probes would hold `close` open forever.
       for (const socket of accepted) socket.destroy();

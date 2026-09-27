@@ -6,7 +6,15 @@ import { join } from "node:path";
 import { ReviewError } from "../../src/errors.ts";
 import { runServe } from "../../src/commands/serve.ts";
 import { runStop } from "../../src/commands/stop.ts";
-import { freePort, occupyPort } from "../helpers/ports.ts";
+import { createReviewServer } from "../../src/server.ts";
+import { SessionStore } from "../../src/session-store.ts";
+import { freePort, NO_SERVER_PORT, occupyPort } from "../helpers/ports.ts";
+
+/*
+ * A test that runs `runServe` itself takes a freePort, not port 0: `runServe`
+ * answers only once stopped, so the port it serves on must be known up front
+ * to reach it and to stop it.
+ */
 
 function stateDir(): string {
   return mkdtempSync(join(tmpdir(), "lsr-serve-"));
@@ -36,8 +44,8 @@ test("stop reports the running server as stopped", async () => {
 });
 
 test("serving on a port someone else holds fails with port_unavailable", async () => {
-  const port = await freePort();
-  const squatter = await occupyPort(port);
+  const squatter = await occupyPort();
+  const { port } = squatter;
 
   await assert.rejects(
     () => runServe({ stateDir: stateDir(), port, feedbackLog: "off" }),
@@ -52,9 +60,8 @@ test("serving on a port someone else holds fails with port_unavailable", async (
 });
 
 test("serving on a port a review server already holds names it as one", async () => {
-  const port = await freePort();
-  const serving = runServe({ stateDir: stateDir(), port, feedbackLog: "off" });
-  assert.equal((await fetch(`http://127.0.0.1:${port}/health`)).status, 200);
+  const holder = createReviewServer({ store: new SessionStore(stateDir()), port: 0 });
+  const { port } = await holder.start();
 
   await assert.rejects(
     () => runServe({ stateDir: stateDir(), port, feedbackLog: "off" }),
@@ -66,15 +73,12 @@ test("serving on a port a review server already holds names it as one", async ()
     },
   );
 
-  await runStop({ port });
-  await serving;
+  await holder.stop();
 });
 
 test("stopping a server that is not running succeeds instead of failing", async () => {
-  const port = await freePort();
+  const output = await runStop({ port: NO_SERVER_PORT });
 
-  const output = await runStop({ port });
-
-  assert.deepEqual(output.server, { port, status: "not_running" });
+  assert.deepEqual(output.server, { port: NO_SERVER_PORT, status: "not_running" });
   assert.match(output.message as string, /no review server/i);
 });
