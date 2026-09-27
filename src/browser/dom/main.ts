@@ -17,6 +17,7 @@ import { mountDiffView } from "./diff-mount.ts";
 import { wireFinish } from "./finish.ts";
 import { wireIntent } from "./intent-mount.ts";
 import { mountOpening } from "./opening-overlay.ts";
+import { playJump } from "./jump-overlay.ts";
 import { reducedMotion, stillness } from "./stillness.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
 import { mountPanelLight } from "./panel-light.ts";
@@ -308,7 +309,14 @@ function wireReplay(page: Page, live: LiveSession): (fresh: SessionData) => void
     fetch: () => fetchReplay(page.key),
     wasReplayed: (shown) => readMemory(localStorage, page.key).replayed === shown,
     markReplayed: (shown) => updateMemory(localStorage, page.key, { replayed: shown }),
-    open: (opening) => replayOverlay.open(opening),
+    // A round shown for the first time arrives by a jump; the replay opens as
+    // it lands. A manual reopen is not an arrival, so it opens straight away.
+    open: (opening) =>
+      playJump({
+        root: page.openingRoot,
+        still: stillness(),
+        land: () => replayOverlay.open(opening),
+      }),
     offer: (opening) => {
       replay = opening;
       page.replayReopen.hidden = opening === undefined;
