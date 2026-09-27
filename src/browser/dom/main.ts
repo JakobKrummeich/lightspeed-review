@@ -17,7 +17,7 @@ import { mountDiffView } from "./diff-mount.ts";
 import { wireFinish } from "./finish.ts";
 import { wireIntent } from "./intent-mount.ts";
 import { mountOpening } from "./opening-overlay.ts";
-import { playJump } from "./jump-overlay.ts";
+import { arrivals } from "./jump-overlay.ts";
 import { reducedMotion, stillness } from "./stillness.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
 import { mountPanelLight } from "./panel-light.ts";
@@ -299,9 +299,11 @@ function wireReplay(page: Page, live: LiveSession): (fresh: SessionData) => void
     },
   });
   let replay: ReplayOpening | undefined;
+  const arrival = arrivals(page.openingRoot, stillness);
   page.replayReopen.addEventListener("click", () => {
-    // Manual reopen ignores the once-per-round memory on purpose.
-    if (replay !== undefined) replayOverlay.open(replay);
+    // Manual reopen ignores the once-per-round memory on purpose. Not mid-jump:
+    // the landing opens the replay itself, and would reset one opened now.
+    if (replay !== undefined && !arrival.jumping()) replayOverlay.open(replay);
   });
   // Ordering (which round a response belongs to, what failed fetches leave)
   // lives in the refresher.
@@ -311,12 +313,7 @@ function wireReplay(page: Page, live: LiveSession): (fresh: SessionData) => void
     markReplayed: (shown) => updateMemory(localStorage, page.key, { replayed: shown }),
     // A round shown for the first time arrives by a jump; the replay opens as
     // it lands. A manual reopen is not an arrival, so it opens straight away.
-    open: (opening) =>
-      playJump({
-        root: page.openingRoot,
-        still: stillness(),
-        land: () => replayOverlay.open(opening),
-      }),
+    open: (opening) => arrival.play(() => replayOverlay.open(opening)),
     offer: (opening) => {
       replay = opening;
       page.replayReopen.hidden = opening === undefined;

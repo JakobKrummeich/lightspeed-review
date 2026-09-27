@@ -1,8 +1,10 @@
 /*
  * The opening is a room, not a card on a scrim: the field is opaque and
  * full-bleed, so until the last press there is no review behind it to look at
- * instead of the reason being read. It never meets the replay overlay, because
- * a first round has no previous round to replay.
+ * instead of the reason being read. A later round can still arrive while it
+ * is up (another tab moved the review on): the round jump then closes it the
+ * way Esc would before taking its root (`dom/room-claim.ts`), so the two rooms
+ * never paint at once.
  *
  * The locals below are declared here rather than on `:root` because nothing
  * else on the page is in this room. All of them go through `light-dark()`: the

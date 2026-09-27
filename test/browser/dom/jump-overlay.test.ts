@@ -1,48 +1,113 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { playJump } from "../../../src/browser/dom/jump-overlay.ts";
+import { arrivals, playJump } from "../../../src/browser/dom/jump-overlay.ts";
+import { mountOpening } from "../../../src/browser/dom/opening-overlay.ts";
+import type { SkyPainter } from "../../../src/browser/dom/starfield-canvas.ts";
 import type { Stillness } from "../../../src/browser/dom/stillness.ts";
-import { SKY_TIMES } from "../../../src/browser/starfield.ts";
+import { SKY_TIMES, type Sky } from "../../../src/browser/starfield.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
-class FakeDocument {
-  private listeners = new Map<string, ((event: unknown) => void)[]>();
+type Inert = FakeNode & { inert?: boolean };
 
-  addEventListener(type: string, handler: (event: unknown) => void): void {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
+interface Key {
+  key: string;
+  stopped: boolean;
+  stopPropagation(): void;
+}
+
+/** Capture listeners first, as the browser runs them; one stopped key reaches no bubble listener. */
+class FakeDocument {
+  activeElement: FakeNode | null = null;
+  body: { children: FakeNode[] } = { children: [] };
+  private listeners: { type: string; handler: (event: unknown) => void; capture: boolean }[] = [];
+
+  addEventListener(type: string, handler: (event: unknown) => void, capture = false): void {
+    this.listeners.push({ type, handler, capture: capture === true });
   }
 
-  removeEventListener(type: string, handler: (event: unknown) => void): void {
-    this.listeners.set(
-      type,
-      (this.listeners.get(type) ?? []).filter((known) => known !== handler),
+  removeEventListener(type: string, handler: (event: unknown) => void, capture = false): void {
+    this.listeners = this.listeners.filter(
+      (known) =>
+        known.type !== type || known.handler !== handler || known.capture !== (capture === true),
     );
   }
 
-  press(key: string): void {
-    for (const handler of this.listeners.get("keydown") ?? []) handler({ key });
+  press(key: string): Key {
+    const event: Key = {
+      key,
+      stopped: false,
+      stopPropagation() {
+        this.stopped = true;
+      },
+    };
+    const keydown = this.listeners.filter((known) => known.type === "keydown");
+    for (const phase of [true, false]) {
+      for (const known of keydown.filter((one) => one.capture === phase)) {
+        if (event.stopped) return event;
+        known.handler(event);
+      }
+    }
+    return event;
   }
 
   keydownCount(): number {
-    return (this.listeners.get("keydown") ?? []).length;
+    return this.listeners.filter((known) => known.type === "keydown").length;
   }
+}
+
+/** Records what the jump asks of its painter: the sky it was handed and every call after. */
+function fakePaint() {
+  const calls: string[] = [];
+  const skies: Sky[] = [];
+  const paint = (_canvas: HTMLCanvasElement, sky: Sky, _view: unknown, still: boolean) => {
+    skies.push(sky);
+    calls.push(`paint still=${still}`);
+    const painter: SkyPainter = {
+      gather: () => calls.push("gather"),
+      jump: () => calls.push("jump"),
+      stop: () => calls.push("stop"),
+    };
+    return painter;
+  };
+  return { calls, skies, paint };
 }
 
 const MOVING: Stillness = { reducedMotion: false, forcedColors: false };
 
-function jumped(t: TestContext, still: Stillness = MOVING) {
+interface Page {
+  page: FakeDocument;
+  root: FakeNode;
+  behind: Inert;
+}
+
+function page(t: TestContext): Page {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  installFakeElements((undo) => t.after(undo));
-  const page = new FakeDocument();
+  const window = installFakeElements((undo) => t.after(undo)) as unknown as Record<string, number>;
+  window.innerWidth = 1440;
+  window.innerHeight = 900;
+  const doc = new FakeDocument();
   const globals = globalThis as Record<string, unknown>;
   const before = globals.document;
-  globals.document = page;
+  globals.document = doc;
   t.after(() => {
     globals.document = before;
   });
   const root = new FakeNode("div", 'id="lsr-opening"');
-  const state = { root, page, lands: 0 };
-  playJump({ root: asPanelRoot(root), still, land: () => (state.lands += 1) });
+  const behind: Inert = new FakeNode("main", 'id="lsr-review"');
+  doc.body.children = [behind, root];
+  return { page: doc, root, behind };
+}
+
+function jumped(t: TestContext, still: Stillness = MOVING) {
+  const { page: doc, root, behind } = page(t);
+  const painter = fakePaint();
+  const state = { root, page: doc, behind, painter, lands: 0 };
+  playJump({
+    root: asPanelRoot(root),
+    still,
+    land: () => (state.lands += 1),
+    paint: painter.paint,
+  });
   return state;
 }
 
@@ -64,6 +129,16 @@ test("the round arrives by a jump that fills the window, and lands after it", (t
   assert.equal(state.page.keydownCount(), 0);
 });
 
+test("the stars are all deep ones, jumping from the first frame, and stop on the landing", (t) => {
+  const state = jumped(t);
+
+  assert.deepEqual(state.painter.calls, ["paint still=false", "jump"]);
+  assert.equal(state.painter.skies[0]?.stars.length, 0, "no files of its own");
+
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.deepEqual(state.painter.calls, ["paint still=false", "jump", "stop"]);
+});
+
 test("the room is decoration only: hidden from a reader, and it takes no caret", (t) => {
   const { root } = jumped(t);
 
@@ -77,18 +152,87 @@ test("Esc lands at once, and the jump's own timers land nothing more", (t) => {
   state.page.press("Escape");
   assert.equal(state.lands, 1);
   assert.equal(state.root.innerHTML, "");
+  assert.ok(state.painter.calls.includes("stop"), "no frame outlives the room");
 
   t.mock.timers.tick(SKY_TIMES.jumpMs);
   assert.equal(state.lands, 1, "one landing, however it came");
   assert.equal(state.page.keydownCount(), 0);
 });
 
-test("an ordinary key is not a way out", (t) => {
+test("an ordinary key is not a way out, and reaches nothing behind the room", (t) => {
   const state = jumped(t);
+  let heard = 0;
+  state.page.addEventListener("keydown", () => (heard += 1));
 
-  state.page.press("a");
+  const key = state.page.press("a");
 
   assert.equal(state.lands, 0);
+  assert.equal(key.stopped, true);
+  assert.equal(heard, 0, "the page's own keys wait for the landing");
+});
+
+test("Esc during the jump is the jump's alone: a popup behind it never hears it", (t) => {
+  const state = jumped(t);
+  let popupClosed = 0;
+  // The done card and the round card listen on the document, in the bubble phase.
+  state.page.addEventListener("keydown", (event) => {
+    if ((event as Key).key === "Escape") popupClosed += 1;
+  });
+
+  state.page.press("Escape");
+
+  assert.equal(state.lands, 1);
+  assert.equal(popupClosed, 0);
+  state.page.press("Escape");
+  assert.equal(popupClosed, 1, "after the landing the page has its keys back");
+});
+
+test("the page is inert while the jump plays and handed back, caret and all, on landing", (t) => {
+  const { page: doc, root, behind } = page(t);
+  const writing = new FakeNode("textarea");
+  doc.activeElement = writing;
+  let whenLanded: { inert?: boolean; caret: boolean } | undefined;
+  playJump({
+    root: asPanelRoot(root),
+    still: MOVING,
+    land: () => {
+      whenLanded = { inert: behind.inert, caret: writing.focused };
+    },
+    paint: fakePaint().paint,
+  });
+
+  assert.equal(behind.inert, true, "Tab and typing cannot reach the review mid-jump");
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.deepEqual(whenLanded, { inert: false, caret: true }, "handed back before the replay");
+  assert.deepEqual(writing.focusCalls, [{ preventScroll: true }]);
+});
+
+test("no canvas to paint: the tunnel and the flash still carry the jump", (t) => {
+  const { page: doc, root } = page(t);
+  let lands = 0;
+  let painted = 0;
+  const bare = asPanelRoot(root);
+  const write = Object.getOwnPropertyDescriptor(FakeNode.prototype, "innerHTML");
+  // A room drawn without its canvas: the markup minus the one element the painter needs.
+  Object.defineProperty(root, "innerHTML", {
+    get: () => write?.get?.call(root) as string,
+    set: (html: string) => write?.set?.call(root, html.replace(/<canvas[^>]*><\/canvas>/, "")),
+  });
+  playJump({
+    root: bare,
+    still: MOVING,
+    land: () => (lands += 1),
+    paint: () => {
+      painted += 1;
+      return undefined;
+    },
+  });
+
+  assert.equal(painted, 0);
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.equal(lands, 1);
+  assert.equal(doc.keydownCount(), 0);
 });
 
 for (const still of [
@@ -101,5 +245,105 @@ for (const still of [
     assert.equal(state.lands, 1);
     assert.equal(state.root.innerHTML, "", "no room drawn at all");
     assert.equal(state.page.keydownCount(), 0);
+    assert.equal(state.behind.inert, undefined, "nothing was held");
+    assert.deepEqual(state.painter.calls, []);
   });
 }
+
+/** Another tab moved the review on while this one still sits in the opening. */
+function openingThenJump(t: TestContext, still: Stillness = MOVING) {
+  const { page: doc, root, behind } = page(t);
+  const cover = new FakeNode("button");
+  doc.activeElement = cover;
+  const state = { page: doc, root, behind, cover, closes: 0, lands: 0 };
+  mountOpening({
+    root: asPanelRoot(root),
+    intents: ["one"],
+    chapters: [{ name: "Only", files: [{ path: "a.ts", lines: 3 }] }],
+    stillness: () => still,
+    onOpen: () => undefined,
+    onClose: () => (state.closes += 1),
+  });
+  assert.equal(behind.inert, true, "the opening holds the page");
+  playJump({
+    root: asPanelRoot(root),
+    still,
+    land: () => (state.lands += 1),
+    paint: fakePaint().paint,
+  });
+  return state;
+}
+
+test("a round arriving under the opening closes it properly before the jump takes the root", (t) => {
+  const state = openingThenJump(t);
+
+  assert.equal(state.closes, 1, "the opening left by its own way out");
+  assert.ok(state.root.querySelector(".lsr-jump-overlay"), "the jump has the root");
+  assert.equal(state.root.querySelector(".lsr-opening-overlay"), null);
+  assert.equal(state.page.keydownCount(), 1, "only the jump listens");
+  assert.equal(state.behind.inert, true, "held again, by the jump");
+
+  t.mock.timers.tick(SKY_TIMES.namesAtMs + SKY_TIMES.heldAfterNamesMs + SKY_TIMES.jumpMs);
+  assert.equal(state.lands, 1);
+  assert.equal(state.page.keydownCount(), 0, "no orphan listener left behind");
+  assert.equal(state.behind.inert, false);
+});
+
+test("after that landing, Esc runs no orphaned close: the caret stays where it landed", (t) => {
+  const state = openingThenJump(t);
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  const caret = state.cover.focusCalls.length;
+
+  state.page.press("Escape");
+
+  assert.equal(state.closes, 1);
+  assert.equal(state.cover.focusCalls.length, caret, "nothing moved the caret again");
+});
+
+test("still, a round arriving under the opening still closes it, then lands at once", (t) => {
+  const state = openingThenJump(t, { reducedMotion: true, forcedColors: false });
+
+  assert.equal(state.closes, 1);
+  assert.equal(state.lands, 1);
+  assert.equal(state.root.innerHTML, "");
+  assert.equal(state.page.keydownCount(), 0);
+  assert.equal(state.behind.inert, false);
+});
+
+test("a second round mid-jump lands the first before it takes off", (t) => {
+  const state = jumped(t);
+
+  playJump({
+    root: asPanelRoot(state.root),
+    still: MOVING,
+    land: () => (state.lands += 10),
+    paint: fakePaint().paint,
+  });
+
+  assert.equal(state.lands, 1, "the first landed");
+  assert.equal(state.page.keydownCount(), 1);
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.equal(state.lands, 11);
+  assert.equal(state.behind.inert, false);
+});
+
+test("the page's arrivals say a jump is in flight until it lands, so a reopen can wait", (t) => {
+  const { root } = page(t);
+  let asked = 0;
+  const arrival = arrivals(asPanelRoot(root), () => {
+    asked += 1;
+    return MOVING;
+  });
+  let landed = 0;
+
+  assert.equal(arrival.jumping(), false);
+  arrival.play(() => (landed += 1));
+  assert.equal(arrival.jumping(), true, "mid-jump: the landing will open the replay");
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.equal(arrival.jumping(), false);
+  assert.equal(landed, 1);
+
+  arrival.play(() => (landed += 1));
+  assert.equal(asked, 2, "stillness is asked per jump, not once");
+  assert.equal(root.querySelector(".lsr-sky-canvas") !== null, true);
+});

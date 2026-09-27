@@ -2,6 +2,7 @@ import { renderOpening } from "../opening-view.ts";
 import type { SkyChapter } from "../starfield.ts";
 import { mountOpeningSky } from "./opening-sky.ts";
 import { holdPageBehind } from "./page-hold.ts";
+import { claimRoom, leaveRoom } from "./room-claim.ts";
 import type { Stillness } from "./stillness.ts";
 
 export interface OpeningHost {
@@ -45,6 +46,10 @@ export function mountOpening(host: OpeningHost): void {
   // rounds, and an empty dialog holding focus would be the worse failure.
   if (stack === "") return;
 
+  // The root is shared with the round jump: whichever room comes second
+  // closes the first by its own way out (`room-claim.ts`).
+  const evicted = (): void => close();
+  claimRoom(host.root, evicted);
   const before = document.activeElement;
   host.root.innerHTML = stack;
   const release = holdPageBehind(host.root);
@@ -66,6 +71,7 @@ export function mountOpening(host: OpeningHost): void {
     open = false;
     sky?.stop();
     clearTimeout(strike);
+    leaveRoom(host.root, evicted);
     host.root.innerHTML = "";
     document.removeEventListener("keydown", onKey);
     release();
@@ -74,12 +80,7 @@ export function mountOpening(host: OpeningHost): void {
   };
 
   const paint = (): void => {
-    for (const [index, sheet] of sheets.entries()) {
-      sheet.dataset.at = index < step ? "gone" : index === step ? "top" : "under";
-      // Faded is not gone: Tab still finds an invisible button.
-      sheet.inert = index !== step;
-    }
-    for (const [index, dot] of dots.entries()) dot.dataset.on = String(index <= step);
+    lay(sheets, dots, step);
     caretTo(sheets[step]);
   };
 
@@ -111,6 +112,16 @@ export function mountOpening(host: OpeningHost): void {
   }
   paint();
   host.onOpen();
+}
+
+/** Moves every sheet and dot to `step`: one attribute write each, the stylesheet animates. */
+function lay(sheets: HTMLElement[], dots: HTMLElement[], step: number): void {
+  for (const [index, sheet] of sheets.entries()) {
+    sheet.dataset.at = index < step ? "gone" : index === step ? "top" : "under";
+    // Faded is not gone: Tab still finds an invisible button.
+    sheet.inert = index !== step;
+  }
+  for (const [index, dot] of dots.entries()) dot.dataset.on = String(index <= step);
 }
 
 /**
