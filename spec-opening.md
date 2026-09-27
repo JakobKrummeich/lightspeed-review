@@ -143,8 +143,10 @@ through `light-dark()` and nothing through a `prefers-color-scheme` query.
   paper's, and the flash is warm white.
 
 The canvas takes its inks from the page's tokens when it mounts and reads them
-again whenever `data-color-scheme` flips, so it follows a scheme picked by hand
-mid-opening as the stylesheet does.
+again whenever `data-color-scheme` flips, so it follows the machine's scheme
+when it changes mid-opening, as the stylesheet does. (The scheme switch itself
+is behind the room and inert while it is up, so a pick by hand never happens
+mid-opening; one made before it opens is what the room mounts with.)
 
 The beam and the edge darkening are two layers of the same gradient, always
 both painted, each transparent in the scheme it is not for. The flare is

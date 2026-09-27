@@ -8,8 +8,9 @@ round arrives by a jump into hyperspace.
 - The round's files drift as faint stars behind the reasons, one star per
   file (at most 600), brighter the more lines it changed. The sky is seeded
   from the chapter names and file paths, so the same round draws the same
-  sky every time. A resize lays it out again for the new size, and a scheme
-  picked by hand mid-opening repaints it in the new inks.
+  sky every time. A resize lays it out again for the new size, and it
+  follows the machine's scheme when that changes mid-opening, repainting in
+  the new inks.
 - A new last sheet, with no words on it: the stars gather into one
   constellation per chapter and the chapter names come up under their
   figures, with each chapter's file count (at most eight names; a long name
