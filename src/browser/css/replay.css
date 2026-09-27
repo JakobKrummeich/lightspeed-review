@@ -13,7 +13,8 @@
 
 /* Wider than the closing summary's card: a hunk folded to 40rem wraps more
  * than it says. The nav has to stay reachable however long a card runs, so the
- * card is a column whose middle scrolls. */
+ * card is a column whose middle scrolls. Its edge is the shadow's, as the
+ * round's card is: the border is transparent, for forced colours to paint. */
 .lsr-replay {
   display: flex;
   flex-direction: column;
@@ -22,7 +23,7 @@
   max-height: 100%;
   overflow: hidden;
   background: var(--lsr-surface);
-  border: 1px solid var(--lsr-border);
+  border: 1px solid transparent;
   border-radius: 0.75rem;
   padding: var(--lsr-space-6);
   box-shadow: var(--lsr-shadow-lift);

@@ -1,19 +1,11 @@
 /**
- * The painter for the sky (`../starfield.ts`) and the only canvas code in the
- * page. It is decorative: the canvas is `aria-hidden`, and everything it shows
- * is also said in words or not needed at all.
+ * The painter for the sky (`../starfield.ts`). Decorative: the canvas is
+ * `aria-hidden`, and what it shows is said in words or not needed.
  *
- * Cheap by construction, for the 4 ms-a-frame budget at 600 stars: every star
- * is one `drawImage` of a sprite rendered once, the figure lines are one path,
- * and the jump strokes three batched paths a frame. No per-star `shadowBlur` —
- * that alone cost more than the budget in the prototype. Little garbage of
- * its own: each star keeps one place object, the streaks are written into
- * buffers made once per jump, and every loop is indexed rather than
- * iterated. It is not none: the engine boxes fractional numbers — those
- * handed to `drawImage`, `globalAlpha`, `moveTo` and `lineTo`, and, until it
- * is optimised, those `fly` in `warp-field.ts` works with. Measured at 600
- * stars: about 2.7 MB per 2 s of gathering, and about 5 MB over a first jump
- * (3 MB of it in `fly`), under 1 MB a jump once the code is warm.
+ * Built for a 4 ms frame at 600 stars: every star is one `drawImage` of a
+ * sprite rendered once, the figure lines are one path, and the jump strokes
+ * three batched paths a frame. No per-star `shadowBlur`: it alone costs more
+ * than the budget. Loops are indexed and places reused, to keep garbage low.
  */
 import {
   SKY_TIMES,
@@ -55,7 +47,6 @@ const SPRITE_RADIUS = 24;
 interface Ink {
   accent: string;
   core: string;
-  /** Night sky: white cores in a wide glow. Otherwise a star atlas: ink cores in a thin wash. */
   night: boolean;
 }
 
@@ -80,7 +71,7 @@ function inkOf(canvas: HTMLCanvasElement): Ink {
   return ink;
 }
 
-/** One star, drawn once: a white-hot point in a glow at night, an inked dot in a wash on paper. */
+/** One star, drawn once into a sprite. */
 function sprite(ink: Ink): HTMLCanvasElement {
   const size = SPRITE_RADIUS * 2;
   const canvas = document.createElement("canvas");
@@ -132,9 +123,7 @@ interface Scene {
   view: SkyBox;
   ink: Ink;
   sprite: HTMLCanvasElement;
-  /** Far, middle, near: worked out once, not per frame. */
   streaks: [StreakStyle, StreakStyle, StreakStyle];
-  /** Every star's place, the jump's starting points. */
   places: Place[];
   /** Every figure edge as the two places it joins, looked up once. */
   lines: [Place, Place][];
@@ -201,7 +190,6 @@ function figureLines(sky: Sky, places: Place[]): [Place, Place][] {
   });
 }
 
-/** Far, middle, near: fainter and thinner far off, the near batch in the core colour. */
 function streakStyles(ink: Ink): [StreakStyle, StreakStyle, StreakStyle] {
   return ink.night
     ? [
@@ -298,8 +286,8 @@ function loop(step: (now: number) => boolean): { stop(): void } {
 
 /**
  * Calls `changed` when the page's scheme flips. The scheme toggle writes the
- * effective scheme to `data-color-scheme` — for a pick by hand and for the
- * machine's own change alike — so that one attribute is all there is to watch.
+ * effective scheme to `data-color-scheme` for both a pick by hand and the
+ * machine's own change, so that attribute is all there is to watch.
  */
 function watchScheme(changed: () => void): () => void {
   const observer = new MutationObserver(changed);
@@ -341,7 +329,6 @@ export function paintSky(
   view: SkyBox,
   still: boolean,
 ): SkyPainter | undefined {
-  // The page's 2D context for `canvas`, if it will give one.
   const context = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
   if (!context) return undefined;
   let scene = sceneOf(canvas, context, sky, view);

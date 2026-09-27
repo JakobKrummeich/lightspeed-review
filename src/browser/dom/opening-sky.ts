@@ -1,14 +1,11 @@
 /**
- * The opening's sky (07 Constellations, 08 Hyperspace): the files drift as
- * stars while the reasons are read, gather into one constellation per chapter
- * when the last sheet arrives, take their names, and at the last press jump
- * the reviewer into the review. `opening-overlay.ts` owns the sheets and when
- * each of these happens; this owns what the room does meanwhile.
+ * The opening's sky: files drift as stars behind the reasons, gather into one
+ * constellation per chapter on the last sheet, and jump into the review at
+ * the last press. `opening-overlay.ts` owns the sheets.
  *
- * Every step is on a timer, never on a frame or an `animationend`: the names,
- * the button and the landing come on the same clock whether or not anything
- * was painted — under reduced motion, forced colours, or with no canvas. A
- * resize lays the sky out again once the window settles, until the jump.
+ * Every step is on a timer, never on a frame or an `animationend`, so the
+ * names, the button and the landing come on time even when nothing is
+ * painted (reduced motion, forced colours, no canvas).
  */
 import { renderSkyNames } from "../opening-view.ts";
 import {
@@ -34,20 +31,15 @@ export interface OpeningSky {
 /** A drag-resize is a burst of events: the sky is laid out again once it settles. */
 const RESIZE_SETTLE_MS = 150;
 
-/**
- * The room is fixed and full-bleed, so the window is its size, and the sky
- * is laid out over all of it: the sky sheet's button stands in its middle, in
- * the box the layout keeps clear (`sky-keep-out.ts`).
- */
+/** The room is fixed and full-bleed, so the window is its size. */
 function viewOf(): { view: SkyBox; box: SkyBox } {
   const view = { width: window.innerWidth, height: window.innerHeight };
   return { view, box: view };
 }
 
 /**
- * Calls `changed` once a burst of resizes settles, or the pixel density moves
- * (a zoom, or a drag to a screen of another density — which changes no size,
- * so no resize comes); what it returns stops listening to both.
+ * Calls `changed` once a burst of resizes settles, or when the pixel density
+ * moves (a drag to another screen fires no resize). Returns the unsubscribe.
  */
 function onSettledResize(changed: () => void): () => void {
   let settle: ReturnType<typeof setTimeout> | undefined;
@@ -83,10 +75,9 @@ function onDensityChange(changed: () => void): () => void {
 }
 
 /**
- * Names measured as the stylesheet will set them: the sky's own canvas
- * measures in the font a probe title computes to (the painter draws no text,
- * and a resize resets the context's font, so it is set on every ask). The
- * estimate when there is no 2D context to ask.
+ * Names measured in the font a probe title computes to. The font is set on
+ * every ask because a resize resets the context's. Falls back to the estimate
+ * with no 2D context.
  */
 function measureNames(field: HTMLElement, names: HTMLElement | null): MeasureName {
   const canvas = field.querySelector<HTMLCanvasElement>(".lsr-sky-canvas");
@@ -131,8 +122,6 @@ export function mountOpeningSky(
   const later = (ms: number, run: () => void): void => {
     timers.push(setTimeout(run, ms));
   };
-  // The window changed under the room (a resize, a zoom, a move to a screen
-  // of another density): the layout, the canvas and the names all again.
   const unwatch = onSettledResize(() => {
     const next = viewOf();
     const laid = layoutSky(chapters, next.box, measure);

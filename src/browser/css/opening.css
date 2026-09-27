@@ -1,10 +1,7 @@
 /*
  * The opening is a room, not a card on a scrim: the field is opaque and
  * full-bleed, so until the last press there is no review behind it to look at
- * instead of the reason being read. A later round can still arrive while it
- * is up (another tab moved the review on): the round jump then closes it the
- * way Esc would before taking its root (`dom/room-claim.ts`), so the two rooms
- * never paint at once.
+ * instead of the reason being read.
  *
  * The locals below are declared here rather than on `:root` because nothing
  * else on the page is in this room. All of them go through `light-dark()`: the
@@ -108,12 +105,7 @@
   transition-duration: 90ms;
 }
 
-/*
- * The sky (`dom/opening-sky.ts`): every file a star, painted on one canvas that
- * is decoration only. The files drift while the reasons are read and gather
- * into their chapters on the last sheet; the names come once the figures have
- * formed. Shared with the round jump (`jump.css`), which is the same room.
- */
+/* The sky (`dom/opening-sky.ts`), decoration only; shared with `jump.css`. */
 .lsr-sky-canvas {
   position: absolute;
   inset: 0;
@@ -146,10 +138,8 @@
   opacity: 1;
 }
 
-/* Centred under its cluster at the left/top the layout gave it. As wide as
- * its text up to the layout's width — `max-content`, so a name near the right
- * edge does not wrap early against the room's edge — and a longer name takes
- * the second line the layout budgeted, then ends in an ellipsis. */
+/* Centred on the left the layout gave it. `max-content` so a name near the
+ * right edge does not wrap early against the room's edge. */
 .lsr-sky-name {
   position: absolute;
   width: max-content;
@@ -242,10 +232,8 @@
   opacity: 1;
 }
 
-/* The sky sheet has no words: its button stands in the middle of the
- * constellations, in the box the layout keeps clear (`sky-keep-out.ts`) —
- * the window's centre, where the jump launches from. The dots have said all
- * they had to. */
+/* The sky sheet's button stands at the window's centre, in the box the
+ * layout keeps clear (`sky-keep-out.ts`). */
 .lsr-opening-sheet[data-sky="true"] {
   position: fixed;
   inset: 0;
@@ -302,10 +290,8 @@
 }
 
 /*
- * The one solid block of the accent in the room, which is what makes it read
- * as the way out rather than one more line of type. The floor under its width
- * keeps the label changing on the last sheet from moving the button out from
- * under a pointer already on its way to it.
+ * The one solid block of accent in the room: it reads as the way out. The
+ * width floor keeps a changed label from moving the button under a pointer.
  */
 .lsr-opening-press {
   min-width: 8rem;

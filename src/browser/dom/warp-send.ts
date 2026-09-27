@@ -1,5 +1,5 @@
 /**
- * 01 Warp Send: what went out squeezes into streaks that shoot into the button
+ * Warp Send: what went out squeezes into streaks that shoot into the button
  * that sent it, and the button flares (`css/light.css`). The streaks are
  * copies laid over the page at the drafts' places, measured before the panel
  * redraws them away: the send has already happened, and the redraw runs at

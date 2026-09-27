@@ -1573,13 +1573,17 @@ test("a thread the reviewer spoke in last keeps its footer, and says it waits on
   panel.setTurn(WORKING);
   assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 1);
   assert.equal(root.querySelector(".lsr-thread-waiting")?.textContent, "Waiting for the agent…");
+  assert.equal(replyBoxOf(root), undefined, "no reply box until the agent has had its chance");
+  assert.ok(root.querySelector(".lsr-thread-resolve"));
 
   panel.setTurn(READING);
   assert.equal(root.querySelectorAll(".lsr-thread-foot").length, 0);
   assert.equal(root.querySelector(".lsr-thread-waiting")?.textContent, "Waiting for the agent…");
 
+  panel.setTurn(WORKING);
   panel.update(session({ conversation: [opened, answered] }));
   assert.equal(root.querySelector(".lsr-thread-waiting"), null);
+  assert.ok(replyBoxOf(root), "answered: the box is back while the agent still works");
 });
 
 test("the reviewer can reply twice in a row in a thread they spoke in last", (t) => {

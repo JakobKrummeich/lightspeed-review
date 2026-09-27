@@ -1,5 +1,5 @@
 /**
- * 03 Return beam: the agent answered (`css/light.css`). The header's turn dot
+ * Return beam: the agent answered (`css/light.css`). The header's turn dot
  * pulses and drops a beam to the first new card in sight; a spark runs once
  * round each new card and its newest answer fades in. A card the reviewer
  * cannot see — the panel folded, or the card scrolled away — gets no beam:

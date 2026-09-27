@@ -1,10 +1,6 @@
 /**
  * The box in the middle of the sky kept clear for the constellation sheet's
- * button — the place the jump launches from. `layoutSky` keeps every star,
- * figure line and name out of it: clusters move out of its way, a straggler
- * that still lands in it is sent back out, a figure edge that would cross it
- * is not drawn, and a name that would cover it goes above its stars instead.
- * Pure geometry, like the layout it serves.
+ * button: `layoutSky` keeps every star, figure line and name out of it.
  */
 
 interface Size {
@@ -26,7 +22,7 @@ export interface SkyRect extends Size, Point {}
  */
 export const KEEP_OUT = { width: 320, height: 140 } as const;
 
-/** Centred on the sky, as the sheet centres its button in the window. */
+/** Centred, as the sheet centres its button in the window. */
 export function keepOut(box: Size): SkyRect {
   const width = Math.min(KEEP_OUT.width, box.width);
   const height = Math.min(KEEP_OUT.height, box.height);

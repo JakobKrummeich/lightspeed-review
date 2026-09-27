@@ -357,7 +357,8 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ ┌ section.lsr-compose (pinned) ──────────┐ │
 │ │ Every file is approved — Send & End    │ │ .lsr-complete (conditional)
 │ │ when you are ready.                    │ │
-│ │ [General comment — Enter sends…      ] │ │ #lsr-general-comment
+│ │ [General comment — Enter sends…      ] │ │ #lsr-general-comment (no
+│ │                                        │ │  border; accent ring on focus)
 │ │ [Send to Agent]         [Send & End]   │ │ #lsr-send (.lsr-primary;
 │ │  or while the agent works:             │ │  "Queue" while it works,
 │ │ [Queue]         [End without Sending]  │ │  disabled while it reads)
@@ -409,7 +410,11 @@ message itself is the voice's bubble, as in a chat: the reviewer's is
 toward the ink, no hue, and every label on either bubble is stepped toward the
 text to stay AA. No message wears a stripe down its left edge: the bubble is
 the glance, the label the word. Messages stack flat, oldest first, never
-nested deeper than the thread.
+nested deeper than the thread. A settled card (`data-resolved="true"`) is
+history: unfolded, its messages drop the bubble's inset and fill and step down
+to `--lsr-size-meta`, a transcript at the card's full width; the labels keep
+their hue, and an unsent draft keeps its bubble. Folded, any card's gist sits
+on its own line under the anchor, at the card's full width.
 
 ## 6. Annotation popup — `.lsr-popup` (annotation.ts, dom/annotation-popup.ts)
 
@@ -494,7 +499,10 @@ constellation sheet (last; no text; section aria-label "3 chapters: …"):
   inert and keys are captured while it plays; Esc lands at once.
 - Long chapter names wrap to two lines (`.lsr-sky-title`, line-clamp 2, then
   an ellipsis), measured with canvas `measureText` in their own font; a
-  resize lays the sky out again. The room clips, never scrolls; Tab stays on
+  resize lays the sky out again.
+- Every chapter with a star is named (`sky-names.ts`): under, over or beside
+  its figure, else the nearest clear grid spot within 48 px of its stars,
+  else the nearest spot overlapping no name; never dropped. The room clips, never scrolls; Tab stays on
   the top sheet (rest of the page `inert`).
 - The stack grows with the longest reason (floor 19rem, ceiling = viewport);
   the button is pushed down rather than the text scrolling.

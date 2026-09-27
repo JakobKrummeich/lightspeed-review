@@ -90,13 +90,15 @@
   transition: background 200ms ease-in;
 }
 
+/* Lifted off the scrim by its shadow alone: a grey line around it read as a
+ * form. The border stays, transparent, for forced colours to paint. */
 .lsr-round-card {
   display: flex;
   flex-direction: column;
   gap: var(--lsr-space-3);
   width: min(24rem, 100%);
   background: var(--lsr-surface);
-  border: 1px solid var(--lsr-border);
+  border: 1px solid transparent;
   border-radius: 0.75rem;
   padding: var(--lsr-space-6);
   box-shadow: var(--lsr-shadow-lift);

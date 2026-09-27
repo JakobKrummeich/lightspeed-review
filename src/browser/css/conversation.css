@@ -161,6 +161,21 @@
 }
 
 /*
+ * A settled exchange — resolved, or a resolve queued — is history, and reads
+ * as a transcript: no bubble's inset or fill, and a step of type down. In the
+ * 352 px panel the card, and then the bubble, each took 12 px a side off a
+ * 320 px column, and a long answer ran twenty lines of 36 characters. The
+ * speaker's label keeps its hue, so who said what still reads. A draft keeps
+ * its bubble: it is not history yet.
+ */
+.lsr-thread[data-resolved="true"] .lsr-message[data-role]:not(.lsr-draft) {
+  padding: 0;
+  margin-top: var(--lsr-space-3);
+  background: none;
+  font-size: var(--lsr-size-meta);
+}
+
+/*
  * Not sent yet: the reviewer's bubble at a third of its tint, so it reads as
  * theirs and as not-yet at once, with no outline to fence it off.
  */
@@ -180,8 +195,9 @@
  */
 .lsr-thread-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--lsr-space-2);
+  gap: 0 var(--lsr-space-2);
   min-width: 0;
 }
 
@@ -202,13 +218,16 @@
   white-space: nowrap;
 }
 
-/* Folded: the ask's first words, on one line, taking whatever room is left. */
+/*
+ * Folded: the ask's first words on a line of their own under where the card
+ * is anchored, at the card's whole width. Sharing one line, the two cut each
+ * other down to "FILE…" and three words. `openingWords` keeps it to eight.
+ */
 .lsr-thread-gist {
-  flex: 1 1 auto;
+  flex: 1 0 100%;
+  order: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
   color: var(--lsr-strong);
 }
 
@@ -248,8 +267,8 @@
 }
 
 /*
- * A folded card is a one-line row: tighter, and a step quieter than an open
- * card — the tone, not a border, says it is put away.
+ * A folded card is a short row, its anchor over its gist: tighter, and a step
+ * quieter than an open card — the tone, not a border, says it is put away.
  */
 .lsr-thread[data-shut="true"] {
   padding-block: var(--lsr-space-1);
@@ -301,63 +320,6 @@
 }
 
 /*
- * The thread's foot, in reading order: the box on its own row, then Reply and
- * Resolve at the far edge. Drawn whenever the page takes writing, whoever
- * spoke last, and never otherwise, so it shows no control the reviewer cannot
- * use. A folded thread's Reopen sits alone in the same row.
- */
-.lsr-thread-foot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--lsr-space-2);
-  margin-top: var(--lsr-space-2);
-}
-
-.lsr-thread-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--lsr-space-2);
-}
-
-/*
- * One family for every press in a card: bordered, quiet and a size down from
- * the compose box's Send, which stays the page's one loud button.
- */
-.lsr-thread-action {
-  background: var(--lsr-raised);
-  color: var(--lsr-text);
-  border: 1px solid var(--lsr-border);
-  padding: var(--lsr-space-1) var(--lsr-space-3);
-  font-size: var(--lsr-size-meta);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.lsr-thread-action:hover:not(:disabled) {
-  color: var(--lsr-accent);
-  border-color: var(--lsr-accent);
-}
-
-/* The reviewer spoke last on the agent's turn: said without asking anything. */
-.lsr-thread-waiting {
-  margin: var(--lsr-space-2) 0 0;
-  font-size: var(--lsr-size-label);
-  color: var(--lsr-muted);
-  font-style: italic;
-}
-
-/*
- * Two lines, not the compose box's four: a tall box in every card would push
- * the threads under it off the screen. Grown to its placeholder where the
- * browser can, so a narrow card wraps the hint rather than clipping it.
- */
-.lsr-thread-reply-box {
-  min-height: calc(2lh + 2 * var(--lsr-space-2) + 2px);
-  field-sizing: content;
-}
-
-/*
  * A pill that outlived the round it was queued in: amber, as on the "changed
  * after approval" badge, because both say time moved on under these words —
  * caution, not error, the pill is still sendable.
@@ -384,8 +346,25 @@
   padding: 0 var(--lsr-space-1);
 }
 
+/*
+ * The compose box stands on its fill alone, a line taller than a popup's box.
+ * Transparent rather than no border: forced colours paint it, and there the
+ * fill is gone. Without a border the caret needs a ring of its own.
+ */
+#lsr-general-comment {
+  min-height: calc(4.5rem + 1lh);
+  border-color: transparent;
+}
+
+#lsr-general-comment:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 0;
+}
+
+/* Send & End at the far edge, so it is not pressed for Send by a hurried hand. */
 .lsr-compose-actions {
   display: flex;
+  justify-content: space-between;
   gap: var(--lsr-space-2);
   margin-top: var(--lsr-space-2);
 }

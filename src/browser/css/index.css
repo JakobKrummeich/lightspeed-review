@@ -402,6 +402,12 @@
   overflow: hidden;
 }
 
+/* A diff opens on its hunk header: that band is the block's top edge, with no
+ * strip of the darker ground above it. */
+.lsr-file-diff:has(> .d2h-wrapper) {
+  padding-top: 0;
+}
+
 /*
  * A block for as long as it is folding: its height is written frame by frame
  * from `dom/fold.ts`, so what is inside is clipped to that height and nothing

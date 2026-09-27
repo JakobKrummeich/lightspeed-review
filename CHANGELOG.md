@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.6.0
+
+- The constellation sheet names every chapter. Names were capped at eight,
+  so a review of 16 chapters showed figures with no name; now every chapter
+  with a star gets its name and file count. When the spots round a figure
+  are taken, its name goes to the nearest clear spot close to its stars, and
+  names still never overlap each other or the button.
+- The general comment box has no border and is one line taller; while it
+  has the caret an accent ring says so, and under forced colours its edge
+  still shows. **Send & End** now stands at the right edge, apart from
+  **Send to Agent**.
+- An expanded diff no longer shows a dark strip above its first hunk header:
+  the header is the top band of the block, in both schemes.
+- While the agent holds the turn, working or reading, the header's presence
+  flies the same firefly as the foot of the conversation, a little smaller,
+  in place of the still dot. It keeps its path across redraws, holds still
+  for a reviewer who asked for less motion, and stays lit under forced
+  colours (so does the foot's).
+- A thread you spoke last in shows no reply box while the agent works:
+  only "Waiting for the agent…" and **Resolve**. The box comes back when the
+  agent answers in that thread, or when the turn is yours again.
+- **Resolve** and **Reply** are soft pills with no border, **Resolve** at
+  the left and **Reply**, in the accent, at the right. The thread's reply box
+  has no border either and takes the compose box's focus ring.
+- The new-round card and the replay card lift off the page on their shadow,
+  with no border line; under forced colours their edge still shows.
+- Resolved threads read in less height: an unfolded resolved card shows its
+  exchange as a transcript at the card's full width and a size down,
+  without the chat bubbles that left a long answer a thin column of text.
+  A folded card's first words get a line of their own under its file,
+  so neither is cut to a stub.
+
 ## 3.5.0
 
 The opening shows the review's shape before it hands it over, and every new

@@ -1,3 +1,4 @@
+import { keepFireflyTime } from "./firefly-clock.ts";
 import { renderStatusBanner, type StatusState } from "../status-banner.ts";
 import type { AgentPresence } from "../agent-presence.ts";
 import { presenceOf } from "../../turn.ts";
@@ -35,6 +36,7 @@ export function mountStatusBanner(session: SessionData): MountedStatusBanner {
     if (!root || html === drawn) return;
     drawn = html;
     root.innerHTML = html;
+    keepFireflyTime(root);
   };
   return {
     setPresence: ({ waiting, turn, items }) => {

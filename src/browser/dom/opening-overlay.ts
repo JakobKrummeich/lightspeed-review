@@ -36,13 +36,10 @@ function flare(field: HTMLElement | null): ReturnType<typeof setTimeout> | undef
 }
 
 /**
- * All sheets pre-rendered: a press is one attribute write per sheet, nothing
- * redrawn — which lets the leaving sheet animate against the arriving one.
- * Both exits share one `close`, so the jump's landing and Esc land in the same
- * place. Dialog focus: top sheet's button takes the caret on open and every
- * peel (the sky sheet itself while its button is held back); close restores
- * the previous holder. The page behind is inert until then, so Tab stays in
- * the room.
+ * All sheets pre-rendered: a press is one attribute write per sheet, so the
+ * leaving sheet can animate against the arriving one. The jump's landing and
+ * Esc share one `close`. The top sheet's button takes the caret on every peel
+ * and `close` hands it back; the page behind is inert meanwhile.
  */
 export function mountOpening(host: OpeningHost): void {
   const stack = renderOpening(host.intents, host.chapters);
@@ -50,9 +47,8 @@ export function mountOpening(host: OpeningHost): void {
   // rounds, and an empty dialog holding focus would be the worse failure.
   if (stack === "") return;
 
-  // The root is shared with the round jump: whichever room comes second
-  // closes the first by its own way out (`room-claim.ts`), which hands the
-  // page and the caret back before this room takes them.
+  // Shared with the round jump (`room-claim.ts`): the room before this one
+  // hands the page and the caret back before this one takes them.
   evictRoom(host.root);
   const caretBack = caretReturn(document.activeElement);
   host.root.innerHTML = stack;

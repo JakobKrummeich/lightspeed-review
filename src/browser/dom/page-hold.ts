@@ -1,11 +1,7 @@
 /**
- * A full-screen room (the opening, the round jump) makes the page behind it
- * inert while it is up: Tab, a click that slips through and a screen reader's
- * cursor all stay out of a review nobody can see. `aria-modal` alone asks
- * nothing of the keyboard.
- *
- * Only what this hold made inert is handed back, so a sibling something else
- * set inert stays inert, and two holds in a row do not undo each other.
+ * Makes the page behind a full-screen room inert: `aria-modal` alone asks
+ * nothing of the keyboard. Only what this hold made inert is handed back, so
+ * something else's inert sibling stays inert.
  */
 export function holdPageBehind(room: HTMLElement): () => void {
   const held: HTMLElement[] = [];

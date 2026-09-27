@@ -31,13 +31,19 @@ export function renderStatusBanner(state: StatusState): string {
   return presenceLine(state);
 }
 
+const DOT = `<span class="lsr-presence-dot" aria-hidden="true"></span>`;
+/** The foot's markup: three nested layers, one axis of drift each (`light.css`). */
+const FIREFLY = `<span class="lsr-firefly" aria-hidden="true"><i><i><i></i></i></i></span>`;
+
 /**
  * Every state stated: "nobody is listening" is as much news as somebody is.
  * The turn wins over listening when both are reported — a second parked agent
  * is nothing the reviewer can act on, and the agent holding their feedback is.
  *
- * The header says a short word beside a dot; the whole sentence — the plan,
+ * The header says a short word beside a mark; the whole sentence — the plan,
  * the item count, what a Send does now — rides in `title`, one hover away.
+ * The mark is the foot's firefly while the agent holds the turn, so the corner
+ * a reviewer checks first says "at work" as the foot does; a still dot otherwise.
  */
 function presenceLine(state: StatusState): string {
   const attributes = `data-waiting="${state.agentWaiting}" data-turn="${state.turn.holder}"`;
@@ -52,8 +58,8 @@ function presenceLine(state: StatusState): string {
   // declared, which is the agent's own words — inside an attribute, so the
   // quote matters as much as the angle brackets.
   const word = presenceWord(state.turn, state.agentWaiting);
-  const dot = `<span class="lsr-presence-dot" aria-hidden="true"></span>`;
-  return `<p class="lsr-presence" ${attributes} title="${escapeHtml(sentence.detail)}">${dot}${escapeHtml(word)}</p>`;
+  const mark = state.turn.holder === "agent" ? FIREFLY : DOT;
+  return `<p class="lsr-presence" ${attributes} title="${escapeHtml(sentence.detail)}">${mark}${escapeHtml(word)}</p>`;
 }
 
 /** `said` is the fact alone; `detail` adds what the reviewer's Send does about it. */

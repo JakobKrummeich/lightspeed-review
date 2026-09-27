@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  MOST_NAMES,
   MOST_STARS,
   FIGURE_STARS,
   SKY_TIMES,
@@ -210,15 +209,12 @@ function spans(edges: [number, number][], count: number): boolean {
   return reached.size === count;
 }
 
-test("no more than eight names, the largest chapters first, none overlapping", () => {
+test("every chapter is named, none overlapping, the small ones too", () => {
   const sky = layoutSky(chapters([80, 60, 52, 45, 40, 35, 30, 22, 15, 11, 6, 4]), BOX);
 
-  assert.equal(MOST_NAMES, 8);
-  assert.ok(sky.labels.length <= MOST_NAMES);
-  assert.ok(sky.labels.length > 0);
-  assert.ok(
-    sky.labels.every((label) => label.chapter < MOST_NAMES),
-    "a small chapter took a name",
+  assert.deepEqual(
+    sky.labels.map((label) => label.chapter),
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   );
   assertApart(sky.labels);
 });
@@ -236,20 +232,15 @@ function assertApart(labels: SkyLabel[]): void {
   }
 }
 
-test("a name that would overlap is passed over for the next largest, still up to eight", () => {
-  // At phone width the fourth chapter's name lands on another; cutting to the top eight
-  // before asking would leave seven names up and the ninth chapter's room unused.
-  const sky = layoutSky(chapters([80, 60, 52, 45, 40, 35, 30, 22, 15, 11, 6, 4]), {
-    width: 375,
-    height: 540,
-  });
+test("on a phone every chapter is still named, inside the sky", () => {
+  const box = { width: 375, height: 540 };
+  const sky = layoutSky(chapters([80, 60, 52, 45, 40, 35, 30, 22, 15, 11, 6, 4]), box);
 
-  assert.equal(sky.labels.length, MOST_NAMES);
-  assert.deepEqual(
-    sky.labels.map((label) => label.chapter),
-    [0, 1, 2, 4, 5, 6, 7, 8],
-  );
-  assertApart(sky.labels);
+  assert.equal(sky.labels.length, 12);
+  for (const label of sky.labels) {
+    assert.ok(label.x - label.width / 2 >= 0 && label.x + label.width / 2 <= box.width);
+    assert.ok(label.y >= 0 && label.y + label.height <= box.height);
+  }
 });
 
 test("a long chapter name takes a second line rather than an ellipsis at 24 characters", () => {

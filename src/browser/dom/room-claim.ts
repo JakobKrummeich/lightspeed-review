@@ -1,10 +1,8 @@
 /**
- * `#lsr-opening` is one root shared by two rooms: the opening (a first round)
- * and the round jump (every later one). They can meet — a round can arrive
- * while a reviewer in another tab still sits in the opening — so a room never
- * writes over the root. It claims it with its own way out, and whoever takes
- * the root next runs that way out first: timers, frames, listeners, the inert
- * page and the caret all go the way they would on Esc.
+ * `#lsr-opening` is shared by the opening and the round jump, and a round can
+ * arrive while the opening is still up. So a room claims the root with its
+ * own way out, and whoever takes the root next runs that first — timers,
+ * frames, listeners, the inert page and the caret go as they would on Esc.
  */
 const owners = new WeakMap<HTMLElement, () => void>();
 

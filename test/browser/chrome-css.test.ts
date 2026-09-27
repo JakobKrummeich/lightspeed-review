@@ -957,3 +957,103 @@ test("the round's announcement holds still too: no fold flight, no orbiting spar
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\] \{\s*animation: none;/);
   assert.match(quiet, /\.lsr-round-offer\[data-beckon="true"\]::after \{\s*display: none;/);
 });
+
+test("a diff's hunk header is the top band of its block, with no strip of ground above it", () => {
+  assert.match(rulesFor(".lsr-file-diff:has(> .d2h-wrapper)").join(""), /padding-top: 0;/);
+});
+
+test("the compose box stands on its fill, a line taller than a popup's box", () => {
+  const box = rulesFor("#lsr-general-comment").join("");
+
+  // Transparent rather than none: forced colours paint a transparent border, so the box keeps
+  // its edge there, where its fill is gone.
+  assert.match(box, /border-color: transparent;/);
+  assert.match(box, /min-height: calc\(4\.5rem \+ 1lh\);/);
+});
+
+test("the borderless compose box still shows where the caret is", () => {
+  const focused = rulesFor("#lsr-general-comment:focus-visible").join("");
+
+  assert.match(focused, /outline: 2px solid var\(--lsr-accent\);/);
+});
+
+test("Send & End stands at the right edge, apart from Send", () => {
+  assert.match(rulesFor(".lsr-compose-actions").join(""), /justify-content: space-between;/);
+});
+
+test("a thread's presses stand on a soft fill with no border, Resolve at one end and Reply at the other", () => {
+  const press = rulesFor(".lsr-thread-action").join("");
+
+  // Transparent, not none: forced colours paint it, so they still read as buttons there.
+  assert.match(press, /border: 1px solid transparent;/);
+  assert.match(press, /background: color-mix\(/);
+  assert.match(
+    rulesFor(".lsr-thread-reply-add").join(""),
+    /background: color-mix\(in oklab, var\(--lsr-accent\)/,
+  );
+  assert.match(rulesFor(".lsr-thread-actions").join(""), /justify-content: space-between;/);
+  assert.match(
+    rulesFor(".lsr-thread-action:focus-visible").join(""),
+    /outline: 2px solid var\(--lsr-accent\);/,
+  );
+});
+
+test("a thread's reply box stands on its fill like the compose box, with the same focus ring", () => {
+  assert.match(rulesFor(".lsr-thread-reply-box").join(""), /border-color: transparent;/);
+  assert.match(
+    rulesFor(".lsr-thread-reply-box:focus-visible").join(""),
+    /outline: 2px solid var\(--lsr-accent\);/,
+  );
+});
+
+test("the header's firefly stands inline in the presence line, smaller than the foot's", () => {
+  const box = rulesFor(".lsr-presence .lsr-firefly").join("");
+
+  // The presence line is a line box: an inline span would drop its width and height.
+  assert.match(box, /display: inline-block;/);
+  assert.match(rulesFor(".lsr-presence .lsr-firefly > i").join(""), /scale: 0\.75;/);
+});
+
+test("the firefly's spark stays lit in forced colours, in the system's text colour", () => {
+  // Forced colours repaint a background as Canvas: the spark would vanish into the page.
+  const forced = [...bare.matchAll(/@media \(forced-colors: active\) \{([\s\S]*?)\n\}/g)]
+    .map(([, body]) => body)
+    .join("");
+  const spark = /\.lsr-firefly i i i \{([^}]*)\}/.exec(forced)?.[1] ?? "";
+
+  assert.match(spark, /forced-color-adjust: none;/);
+  assert.match(spark, /background: var\(--lsr-system-text\);/);
+});
+
+test("the round's announcement and the replay card lift off the page on a shadow, not a border", () => {
+  for (const card of [".lsr-round-card", ".lsr-replay"]) {
+    const body = rulesFor(card).join("");
+
+    // Transparent, not none: forced colours paint the edge the shadow cannot draw there.
+    assert.match(body, /border: 1px solid transparent;/, `${card} draws a border`);
+    assert.match(body, /box-shadow: var\(--lsr-shadow-lift\);/, `${card} has nothing to lift it`);
+  }
+});
+
+test("a folded card's gist takes a line of its own at the card's full width", () => {
+  // Regression: the gist shared one line with the file press, and each ellipsised the
+  // other down to "FILE…" and three words.
+  assert.match(rulesFor(".lsr-thread-head").join(""), /flex-wrap: wrap;/);
+  const gist = rulesFor(".lsr-thread-gist").join("");
+  assert.match(gist, /flex: 1 0 100%;/);
+  assert.match(gist, /order: 1;/);
+  assert.match(gist, /white-space: normal;/);
+});
+
+test("an unfolded resolved card reads as a transcript, not a column of bubbles", () => {
+  // Three insets (panel, card, bubble) left a 272 px measure in the 352 px panel: a settled
+  // exchange drops the bubble's inset and fill, and a step of type, so it takes the card's width.
+  const said = rulesFor(
+    '.lsr-thread[data-resolved="true"] .lsr-message[data-role]:not(.lsr-draft)',
+  );
+  const body = said.join("");
+
+  assert.match(body, /padding: 0;/);
+  assert.match(body, /background: none;/);
+  assert.match(body, /font-size: var\(--lsr-size-meta\);/);
+});

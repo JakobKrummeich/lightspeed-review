@@ -1,16 +1,13 @@
 /**
- * The field the jump flies through (08 Hyperspace): the sky's stars where they
- * stand, plus deep ones around them, rushing past the eye. Pure — the painter
- * (`dom/starfield-canvas.ts`) strokes what `warpStreaks` returns.
+ * The field the jump flies through: the sky's stars where they stand, plus
+ * deep ones around them. Pure; `dom/starfield-canvas.ts` strokes the streaks.
  */
 import { seeded, seedOf, type SkyBox } from "./starfield.ts";
 
 /**
- * The stars in the jump, one column per coordinate: `x`/`y` from the sky's
- * centre, `z` the depth. A star is gone once `z` is under `PAST_EYE` — depth
- * only ever falls, so it never comes back. Typed columns, not an object per
- * star: a double written to an object field is boxed, and at 780 stars a
- * frame that was most of the jump's garbage.
+ * `x`/`y` from the sky's centre, `z` the depth; a star is gone once `z` is
+ * under `PAST_EYE`. Typed columns rather than an object per star: a double
+ * written to an object field is boxed, which is garbage every frame.
  */
 export interface WarpField {
   x: Float64Array;
@@ -21,10 +18,7 @@ export interface WarpField {
 /** Nearer than this and a star has flown past the eye. */
 export const PAST_EYE = 4;
 
-/**
- * The stars where they stand, at the depth of the screen, plus `extra` deep
- * ones around them so the jump fills the whole view.
- */
+/** `extra` deep stars so even a one-file review fills the view. */
 export function warpField(
   points: readonly { x: number; y: number }[],
   box: SkyBox,
@@ -54,8 +48,7 @@ export function warpField(
 
 /**
  * Depth units per 60 Hz frame: a slow first beat, then a cubic rush. Scaled
- * to the view, because depth is measured in its widths: tuned on a 570 px
- * stage, the same numbers crawl across a 1440 px window.
+ * by width because depth is measured in view widths (570 px is the reference).
  */
 export function warpSpeed(ms: number, box: SkyBox): number {
   const rush = ms < 150 ? 0.6 : 0.6 + ((ms - 150) / 750) ** 3 * 38;
@@ -63,9 +56,8 @@ export function warpSpeed(ms: number, box: SkyBox): number {
 }
 
 /**
- * One frame's streaks, as flat `x1 y1 x2 y2` runs in three batches by
- * nearness: batch `b` is `runs[b]` up to `ends[b]`. Allocated once per jump
- * and rewritten every frame.
+ * One frame's streaks as flat `x1 y1 x2 y2` runs in three batches by
+ * nearness: batch `b` is `runs[b]` up to `ends[b]`. Reused every frame.
  */
 export interface StreakBatches {
   runs: [Float32Array, Float32Array, Float32Array];
@@ -79,13 +71,8 @@ export function streakBatches(stars: number): StreakBatches {
 }
 
 /**
- * Moves every star `speed` closer and writes the streak each drew into
- * `into` — the painter strokes one path per batch. Mutates `field` and
- * `into` and makes no arrays of its own: at 780 stars and 60 frames a
- * second, fresh arrays every frame were 5.7 MB of garbage a second. Not no
- * allocation, though: until the engine optimises `fly`, the doubles it works
- * with are boxed — about 3 MB over a first jump at 600 stars, a small part of
- * that once warm (see `starfield-canvas.ts`).
+ * Moves every star `speed` closer and writes its streak into `into`.
+ * Mutates both and allocates no arrays: this runs every frame.
  */
 export function warpStreaks(
   field: WarpField,
@@ -106,7 +93,6 @@ export function warpStreaks(
   into.ends[1] = 0;
   into.ends[2] = 0;
   for (let index = 0; index < field.z.length; index += 1) {
-    // In bounds: `index` runs over the field it indexes.
     if (field.z[index]! >= PAST_EYE) fly(field, index, speed, lens, into);
   }
   return into;
@@ -122,12 +108,10 @@ interface Lens {
 }
 
 /**
- * Star `at` comes `speed` closer: gone once past the eye, else its streak into
- * its batch. Few temporaries on purpose — a jump is over before this is
- * optimised, and until then every intermediate number is a heap object.
+ * Few temporaries on purpose: until the engine optimises this, every
+ * intermediate number is a heap object.
  */
 function fly(field: WarpField, at: number, speed: number, lens: Lens, into: StreakBatches): void {
-  // In bounds: `at` comes from the loop over this field.
   const before = field.z[at]!;
   const z = before - speed;
   field.z[at] = z;

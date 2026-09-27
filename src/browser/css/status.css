@@ -43,6 +43,24 @@
   background: var(--lsr-accent);
 }
 
+/*
+ * The foot's firefly in place of the dot while the agent holds the turn: a
+ * line box, not a flex row, so it stands inline, and three quarters of the
+ * foot's size so it fits the header's meta line. `scale` on the outer layer
+ * shrinks the drift with the spark, since the keyframes travel in rem.
+ */
+.lsr-presence .lsr-firefly {
+  display: inline-block;
+  width: 1.625rem;
+  height: 0.75rem;
+  margin-right: var(--lsr-space-1);
+  vertical-align: middle;
+}
+
+.lsr-presence .lsr-firefly > i {
+  scale: 0.75;
+}
+
 /* Unknown while the stream is down: grey whatever the last frame said. */
 .lsr-presence[data-connection="lost"] {
   color: var(--lsr-muted);

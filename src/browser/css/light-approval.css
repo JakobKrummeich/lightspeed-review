@@ -6,7 +6,7 @@
  */
 
 /*
- * 05 Accelerator: a tick. A particle runs along the bar to the fill's new
+ * Accelerator: a tick. A particle runs along the bar to the fill's new
  * edge, the fill grows behind it and a spark marks where it stopped; a
  * finished chapter flashes and a glint crosses it; the last one sends a glint
  * down the whole bar. `--lsr-photon-ms`, the particle's run, is set per tick
@@ -130,7 +130,7 @@
 }
 
 /*
- * 09 Supernova: every file is approved. A point of light, two rings and a
+ * Supernova: every file is approved. A point of light, two rings and a
  * flare streak, then the ✓ settles out of it — and nothing on the card moves
  * after that, because the reviewer is about to decide. Laid over the mark
  * inside its badge (`done.css`), so it is centred on the mark wherever the
