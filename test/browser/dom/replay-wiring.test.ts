@@ -64,6 +64,11 @@ function fakeArrivals() {
       next = undefined;
     },
     jumping: () => flying,
+    abort: () => {
+      calls.push("abort");
+      flying = false;
+      next = undefined;
+    },
   };
   const land = (): void => {
     flying = false;
@@ -81,7 +86,24 @@ const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resol
  * shares. The server answers each round with cards when the round before it
  * was commented on, as `rounds/replay.ts` does; `answer` stands in for it.
  */
-function tab(storage = new FakeStorage(), answer?: () => Promise<ReplayData>) {
+/**
+ * The browser's locks, one table for every tab of the test: the first to ask
+ * for a name holds it, anyone after is told, a turn later, that they lost.
+ */
+function fakeLocks() {
+  const held = new Set<string>();
+  return (name: string, lost: () => void): void => {
+    const won = !held.has(name);
+    held.add(name);
+    if (!won) void Promise.resolve().then(lost);
+  };
+}
+
+function tab(
+  storage = new FakeStorage(),
+  answer?: () => Promise<ReplayData>,
+  contend = fakeLocks(),
+) {
   const flight = fakeArrivals();
   const opened: string[] = [];
   const reopen = new FakeNode("button", "hidden");
@@ -98,6 +120,7 @@ function tab(storage = new FakeStorage(), answer?: () => Promise<ReplayData>) {
     arrivals: () => flight.arrival,
     fetch: answer ?? (async () => served),
     storage,
+    contend,
     overlay: () => ({
       open: (opening: ReplayOpening) => opened.push(opening.data.comments[0]?.id ?? "?"),
     }),
@@ -231,4 +254,39 @@ test("a claim opens once: the same round asked for again opens nothing more", as
   await settled();
 
   assert.deepEqual(page.opened, ["r1"]);
+});
+
+test("two tabs that read the round free in the same instant: the lock picks one", async () => {
+  // Each tab's own view of the storage: the other's claim has not reached it yet.
+  const locks = fakeLocks();
+  const first = tab(new FakeStorage(), undefined, locks);
+  const second = tab(new FakeStorage(), undefined, locks);
+
+  first.arrive(roundOf(1));
+  second.arrive(roundOf(1));
+  await settled();
+  first.land();
+  second.land();
+
+  assert.deepEqual(first.calls, ["forget", "jump"]);
+  assert.deepEqual(first.opened, ["r1"]);
+  assert.deepEqual(second.calls, ["forget", "jump", "abort"], "it lands at once");
+  assert.deepEqual(second.opened, [], "and gives its claim up");
+  assert.equal(second.reopen.hidden, false, "the replay is there to open by hand");
+});
+
+test("a lost lock for an older round takes nothing from the newer one", async () => {
+  let lose: () => void = () => undefined;
+  const page = tab(new FakeStorage(), undefined, (name, lost) => {
+    if (name.endsWith(":1")) lose = lost;
+  });
+
+  page.arrive(roundOf(1));
+  page.arrive(roundOf(2));
+  lose();
+  await settled();
+  page.land();
+
+  assert.deepEqual(page.calls, ["forget", "jump", "forget", "jump"]);
+  assert.deepEqual(page.opened, ["r2"]);
 });

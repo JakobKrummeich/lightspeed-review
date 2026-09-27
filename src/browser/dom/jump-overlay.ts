@@ -107,6 +107,11 @@ export interface Arrivals {
    * dropped, jump or not, so its replay never opens over the newer round.
    */
   forget(): void;
+  /**
+   * The round was not this page's to arrive by: the jump in flight lands at
+   * once, opening nothing. On the ground, the root is left alone.
+   */
+  abort(): void;
   /** A jump is in flight: its landing will open what follows it. */
   jumping(): boolean;
 }
@@ -142,6 +147,11 @@ export function arrivals(root: HTMLElement, still: () => Stillness): Arrivals {
     },
     forget() {
       next = undefined;
+    },
+    abort() {
+      next = undefined;
+      // The room's own way out: the page and the caret go back as on Esc.
+      if (inFlight !== 0) evictRoom(root);
     },
     jumping: () => inFlight !== 0,
   };

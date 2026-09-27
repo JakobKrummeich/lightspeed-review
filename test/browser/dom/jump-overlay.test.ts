@@ -474,6 +474,42 @@ test("a newer round forgets what an older one queued for the landing, even witho
   assert.deepEqual(opened, ["later"], "and what follows now runs at once");
 });
 
+test("an aborted arrival lands at once and opens nothing it queued", (t) => {
+  const { page: doc, root, behind } = page(t);
+  const arrival = arrivals(asPanelRoot(root), () => MOVING);
+  const opened: string[] = [];
+  arrival.jump();
+  arrival.onLanding(() => opened.push("replay"));
+
+  arrival.abort();
+
+  assert.equal(arrival.jumping(), false);
+  assert.equal(root.innerHTML, "", "the room is gone");
+  assert.equal(behind.inert, false, "the page is handed back");
+  assert.equal(doc.keydownCount(), 0);
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.equal(opened.length, 0);
+});
+
+test("aborting on the ground leaves the opening in the root alone", (t) => {
+  const state = openingThenJump(t);
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  let closes = 0;
+  mountOpening({
+    root: asPanelRoot(state.root),
+    intents: ["two"],
+    chapters: [{ name: "Only", files: [{ path: "a.ts", lines: 3 }] }],
+    stillness: () => MOVING,
+    onOpen: () => undefined,
+    onClose: () => (closes += 1),
+  });
+
+  arrivals(asPanelRoot(state.root), () => MOVING).abort();
+
+  assert.equal(closes, 0);
+  assert.ok(state.root.querySelector(".lsr-opening-overlay"));
+});
+
 test("a painter that throws lands the jump at once and hands the page back", (t) => {
   const { page: doc, root, behind } = page(t);
   const errors = t.mock.method(console, "error", () => {});

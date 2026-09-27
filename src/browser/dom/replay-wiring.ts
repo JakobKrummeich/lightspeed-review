@@ -39,7 +39,31 @@ export interface ReplayDeps {
   arrivals(root: HTMLElement): Arrivals;
   fetch(key: string): Promise<ReplayData>;
   storage: ReviewMemoryStorage;
+  /** Asks every tab of this browser for `name`: `lost` runs in each but the first. */
+  contend(name: string, lost: () => void): void;
   overlay(page: ReplayHosts): ReplayOverlayControl;
+}
+
+/**
+ * Long enough for a claim written to `localStorage` to reach every other tab:
+ * a tab learning of the round after this reads it taken instead.
+ */
+const CLAIM_HELD_MS = 5000;
+
+/**
+ * `localStorage` is not shared at once between tabs: two that learn of a round
+ * in the same instant both read it free. A Web Lock is — the first tab to ask
+ * holds it, the others hear they lost within a millisecond or so, before the
+ * room is painted. A browser without locks keeps the claim as read.
+ */
+function firstTab(name: string, lost: () => void): void {
+  if (!("locks" in navigator)) return;
+  navigator.locks
+    .request(name, { ifAvailable: true }, (lock) => {
+      if (lock === null) return lost();
+      return new Promise((held) => setTimeout(held, CLAIM_HELD_MS));
+    })
+    .catch(() => undefined);
 }
 
 /** Closing the replay lands at the top of the diff, where a new round starts anyway. */
@@ -59,6 +83,7 @@ function browserDeps(): ReplayDeps {
     arrivals: (root) => arrivals(root, stillness),
     fetch: fetchReplay,
     storage: localStorage,
+    contend: firstTab,
     overlay: mountOverlay,
   };
 }
@@ -103,9 +128,15 @@ export function wireReplay(
       // Claimed now, not when the cards come back: another tab on this review
       // reads it taken and neither jumps nor opens, and a fetch that fails
       // leaves it spent, so a reload does not jump to nothing again.
-      claim = currentRound(fresh.rounds);
-      updateMemory(deps.storage, page.key, { replayed: claim });
+      const round = currentRound(fresh.rounds);
+      claim = round;
+      updateMemory(deps.storage, page.key, { replayed: round });
       arrival.jump();
+      deps.contend(`lightspeed-replay:${page.key}:${round}`, () => {
+        if (claim !== round) return;
+        claim = undefined;
+        arrival.abort();
+      });
     },
     refreshReplay: (fresh) =>
       replayRefresh({
