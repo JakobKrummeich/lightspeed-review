@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { opensFor, renderOpening } from "../../src/browser/opening-view.ts";
+import { opensFor, renderOpening, renderSkyNames } from "../../src/browser/opening-view.ts";
 
 function sheets(html: string): string[] {
   return [...html.matchAll(/<section class="lsr-opening-sheet"[\s\S]*?<\/section>/g)].map(
@@ -88,35 +88,75 @@ test("the room is opaque and starts unlit: no flare, no bloom, until a press ask
   assert.match(html, /<span class="lsr-opening-bloom" aria-hidden="true"><\/span>/);
 });
 
-test("the motes are a field of fourteen, and the same field every time it is drawn", () => {
+test("the stars are one decorative canvas, not markup: no motes, nothing a reader hears", () => {
   const html = renderOpening(["one"]);
-  const motes = [...html.matchAll(/<i class="lsr-opening-mote" style="([^"]*)"><\/i>/g)].map(
-    ([, style]) => style ?? "",
-  );
 
-  assert.equal(motes.length, 14);
-  assert.equal(new Set(motes).size, 14, "fourteen motes in one place is one mote");
-  // A render nobody can predict is a render nobody can test, and randomness
-  // here would redraw the field differently on every call.
-  assert.equal(renderOpening(["one"]), html);
+  assert.match(html, /<canvas class="lsr-sky-canvas" aria-hidden="true"><\/canvas>/);
+  assert.match(html, /<div class="lsr-sky-names" aria-hidden="true" data-on="false"><\/div>/);
+  assert.doesNotMatch(html, /lsr-opening-mote/);
+  assert.match(html, /data-jump="false"/, "the room starts before the jump, not in it");
 });
 
-test("every mote is inside the room, already drifting, and drifting somewhere", () => {
-  const styles = [...renderOpening(["one"]).matchAll(/class="lsr-opening-mote" style="([^"]*)"/g)];
+const CHAPTERS = [
+  { name: "Session state", files: [{ path: "src/state.ts", lines: 40 }] },
+  { name: "Docs <b>", files: [{ path: "README.md", lines: 2 }] },
+];
 
-  for (const [, style = ""] of styles) {
-    const left = Number(/left:([\d.]+)%/.exec(style)?.[1]);
-    const life = Number(/--life:([\d.]+)s/.exec(style)?.[1]);
-    const delay = Number(/--delay:(-?[\d.]+)s/.exec(style)?.[1]);
-    const drift = Number(/--drift:(-?\d+)px/.exec(style)?.[1]);
+test("with chapters, the constellation sheet comes last, after every reason", () => {
+  const stack = sheets(renderOpening(["one", "two"], CHAPTERS));
 
-    assert.ok(left >= 8 && left <= 92, `a mote at ${left}% is up against the wall`);
-    assert.ok(life >= 7 && life <= 14, `a mote living ${life}s is not drifting`);
-    // Negative, so the field is full on the first frame rather than filling up
-    // while the cover is being read.
-    assert.ok(delay <= 0 && delay >= -life, `a mote delayed ${delay}s arrives late`);
-    assert.ok(Math.abs(drift) <= 30, `a mote drifting ${drift}px crosses the room`);
-  }
+  assert.equal(stack.length, 4, "cover, two reasons, the sky");
+  assert.deepEqual(
+    stack.map((sheet) => attribute(sheet, "data-sky")),
+    ["", "", "", "true"],
+  );
+});
+
+test("the constellation sheet has no words on it, only the way into the review", () => {
+  const sky = sheets(renderOpening(["one"], CHAPTERS)).at(-1) ?? "";
+
+  assert.doesNotMatch(sky, /<p /, "no intent, no headline, no lead");
+  assert.deepEqual(buttons(sky), ["Open the review"]);
+});
+
+test("the sky's button starts held back, and the sheet can hold the caret meanwhile", () => {
+  const sky = sheets(renderOpening(["one"], CHAPTERS)).at(-1) ?? "";
+
+  assert.match(sky, /<button type="button" class="lsr-opening-press" data-held="true">/);
+  assert.match(sky, /tabindex="-1"/);
+  const others = sheets(renderOpening(["one"], CHAPTERS))
+    .slice(0, -1)
+    .join("");
+  assert.doesNotMatch(others, /data-held/, "only the sky holds its button back");
+});
+
+test("the last reason leads to the chapters when there is a sky to show", () => {
+  assert.deepEqual(buttons(renderOpening(["one", "two"], CHAPTERS)), [
+    "Unwrap",
+    "Next reason",
+    "Show the chapters",
+    "Open the review",
+  ]);
+});
+
+test("a reader who cannot see the sky hears the chapters in the sheet's label, escaped", () => {
+  const sky = sheets(renderOpening(["one"], CHAPTERS)).at(-1) ?? "";
+
+  assert.equal(attribute(sky, "aria-label"), "2 chapters: Session state, Docs &lt;b&gt;");
+});
+
+test("each name stands where the layout put it, with its file count, and is text only", () => {
+  const html = renderSkyNames([
+    { chapter: 0, name: "Docs <b>", files: 1, x: 120.04, y: 80.5, width: 90, height: 34 },
+    { chapter: 1, name: "Session state", files: 12, x: 300, y: 40, width: 120, height: 34 },
+  ]);
+
+  assert.equal(
+    html,
+    '<span class="lsr-sky-name" style="left:120.0px;top:80.5px;max-width:90px">Docs &lt;b&gt;<small class="lsr-sky-count">1 file</small></span>' +
+      '<span class="lsr-sky-name" style="left:300.0px;top:40.0px;max-width:120px">Session state<small class="lsr-sky-count">12 files</small></span>',
+  );
+  assert.equal(renderSkyNames([]), "");
 });
 
 test("the last sheet opens the review and every sheet before it moves on", () => {

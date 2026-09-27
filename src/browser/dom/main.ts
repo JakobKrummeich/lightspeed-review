@@ -5,6 +5,7 @@ import { currentRound } from "../conversation-rounds.ts";
 import { clampFocus } from "../focus-mode.ts";
 import { showIntentFor } from "../intent-view.ts";
 import { opensFor } from "../opening-view.ts";
+import { skyChapters } from "../starfield.ts";
 import { readMemory, reviewPlace, updateMemory, type ReviewPlace } from "../review-memory.ts";
 import { agentRoundReply } from "../round-replay.ts";
 import { effectiveFormat, readViewFormat, roomQuery } from "../view-format.ts";
@@ -16,6 +17,7 @@ import { mountDiffView } from "./diff-mount.ts";
 import { wireFinish } from "./finish.ts";
 import { wireIntent } from "./intent-mount.ts";
 import { mountOpening } from "./opening-overlay.ts";
+import { reducedMotion, stillness } from "./stillness.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
 import { mountPanelLight } from "./panel-light.ts";
 import type { LinePlace } from "./line-numbers.ts";
@@ -208,11 +210,6 @@ function roomWatch(): {
   };
 }
 
-/** Asked each time, not once: the preference can change under an open page. */
-function reducedMotion(): boolean {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
 function mountScheme(schemeSwitch: HTMLElement): void {
   mountSchemeToggle({
     root: schemeSwitch,
@@ -356,6 +353,8 @@ function wireOpening(page: Page, session: SessionData, round: number): void {
   mountOpening({
     root: page.openingRoot,
     intents: session.intents,
+    chapters: skyChapters(session.groups),
+    stillness,
     onOpen: () => updateMemory(localStorage, page.key, { unwrapped: true }),
     onClose: () => {
       // Lands on the home screen: the survey is what the reasons were about.

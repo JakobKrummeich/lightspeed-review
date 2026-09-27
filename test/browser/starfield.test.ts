@@ -10,11 +10,10 @@ import {
   layoutSky,
   seeded,
   seedOf,
-  warpField,
-  warpSpeed,
-  warpStreaks,
+  skyChapters,
   type SkyChapter,
 } from "../../src/browser/starfield.ts";
+import { warpField, warpSpeed, warpStreaks } from "../../src/browser/warp-field.ts";
 
 const BOX = { width: 1440, height: 770 };
 
@@ -281,4 +280,17 @@ test("streaks come in three batches by depth, and a star past the eye is gone", 
     "every star flew past",
   );
   assert.deepEqual(warpStreaks(field, 40, BOX), [[], [], []]);
+});
+
+test("the page's chapters become the sky's: a file weighs every line it changed", () => {
+  const file = { status: "modified" as const, diff: "", oversized: false };
+  const sky = skyChapters([
+    {
+      name: "Schema",
+      rationale: "why",
+      files: [{ ...file, path: "src/db.ts", insertions: 12, deletions: 3 }],
+    },
+  ]);
+
+  assert.deepEqual(sky, [{ name: "Schema", files: [{ path: "src/db.ts", lines: 15 }] }]);
 });

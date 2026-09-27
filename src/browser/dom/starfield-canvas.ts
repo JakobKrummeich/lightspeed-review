@@ -14,19 +14,10 @@ import {
   driftAt,
   figureShown,
   gathered,
-  warpField,
-  warpSpeed,
-  warpStreaks,
   type Sky,
   type SkyBox,
-  type WarpStar,
 } from "../starfield.ts";
-
-/** Asked by the page, never assumed: both can change under an open page. */
-export interface Stillness {
-  reducedMotion: boolean;
-  forcedColors: boolean;
-}
+import { warpField, warpSpeed, warpStreaks, type WarpStar } from "../warp-field.ts";
 
 export interface SkyPainter {
   /** The files start gathering into their figures now (formed at once when still). */
@@ -38,7 +29,7 @@ export interface SkyPainter {
 }
 
 /** Deep stars around the files, so the jump fills the view however small the review. */
-const JUMP_EXTRA = 180;
+const JUMP_EXTRA = 240;
 const SPRITE_RADIUS = 24;
 
 interface Ink {

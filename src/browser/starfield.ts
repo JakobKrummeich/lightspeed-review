@@ -5,6 +5,7 @@
  * `Math.random` — so the same review draws the same sky on every reload and a
  * test can say where every star stands. `dom/starfield-canvas.ts` paints it.
  */
+import type { DiffGroup } from "../diff-extract.ts";
 
 export interface SkyFile {
   path: string;
@@ -59,6 +60,17 @@ export interface Sky {
   labels: SkyLabel[];
 }
 
+/** The page's chapters as the sky reads them: a file's weight is every line it changed. */
+export function skyChapters(groups: readonly DiffGroup[]): SkyChapter[] {
+  return groups.map((group) => ({
+    name: group.name,
+    files: group.files.map((file) => ({
+      path: file.path,
+      lines: file.insertions + file.deletions,
+    })),
+  }));
+}
+
 /** Past this a sky is a crowd, and the painter's 4 ms budget was measured at it. */
 export const MOST_STARS = 600;
 /** Real constellations skip their faint stars: 40 files read as a cluster with a figure in it. */
@@ -82,7 +94,7 @@ export const SKY_TIMES = {
 } as const;
 
 const EDGE = 12;
-const NAME_HEIGHT = 34;
+const NAME_HEIGHT = 38;
 const NAME_GAP = 6;
 
 /** Park–Miller: tiny, repeatable, and good enough to scatter stars. */
@@ -232,7 +244,7 @@ function spanningTree(points: { x: number; y: number }[]): [number, number][] {
 
 /** Wide enough for the longer of its two lines, capped where the stylesheet ellipsizes. */
 function labelWidth(name: string, files: number): number {
-  return Math.min(168, Math.max(name.length, `${files} files`.length) * 7.4 + 12);
+  return Math.min(200, Math.max(name.length, `${files} files`.length) * 8.2 + 12);
 }
 
 function overlaps(a: SkyLabel, b: SkyLabel): boolean {
@@ -310,77 +322,4 @@ export function layoutSky(chapters: readonly SkyChapter[], box: SkyBox): Sky {
     });
   }
   return { box, stars, figures, labels: names(constellations, box) };
-}
-
-/** A star in the jump: `x`/`y` from the sky's centre, `z` its depth. */
-export interface WarpStar {
-  x: number;
-  y: number;
-  z: number;
-  alive: boolean;
-}
-
-/**
- * The stars where they stand, at the depth of the screen, plus `extra` deep
- * ones around them so the jump fills the whole view.
- */
-export function warpField(
-  points: readonly { x: number; y: number }[],
-  box: SkyBox,
-  seedText: string,
-  extra: number,
-): WarpStar[] {
-  const random = seeded(seedOf(seedText));
-  const depth = box.width / 2;
-  const near = points.map(({ x, y }) => ({
-    x: x - box.width / 2,
-    y: y - box.height / 2,
-    z: depth,
-    alive: true,
-  }));
-  const far = Array.from({ length: extra }, () => ({
-    x: (random() - 0.5) * box.width * 2.4,
-    y: (random() - 0.5) * box.height * 2.4,
-    z: depth * (0.4 + random() * 2.4),
-    alive: true,
-  }));
-  return [...near, ...far];
-}
-
-/** Depth units per 60 Hz frame: a slow first beat, then a cubic rush. */
-export function warpSpeed(ms: number): number {
-  return ms < 150 ? 0.6 : 0.6 + ((ms - 150) / 750) ** 3 * 38;
-}
-
-/**
- * Moves every star `speed` closer and returns the streak each drew, as flat
- * `x1 y1 x2 y2` runs in three batches by nearness — the painter strokes one
- * path per batch. Mutates `field`: at 780 stars and 60 frames a second a copy
- * per frame is the garbage that would drop frames.
- */
-export function warpStreaks(
-  field: WarpStar[],
-  speed: number,
-  box: SkyBox,
-): [number[], number[], number[]] {
-  const [cx, cy, lens] = [box.width / 2, box.height / 2, box.width / 2];
-  const batches: [number[], number[], number[]] = [[], [], []];
-  for (const star of field) {
-    if (!star.alive) continue;
-    const before = star.z;
-    star.z -= speed;
-    if (star.z < 4) {
-      star.alive = false;
-      continue;
-    }
-    const near = clamp(1 - star.z / (lens * 2.2));
-    const batch = batches[near > 0.6 ? 2 : near > 0.3 ? 1 : 0];
-    batch.push(
-      cx + (star.x / before) * lens,
-      cy + (star.y / before) * lens,
-      cx + (star.x / star.z) * lens,
-      cy + (star.y / star.z) * lens,
-    );
-  }
-  return batches;
 }

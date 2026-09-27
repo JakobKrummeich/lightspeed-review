@@ -858,7 +858,7 @@ test("the opening is painted for both schemes at once, never for one of them", (
     "halo",
     "edge",
     "pool",
-    "dust",
+    "tunnel",
     "flash",
     "bloom-core",
     "bloom-edge",
@@ -885,13 +885,19 @@ test("a reviewer who asked for less motion gets the handover without the movemen
   const quiet = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\n\}/.exec(bare)?.[1] ?? "";
 
   // Lights go out rather than fade: a quarter-second of white is worse than no reward.
-  assert.match(quiet, /\.lsr-opening-motes,\s*\.lsr-opening-bloom \{\s*display: none;/);
+  assert.match(
+    quiet,
+    /\.lsr-sky-tunnel,\s*\.lsr-opening-bloom,\s*\.lsr-jump-overlay \{\s*display: none;/,
+  );
   assert.match(quiet, /\.lsr-opening-overlay\[data-flare="true"\]::after \{\s*opacity: 0;/);
   assert.match(
     quiet,
     /\.lsr-opening-sheet\[data-at="top"\] \.lsr-opening-body \{\s*animation: none;/,
   );
-  assert.match(quiet, /\.lsr-opening-press \{\s*animation: none;/);
+  assert.match(
+    quiet,
+    /\.lsr-opening-press,\s*\.lsr-opening-press\[data-held="false"\] \{\s*animation: none;/,
+  );
 });
 
 test("the busy marker holds still for that reviewer rather than going away", () => {
