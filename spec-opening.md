@@ -62,7 +62,8 @@ rest one press later.
 names and file paths, so the same round draws the same sky every time:
 
 - one star per file, at most 600; a star's brightness grows with the log of
-  the lines it changed;
+  the lines it changed, from a floor of 0.15, so a file that changed no lines
+  (a rename, a binary) is still a faint star rather than nothing;
 - each chapter's stars cluster round a point on an arc (a closer arc for three
   chapters or fewer, a ring past six); the figure is the minimum spanning tree over the chapter's
   seven brightest stars, and the rest of its files stay loose around it;

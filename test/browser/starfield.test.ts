@@ -127,17 +127,32 @@ test("brightness follows the lines changed, on a log scale", () => {
     assert.ok(before && after && before.magnitude < after.magnitude, "more lines, brighter star");
   }
   assert.equal(byLines.at(-1)?.magnitude, 1, "the largest file is the brightest star");
-  assert.equal(byLines[0]?.magnitude, 0, "a file with no lines is dust");
+  assert.equal(byLines[0]?.magnitude, 0.15, "a file with no lines is the faintest star, not dust");
   // Logarithmic: ten times the lines is far less than ten times the light.
   const at = (lines: number): number =>
     sky.stars.find((star) => star.lines === lines)?.magnitude ?? 0;
   assert.ok(at(40) / at(9) < 2);
 });
 
-test("a review of files with no lines at all is still a sky of dust, not NaN", () => {
+test("a review of files with no lines at all is a sky of faint stars, not dust or NaN", () => {
+  // Renames and binaries change no lines: a chapter of them was a figure with no stars on it.
   const sky = layoutSky([{ name: "Binary", files: [{ path: "a.png", lines: 0 }] }], BOX);
 
-  assert.equal(sky.stars[0]?.magnitude, 0);
+  assert.equal(sky.stars[0]?.magnitude, 0.15);
+});
+
+test("a chapter of renames beside a big one still shows its stars", () => {
+  const sky = layoutSky(
+    [
+      { name: "Big", files: [{ path: "big.ts", lines: 5000 }] },
+      { name: "Renames", files: ["a", "b", "c"].map((path) => ({ path, lines: 0 })) },
+    ],
+    BOX,
+  );
+
+  const renames = sky.stars.filter((star) => star.chapter === 1);
+  assert.equal(renames.length, 3);
+  assert.ok(renames.every((star) => star.magnitude === 0.15));
 });
 
 test("each figure joins its chapter's seven brightest stars and nothing else", () => {

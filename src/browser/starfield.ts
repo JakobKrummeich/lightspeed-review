@@ -27,7 +27,10 @@ export interface Star {
   chapter: number;
   path: string;
   lines: number;
-  /** 0 (dust) to 1 (the largest file in the review), on a log scale. */
+  /**
+   * `FAINTEST` (a file with no lines: a rename, a binary) to 1 (the largest
+   * file in the review), on a log scale.
+   */
   magnitude: number;
   /** Its place in the formed constellation. */
   x: number;
@@ -94,6 +97,11 @@ export const SKY_TIMES = {
 } as const;
 
 const EDGE = 12;
+/**
+ * The dimmest a star gets. A file that changed no lines is still a file: at
+ * 0 a chapter of renames or binaries was a figure with no stars on it.
+ */
+const FAINTEST = 0.15;
 /** A one-line name and its count, px; each further line of the name adds `NAME_LINE`. */
 const NAME_HEIGHT = 38;
 const NAME_LINE = 18;
@@ -243,7 +251,8 @@ function cluster(files: Kept[], centre: [number, number], radius: number, scope:
       chapter: file.chapter,
       path: file.path,
       lines: file.lines,
-      magnitude: most > 0 ? Math.log(file.lines + 1) / Math.log(most + 1) : 0,
+      magnitude:
+        FAINTEST + (1 - FAINTEST) * (most > 0 ? Math.log(file.lines + 1) / Math.log(most + 1) : 0),
       x: clamp(centre[0] + Math.cos(angle) * reach, EDGE, box.width - EDGE),
       y: clamp(centre[1] + Math.sin(angle) * reach * 0.8, EDGE, box.height - EDGE),
       fromX: random() * box.width,
