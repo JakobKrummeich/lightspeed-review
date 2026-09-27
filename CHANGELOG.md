@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.5.0
+
+The opening shows the review's shape before it hands it over, and every new
+round arrives by a jump into hyperspace.
+
+- The round's files drift as faint stars behind the reasons, one star per
+  file (at most 600), brighter the more lines it changed. The sky is seeded
+  from the paths, so the same round draws the same sky every time.
+- A new last sheet, with no words on it: the stars gather into one
+  constellation per chapter and the chapter names come up under their
+  figures, with each chapter's file count (at most eight names). Its
+  **Open the review** button waits 1.5 s after the names; `Esc` still skips.
+  A screen reader hears the chapter names in the sheet's label. The last
+  reason's button now reads **Show the chapters**.
+- The last press jumps into the review: the stars streak outward, the edges
+  close in and a flash covers the swap, a second in all. This replaces the
+  flood of light.
+- Rounds 2 and later arrive the same way: when the replay opens on its own for
+  a new round, the same one-second jump plays first. `Esc` lands at once.
+- Light scheme draws the sky as a star atlas — ink cores in a thin wash on
+  the paper; dark as a night sky — white cores in a wide glow.
+- Under `prefers-reduced-motion` the sky is still, the constellations are
+  already formed and the last press lands at once, with no jump. Under forced
+  colours the sky is not drawn: the chapter names stand alone.
+- The motes are gone: the drifting stars take their place.
+
 ## 3.4.0
 
 The review lights up at the moments a turn changes hands: sending, the

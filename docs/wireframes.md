@@ -434,13 +434,14 @@ feedback." in place of the box and button.
 
 ## 7. Opening overlay — round 0 ceremony (opening-view.ts, dom/opening-overlay.ts)
 
-Full-screen "unlit room": darker-than-page field, gold lamp beam in dark
-scheme / darkened paper edges in light, drifting motes. Shown once, on a
-review's first round, only if intents were stated. One sheet at a time.
+Full-screen "unlit room": darker-than-page field, lamp beam in dark scheme /
+darkened paper edges in light, the round's files drifting behind as faint
+stars (`canvas.lsr-sky-canvas`). Shown once, on a review's first round, only
+if intents were stated. One sheet at a time.
 
 ```
 ┌ .lsr-opening-overlay ──────────────────────────────────────┐
-│      ·      ·   (motes drifting)    ·          ·           │
+│      ·      ·   (file stars drifting)    ·        ·        │
 │                                                            │
 │                    FROM YOUR AGENT             .lsr-opening-lead
 │            Something was built for you         .lsr-opening-headline
@@ -454,12 +455,37 @@ reason sheets (one per intent, same room):
 │           The intent text, set large,          .lsr-opening-body
 │           nearly headline size, ≤30ch          (reason size)
 │                                                            │
-│          ( Next reason │ Open the review )     last sheet opens
+│          ( Next reason │ Show the chapters )   last reason
+
+constellation sheet (last; no text; section aria-label "3 chapters: …"):
+┌ .lsr-opening-overlay[data-sky="true"] ─────────────────────┐
+│        *──*                          *                     │
+│         \  *──*                  *──*  \      stars gather │
+│          *                            *     (1.7 s), MST   │
+│       CLI verbs                   Browser chat   figure    │
+│        5 files          *──*        5 files    fades in    │
+│                        /    *                  .lsr-sky-names
+│                       *                        (2.4 s)     │
+│                  Session state                             │
+│                     4 files                                │
+│                                                            │
+│                 ( Open the review )            held 1.5 s  │
+│                     ● ● ● ●                    after names │
+└────────────────────────────────────────────────────────────┘
 ```
 
 - Sheets cross mid-room: leaving lifts up+fades, arriving rises from below
-  (`data-at="top|under|gone"`). Press flash `data-flare`; final press floods
-  the room `data-bloom` then closes. Esc skips at any point.
+  (`data-at="top|under|gone"`). Press flash `data-flare`. The sky sheet only
+  exists when the round has chapters; its button carries `data-held` and the
+  sheet (`tabindex="-1"`) holds the caret until it is shown.
+- Final press: `data-jump` — names go, stars streak outward from where they
+  stand, `.lsr-sky-tunnel` closes the edges, `data-bloom` flashes at 800 ms,
+  the room closes at 1 s. Esc skips at any point.
+- Reduced motion: still sky, figures formed, names at once, no jump. Forced
+  colours: canvas hidden, names only.
+- Rounds 2+: `.lsr-jump-overlay` (canvas + tunnel + `.lsr-jump-bloom`, drawn
+  into `#lsr-opening`, `aria-hidden`) plays the same 1 s jump before the
+  replay's automatic open; Esc lands at once.
 - The stack grows with the longest reason (floor 19rem, ceiling = viewport);
   the button is pushed down rather than the text scrolling.
 
@@ -520,7 +546,10 @@ ended overlay, whose word is last.
 ## 9. Replay overlay — between rounds (round-replay.ts, dom/replay-overlay.ts)
 
 For rounds > 0: what became of each comment from the previous round, one card
-at a time, before the new diff is read. Never shown together with §7.
+at a time, before the new diff is read. Never shown together with §7. When it
+opens on its own for a new round, §7's 1 s hyperspace jump
+(`.lsr-jump-overlay`, dom/jump-overlay.ts) plays first and the replay opens
+under its flash.
 
 ```
 ┌ .lsr-replay-overlay (z18) ─────────────────────────────────┐
