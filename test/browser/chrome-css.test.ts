@@ -976,3 +976,7 @@ test("the borderless compose box still shows where the caret is", () => {
 
   assert.match(focused, /outline: 2px solid var\(--lsr-accent\);/);
 });
+
+test("Send & End stands at the right edge, apart from Send", () => {
+  assert.match(rulesFor(".lsr-compose-actions").join(""), /justify-content: space-between;/);
+});

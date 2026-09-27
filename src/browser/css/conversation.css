@@ -399,8 +399,10 @@
   outline-offset: 0;
 }
 
+/* Send & End at the far edge, so it is not pressed for Send by a hurried hand. */
 .lsr-compose-actions {
   display: flex;
+  justify-content: space-between;
   gap: var(--lsr-space-2);
   margin-top: var(--lsr-space-2);
 }
