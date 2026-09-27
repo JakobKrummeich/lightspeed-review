@@ -38,7 +38,9 @@
   }
 }
 
+/* At the card's right edge: the eye lands there, and the buttons end there too. */
 .lsr-done-mark {
+  align-self: end;
   display: grid;
   place-items: center;
   width: var(--lsr-space-8);
@@ -66,8 +68,11 @@
   line-height: var(--lsr-leading);
 }
 
+/* Across the card: End review on the left, Keep looking on the right edge. */
 .lsr-done-actions {
+  align-self: stretch;
   display: flex;
+  justify-content: space-between;
   gap: var(--lsr-space-3);
   margin-top: var(--lsr-space-2);
 }

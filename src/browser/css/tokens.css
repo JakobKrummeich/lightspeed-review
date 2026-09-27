@@ -24,6 +24,12 @@
   --lsr-raised: light-dark(oklch(0.995 0.002 90), oklch(0.292 0.012 262));
   --lsr-border: light-dark(oklch(0.89 0.006 90), oklch(0.36 0.014 262));
   /*
+   * The edge of an empty approve box: the box's whole shape, not a divider, so
+   * it holds 3:1 against its fill and the card round it (3.3 on `--lsr-bg`).
+   * `--lsr-border` does that on dark and nowhere near it on light.
+   */
+  --lsr-tick-edge: light-dark(oklch(0.62 0.006 90), oklch(0.36 0.014 262));
+  /*
    * Tinted with the accent rather than lifted one more shade: a single step of
    * lightness is invisible, a change of hue is not. Marks the one option of a
    * set that is in use.

@@ -133,7 +133,7 @@
  * 09 Supernova: every file is approved. A point of light, two rings and a
  * flare streak, then the ✓ settles out of it — and nothing on the card moves
  * after that, because the reviewer is about to decide. Laid over the mark from
- * the card's corner, where the mark is.
+ * the card's top right corner, where the mark is (`done.css`).
  */
 .lsr-done-card::before {
   content: "";
@@ -148,7 +148,7 @@
 
 .lsr-done-nova {
   position: absolute;
-  inset: var(--lsr-space-6) auto auto var(--lsr-space-6);
+  inset: var(--lsr-space-6) var(--lsr-space-6) auto auto;
   width: var(--lsr-space-8);
   height: var(--lsr-space-8);
   pointer-events: none;

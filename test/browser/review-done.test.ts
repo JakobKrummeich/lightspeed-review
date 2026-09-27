@@ -25,6 +25,14 @@ test("ending is the sidebar's Send & End, so the card says what goes with it", (
   assert.match(renderReviewDone(3), /Your 3 queued notes go with it\./);
 });
 
-test("the card says approved is not yet done: nothing leaves until the reviewer says", () => {
-  assert.match(renderReviewDone(0), /nothing is sent until you say so\./);
+test("the note offers both ways out and nothing more", () => {
+  assert.match(
+    renderReviewDone(0),
+    /<p class="lsr-done-note">End the review to hand it back to the agent, or keep looking\.<\/p>/,
+  );
+  assert.match(
+    renderReviewDone(2),
+    /or keep looking\. Your 2 queued notes go with it\.<\/p>/,
+    "the queue is still said after it",
+  );
 });
