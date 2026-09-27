@@ -31,7 +31,8 @@ there is nothing to look at instead of the reason being read.
 - **The constellation sheet.** Last, and with no words on it at all: the
   round's files, which drifted behind the reasons as stars, gather into one
   constellation per chapter, and the chapter names come up under their
-  figures. Its button, **Open the review**, is held back until the names have
+  figures; a long name wraps onto a second line rather than being cut. Its
+  button, **Open the review**, is held back until the names have
   been up for 1.5 s — the sheet takes the caret meanwhile, so `Esc` still
   works. A screen reader hears every chapter name in the sheet's
   `aria-label` ("3 chapters: …"); the names on screen are eye-only.
@@ -57,17 +58,24 @@ rest one press later.
 
 ### The sky
 
-`layoutSky` in `src/browser/starfield.ts` is pure and seeded from the files'
-paths, so the same round draws the same sky every time:
+`layoutSky` in `src/browser/starfield.ts` is pure and seeded from the chapter
+names and file paths, so the same round draws the same sky every time:
 
 - one star per file, at most 600; a star's brightness grows with the log of
   the lines it changed;
 - each chapter's stars cluster round a point on an arc (a closer arc for three
   chapters or fewer, a ring past six); the figure is the minimum spanning tree over the chapter's
   seven brightest stars, and the rest of its files stay loose around it;
-- at most eight names; the chapters past that keep their figures unnamed;
 - a name is placed under its figure and kept clear of the others and of the
-  strip the button stands in.
+  strip the button stands in; the box it is checked in is the whole name, two
+  lines of it when it wraps, not a guess at one;
+- at most eight names: a chapter whose name would overlap is skipped and the
+  next one is asked, so the eight are the first eight that fit, and the rest
+  keep their figures unnamed.
+
+When the window is resized the sky is laid out again for the new size (after
+the resize has settled for 150 ms), so the figures and names stay inside the
+room; a resize during the jump is ignored.
 
 The light scheme draws it as a star atlas — ink cores in a thin accent wash on
 the paper; the dark one as a night sky — white cores in a wide glow.
@@ -101,8 +109,16 @@ The ceremony costs presses, so every press pays something back:
 Rounds 2 and later have no opening, but they arrive the same way: when the
 replay opens on its own for a new round, the same jump plays first — about a
 second, no sheets, all deep stars — and the replay overlay opens under the
-flash. It takes no focus and is `aria-hidden`; `Esc` lands at once. Reopening
-the replay by hand, or a round with no comments to replay, gets no jump.
+flash. It is `aria-hidden` and holds the page still while it plays: the page
+behind is `inert`, and keys are caught before anything on the page hears them —
+`Esc` lands at once, nothing typed reaches a text box, and a hand reopen of the
+replay mid-jump is ignored. The caret goes back where it was, without
+scrolling, before the replay opens. Reopening the replay by hand, or a round
+with no comments to replay, gets no jump.
+
+If a later round arrives while a first round's opening is still up, the jump
+closes the opening properly first — its timers, frames and listeners stopped,
+the page released — and takes the room over.
 
 ### Both schemes
 
@@ -118,8 +134,9 @@ through `light-dark()` and nothing through a `prefers-color-scheme` query.
   Stars are ink cores in a thin accent wash, the jump's edges close in as the
   paper's, and the flash is warm white.
 
-The canvas takes its inks from the page's tokens when it mounts, so it follows
-a scheme picked by hand as the stylesheet does.
+The canvas takes its inks from the page's tokens when it mounts and reads them
+again whenever `data-color-scheme` flips, so it follows a scheme picked by hand
+mid-opening as the stylesheet does.
 
 The beam and the edge darkening are two layers of the same gradient, always
 both painted, each transparent in the scheme it is not for. The flare is
@@ -160,6 +177,12 @@ round has none of.
   mid-stack lands on the home screen rather than starting the ceremony again.
 - It never shows a sheet the round did not state. A round opened without an
   intent has nothing to unwrap and gets no overlay.
+- It never lets the page behind it be reached. While it is up every other
+  child of `body` is `inert` (released on close), sheets not on top are
+  `inert` too, so `Tab` only ever finds the top sheet's button.
+- It never scrolls. The room clips instead of scrolling, and focus moves with
+  `preventScroll`, so a long reason on a short screen cannot drag the sky or
+  the flash off centre.
 
 ## How it is built
 
@@ -175,7 +198,9 @@ round has none of.
   button on every peel and is restored to the page on close. It also writes the
   lights — `data-flare` on every press, `data-sky` when the constellation
   sheet arrives, `data-jump` and `data-bloom` on the last press — and ignores
-  anything pressed once the jump has started.
+  anything pressed once the jump has started. The flare's timer is tracked and
+  cleared on close. `holdPageBehind` in `src/browser/dom/page-hold.ts` makes
+  the rest of the page `inert` while the room is up.
 - `mountOpeningSky` in `src/browser/dom/opening-sky.ts` — what the room does
   meanwhile: lays out the sky, starts the painter, and runs the gathering, the
   names, the held button and the jump on timers (`SKY_TIMES`), never on a frame
@@ -184,18 +209,24 @@ round has none of.
 - `paintSky` in `src/browser/dom/starfield-canvas.ts` — the only canvas code in
   the page. Every star is one `drawImage` of a sprite rendered once, the
   figures are one path, and the jump strokes three batched paths a frame
-  (`src/browser/warp-field.ts`), inside a 4 ms frame at 600 stars.
+  (`src/browser/warp-field.ts`), inside a 4 ms frame at 600 stars, reusing
+  its arrays so a frame makes next to no garbage.
 - `playJump` in `src/browser/dom/jump-overlay.ts` — the later rounds' jump,
-  drawn into `#lsr-opening` (a later round never has an opening), called from
-  the replay's automatic open.
+  drawn into `#lsr-opening`, called from the replay's automatic open. Both
+  the opening and the jump claim that root through
+  `src/browser/dom/room-claim.ts`: a claim evicts whoever holds it (running
+  their close), so a round that arrives under a live opening closes it first.
 - `stillness()` in `src/browser/dom/stillness.ts` reads
-  `prefers-reduced-motion` and `forced-colors` once, for the sky and the jump.
+  `prefers-reduced-motion` and `forced-colors` on every call, never cached:
+  either can change under an open page.
 - The room's colours are locals on `.lsr-opening-overlay` rather than page
   tokens (`--lsr-opening-room`, `-lamp`, `-halo`, `-edge`, `-pool`,
   `-tunnel`, `-flash`, `-bloom-core`, `-bloom-edge`), shared with
   `.lsr-jump-overlay`: nothing else on the page is in this room.
-- `#lsr-opening` in `src/html-template.ts`, beside `#lsr-replay`, at the same
-  overlay layer (z-index 18).
+- `#lsr-opening` in `src/html-template.ts`, beside `#lsr-replay`. The opening
+  sits at the replay's overlay layer (z-index 18); the jump overlay sits above
+  it at z-index 20, so the replay opening under its flash stays hidden until
+  the flash fades.
 - `unwrapped` on `ReviewMemory` — a plain flag, like `replayed`, untouched by
   the round-change reset.
 - The sheets' motion is CSS transitions and keyframes; the sky's is the

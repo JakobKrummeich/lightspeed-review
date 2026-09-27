@@ -7,10 +7,14 @@ round arrives by a jump into hyperspace.
 
 - The round's files drift as faint stars behind the reasons, one star per
   file (at most 600), brighter the more lines it changed. The sky is seeded
-  from the paths, so the same round draws the same sky every time.
+  from the chapter names and file paths, so the same round draws the same
+  sky every time. A resize lays it out again for the new size, and a scheme
+  picked by hand mid-opening repaints it in the new inks.
 - A new last sheet, with no words on it: the stars gather into one
   constellation per chapter and the chapter names come up under their
-  figures, with each chapter's file count (at most eight names). Its
+  figures, with each chapter's file count (at most eight names; a long name
+  wraps to a second line, and a name that would overlap gives its place to
+  the next chapter's). Its
   **Open the review** button waits 1.5 s after the names; `Esc` still skips.
   A screen reader hears the chapter names in the sheet's label. The last
   reason's button now reads **Show the chapters**.
@@ -18,7 +22,12 @@ round arrives by a jump into hyperspace.
   close in and a flash covers the swap, a second in all. This replaces the
   flood of light.
 - Rounds 2 and later arrive the same way: when the replay opens on its own for
-  a new round, the same one-second jump plays first. `Esc` lands at once.
+  a new round, the same one-second jump plays first. `Esc` lands at once;
+  nothing else on the page hears a key while it plays. A round that arrives
+  while the first round's opening is still up closes the opening first.
+- While the opening is up the page behind it is inert, so `Tab` stays on the
+  top sheet, and the room never scrolls: a long reason on a short screen
+  keeps the sky and the flash centred.
 - Light scheme draws the sky as a star atlas — ink cores in a thin wash on
   the paper; dark as a night sky — white cores in a wide glow.
 - Under `prefers-reduced-motion` the sky is still, the constellations are
