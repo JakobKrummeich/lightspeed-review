@@ -102,6 +102,11 @@ export interface Arrivals {
    * newer round's replay supersedes an older one's — or at once with none.
    */
   onLanding(next: () => void): void;
+  /**
+   * A newer round is arriving: what an older one queued for the landing is
+   * dropped, jump or not, so its replay never opens over the newer round.
+   */
+  forget(): void;
   /** A jump is in flight: its landing will open what follows it. */
   jumping(): boolean;
 }
@@ -134,6 +139,9 @@ export function arrivals(root: HTMLElement, still: () => Stillness): Arrivals {
     onLanding(then) {
       if (inFlight === 0) then();
       else next = then;
+    },
+    forget() {
+      next = undefined;
     },
     jumping: () => inFlight !== 0,
   };

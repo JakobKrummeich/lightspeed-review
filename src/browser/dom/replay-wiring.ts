@@ -61,6 +61,8 @@ export function wireReplay(page: ReplayHosts, live: LiveSession): WiredReplay {
   });
   return {
     arriving: (fresh) => {
+      // An older round's replay, queued for a landing, is not this round's.
+      arrival.forget();
       if (arrivesByJump(fresh, replayed())) arrival.jump();
     },
     refreshReplay: (fresh) =>

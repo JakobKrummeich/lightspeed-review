@@ -456,6 +456,24 @@ test("a second arrival mid-jump keeps the page jumping until the second lands", 
   assert.deepEqual(opened, ["second"], "only the latest round's replay opens");
 });
 
+test("a newer round forgets what an older one queued for the landing, even without a jump", (t) => {
+  const { root } = page(t);
+  const arrival = arrivals(asPanelRoot(root), () => MOVING);
+  const opened: string[] = [];
+  arrival.jump(); // round 2 arrives on a commented round 1
+  arrival.onLanding(() => opened.push("round 2 replay")); // its replay answers mid-jump
+  t.mock.timers.tick(300);
+
+  // Round 3 arrives mid-jump; round 2 had no comments, so no jump and nothing to open.
+  arrival.forget();
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.equal(opened.length, 0, "round 2's replay does not open over round 3");
+  assert.equal(arrival.jumping(), false, "the flight itself still lands");
+  arrival.onLanding(() => opened.push("later"));
+  assert.deepEqual(opened, ["later"], "and what follows now runs at once");
+});
+
 test("a painter that throws lands the jump at once and hands the page back", (t) => {
   const { page: doc, root, behind } = page(t);
   const errors = t.mock.method(console, "error", () => {});
