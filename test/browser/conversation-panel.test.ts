@@ -515,13 +515,17 @@ function cardOf(html: string, key: string): string {
   return html.slice(html.lastIndexOf("<article", start), html.indexOf("</article>", start));
 }
 
-/** The box on its own row, so its placeholder has the card's width; the two presses in a row under it. */
-test("a thread on the reviewer's turn ends in a footer: reply box, then Reply and Resolve in one row", () => {
+/**
+ * The box on its own row, so its placeholder has the card's width; the two
+ * presses in a row under it, Resolve first so the stylesheet can set Reply at
+ * the far end, under the box it sends.
+ */
+test("a thread on the reviewer's turn ends in a footer: reply box, then Resolve and Reply in one row", () => {
   const card = cardOf(renderScroll(panelState({ conversation: exchange })), "t2");
 
   assert.match(
     card,
-    /<footer class="lsr-thread-foot">\s*<textarea class="lsr-thread-reply-box" data-thread="t2"[^>]*aria-label="Reply to why a new table\?"><\/textarea>\s*<div class="lsr-thread-actions">\s*<button type="button" class="lsr-thread-action lsr-thread-reply-add" data-thread="t2">Reply<\/button>\s*<button type="button" class="lsr-thread-action lsr-thread-resolve" data-thread="t2" aria-expanded="true">Resolve<\/button>\s*<\/div>\s*<\/footer>/,
+    /<footer class="lsr-thread-foot">\s*<textarea class="lsr-thread-reply-box" data-thread="t2"[^>]*aria-label="Reply to why a new table\?"><\/textarea>\s*<div class="lsr-thread-actions">\s*<button type="button" class="lsr-thread-action lsr-thread-resolve" data-thread="t2" aria-expanded="true">Resolve<\/button>\s*<button type="button" class="lsr-thread-action lsr-thread-reply-add" data-thread="t2">Reply<\/button>\s*<\/div>\s*<\/footer>/,
   );
   assert.ok(card.indexOf("batched") < card.indexOf("lsr-thread-foot"));
   const head = card.slice(0, card.indexOf("</header>"));
@@ -561,13 +565,37 @@ test("on the reviewer's turn a thread they spoke in last still ends in the foote
   assert.doesNotMatch(card, /Waiting for the agent/);
 });
 
-/** The agent holds the turn and owes this thread an answer; while it works the reviewer can still queue more. */
-test("while the agent works, a thread the reviewer spoke in last says it waits, above a footer that queues", () => {
+/**
+ * The agent holds the turn and owes this thread an answer: a second word
+ * before it has had its chance to answer the first would only pile up. The
+ * box comes back when the agent answers here, or when the turn is the
+ * reviewer's again, answered or not. Resolve stays: it asks the agent nothing.
+ */
+test("while the agent works, a thread the reviewer spoke in last says it waits, with no reply box yet", () => {
   const card = cardOf(renderScroll(panelState({ conversation: exchange, turn: WORKING })), "t1");
 
   assert.match(card, /<p class="lsr-thread-waiting">Waiting for the agent…<\/p>/);
-  assert.match(card, /lsr-thread-foot/);
+  assert.doesNotMatch(card, /lsr-thread-reply-box|lsr-thread-reply-add/);
+  assert.match(card, />Resolve<\/button>/);
   assert.ok(card.indexOf("lsr-thread-waiting") < card.indexOf("lsr-thread-foot"));
+});
+
+test("while the agent works, a thread it has answered takes a reply again", () => {
+  const card = cardOf(renderScroll(panelState({ conversation: exchange, turn: WORKING })), "t2");
+
+  assert.match(card, /<textarea class="lsr-thread-reply-box" data-thread="t2"/);
+  assert.match(card, />Reply<\/button>/);
+  assert.doesNotMatch(card, /Waiting for the agent/);
+});
+
+test("once the turn is the reviewer's again, an unanswered thread takes a reply again", () => {
+  const card = cardOf(
+    renderScroll(panelState({ conversation: exchange, turn: REVIEWERS_TURN })),
+    "t1",
+  );
+
+  assert.match(card, /<textarea class="lsr-thread-reply-box" data-thread="t1"/);
+  assert.doesNotMatch(card, /Waiting for the agent/);
 });
 
 test("while the agent digests, a thread the reviewer spoke in last says it waits, with no footer", () => {
