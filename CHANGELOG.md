@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.5.1 (unreleased)
+## 3.6.0
 
 - The constellation sheet names every chapter. Names were capped at eight,
   so a review of 16 chapters showed figures with no name; now every chapter
