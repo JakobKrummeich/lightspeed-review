@@ -1,8 +1,9 @@
 import { renderOpening } from "../opening-view.ts";
 import type { SkyChapter } from "../starfield.ts";
-import { mountOpeningSky } from "./opening-sky.ts";
+import { mountOpeningSky, type OpeningSky } from "./opening-sky.ts";
 import { holdPageBehind } from "./page-hold.ts";
 import { claimRoom, leaveRoom } from "./room-claim.ts";
+import type { paintSky } from "./starfield-canvas.ts";
 import type { Stillness } from "./stillness.ts";
 
 export interface OpeningHost {
@@ -18,6 +19,8 @@ export interface OpeningHost {
    */
   onOpen(): void;
   onClose(): void;
+  /** The sky's canvas painter; a test hands in its own. */
+  paint?: typeof paintSky;
 }
 
 const FLARE_MS = 160;
@@ -46,17 +49,9 @@ export function mountOpening(host: OpeningHost): void {
   // rounds, and an empty dialog holding focus would be the worse failure.
   if (stack === "") return;
 
-  // The root is shared with the round jump: whichever room comes second
-  // closes the first by its own way out (`room-claim.ts`).
-  const evicted = (): void => close();
-  claimRoom(host.root, evicted);
   const before = document.activeElement;
-  host.root.innerHTML = stack;
-  const release = holdPageBehind(host.root);
-  const field = host.root.querySelector<HTMLElement>(".lsr-opening-overlay");
-  const sheets = [...host.root.querySelectorAll<HTMLElement>(".lsr-opening-sheet")];
-  const dots = [...host.root.querySelectorAll<HTMLElement>(".lsr-opening-dot")];
-  const sky = field && mountOpeningSky(field, host.chapters, host.stillness());
+  let release = (): void => {};
+  let sky: OpeningSky | undefined = undefined;
   let step = 0;
   let open = true;
   let leaving = false;
@@ -66,18 +61,34 @@ export function mountOpening(host: OpeningHost): void {
     if (event.key === "Escape") close();
   };
 
+  // Declared before anything that can throw: the next room's claim, Esc and
+  // a mount that failed halfway all leave by it.
   const close = (): void => {
     if (!open) return;
     open = false;
     sky?.stop();
     clearTimeout(strike);
-    leaveRoom(host.root, evicted);
+    leaveRoom(host.root, close);
     host.root.innerHTML = "";
     document.removeEventListener("keydown", onKey);
     release();
     if (before instanceof HTMLElement) before.focus();
     host.onClose();
   };
+
+  // The root is shared with the round jump: whichever room comes second
+  // closes the first by its own way out (`room-claim.ts`).
+  claimRoom(host.root, close);
+  host.root.innerHTML = stack;
+  release = holdPageBehind(host.root);
+  document.addEventListener("keydown", onKey);
+  const field = host.root.querySelector<HTMLElement>(".lsr-opening-overlay");
+  const mountedSky = skyOf(field, host);
+  // The ceremony is decoration over the review: without its sky, no ceremony.
+  if (mountedSky === null) return close();
+  sky = mountedSky;
+  const sheets = [...host.root.querySelectorAll<HTMLElement>(".lsr-opening-sheet")];
+  const dots = [...host.root.querySelectorAll<HTMLElement>(".lsr-opening-dot")];
 
   const paint = (): void => {
     lay(sheets, dots, step);
@@ -104,14 +115,29 @@ export function mountOpening(host: OpeningHost): void {
     if (next.dataset.sky === "true") sky?.arrive(() => reveal(next));
   };
 
-  document.addEventListener("keydown", onKey);
+  onPress(sheets, peel);
+  paint();
+  host.onOpen();
+}
+
+/** The room's sky; `null` when mounting it threw (said here), `undefined` with no field. */
+function skyOf(field: HTMLElement | null, host: OpeningHost): OpeningSky | null | undefined {
+  if (!field) return undefined;
+  try {
+    return mountOpeningSky(field, host.chapters, host.stillness(), host.paint);
+  } catch (error) {
+    console.error("lightspeed: the opening could not start", error);
+    return null;
+  }
+}
+
+/** Each sheet's button answers for its own sheet. */
+function onPress(sheets: HTMLElement[], peel: (index: number) => void): void {
   for (const [index, sheet] of sheets.entries()) {
     sheet
       .querySelector<HTMLElement>(".lsr-opening-press")
       ?.addEventListener("click", () => peel(index));
   }
-  paint();
-  host.onOpen();
 }
 
 /** Moves every sheet and dot to `step`: one attribute write each, the stylesheet animates. */

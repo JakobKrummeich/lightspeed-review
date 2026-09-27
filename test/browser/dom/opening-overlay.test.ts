@@ -1,6 +1,8 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { playJump } from "../../../src/browser/dom/jump-overlay.ts";
 import { mountOpening } from "../../../src/browser/dom/opening-overlay.ts";
+import type { paintSky } from "../../../src/browser/dom/starfield-canvas.ts";
 import type { Stillness } from "../../../src/browser/dom/stillness.ts";
 import { SKY_TIMES, type SkyChapter } from "../../../src/browser/starfield.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
@@ -49,10 +51,11 @@ interface Room {
   held?: FakeNode;
   chapters?: SkyChapter[];
   still?: Stillness;
+  paint?: typeof paintSky;
 }
 
 function mounted(t: TestContext, intents: string[], room: Room = {}): Mounted {
-  const { held, chapters = [], still = MOVING } = room;
+  const { held, chapters = [], still = MOVING, paint } = room;
   const window = installFakeElements((undo) => t.after(undo)) as unknown as Record<string, number>;
   window.innerWidth = 1440;
   window.innerHeight = 900;
@@ -78,6 +81,7 @@ function mounted(t: TestContext, intents: string[], room: Room = {}): Mounted {
     stillness: () => still,
     onOpen: () => (state.opens += 1),
     onClose: () => (state.closes += 1),
+    paint,
   });
   return state;
 }
@@ -474,4 +478,31 @@ test("only the sheet on top can be reached: the invisible ones are inert, not ju
   assert.deepEqual(reachable(), [true, false, false]);
   press(root, 0);
   assert.deepEqual(reachable(), [false, true, false], "a peeled sheet's button is out of Tab");
+});
+
+test("a sky that throws while mounting closes the room and hands the page back whole", (t) => {
+  const errors = t.mock.method(console, "error", () => {});
+  const state = mounted(t, ["one"], {
+    chapters: CHAPTERS,
+    paint: () => {
+      throw new Error("no canvas today");
+    },
+  });
+
+  assert.equal(state.closes, 1, "closed by its own way out: the review is shown");
+  assert.equal(state.root.innerHTML, "");
+  assert.equal((state.behind as FakeNode & { inert?: boolean }).inert, false, "not left inert");
+  assert.equal(state.away.inert, true, "what was inert before stays so");
+  assert.equal(state.page.keydownCount(), 0);
+  assert.equal(errors.mock.callCount(), 1, "said, not swallowed");
+
+  // Nothing half-built holds the root: the next room's claim runs no stale close.
+  let lands = 0;
+  playJump({
+    root: asPanelRoot(state.root),
+    still: { reducedMotion: true, forcedColors: false },
+    land: () => (lands += 1),
+  });
+  assert.equal(lands, 1);
+  assert.equal(state.closes, 1);
 });
