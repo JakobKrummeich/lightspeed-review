@@ -6,6 +6,8 @@
  * test can say where every star stands. `dom/starfield-canvas.ts` paints it.
  */
 import type { DiffGroup } from "../diff-extract.ts";
+import { spanningTree } from "./sky-figure.ts";
+import { clearCentre, coversRect, keepOut, outOf, type SkyRect } from "./sky-keep-out.ts";
 
 export interface SkyFile {
   path: string;
@@ -234,27 +236,33 @@ interface Scope {
   box: SkyBox;
   random: () => number;
   most: number;
+  /** Kept clear for the button (`sky-keep-out.ts`). */
+  keep: SkyRect;
 }
 
 /**
  * A cluster spirals out from its centre, biggest file in the middle (the
  * golden angle keeps the spiral from lining up). Stars and their drift are
- * both kept inside the sky.
+ * both kept inside the sky, and the formed stars off the button's box.
  */
 function cluster(files: Kept[], centre: [number, number], radius: number, scope: Scope): Star[] {
-  const { box, random, most } = scope;
+  const { box, random, most, keep } = scope;
   const turn = random() * Math.PI * 2;
   return [...files].sort(byWeight).map((file, rank) => {
     const reach = radius * Math.sqrt((rank + 0.5) / files.length) * (0.75 + random() * 0.5);
     const angle = turn + rank * 2.39996 + random() * 0.5;
+    const at = outOf(keep, {
+      x: centre[0] + Math.cos(angle) * reach,
+      y: centre[1] + Math.sin(angle) * reach * 0.8,
+    });
     return {
       chapter: file.chapter,
       path: file.path,
       lines: file.lines,
       magnitude:
         FAINTEST + (1 - FAINTEST) * (most > 0 ? Math.log(file.lines + 1) / Math.log(most + 1) : 0),
-      x: clamp(centre[0] + Math.cos(angle) * reach, EDGE, box.width - EDGE),
-      y: clamp(centre[1] + Math.sin(angle) * reach * 0.8, EDGE, box.height - EDGE),
+      x: clamp(at.x, EDGE, box.width - EDGE),
+      y: clamp(at.y, EDGE, box.height - EDGE),
       fromX: random() * box.width,
       fromY: box.height * (0.1 + random() * 0.9),
       driftX: (random() - 0.5) * 7,
@@ -262,26 +270,6 @@ function cluster(files: Kept[], centre: [number, number], radius: number, scope:
       twinkle: random() * Math.PI * 2,
     };
   });
-}
-
-/** Prim's minimum spanning tree over `points`; edges as indexes into `points`. */
-function spanningTree(points: { x: number; y: number }[]): [number, number][] {
-  const edges: [number, number][] = [];
-  const inTree = [0];
-  while (inTree.length < points.length) {
-    let best: [number, number, number] = [0, 0, Infinity];
-    for (const from of inTree) {
-      for (const [to, point] of points.entries()) {
-        if (inTree.includes(to)) continue;
-        const origin = points[from] ?? point;
-        const length = Math.hypot(origin.x - point.x, origin.y - point.y);
-        if (length < best[2]) best = [from, to, length];
-      }
-    }
-    edges.push([best[0], best[1]]);
-    inTree.push(best[1]);
-  }
-  return edges;
 }
 
 /**
@@ -315,6 +303,35 @@ interface Constellation {
   stars: number;
   centre: [number, number];
   radius: number;
+  /** How far its placed stars reach up and down: a lone chapter rings the button. */
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Where a name may stand: under its stars; beside the button's box, still
+ * under them, when that would cover the button; then over them, and beside
+ * again. The first that keeps off the button, or none.
+ */
+function nameSpot(
+  one: Constellation,
+  size: { width: number; height: number },
+  box: SkyBox,
+  keep: SkyRect,
+): SkyLabel | undefined {
+  const { width, height } = size;
+  const place = (x: number, y: number): SkyLabel => ({
+    ...{ chapter: one.chapter, name: one.name, files: one.files, width, height },
+    x: clamp(x, width / 2 + EDGE, box.width - width / 2 - EDGE),
+    y: clamp(y, EDGE, box.height - height - EDGE),
+  });
+  const [x] = one.centre;
+  const aside = x < box.width / 2 ? keep.x - width / 2 : keep.x + keep.width + width / 2;
+  const under = Math.max(one.centre[1] + one.radius * 0.8, one.bottom) + 10;
+  const over = Math.min(one.centre[1] - one.radius * 0.8, one.top) - 10 - height;
+  return [place(x, under), place(aside, under), place(x, over), place(aside, over)].find(
+    (spot) => !coversRect(keep, spot),
+  );
 }
 
 /**
@@ -322,24 +339,20 @@ interface Constellation {
  * would overlap one already placed is left off — the stars still say it — and
  * the next largest is asked instead, until `MOST_NAMES` are up.
  */
-function names(constellations: Constellation[], box: SkyBox, measure: MeasureName): SkyLabel[] {
+function names(
+  constellations: Constellation[],
+  box: SkyBox,
+  measure: MeasureName,
+  keep: SkyRect,
+): SkyLabel[] {
   const placed: SkyLabel[] = [];
   const ranked = constellations
     .filter((one) => one.stars > 0)
     .sort((a, b) => b.stars - a.stars || a.chapter - b.chapter);
   for (const one of ranked) {
     if (placed.length === MOST_NAMES) break;
-    const { width, height } = nameBox(one, box, measure);
-    const label = {
-      chapter: one.chapter,
-      name: one.name,
-      files: one.files,
-      width,
-      height,
-      x: clamp(one.centre[0], width / 2 + EDGE, box.width - width / 2 - EDGE),
-      y: clamp(one.centre[1] + one.radius * 0.8 + 10, EDGE, box.height - height - EDGE),
-    };
-    if (!placed.some((other) => overlaps(label, other))) placed.push(label);
+    const label = nameSpot(one, nameBox(one, box, measure), box, keep);
+    if (label && !placed.some((other) => overlaps(label, other))) placed.push(label);
   }
   return placed.sort((a, b) => a.chapter - b.chapter);
 }
@@ -359,7 +372,8 @@ export function layoutSky(
     .join("\n\n");
   const kept = keptFiles(chapters);
   const most = Math.max(0, ...kept.map((file) => file.lines));
-  const scope = { box, random: seeded(seedOf(seedText)), most };
+  const keep = keepOut(box);
+  const scope = { box, random: seeded(seedOf(seedText)), most, keep };
   const points = centres(chapters.length, box);
   const gap = closestGap(points, box);
   const stars: Star[] = [];
@@ -367,13 +381,18 @@ export function layoutSky(
   const constellations: Constellation[] = [];
   for (const [chapter, { name, files }] of chapters.entries()) {
     const mine = kept.filter((file) => file.chapter === chapter);
-    const centre = points[chapter] ?? [box.width / 2, box.height / 2];
     const spread = 24 + 11 * Math.sqrt(mine.length) * Math.min(1, box.width / 700);
     const radius = Math.min(gap * 0.42, spread);
+    // A star reaches out to 1.25 of the radius (`cluster`).
+    const centre = clearCentre(
+      points[chapter] ?? [box.width / 2, box.height / 2],
+      radius * 1.25,
+      keep,
+    );
     const placed = cluster(mine, centre, radius, scope);
     const offset = stars.length;
     stars.push(...placed);
-    const tree = spanningTree(placed.slice(0, FIGURE_STARS));
+    const tree = spanningTree(placed.slice(0, FIGURE_STARS), keep);
     figures.push(tree.map(([a, b]) => [a + offset, b + offset]));
     constellations.push({
       chapter,
@@ -382,7 +401,9 @@ export function layoutSky(
       stars: placed.length,
       centre,
       radius,
+      top: Math.min(...placed.map((star) => star.y)),
+      bottom: Math.max(...placed.map((star) => star.y)),
     });
   }
-  return { box, stars, figures, labels: names(constellations, box, measure) };
+  return { box, stars, figures, labels: names(constellations, box, measure, keep) };
 }

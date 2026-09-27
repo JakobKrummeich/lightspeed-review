@@ -98,7 +98,8 @@
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 42%, var(--lsr-opening-flash), transparent 56%);
+  /* From the middle, where the sky sheet's button stands. */
+  background: radial-gradient(circle at 50% 50%, var(--lsr-opening-flash), transparent 56%);
   transition: opacity 520ms ease;
 }
 
@@ -241,13 +242,21 @@
   opacity: 1;
 }
 
-/* The sky sheet has no words: its button stands under the constellations, in
- * the strip the layout keeps clear, and the dots have said all they had to. */
+/* The sky sheet has no words: its button stands in the middle of the
+ * constellations, in the box the layout keeps clear (`sky-keep-out.ts`) —
+ * the window's centre, where the jump launches from. The dots have said all
+ * they had to. */
 .lsr-opening-sheet[data-sky="true"] {
   position: fixed;
-  inset: auto 0 0;
+  inset: 0;
+  place-content: center;
+  padding: 0;
   overflow: visible;
   outline: none;
+}
+
+.lsr-opening-sheet[data-sky="true"] .lsr-opening-press {
+  margin: 0;
 }
 
 .lsr-opening-overlay[data-sky="true"] .lsr-opening-dots {
@@ -364,8 +373,9 @@
   inset: 0;
   pointer-events: none;
   opacity: 0;
+  /* From the centre, where the button stood and the stars streak out from. */
   background: radial-gradient(
-    circle at 50% 42%,
+    circle at 50% 50%,
     var(--lsr-opening-bloom-core),
     var(--lsr-opening-bloom-edge)
   );

@@ -75,7 +75,7 @@ function names(field: FakeNode): string {
   return field.querySelector(".lsr-sky-names")?.innerHTML ?? "";
 }
 
-test("the sky is painted over the whole window, laid out above the button's strip", (t) => {
+test("the sky is painted and laid out over the whole window, round the button's box", (t) => {
   const { field } = room(t);
   const painter = fakePaint();
 
@@ -83,7 +83,7 @@ test("the sky is painted over the whole window, laid out above the button's stri
 
   assert.deepEqual(painter.calls, ["paint still=false"]);
   assert.deepEqual(painter.views[0], { width: 1440, height: 900 });
-  assert.deepEqual(painter.skies[0]?.box, { width: 1440, height: 772 });
+  assert.deepEqual(painter.skies[0]?.box, { width: 1440, height: 900 });
   assert.match(names(field), /Session state/);
 });
 
@@ -104,7 +104,7 @@ test("a resize lays the sky out again once the window settles, names and all", (
 
   assert.deepEqual(painter.calls, ["paint still=false", "resize"], "once, for the whole burst");
   assert.deepEqual(painter.views.at(-1), { width: 700, height: 600 });
-  assert.deepEqual(painter.skies.at(-1)?.box, { width: 700, height: 472 });
+  assert.deepEqual(painter.skies.at(-1)?.box, { width: 700, height: 600 });
   assert.notEqual(names(field), before, "the names stand under the new layout");
 });
 
@@ -158,10 +158,11 @@ test("names are measured on the sky's canvas, in the font a name is set in", (t)
   );
   assert.doesNotMatch(names(field), /lsr-sky-title">M</, "the probe is gone");
 
-  window.innerWidth = 700;
+  window.innerWidth = 1024;
   window.fire("resize");
   t.mock.timers.tick(150);
-  assert.equal(painter.skies.at(-1)?.labels[0]?.height, 56, "measured again on the relayout");
+  const again = painter.skies.at(-1)?.labels.find((label) => label.name === "Session state");
+  assert.equal(again?.height, 56, "measured again on the relayout");
 });
 
 test("with no canvas context to measure in, names fall back to the estimate", (t) => {

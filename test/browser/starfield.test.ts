@@ -178,8 +178,9 @@ test("each figure joins its chapter's seven brightest stars and nothing else", (
 });
 
 test("a figure is the shortest tree over its stars", () => {
-  // Four stars on a line: the minimum spanning tree joins neighbours only.
-  const sky = layoutSky(chapters([4]), BOX);
+  // Four stars off to one side, clear of the button's box (a lone chapter rings it, and its
+  // figure may not cross it: `sky-keep-out.test.ts`).
+  const sky = layoutSky(chapters([4, 1]), BOX);
   const [edges = []] = sky.figures;
   const length = (a: number, b: number): number => {
     const [p, q] = [sky.stars[a], sky.stars[b]];

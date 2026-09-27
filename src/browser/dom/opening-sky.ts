@@ -31,21 +31,17 @@ export interface OpeningSky {
   stop(): void;
 }
 
-/** The strip under the sky kept clear for the button, px. */
-const BUTTON_BAND = 128;
 /** A drag-resize is a burst of events: the sky is laid out again once it settles. */
 const RESIZE_SETTLE_MS = 150;
 
 /**
- * The room is fixed and full-bleed, so the window is its size. The stars keep
- * off the strip the sky sheet's button stands in.
+ * The room is fixed and full-bleed, so the window is its size, and the sky
+ * is laid out over all of it: the sky sheet's button stands in its middle, in
+ * the box the layout keeps clear (`sky-keep-out.ts`).
  */
 function viewOf(): { view: SkyBox; box: SkyBox } {
   const view = { width: window.innerWidth, height: window.innerHeight };
-  return {
-    view,
-    box: { width: view.width, height: Math.max(view.height / 2, view.height - BUTTON_BAND) },
-  };
+  return { view, box: view };
 }
 
 /**
