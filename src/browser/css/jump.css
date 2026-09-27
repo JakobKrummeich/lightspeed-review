@@ -9,7 +9,7 @@
   position: fixed;
   inset: 0;
   z-index: 20;
-  overflow: hidden;
+  overflow: clip;
   background: var(--lsr-opening-room);
   animation: lsr-jump-in 250ms ease-out both;
 }

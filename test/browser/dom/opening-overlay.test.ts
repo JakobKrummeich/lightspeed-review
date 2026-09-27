@@ -322,6 +322,23 @@ test("the names come once the figures have formed, and the button 1.5 s after th
   assert.equal(button?.focused, true);
 });
 
+test("no caret move scrolls the room: the sky stays centred under a tall reason", (t) => {
+  // The room is full-bleed and fixed; a focus() that scrolls it drags the sky, the names and
+  // the flash off centre. Every sheet, the held sky sheet and the revealed button included.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { root } = mounted(t, ["one", "two"], { chapters: CHAPTERS });
+  press(root, 0);
+  press(root, 1);
+  press(root, 2);
+  t.mock.timers.tick(SKY_TIMES.namesAtMs + SKY_TIMES.heldAfterNamesMs);
+
+  const moved = [...root.querySelectorAll(".lsr-opening-sheet"), ...presses(root)].flatMap(
+    (node) => node.focusCalls,
+  );
+  assert.ok(moved.length >= 5, "every sheet and the revealed button took the caret");
+  for (const options of moved) assert.deepEqual(options, { preventScroll: true });
+});
+
 test("the names are laid in from the layout, one per chapter it could name", (t) => {
   const { root } = mounted(t, ["one"], { chapters: CHAPTERS });
 

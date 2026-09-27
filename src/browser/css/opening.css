@@ -63,7 +63,8 @@
   justify-content: center;
   gap: var(--lsr-space-4);
   padding: var(--lsr-space-6);
-  overflow: hidden;
+  /* Not `hidden`: that is still a scroll container, and focus() scrolls one. */
+  overflow: clip;
   background: var(--lsr-opening-room);
   z-index: 18;
 }

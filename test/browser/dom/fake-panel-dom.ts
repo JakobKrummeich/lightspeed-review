@@ -88,9 +88,12 @@ export class FakeNode {
   }
 
   focused = false;
+  /** Every `focus()` call's options, in order: the opening must never let focus scroll its room. */
+  readonly focusCalls: (FocusOptions | undefined)[] = [];
 
-  focus(): void {
+  focus(options?: FocusOptions): void {
     this.focused = true;
+    this.focusCalls.push(options);
   }
 
   setSelectionRange(start: number, end: number): void {

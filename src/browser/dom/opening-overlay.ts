@@ -103,16 +103,22 @@ export function mountOpening(host: OpeningHost): void {
   host.onOpen();
 }
 
+/**
+ * Focus never scrolls the room: it is fixed and full-bleed, and a scrolled
+ * room drags the sky, its names and the flash off centre.
+ */
+const STAY = { preventScroll: true } as const;
+
 /** A held button cannot take the caret, so the sheet holds it until the button is shown. */
 function caretTo(sheet: HTMLElement | undefined): void {
   const button = sheet?.querySelector<HTMLElement>(".lsr-opening-press");
-  if (button?.dataset.held === "true") sheet?.focus();
-  else button?.focus();
+  if (button?.dataset.held === "true") sheet?.focus(STAY);
+  else button?.focus(STAY);
 }
 
 function reveal(sheet: HTMLElement): void {
   const button = sheet.querySelector<HTMLElement>(".lsr-opening-press");
   if (!button) return;
   button.dataset.held = "false";
-  button.focus();
+  button.focus(STAY);
 }

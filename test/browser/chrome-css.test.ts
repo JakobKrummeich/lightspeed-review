@@ -847,6 +847,16 @@ test("the room grows with the longest reason instead of scrolling it", () => {
   assert.match(sheet, /align-content: safe center;/, "a scrolled sheet must keep its top");
 });
 
+test("no room scrolls: focus inside it must not push the sky off centre", () => {
+  // `overflow: hidden` is still a scroll container, and focus() scrolls one: a tall reason
+  // left the sky, the names and the flash 89px off at 1440×900. `clip` cannot be scrolled.
+  for (const selector of [".lsr-opening-overlay", ".lsr-jump-overlay"]) {
+    const body = rulesFor(selector).join("");
+    assert.match(body, /overflow: clip;/, selector);
+    assert.doesNotMatch(body, /overflow: hidden;/, selector);
+  }
+});
+
 test("the opening is painted for both schemes at once, never for one of them", () => {
   // A hand-picked scheme overrides the machine's: prefers-color-scheme would follow the machine
   // while the page follows the pick, so every local uses light-dark().
