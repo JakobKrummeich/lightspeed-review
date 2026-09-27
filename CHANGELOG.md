@@ -14,7 +14,12 @@ agent's answer, each approval and the last one.
   untick takes the light down and its width applies at once.
 - Every file approved opens the done card with a supernova — a point of
   light, two rings and a flare — and the ✓ settles out of it. Nothing on the
-  card moves after that.
+  card moves after that. The card drops its "Nothing left to read" line: the
+  title says it.
+- An approve box, per file or per chapter, no longer draws a tick mark: an
+  approved box is filled with the accent, one still to approve is an empty
+  outline. Under forced colours the filled box takes the system highlight, so
+  the two still read apart.
 - A send goes out at warp: what was sent squeezes into streaks that shoot into
   the button that sent it, and the button flares as they land. It starts once
   delivery succeeds, so a failed send never animates.
