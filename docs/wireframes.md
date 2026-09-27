@@ -497,15 +497,13 @@ ended overlay, whose word is last.
 ```
 ┌ .lsr-done-overlay (scrim, z19) ────────────────────┐
 │          ┌ .lsr-done-card ──────────────────┐      │
-│          │ (✓)                              │      │ .lsr-done-mark (accent badge)
-│          │ NOTHING LEFT TO READ             │      │ .lsr-done-eyebrow
-│          │ Every file is approved           │      │ .lsr-done-title
+│          │ Every file is approved       (✓) │      │ .lsr-done-head: .lsr-done-title,
+│          │                                  │      │  .lsr-done-mark (accent badge, right)
 │          │ End the review to hand it back   │      │ .lsr-done-note
-│          │ to the agent, or keep looking —  │      │  (+ "Your 2 queued notes
-│          │ nothing is sent until you say so.│      │    go with it." when queued)
-│          │                                  │      │
-│          │ [End review]   [Keep looking]    │      │ .lsr-done-end /
-│          └──────────────────────────────────┘      │ .lsr-done-stay
+│          │ to the agent, or keep looking.   │      │  (+ "Your 2 queued notes
+│          │                                  │      │    go with it." when queued)
+│          │ [End review]      [Keep looking] │      │ .lsr-done-end /
+│          └──────────────────────────────────┘      │ .lsr-done-stay (row spread)
 └────────────────────────────────────────────────────┘
 ```
 

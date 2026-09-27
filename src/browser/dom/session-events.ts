@@ -18,6 +18,7 @@ import type { MountedDiff } from "./diff-mount.ts";
 import type { MountedPanel } from "./panel-mount.ts";
 import type { MountedRail } from "./panel-rail.ts";
 import type { MountedStatusBanner } from "./status-mount.ts";
+import type { MountedBeacon } from "./tab-beacon-mount.ts";
 
 /**
  * A subset of the page: taking the whole `Page` would make this module and
@@ -51,6 +52,8 @@ export interface Wired {
   banner: MountedStatusBanner;
   railControl: MountedRail;
   finish: TurnAware;
+  /** The tab's title and favicon, for a reviewer who is looking elsewhere. */
+  beacon: MountedBeacon;
   refreshReplay(fresh: SessionData): void;
   place(): ReviewerPlace;
 }
@@ -158,6 +161,11 @@ function openStream(
     banner.setPresence(presence);
     panel.setTurn(presence.turn, presence.items);
     wired.finish.setTurn(presence.turn);
+    // Before the turn: the end's frame hands the turn back ahead of the fetch
+    // that says the review ended. Never taken back here; a reopen is a round,
+    // and `applyRound` says it.
+    if (presence.ended) wired.beacon.setEnded(true);
+    wired.beacon.setTurn(presence.turn);
   });
   // A dropped stream reconnects by itself; a refused one never does. The
   // wait doubles while the server keeps refusing, and resets on an open.
@@ -195,12 +203,18 @@ function applyRound(wired: Wired, fresh: SessionData): void {
   // changes its standing (takes the reopen control away).
   if (change === "regrouped") openRound(wired, fresh);
   else if (fresh.status === "ended") page.replayReopen.hidden = true;
+  // Both ways: `open --reopen` lights the tab again on the next flip.
+  wired.beacon.setEnded(fresh.status === "ended");
+  // An answer the reviewer never sees costs more than the width. Opened, and
+  // taken to the foot, before the panel draws it: the draw decides from what is
+  // in sight how the answer is lit, and follows the foot only from the foot.
+  if (agentSpokeAgain(live.drawn.conversation, fresh.conversation) && railControl.expand()) {
+    panel.toFoot();
+  }
   panel.update(fresh);
   // Whole session, not status alone: an ended review is summed over the page,
   // last send included.
   banner.setSession(fresh);
-  // An answer the reviewer never sees costs more than the width.
-  if (agentSpokeAgain(live.drawn.conversation, fresh.conversation)) railControl.expand();
   live.drawn = fresh;
 }
 

@@ -10,6 +10,8 @@ export interface AgentPresence {
   turn: Turn;
   /** How many items the agent is reading; only while it digests. */
   items?: number;
+  /** Only on a review that has ended; an older server never says it. */
+  ended?: true;
 }
 
 /**
@@ -19,16 +21,28 @@ export interface AgentPresence {
  */
 export function readPresence(data: string): AgentPresence {
   try {
-    const frame = JSON.parse(data) as { waiting?: unknown; turn?: unknown; items?: unknown } | null;
-    const items = frame?.items;
+    const frame = JSON.parse(data) as {
+      waiting?: unknown;
+      turn?: unknown;
+      items?: unknown;
+      ended?: unknown;
+    } | null;
     return {
       waiting: frame?.waiting === true,
       turn: readTurn(frame?.turn),
-      ...(Number.isInteger(items) && (items as number) > 0 ? { items: items as number } : {}),
+      ...extras(frame?.items, frame?.ended),
     };
   } catch {
     return { waiting: false, turn: reviewerHolds() };
   }
+}
+
+/** The facts a frame may leave out, each kept only when it is well formed. */
+function extras(items: unknown, ended: unknown): Pick<AgentPresence, "items" | "ended"> {
+  return {
+    ...(Number.isInteger(items) && (items as number) > 0 ? { items: items as number } : {}),
+    ...(ended === true ? { ended } : {}),
+  };
 }
 
 /** `at` empty: nobody said when. */

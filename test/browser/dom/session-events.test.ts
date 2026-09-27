@@ -136,6 +136,10 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
   const log: string[] = [];
   /** What the header was told of the stream, apart from `log`: every open says it. */
   const connections: boolean[] = [];
+  /** What the tab beacon was told of the review's end, apart from `log`: every draw says it. */
+  const endings: boolean[] = [];
+  /** Folded until the first `expand`, as a reviewer who put the panel away left it. */
+  const rail = { folded: true };
   const roots = {
     review: new FakeNode("div"),
     intent: new FakeNode("div"),
@@ -170,6 +174,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       setAllApproved: () => {},
       setTurn: (turn) => log.push(`panel turn ${turn.holder}`),
       writesLocked: () => false,
+      toFoot: () => log.push("panel to foot"),
       end: () => {},
     },
     banner: {
@@ -178,8 +183,23 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
       setEndedByReviewer: () => {},
       setConnected: (connected) => void connections.push(connected),
     },
-    railControl: { setQueued: () => {}, expand: () => log.push("rail expand") },
+    railControl: {
+      setQueued: () => {},
+      expand: () => {
+        log.push("rail expand");
+        const { folded } = rail;
+        rail.folded = false;
+        return folded;
+      },
+    },
     finish: { setTurn: () => {} },
+    beacon: {
+      setTurn: (turn) => log.push(`beacon turn ${turn.holder}`),
+      setEnded: (ended) => {
+        endings.push(ended);
+        if (ended) log.push("beacon ended");
+      },
+    },
     refreshReplay: () => log.push("replay"),
     place: () => place,
   };
@@ -189,7 +209,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     assert.ok(open, "the page opened its stream");
     return open;
   };
-  return { stream, log, live, roots, connections };
+  return { stream, log, live, roots, connections, endings, rail };
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -273,10 +293,14 @@ test("a reconnect onto the same round with missed talk draws it in place", async
 
   assert.deepEqual(log, [
     "panel turn reviewer",
+    "beacon turn reviewer",
     "diff same-round",
+    // Opened before the draw that lights the answer, or a folded panel has no card in sight;
+    // and at its foot, where a folded panel's draws could not keep it.
+    "rail expand",
+    "panel to foot",
     "panel 1 said",
     "banner",
-    "rail expand",
   ]);
   // The refetch speaks for the round, never for the turn: nothing after it overrules presence.
   assert.equal(live.round, 0);
@@ -284,6 +308,19 @@ test("a reconnect onto the same round with missed talk draws it in place", async
   assert.equal(roots.review.scrollTop, 500, "no one is moved inside a round");
   assert.equal(roots.offer.hidden, true);
   assert.equal(roots.popup.hidden, true);
+});
+
+test("an answer drawn into an open panel leaves the reviewer's scroll to the panel", async (t) => {
+  // Only an unfolded panel is taken to its foot: in an open one the reviewer may be reading
+  // further up, and the panel's own draw decides whether they were following.
+  const { stream, server, log, rail } = world(t).page();
+  rail.folded = false;
+  server.serving = session(0, [reply]);
+
+  stream().emit("session");
+  await settled();
+
+  assert.deepEqual(log, ["diff same-round", "rail expand", "panel 1 said", "banner"]);
 });
 
 test("once drawn, the same talk is not drawn again on the next reconnect", async (t) => {
@@ -321,6 +358,42 @@ test("an announced session is drawn even when nothing the page compares has move
   await settled();
 
   assert.deepEqual(log, ["diff same-round", "panel 0 said", "banner"]);
+});
+
+test("a review that ends puts the tab beacon out, and a reopen lets it light again", async (t) => {
+  // Regression: `lightspeed end` hands the turn to the reviewer, and a hidden tab read that as
+  // "● Your turn" on a review nobody can act on any more; then `open --reopen` left it dark.
+  const { stream, server, endings } = world(t).page();
+  server.serving = { ...session(0), status: "ended" };
+  stream().emit("session");
+  await settled();
+
+  server.serving = session(1);
+  stream().emit("session");
+  await settled();
+
+  assert.deepEqual(endings, [true, false]);
+});
+
+test("the end's own presence frame puts the tab beacon out before it hands the turn back", (t) => {
+  // Regression: the frame lands before the fetch that says the review ended, and a hidden tab
+  // read "● Your turn" and twinkled for as long as that fetch took.
+  const { stream, log, endings } = world(t).page();
+
+  stream().emit(
+    "presence",
+    JSON.stringify({ waiting: false, turn: { holder: "reviewer", at: "" }, ended: true }),
+  );
+  stream().emit(
+    "presence",
+    JSON.stringify({ waiting: false, turn: { holder: "reviewer", at: "" } }),
+  );
+
+  assert.deepEqual(
+    log.filter((line) => line.startsWith("beacon")),
+    ["beacon ended", "beacon turn reviewer", "beacon turn reviewer"],
+  );
+  assert.deepEqual(endings, [true], "a frame never reopens the review: only a round does");
 });
 
 test("an older answer landing last does not put the old round back", async (t) => {

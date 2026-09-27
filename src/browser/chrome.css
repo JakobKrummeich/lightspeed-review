@@ -5,8 +5,9 @@
  * The order is the cascade: esbuild inlines a relative `@import` where it
  * stands, so moving a line here moves a whole area past or behind every rule
  * it shares a selector with. Tokens first, the shell next, one area per screen
- * of the review, and `motion.css` last so its `prefers-reduced-motion` answer
- * wins over all of them. Nothing else belongs here: a rule written in this
+ * of the review, the light moments over every screen they play on, and
+ * `motion.css` last so its `prefers-reduced-motion` answer wins over all of
+ * them. Nothing else belongs here: a rule written in this
  * file is a rule with no area, and `test/helpers/stylesheet.ts` reads the
  * import lines by their exact shape.
  */
@@ -26,4 +27,6 @@
 @import "./css/round.css";
 @import "./css/done.css";
 @import "./css/opening.css";
+@import "./css/light.css";
+@import "./css/light-approval.css";
 @import "./css/motion.css";

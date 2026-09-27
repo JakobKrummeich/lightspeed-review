@@ -24,6 +24,12 @@
   --lsr-raised: light-dark(oklch(0.995 0.002 90), oklch(0.292 0.012 262));
   --lsr-border: light-dark(oklch(0.89 0.006 90), oklch(0.36 0.014 262));
   /*
+   * The edge of an empty approve box: the box's whole shape, not a divider, so
+   * it holds 3:1 against its fill and the card round it (3.3 on `--lsr-bg`).
+   * `--lsr-border` does that on dark and nowhere near it on light.
+   */
+  --lsr-tick-edge: light-dark(oklch(0.62 0.006 90), oklch(0.36 0.014 262));
+  /*
    * Tinted with the accent rather than lifted one more shade: a single step of
    * lightness is invisible, a change of hue is not. Marks the one option of a
    * set that is in use.
@@ -86,6 +92,30 @@
   --lsr-shadow-flat: 0 1px 3px light-dark(oklch(0.25 0.02 262 / 0.1), oklch(0 0 0 / 0.35));
   --lsr-scrim: light-dark(oklch(0.25 0.015 270 / 0.45), oklch(0.1 0.01 262 / 0.6));
   --lsr-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /*
+   * The light moments (`light.css`): light moves when the turn changes hands,
+   * and it is drawn two ways. At night it is starlight — a white-hot core in a
+   * wide accent halo. On paper it is a star atlas, where white would vanish:
+   * the core is cobalt ink, the halo a thin wash. Always the accent's hue,
+   * never red or green, which the diff owns.
+   */
+  --lsr-light-core: light-dark(var(--lsr-accent), var(--lsr-white));
+  --lsr-light-ink: light-dark(color-mix(in oklab, var(--lsr-accent) 85%, black), var(--lsr-white));
+  --lsr-light-glow: light-dark(
+    color-mix(in oklab, var(--lsr-accent) 38%, transparent),
+    color-mix(in oklab, var(--lsr-accent) 75%, transparent)
+  );
+  /* The sheen that runs over a filled bar: white on either sheet, because it
+   * crosses the accent fill, never the page. */
+  --lsr-light-glint: color-mix(in oklab, var(--lsr-white) 85%, transparent);
+  /* A point of light: ink at the centre, the accent around it, then nothing. */
+  --lsr-light-spark: radial-gradient(
+    circle,
+    var(--lsr-light-ink) 0 30%,
+    var(--lsr-accent) 55%,
+    transparent 72%
+  );
 
   /*
    * Code and chrome are both 1rem: the reviewer reads their editor at 16px, and
@@ -194,6 +224,12 @@
   /* The `@@` row states its line numbers; it does not need a band to be found. */
   --d2h-info-bg-color: var(--lsr-code-quiet);
   --d2h-info-border-color: var(--lsr-border);
+  /*
+   * The system's own colours, for forced-colours mode only: there the page's
+   * palette is replaced, and what must still read is said in the reader's.
+   */
+  --lsr-system-text: CanvasText;
+  --lsr-system-mark: Highlight;
 }
 
 /* An explicit pick overrides the OS; `light-dark()` re-resolves every token. */

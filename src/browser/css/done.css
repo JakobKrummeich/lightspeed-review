@@ -14,9 +14,10 @@
   z-index: 19;
 }
 
-/* One glow and done: the reviewer is about to make a decision, and nothing on
- * the card keeps moving while they do. */
+/* Arrives, and its light is the supernova's (`light-approval.css`): the reviewer is
+ * about to make a decision, and nothing on the card keeps moving while they do. */
 .lsr-done-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: start;
@@ -27,9 +28,7 @@
   border-radius: 0.75rem;
   padding: var(--lsr-space-6);
   box-shadow: var(--lsr-shadow-lift);
-  animation:
-    lsr-done-arrive 180ms ease-out,
-    lsr-done-glow 900ms ease-out 180ms;
+  animation: lsr-done-arrive 180ms ease-out;
 }
 
 @keyframes lsr-done-arrive {
@@ -39,12 +38,23 @@
   }
 }
 
-@keyframes lsr-done-glow {
-  50% {
-    box-shadow:
-      var(--lsr-shadow-lift),
-      0 0 2rem color-mix(in srgb, var(--lsr-accent) 55%, transparent);
-  }
+/*
+ * The news and its mark on one line at the top: the heading on the left, the
+ * ✓ on the right edge, where the buttons end too. The heading wraps before it
+ * ever reaches the mark, and the gap keeps them apart when it does.
+ */
+.lsr-done-head {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lsr-space-4);
+}
+
+/* The supernova's frame (`light-approval.css`): the nova is laid over the mark from here. */
+.lsr-done-badge {
+  position: relative;
+  flex: none;
 }
 
 .lsr-done-mark {
@@ -58,28 +68,12 @@
   font-size: var(--lsr-size-lead);
   font-weight: 700;
   line-height: var(--lsr-leading-display);
-  animation: lsr-done-land 320ms cubic-bezier(0.34, 1.56, 0.64, 1) 120ms backwards;
-}
-
-@keyframes lsr-done-land {
-  from {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-}
-
-.lsr-done-eyebrow {
-  margin: 0;
-  color: var(--lsr-muted);
-  font-size: var(--lsr-size-label);
-  line-height: var(--lsr-leading-tight);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .lsr-done-title {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--lsr-strong);
   font-size: var(--lsr-size-title);
   line-height: var(--lsr-leading-tight);
@@ -93,8 +87,11 @@
   line-height: var(--lsr-leading);
 }
 
+/* Across the card: End review on the left, Keep looking on the right edge. */
 .lsr-done-actions {
+  align-self: stretch;
   display: flex;
+  justify-content: space-between;
   gap: var(--lsr-space-3);
   margin-top: var(--lsr-space-2);
 }

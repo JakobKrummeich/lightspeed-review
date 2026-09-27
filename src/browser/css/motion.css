@@ -3,8 +3,8 @@
  * of it. The opening's two light layers are hidden outright rather than left
  * to fade, because a quarter-second of white across the screen is worse than
  * no reward at all. The working line at the foot of the conversation stays,
- * its dots up and still: the line being there at all carries the fact, the
- * movement only ever made it easy to catch.
+ * its firefly lit and still: the line being there at all carries the fact,
+ * the movement only ever made it easy to catch.
  */
 @media (prefers-reduced-motion: reduce) {
   .lsr-opening-sheet {
@@ -31,7 +31,11 @@
     transition: none;
   }
 
-  .lsr-working-dots i {
+  /* Every layer by its own selector: `light.css` names the inner two more
+   * closely, and a rule for the outer one alone loses to them. */
+  .lsr-firefly i,
+  .lsr-firefly i i,
+  .lsr-firefly i i i {
     animation: none;
   }
 
@@ -70,5 +74,35 @@
   .lsr-done-card,
   .lsr-done-mark {
     animation: none;
+  }
+
+  /*
+   * The light moments land on their end state. What a streak, beam, particle
+   * or nova announced is simply there — the sent words, the answer, the grown
+   * fill, the ✓ — and the lights themselves are not drawn at all.
+   */
+  .lsr-warp-layer,
+  .lsr-light-beam,
+  .lsr-light-photon,
+  .lsr-light-edge,
+  .lsr-light-flash,
+  .lsr-light-glint,
+  .lsr-done-nova,
+  .lsr-done-card::before,
+  .lsr-compose-actions [data-light]::after,
+  .lsr-light-pulse,
+  .lsr-thread[data-light]::before,
+  .lsr-thread[data-light]::after,
+  .lsr-tick input[data-light="tick"]:checked::before {
+    display: none;
+  }
+
+  .lsr-message[data-light] {
+    animation: none;
+  }
+
+  .lsr-progress-fill,
+  .lsr-progress-segment[data-light] .lsr-progress-fill {
+    transition: none;
   }
 }

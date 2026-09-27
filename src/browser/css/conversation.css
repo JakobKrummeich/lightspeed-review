@@ -83,40 +83,6 @@
   color: var(--lsr-accent);
 }
 
-.lsr-working-dots {
-  display: inline-flex;
-  /* Never squeezed by the sentence beside it: the dots are the moving part. */
-  flex: 0 0 auto;
-  gap: var(--lsr-space-1);
-}
-
-/* The dots fade rather than travel: motion beside text being read is the kind
- * that gets a page closed. */
-.lsr-working-dots i {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 999px;
-  background: currentcolor;
-  animation: lsr-working-breathe 1200ms ease-in-out infinite;
-}
-
-.lsr-working-dots i:nth-child(2) {
-  animation-delay: 160ms;
-}
-
-.lsr-working-dots i:nth-child(3) {
-  animation-delay: 320ms;
-}
-
-/* Down to a quarter rather than out: a dot that goes to nothing leaves a hole
- * in the row, and the row is what reads as one thing. */
-@keyframes lsr-working-breathe {
-  50% {
-    opacity: 0.25;
-    transform: scale(0.7);
-  }
-}
-
 /*
  * Each voice wears the hue it has everywhere else on the page: the accent
  * where the agent speaks, the violet of the reviewer's own words in the replay

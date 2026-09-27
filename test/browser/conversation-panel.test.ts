@@ -387,10 +387,10 @@ test("an agent at work with no plan says it is working on your feedback", () => 
   assert.match(html, /Working on your feedback/);
 });
 
-test("the breathing dots are hidden from a reader the sentence already tells", () => {
+test("the firefly is hidden from a reader the sentence already tells", () => {
   const html = renderScroll(panelState({ turn: AGENTS_TURN }));
 
-  assert.match(html, /class="lsr-working-dots" aria-hidden="true"/);
+  assert.match(html, /class="lsr-firefly" aria-hidden="true"/);
 });
 
 test("nobody is said to be working when nobody is", () => {

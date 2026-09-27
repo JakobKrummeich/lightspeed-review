@@ -21,7 +21,7 @@ import {
   generalCommentBox,
   onTheWire,
   replyBox,
-  replyBoxes,
+  focusedReply,
   restoreReplies,
   typedReplies,
 } from "./panel-wire.ts";
@@ -34,6 +34,7 @@ import {
 } from "../review-memory.ts";
 import { deliveryFacts, handedOnTurn } from "../delivery.ts";
 import { foldPress, groupPress } from "./panel-folds.ts";
+import type { PanelLight } from "./panel-light.ts";
 import { saveLater } from "./save-later.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
@@ -48,6 +49,11 @@ export interface MountedPanel {
   setTurn(turn: Turn, items?: number): void;
   /** Nothing may be written — the line popup asks before it queues. */
   writesLocked(): boolean;
+  /**
+   * To the newest talk. A folded panel lays nothing out, so its draws cannot
+   * follow the foot: unfolded, it stands wherever it was when it was folded.
+   */
+  toFoot(): void;
   /**
    * The same send as Send & End, queue and comment included, so there is one
    * way a review ends however the word was given.
@@ -69,6 +75,8 @@ export interface PanelOptions {
   onPending(queued: QueueTally): void;
   /** The panel only says which file and where; opening and scrolling is the diff's craft. */
   onJump(file: string, place: LinePlace | undefined): void;
+  /** Absent, nothing lights: the moments are the page's, the panel only says when. */
+  light?: PanelLight;
 }
 
 interface PanelView extends ComposeView {
@@ -112,8 +120,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
 
   root.addEventListener("click", (event) => handleClick(view, event));
   root.addEventListener("input", (event) => {
-    if (event.target !== generalCommentBox(root)) return;
-    rememberDraft.soon();
+    if (event.target === generalCommentBox(root)) rememberDraft.soon();
   });
   // Both guard their own box, so neither can act on the other's Enter.
   root.addEventListener("keydown", (event) => {
@@ -154,6 +161,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
       draw(view);
     },
     writesLocked: () => writesLocked(state),
+    toFoot: () => toBottom(view.scrollHost),
     end() {
       // Not awaited, as the button's own press is not: the send reports
       // through `onEnd`, and a failure leaves the controls full to press again.
@@ -232,6 +240,8 @@ function draw(view: PanelView): void {
   restoreReplies(options.root, typed);
   if (focused !== undefined) replyBox(options.root, focused)?.focus();
   if (following) toBottom(scrollHost);
+  // After the scroll: whether a new card is in sight decides how it is lit.
+  options.light?.drawn(state.conversation);
   options.onPending(tallyOf(state.pending));
   // Queue stored on every change, no delay: a pill is one gesture, and the
   // thing a reload must not lose.
@@ -240,12 +250,6 @@ function draw(view: PanelView): void {
   // back fresh, live ones. Re-locked here rather than at each call site: a
   // draw that forgot would be a live Reply while the agent digests.
   lockControls(view);
-}
-
-/** No `document` outside a browser; there is then nothing focused to keep. */
-function focusedReply(root: HTMLElement): string | undefined {
-  const active = (globalThis as { document?: Document }).document?.activeElement;
-  return replyBoxes(root).find((box) => box === active)?.dataset.thread;
 }
 
 /** The only thing that replaces the compose box, and only when it must. */
@@ -404,17 +408,7 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // with a dead SSE stream; the `feedback` event brings the server's copy —
   // the truth, and all another tab ever sees.
   echoSent(state, before, prompts);
-  // Cleared only for what actually went out. An end on the agent's turn sends
-  // nothing — the button says `End without Sending` and the round card promises
-  // the queue — so the pills and the half-typed comment stay exactly where the
-  // reviewer left them, to go out when the review is reopened.
-  if (prompts.length > 0) {
-    state.pending = [];
-    clearGeneralComment(options.root);
-    // Both halves at once, ahead of the delayed write: a reload must not offer
-    // to send what the server now owns.
-    updateMemory(options.storage, options.key, { pending: [], draft: "" });
-  }
+  clearSent(view, prompts, ended);
   draw(view);
   if (ended) setStatus(view, "ended");
   // After the status: lifting the send lock must never reopen a closed review.
@@ -422,6 +416,25 @@ async function send(view: PanelView, ended: boolean): Promise<void> {
   // Not left to the SSE round trip: every control must stop at the moment the
   // reviewer said done.
   if (ended) options.onEnd(prompts);
+}
+
+/**
+ * Cleared only for what actually went out. An end on the agent's turn sends
+ * nothing — the button says `End without Sending` and the round card promises
+ * the queue — so the pills and the half-typed comment stay exactly where the
+ * reviewer left them, to go out when the review is reopened.
+ */
+function clearSent(view: PanelView, prompts: FeedbackPrompt[], ended: boolean): void {
+  if (prompts.length === 0) return;
+  const { options, state } = view;
+  // Lit before the box empties and the draw takes the drafts away, which both
+  // follow at once: the light is laid over them and holds neither up.
+  options.light?.sent(ended);
+  state.pending = [];
+  clearGeneralComment(options.root);
+  // Both halves at once, ahead of the delayed write: a reload must not offer
+  // to send what the server now owns.
+  updateMemory(options.storage, options.key, { pending: [], draft: "" });
 }
 
 function setSending(view: PanelView, sending: boolean): void {

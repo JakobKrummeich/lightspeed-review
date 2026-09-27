@@ -60,3 +60,11 @@ test("the count of items being read comes through only as a positive whole numbe
     assert.equal("items" in readPresence(`{${digesting},"items":${items}}`), false, items);
   }
 });
+
+test("the end of the review comes through only as an explicit true", () => {
+  const reviewers = `"turn":{"holder":"reviewer","at":"T4"}`;
+  assert.equal(readPresence(`{${reviewers},"ended":true}`).ended, true);
+  for (const ended of ["false", '"true"', "1", "null"]) {
+    assert.equal("ended" in readPresence(`{${reviewers},"ended":${ended}}`), false, ended);
+  }
+});

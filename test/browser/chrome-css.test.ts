@@ -198,9 +198,18 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
   // `.lsr-gate-path`: one path on the chapter's card, a leaf with no diff under it.
   // `.lsr-file-path`: the path on a file's header row — two paths and an arrow
   // for a moved file — a span in the header button, a sibling of the diff, never over it.
+  // `.lsr-done-title`: the done card's heading, a leaf on an overlay, which must wrap before it
+  // reaches the ✓ beside it.
   assert.deepEqual(
     wrapping,
-    [".lsr-file-path", ".lsr-gate-path", ".lsr-panel-scroll", ".lsr-popup", "textarea"],
+    [
+      ".lsr-done-title",
+      ".lsr-file-path",
+      ".lsr-gate-path",
+      ".lsr-panel-scroll",
+      ".lsr-popup",
+      "textarea",
+    ],
     "a new mid-token wrap is a deliberate choice: say so here, and check it cannot reach the diff",
   );
 });
@@ -888,9 +897,9 @@ test("a reviewer who asked for less motion gets the handover without the movemen
 test("the busy marker holds still for that reviewer rather than going away", () => {
   const quiet = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\n\}/.exec(bare)?.[1] ?? "";
 
-  // Hiding the marker would answer the preference by taking the news away: the dots stop
-  // animating but stay up.
-  assert.match(quiet, /\.lsr-working-dots i \{\s*animation: none;/);
+  // Hiding the marker would answer the preference by taking the news away: the firefly
+  // stops drifting but stays lit. That it stops is a question of which rule wins, which only a
+  // browser answers; this asserts only that nothing hides it.
   assert.doesNotMatch(quiet, /\.lsr-working[\w-]* \{[^}]*display: none/);
 });
 

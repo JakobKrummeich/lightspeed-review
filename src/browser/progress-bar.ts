@@ -49,10 +49,45 @@ function weightOf(files: DiffFile[]): number {
   return files.reduce((total, file) => total + Math.max(1, file.insertions + file.deletions), 0);
 }
 
+/**
+ * What a tick did to the bar, for the light that answers it: `partial` grew a
+ * chapter's fill, `chapter` finished one, `all` finished the review. `share`
+ * is the grown fill's new width, where the particle stops.
+ */
+export interface ProgressChange {
+  kind: "partial" | "chapter" | "all";
+  index: number;
+  share: number;
+}
+
+/**
+ * Only growth is news: an untick takes light away, and nothing should
+ * celebrate it. One tick grows one chapter, so the first grown segment is it.
+ */
+export function progressChange(
+  before: ProgressSegment[],
+  after: ProgressSegment[],
+): ProgressChange | undefined {
+  const index = after.findIndex(
+    (segment, at) => segment.approvedWeight > (before[at]?.approvedWeight ?? 0),
+  );
+  const grown = after[index];
+  if (grown === undefined) return undefined;
+  return { kind: changeKind(grown, after), index, share: fillShare(grown) };
+}
+
+function changeKind(grown: ProgressSegment, after: ProgressSegment[]): ProgressChange["kind"] {
+  if (grown.state !== "approved") return "partial";
+  return after.every((segment) => segment.state === "approved") ? "all" : "chapter";
+}
+
+function fillShare(segment: ProgressSegment): number {
+  return segment.weight === 0 ? 0 : segment.approvedWeight / segment.weight;
+}
+
 /** Inline width, patchable on a tick without a bar redraw. */
 export function segmentFillStyle(segment: ProgressSegment): string {
-  const share = segment.weight === 0 ? 0 : segment.approvedWeight / segment.weight;
-  return `width: ${Math.round(share * 1000) / 10}%`;
+  return `width: ${Math.round(fillShare(segment) * 1000) / 10}%`;
 }
 
 /**

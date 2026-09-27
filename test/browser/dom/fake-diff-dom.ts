@@ -194,6 +194,10 @@ export class FakeElement {
     this.attributes.set(name, value);
   }
 
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
+
   addEventListener(type: string, handler: (event: unknown) => void): void {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
   }

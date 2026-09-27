@@ -17,6 +17,7 @@ import { wireFinish } from "./finish.ts";
 import { wireIntent } from "./intent-mount.ts";
 import { mountOpening } from "./opening-overlay.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
+import { mountPanelLight } from "./panel-light.ts";
 import type { LinePlace } from "./line-numbers.ts";
 import { createReplayRefresher } from "./replay-refresh.ts";
 import { mountReplayOverlay, type ReplayOpening } from "./replay-overlay.ts";
@@ -24,6 +25,7 @@ import { mountPanelRail, type MountedRail } from "./panel-rail.ts";
 import { mountSchemeToggle } from "./scheme-toggle.ts";
 import { fetchReplay, fetchSession, type SessionData } from "./session-api.ts";
 import { mountStatusBanner, type MountedStatusBanner } from "./status-mount.ts";
+import { mountTabBeacon, type MountedBeacon } from "./tab-beacon-mount.ts";
 import { trackReader } from "./reader-place.ts";
 import { queuedTotal, type QueueTally } from "../queued-pill.ts";
 import { wireSessionEvents, type LiveSession } from "./session-events.ts";
@@ -206,6 +208,11 @@ function roomWatch(): {
   };
 }
 
+/** Asked each time, not once: the preference can change under an open page. */
+function reducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function mountScheme(schemeSwitch: HTMLElement): void {
   mountSchemeToggle({
     root: schemeSwitch,
@@ -236,13 +243,21 @@ function mountPanelSide(
   onQueued: (queued: QueueTally) => void,
   onToggle: () => void,
   onJump: (file: string, place: LinePlace | undefined) => void,
-): { banner: MountedStatusBanner; railControl: MountedRail; panel: MountedPanel } {
+): {
+  banner: MountedStatusBanner;
+  beacon: MountedBeacon;
+  railControl: MountedRail;
+  panel: MountedPanel;
+} {
   const banner = mountStatusBanner(session);
+  // The header's word for the turn, and the tab's for a reviewer not looking at it.
+  const beacon = mountTabBeacon(document, session, reducedMotion);
   const railControl = mountPanelRail({
     rail: page.rail,
     page: document.body,
     onToggle,
   });
+  const light = mountPanelLight(page.panelRoot, session.conversation);
   const panel = mountPanel({
     root: page.panelRoot,
     key: page.key,
@@ -266,8 +281,11 @@ function mountPanelSide(
       onQueued(queued);
     },
     onJump,
+    light,
   });
-  return { banner, railControl, panel };
+  // The mount's render is the panel's first draw; the talk it shows is not news.
+  light.drawn(session.conversation);
+  return { banner, beacon, railControl, panel };
 }
 
 /**
