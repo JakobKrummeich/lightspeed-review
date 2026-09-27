@@ -34,12 +34,31 @@ export interface WiredReplay {
   refreshReplay(fresh: SessionData): void;
 }
 
+/** Whether the tab is on screen, and word when that changes: the document's. */
+export interface PageVisibility {
+  readonly visibilityState: DocumentVisibilityState;
+  addEventListener(type: "visibilitychange", listener: () => void): void;
+  removeEventListener(type: "visibilitychange", listener: () => void): void;
+}
+
 /** What the wiring reaches outside itself for; a test hands in its own. */
 export interface ReplayDeps {
   arrivals(root: HTMLElement): Arrivals;
   fetch(key: string): Promise<ReplayData>;
   storage: ReviewMemoryStorage;
+  visibility: PageVisibility;
   overlay(page: ReplayHosts): ReplayOverlayControl;
+}
+
+/** Runs `back` once, the next time the tab comes on screen; the returned call stops waiting. */
+function onReturn(page: PageVisibility, back: () => void): () => void {
+  const changed = (): void => {
+    if (page.visibilityState === "hidden") return;
+    page.removeEventListener("visibilitychange", changed);
+    back();
+  };
+  page.addEventListener("visibilitychange", changed);
+  return () => page.removeEventListener("visibilitychange", changed);
 }
 
 /** Closing the replay lands at the top of the diff, where a new round starts anyway. */
@@ -59,7 +78,28 @@ function browserDeps(): ReplayDeps {
     arrivals: (root) => arrivals(root, stillness),
     fetch: fetchReplay,
     storage: localStorage,
+    visibility: document,
     overlay: mountOverlay,
+  };
+}
+
+/**
+ * This page's claim on a round's one showing: written where every tab of the
+ * review reads it, and held here until the showing spends it.
+ */
+function roundClaims(storage: ReviewMemoryStorage, key: string) {
+  let claim: number | undefined = undefined;
+  return {
+    replayed: (): number | undefined => readMemory(storage, key).replayed,
+    take(round: number): void {
+      claim = round;
+      updateMemory(storage, key, { replayed: round });
+    },
+    spend(round: number): boolean {
+      if (claim !== round) return false;
+      claim = undefined;
+      return true;
+    },
   };
 }
 
@@ -71,8 +111,21 @@ export function wireReplay(
   const replayOverlay = deps.overlay(page);
   let replay: ReplayOpening | undefined;
   const arrival = deps.arrivals(page.openingRoot);
-  /** The round this page claimed the showing of, until the showing spends it. */
-  let claim: number | undefined = undefined;
+  const claims = roundClaims(deps.storage, page.key);
+  /** Waiting for a hidden tab to come back to a round it left unclaimed. */
+  let stopWaiting: (() => void) | undefined = undefined;
+  // Opened as the arrival's jump lands, or at once when there was none.
+  const show = (opening: ReplayOpening): void =>
+    arrival.onLanding(() => replayOverlay.open(opening));
+  // Back on screen: the round is this tab's if no tab took it meanwhile. No
+  // jump — the round was drawn while nobody watched, there is no swap to cover.
+  const cameBack = (round: number): void => {
+    stopWaiting = undefined;
+    if (claims.replayed() === round || live.drawn.status === "ended") return;
+    claims.take(round);
+    // Cards still coming: the refresher opens them when they do.
+    if (replay !== undefined && claims.spend(round)) show(replay);
+  };
   page.replayReopen.addEventListener("click", () => {
     // Manual reopen ignores the once-per-round memory on purpose. Not mid-jump:
     // the landing opens the replay itself, and would reset one opened now.
@@ -82,14 +135,8 @@ export function wireReplay(
   // lives in the refresher.
   const replayRefresh = createReplayRefresher({
     fetch: () => deps.fetch(page.key),
-    claimed: (round) => {
-      if (claim !== round) return false;
-      claim = undefined;
-      return true;
-    },
-    // Opened as the arrival's jump lands, or at once when there was none. A
-    // manual reopen is not an arrival, so it opens straight away.
-    open: (opening) => arrival.onLanding(() => replayOverlay.open(opening)),
+    claimed: claims.spend,
+    open: show,
     offer: (opening) => {
       replay = opening;
       page.replayReopen.hidden = opening === undefined;
@@ -97,14 +144,21 @@ export function wireReplay(
   });
   return {
     arriving: (fresh) => {
-      // An older round's replay, queued for a landing, is not this round's.
+      // An older round's replay, queued for a landing or a return, is not this round's.
       arrival.forget();
-      if (!arrivesByJump(fresh, readMemory(deps.storage, page.key).replayed)) return;
+      stopWaiting?.();
+      stopWaiting = undefined;
+      if (!arrivesByJump(fresh, claims.replayed())) return;
+      const round = currentRound(fresh.rounds);
+      // A background tab leaves the showing to a tab on screen, until it is one.
+      if (deps.visibility.visibilityState === "hidden") {
+        stopWaiting = onReturn(deps.visibility, () => cameBack(round));
+        return;
+      }
       // Claimed now, not when the cards come back: another tab on this review
       // reads it taken and neither jumps nor opens, and a fetch that fails
       // leaves it spent, so a reload does not jump to nothing again.
-      claim = currentRound(fresh.rounds);
-      updateMemory(deps.storage, page.key, { replayed: claim });
+      claims.take(round);
       arrival.jump();
     },
     refreshReplay: (fresh) =>

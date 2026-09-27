@@ -73,6 +73,22 @@ function fakeArrivals() {
   return { arrival, flights, land };
 }
 
+/** The tab's visibility, flipped by hand; `listening` counts who waits for the flip. */
+function fakeVisibility(state: DocumentVisibilityState = "visible") {
+  const listeners = new Set<() => void>();
+  return {
+    visibilityState: state,
+    addEventListener: (_type: "visibilitychange", listener: () => void) => listeners.add(listener),
+    removeEventListener: (_type: "visibilitychange", listener: () => void) =>
+      listeners.delete(listener),
+    listening: () => listeners.size,
+    flip(to: DocumentVisibilityState) {
+      this.visibilityState = to;
+      for (const listener of [...listeners]) listener();
+    },
+  };
+}
+
 const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 /**
@@ -80,7 +96,11 @@ const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resol
  * shares. The server answers each round with cards when the round before it
  * was commented on, as `rounds/replay.ts` does; `answer` stands in for it.
  */
-function tab(storage = new FakeStorage(), answer?: () => Promise<ReplayData>) {
+function tab(
+  storage = new FakeStorage(),
+  answer?: () => Promise<ReplayData>,
+  visibility = fakeVisibility(),
+) {
   const flight = fakeArrivals();
   const opened: string[] = [];
   const reopen = new FakeNode("button", "hidden");
@@ -97,6 +117,7 @@ function tab(storage = new FakeStorage(), answer?: () => Promise<ReplayData>) {
     arrivals: () => flight.arrival,
     fetch: answer ?? (async () => served),
     storage,
+    visibility,
     overlay: () => ({
       open: (opening: ReplayOpening) => opened.push(opening.data.comments[0]?.id ?? "?"),
     }),
@@ -108,7 +129,11 @@ function tab(storage = new FakeStorage(), answer?: () => Promise<ReplayData>) {
     live.round = fresh.rounds.length - 1;
     wired.refreshReplay(fresh);
   };
-  return { ...flight, opened, reopen, storage, arrive };
+  /** The review ends inside the round: the page draws it, no arrival. */
+  const end = (): void => {
+    live.drawn = { ...live.drawn, status: "ended" };
+  };
+  return { ...flight, opened, reopen, storage, visibility, arrive, end };
 }
 
 test("a round whose replay opens arrives by the jump, and the replay opens as it lands", async () => {
@@ -226,4 +251,112 @@ test("a claim opens once: the same round asked for again opens nothing more", as
   await settled();
 
   assert.deepEqual(page.opened, ["r1"]);
+});
+
+test("a background tab takes nothing: it neither claims, jumps nor opens", async () => {
+  const page = tab(new FakeStorage(), undefined, fakeVisibility("hidden"));
+
+  page.arrive(roundOf(1));
+  await settled();
+
+  assert.equal(readMemory(page.storage, KEY).replayed, undefined, "left for a tab on screen");
+  assert.equal(page.flights.jumps, 0);
+  assert.deepEqual(page.opened, []);
+  assert.equal(page.reopen.hidden, false, "offered as usual");
+});
+
+test("back on screen with the round still free: it claims it and opens, without a jump", async () => {
+  const page = tab(new FakeStorage(), undefined, fakeVisibility("hidden"));
+  page.arrive(roundOf(1));
+  await settled();
+
+  page.visibility.flip("visible");
+
+  assert.deepEqual(page.opened, ["r1"]);
+  assert.equal(page.flights.jumps, 0, "the round was drawn long ago: no swap to cover");
+  assert.equal(readMemory(page.storage, KEY).replayed, 1);
+  assert.equal(page.visibility.listening(), 0, "no listener left behind");
+  page.visibility.flip("hidden");
+  page.visibility.flip("visible");
+  assert.deepEqual(page.opened, ["r1"], "once");
+});
+
+test("back on screen before the cards came back: they open when they do", async () => {
+  let answer: (data: ReplayData) => void = () => undefined;
+  const slow = new Promise<ReplayData>((resolve) => (answer = resolve));
+  const page = tab(new FakeStorage(), () => slow, fakeVisibility("hidden"));
+  page.arrive(roundOf(1));
+
+  page.visibility.flip("visible");
+  assert.deepEqual(page.opened, []);
+  answer(cardsOf("r1"));
+  await settled();
+
+  assert.deepEqual(page.opened, ["r1"]);
+});
+
+test("back on screen after a tab on screen took the round: nothing opens, reopen offered", async () => {
+  const shared = new FakeStorage();
+  const behind = tab(shared, undefined, fakeVisibility("hidden"));
+  const onScreen = tab(shared);
+
+  behind.arrive(roundOf(1));
+  onScreen.arrive(roundOf(1));
+  await settled();
+  onScreen.land();
+  behind.visibility.flip("visible");
+
+  assert.deepEqual(onScreen.opened, ["r1"]);
+  assert.deepEqual(behind.opened, []);
+  assert.equal(behind.reopen.hidden, false);
+  assert.equal(behind.visibility.listening(), 0);
+});
+
+test("a flip that leaves the tab hidden is not a return", async () => {
+  const page = tab(new FakeStorage(), undefined, fakeVisibility("hidden"));
+  page.arrive(roundOf(1));
+  await settled();
+
+  page.visibility.flip("hidden");
+
+  assert.deepEqual(page.opened, []);
+  assert.equal(page.visibility.listening(), 1, "still waiting");
+});
+
+test("rounds arriving while hidden: only the latest counts on the return", async () => {
+  const page = tab(new FakeStorage(), undefined, fakeVisibility("hidden"));
+  page.arrive(roundOf(1));
+  page.arrive(roundOf(2));
+  await settled();
+
+  assert.equal(page.visibility.listening(), 1, "one wait, not one per round");
+  page.visibility.flip("visible");
+
+  assert.deepEqual(page.opened, ["r2"]);
+  assert.equal(readMemory(page.storage, KEY).replayed, 2);
+});
+
+test("a newer round with nothing to replay, while hidden, leaves nothing to open on the return", async () => {
+  const page = tab(new FakeStorage(), undefined, fakeVisibility("hidden"));
+  page.arrive(roundOf(1));
+  page.arrive(roundOf(2, false), false);
+  await settled();
+
+  assert.equal(page.visibility.listening(), 0);
+  page.visibility.flip("visible");
+
+  assert.deepEqual(page.opened, []);
+  assert.equal(readMemory(page.storage, KEY).replayed, undefined);
+});
+
+test("a review that ended while the tab was hidden opens no replay on the return", async () => {
+  const page = tab(new FakeStorage(), undefined, fakeVisibility("hidden"));
+  page.arrive(roundOf(1));
+  await settled();
+  page.end();
+
+  page.visibility.flip("visible");
+
+  assert.deepEqual(page.opened, []);
+  assert.equal(readMemory(page.storage, KEY).replayed, undefined);
 });

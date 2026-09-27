@@ -140,7 +140,13 @@ Another tab on the same review reads the round as taken, so it neither jumps
 nor opens — the replay is there to open by hand. Two tabs that learn of the
 round in the same instant can both read it free (`localStorage` reaches other
 tabs a moment late); both then jump and both open, as every tab did in v3.4.0.
-That race is accepted. If the cards cannot be
+That race is accepted. A tab in the background (`visibilityState` hidden)
+takes nothing as the round arrives — no claim, no jump, no replay — so it
+cannot take the showing from the tab on screen. When it comes back on screen
+and no tab has claimed the round meanwhile, it claims it and opens the replay
+at once, without a jump: the round was drawn while nobody watched, so there is
+no swap to cover. Only the latest round counts: a newer one arriving while
+hidden replaces the wait. If the cards cannot be
 fetched, the jump has played to no replay; the claim stands, so a reload
 neither jumps nor opens again, and the replay stays reachable by hand once it
 loads. A newer round arriving drops whatever an older round queued for the
