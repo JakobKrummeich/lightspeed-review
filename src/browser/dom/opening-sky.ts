@@ -7,10 +7,11 @@
  *
  * Every step is on a timer, never on a frame or an `animationend`: the names,
  * the button and the landing come on the same clock whether or not anything
- * was painted — under reduced motion, forced colours, or with no canvas.
+ * was painted — under reduced motion, forced colours, or with no canvas. A
+ * resize lays the sky out again once the window settles, until the jump.
  */
 import { renderSkyNames } from "../opening-view.ts";
-import { SKY_TIMES, layoutSky, type SkyChapter } from "../starfield.ts";
+import { SKY_TIMES, layoutSky, type SkyBox, type SkyChapter } from "../starfield.ts";
 import { paintSky } from "./starfield-canvas.ts";
 import type { Stillness } from "./stillness.ts";
 
@@ -25,22 +26,42 @@ export interface OpeningSky {
 
 /** The strip under the sky kept clear for the button, px. */
 const BUTTON_BAND = 128;
+/** A drag-resize is a burst of events: the sky is laid out again once it settles. */
+const RESIZE_SETTLE_MS = 150;
 
 /**
  * The room is fixed and full-bleed, so the window is its size. The stars keep
  * off the strip the sky sheet's button stands in.
  */
-function viewOf(): { width: number; height: number } {
-  return { width: window.innerWidth || 0, height: window.innerHeight || 0 };
+function viewOf(): { view: SkyBox; box: SkyBox } {
+  const view = { width: window.innerWidth || 0, height: window.innerHeight || 0 };
+  return {
+    view,
+    box: { width: view.width, height: Math.max(view.height / 2, view.height - BUTTON_BAND) },
+  };
+}
+
+/** Calls `changed` once a burst of resizes settles; what it returns stops listening. */
+function onSettledResize(changed: () => void): () => void {
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  const onResize = (): void => {
+    clearTimeout(settle);
+    settle = setTimeout(changed, RESIZE_SETTLE_MS);
+  };
+  window.addEventListener("resize", onResize);
+  return () => {
+    window.removeEventListener("resize", onResize);
+    clearTimeout(settle);
+  };
 }
 
 export function mountOpeningSky(
   field: HTMLElement,
   chapters: readonly SkyChapter[],
   still: Stillness,
+  paint: typeof paintSky = paintSky,
 ): OpeningSky {
-  const view = viewOf();
-  const box = { width: view.width, height: Math.max(view.height / 2, view.height - BUTTON_BAND) };
+  const { view, box } = viewOf();
   const sky = layoutSky(chapters, box);
   const canvas = field.querySelector<HTMLCanvasElement>(".lsr-sky-canvas");
   // Forced colours paint no decoration: the stylesheet hides the canvas, and
@@ -48,7 +69,7 @@ export function mountOpeningSky(
   const painter =
     canvas === null || still.forcedColors
       ? undefined
-      : paintSky(canvas, sky, view, still.reducedMotion);
+      : paint(canvas, sky, view, still.reducedMotion);
   const moving = !still.reducedMotion && !still.forcedColors;
   const names = field.querySelector<HTMLElement>(".lsr-sky-names");
   if (names) names.innerHTML = renderSkyNames(sky.labels);
@@ -56,6 +77,14 @@ export function mountOpeningSky(
   const later = (ms: number, run: () => void): void => {
     timers.push(setTimeout(run, ms));
   };
+  // The window changed under the room (a resize, a zoom, a move to a screen
+  // of another density): the layout, the canvas and the names all again.
+  const unwatch = onSettledResize(() => {
+    const next = viewOf();
+    const laid = layoutSky(chapters, next.box);
+    painter?.resize(laid, next.view);
+    if (names) names.innerHTML = renderSkyNames(laid.labels);
+  });
 
   return {
     arrive(reveal) {
@@ -70,6 +99,7 @@ export function mountOpeningSky(
       later(namesAt + SKY_TIMES.heldAfterNamesMs, reveal);
     },
     leave(land) {
+      unwatch();
       if (!moving) return land();
       if (names) names.dataset.on = "false";
       field.dataset.jump = "true";
@@ -81,6 +111,7 @@ export function mountOpeningSky(
     },
     stop() {
       painter?.stop();
+      unwatch();
       for (const timer of timers) clearTimeout(timer);
     },
   };

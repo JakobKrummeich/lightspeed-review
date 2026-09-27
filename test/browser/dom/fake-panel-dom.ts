@@ -204,6 +204,22 @@ export class FakeWindow {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
   }
 
+  removeEventListener(type: string, handler: () => void): void {
+    this.listeners.set(
+      type,
+      (this.listeners.get(type) ?? []).filter((known) => known !== handler),
+    );
+  }
+
+  /** Runs every `type` listener, as the browser would on that event. */
+  fire(type: string): void {
+    for (const handler of this.listeners.get(type) ?? []) handler();
+  }
+
+  listening(type: string): number {
+    return (this.listeners.get(type) ?? []).length;
+  }
+
   leave(): void {
     for (const handler of this.listeners.get("pagehide") ?? []) handler();
   }

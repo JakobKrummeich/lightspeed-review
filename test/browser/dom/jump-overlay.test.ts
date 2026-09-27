@@ -66,6 +66,7 @@ function fakePaint() {
       gather: () => calls.push("gather"),
       jump: () => calls.push("jump"),
       stop: () => calls.push("stop"),
+      resize: () => calls.push("resize"),
     };
     return painter;
   };

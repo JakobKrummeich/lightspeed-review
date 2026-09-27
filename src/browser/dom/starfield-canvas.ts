@@ -37,8 +37,13 @@ export interface SkyPainter {
   gather(): void;
   /** The stars jump from where they stand now; the loop ends with the jump. */
   jump(): void;
-  /** Ends the loop now: nothing is left asking for frames. */
+  /** Ends the loop now: nothing is left asking for frames or watching the scheme. */
   stop(): void;
+  /**
+   * The window changed: `sky` over `view` from now on, from where the clock
+   * stands — sized again for the device's pixels. Ignored once jumping.
+   */
+  resize(sky: Sky, view: SkyBox): void;
 }
 
 /** Deep stars around the files, so the jump fills the view however small the review. */
@@ -259,10 +264,63 @@ function sceneOf(canvas: HTMLCanvasElement, sky: Sky, view: SkyBox): Scene | und
   };
 }
 
+/** One animation frame at a time, while `step` asks for another and until `stop`. */
+function loop(step: (now: number) => boolean): { stop(): void } {
+  let frame = 0;
+  let stopped = false;
+  const tick = (now: number): void => {
+    frame = 0;
+    if (!stopped && step(now)) frame = requestAnimationFrame(tick);
+  };
+  frame = requestAnimationFrame(tick);
+  return {
+    stop() {
+      stopped = true;
+      if (frame !== 0) cancelAnimationFrame(frame);
+      frame = 0;
+    },
+  };
+}
+
+/**
+ * Calls `changed` when the page's scheme flips. The scheme toggle writes the
+ * effective scheme to `data-color-scheme` — for a pick by hand and for the
+ * machine's own change alike — so that one attribute is all there is to watch.
+ */
+function watchScheme(changed: () => void): () => void {
+  if (typeof MutationObserver !== "function") return () => undefined;
+  const observer = new MutationObserver(changed);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-color-scheme"],
+  });
+  return () => observer.disconnect();
+}
+
+/** The jump in flight: when it began, the last frame, and its field once built. */
+interface Flight {
+  at: number;
+  last: number;
+  field?: WarpField;
+  batches?: StreakBatches;
+}
+
+/** One frame of the jump, from where the stars last stood; false once it is over. */
+function flyFrame(scene: Scene, flight: Flight, now: number): boolean {
+  const { places, view } = scene;
+  flight.field ??= warpField(places, view, "jump", JUMP_EXTRA);
+  flight.batches ??= streakBatches(flight.field.z.length);
+  const step = warpSpeed(now - flight.at, view) * Math.min(3, (now - flight.last) / 16.7);
+  flight.last = now;
+  drawStreaks(scene, warpStreaks(flight.field, step, view, flight.batches));
+  return now - flight.at < SKY_TIMES.jumpMs;
+}
+
 /**
  * Starts painting `sky` over `view` (the whole canvas; the sky's own box may
  * be smaller). Undefined when there is no 2D context — the room goes on
- * without its stars. `still` draws each state once and runs no loop.
+ * without its stars. `still` draws each state once and runs no loop. The inks
+ * are read again whenever the scheme flips, and the scene rebuilt on `resize`.
  */
 export function paintSky(
   canvas: HTMLCanvasElement,
@@ -270,55 +328,51 @@ export function paintSky(
   view: SkyBox,
   still: boolean,
 ): SkyPainter | undefined {
-  const scene = sceneOf(canvas, sky, view);
-  if (!scene) return undefined;
+  const first = sceneOf(canvas, sky, view);
+  if (!first) return undefined;
+  let scene = first;
   const started = performance.now();
   let gatherAt: number | undefined;
-  let jumpAt: number | undefined;
-  let field: WarpField | undefined;
-  let batches: StreakBatches | undefined;
-  let last = started;
-  let frame = 0;
+  let flight: Flight | undefined;
   let stopped = false;
 
   const draw = (now: number): boolean => {
-    scene.context.clearRect(0, 0, view.width, view.height);
-    if (jumpAt === undefined) {
-      drawSky(scene, (now - started) / 1000, gatherAt === undefined ? -1 : now - gatherAt);
-      return true;
-    }
-    field ??= warpField(scene.places, view, "jump", JUMP_EXTRA);
-    batches ??= streakBatches(field.z.length);
-    const step = warpSpeed(now - jumpAt, view) * Math.min(3, (now - last) / 16.7);
-    drawStreaks(scene, warpStreaks(field, step, view, batches));
-    return now - jumpAt < SKY_TIMES.jumpMs;
+    scene.context.clearRect(0, 0, scene.view.width, scene.view.height);
+    if (flight) return flyFrame(scene, flight, now);
+    drawSky(scene, (now - started) / 1000, gatherAt === undefined ? -1 : now - gatherAt);
+    return true;
   };
-
-  const tick = (now: number): void => {
-    frame = 0;
+  /** A still sky shows its latest state: drifting, or formed once gathering began. */
+  const drawStill = (): void => {
+    draw(gatherAt === undefined ? started : gatherAt + SKY_TIMES.namesAtMs);
+  };
+  const rebuild = (nextSky: Sky, nextView: SkyBox): void => {
     if (stopped) return;
-    const more = draw(now);
-    last = now;
-    if (more) frame = requestAnimationFrame(tick);
+    scene = sceneOf(canvas, nextSky, nextView) ?? scene;
+    if (still) drawStill();
   };
-
+  const unwatch = watchScheme(() => rebuild(scene.sky, scene.view));
+  const frames = still ? undefined : loop(draw);
   const stop = (): void => {
     stopped = true;
-    if (frame !== 0) cancelAnimationFrame(frame);
-    frame = 0;
+    unwatch();
+    frames?.stop();
   };
 
-  if (still) draw(started);
-  else frame = requestAnimationFrame(tick);
+  if (still) drawStill();
   return {
     gather() {
       gatherAt = performance.now();
-      if (still) draw(gatherAt + SKY_TIMES.namesAtMs);
+      if (still) drawStill();
     },
     jump() {
       if (still) return stop();
-      jumpAt = performance.now();
+      const now = performance.now();
+      flight = { at: now, last: now };
     },
     stop,
+    resize(nextSky, nextView) {
+      if (!flight) rebuild(nextSky, nextView);
+    },
   };
 }
