@@ -7,8 +7,12 @@ import type { ReplayOpening } from "./replay-overlay.ts";
  */
 export interface ReplayRefresherHost {
   fetch(): Promise<ReplayData>;
-  wasReplayed(round: number): boolean;
-  markReplayed(round: number): void;
+  /**
+   * Whether this page claimed the round's one showing as it arrived (and
+   * jumped for it): asking spends the claim. Another tab's claim, or a round
+   * shown before, is not this page's to open.
+   */
+  claimed(round: number): boolean;
   open(opening: ReplayOpening): void;
   offer(opening: ReplayOpening | undefined): void;
 }
@@ -21,9 +25,9 @@ export interface ReplayRoundView {
 }
 
 /**
- * Auto-shows once per round. Each call supersedes the last: a slow pre-regroup
- * fetch can neither show the wrong round's cards nor burn the new round's
- * turn. Offer withdrawn on refresh start; failures swallowed whole — the
+ * Auto-shows once per round, in the page that claimed it. Each call supersedes
+ * the last: a slow pre-regroup fetch can neither show the wrong round's cards
+ * nor spend the new round's claim. Offer withdrawn on refresh start; failures swallowed whole — the
  * replay never blocks the diff.
  */
 export function createReplayRefresher(host: ReplayRefresherHost): (view: ReplayRoundView) => void {
@@ -38,9 +42,7 @@ export function createReplayRefresher(host: ReplayRefresherHost): (view: ReplayR
         if (data.comments.length === 0 || view.ended) return;
         const opening: ReplayOpening = { data, roundReply: view.roundReply };
         host.offer(opening);
-        if (host.wasReplayed(view.round)) return;
-        host.markReplayed(view.round);
-        host.open(opening);
+        if (host.claimed(view.round)) host.open(opening);
       })
       .catch(() => {
         // No overlay, no retry: an unreadable replay just opens on the diff.

@@ -1,5 +1,6 @@
 import { createDiff2HtmlRenderer } from "../diff2html-adapter.ts";
 import type { ReplayData } from "../../rounds/replay.ts";
+import { currentRound } from "../conversation-rounds.ts";
 import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
 import { arrivesByJump } from "../round-arrival.ts";
 import { agentRoundReply } from "../round-replay.ts";
@@ -70,7 +71,8 @@ export function wireReplay(
   const replayOverlay = deps.overlay(page);
   let replay: ReplayOpening | undefined;
   const arrival = deps.arrivals(page.openingRoot);
-  const replayed = (): number | undefined => readMemory(deps.storage, page.key).replayed;
+  /** The round this page claimed the showing of, until the showing spends it. */
+  let claim: number | undefined = undefined;
   page.replayReopen.addEventListener("click", () => {
     // Manual reopen ignores the once-per-round memory on purpose. Not mid-jump:
     // the landing opens the replay itself, and would reset one opened now.
@@ -80,8 +82,11 @@ export function wireReplay(
   // lives in the refresher.
   const replayRefresh = createReplayRefresher({
     fetch: () => deps.fetch(page.key),
-    wasReplayed: (shown) => replayed() === shown,
-    markReplayed: (shown) => updateMemory(deps.storage, page.key, { replayed: shown }),
+    claimed: (round) => {
+      if (claim !== round) return false;
+      claim = undefined;
+      return true;
+    },
     // Opened as the arrival's jump lands, or at once when there was none. A
     // manual reopen is not an arrival, so it opens straight away.
     open: (opening) => arrival.onLanding(() => replayOverlay.open(opening)),
@@ -94,7 +99,13 @@ export function wireReplay(
     arriving: (fresh) => {
       // An older round's replay, queued for a landing, is not this round's.
       arrival.forget();
-      if (arrivesByJump(fresh, replayed())) arrival.jump();
+      if (!arrivesByJump(fresh, readMemory(deps.storage, page.key).replayed)) return;
+      // Claimed now, not when the cards come back: another tab on this review
+      // reads it taken and neither jumps nor opens, and a fetch that fails
+      // leaves it spent, so a reload does not jump to nothing again.
+      claim = currentRound(fresh.rounds);
+      updateMemory(deps.storage, page.key, { replayed: claim });
+      arrival.jump();
     },
     refreshReplay: (fresh) =>
       replayRefresh({

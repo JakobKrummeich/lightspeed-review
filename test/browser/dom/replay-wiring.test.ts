@@ -4,6 +4,7 @@ import type { Arrivals } from "../../../src/browser/dom/jump-overlay.ts";
 import type { ReplayOpening } from "../../../src/browser/dom/replay-overlay.ts";
 import { wireReplay, type ReplayHosts } from "../../../src/browser/dom/replay-wiring.ts";
 import type { SessionData } from "../../../src/browser/dom/session-api.ts";
+import { readMemory } from "../../../src/browser/review-memory.ts";
 import type { ReplayComment, ReplayData } from "../../../src/rounds/replay.ts";
 import type { ConversationEntry, RoundMark } from "../../../src/session-store.ts";
 import { FakeStorage } from "../fake-storage.ts";
@@ -162,4 +163,72 @@ test("a reopen by hand mid-jump is ignored; after the landing it opens at once",
   page.reopen.dispatch("click", {});
 
   assert.deepEqual(page.opened, ["r1", "r1"]);
+});
+
+test("two tabs on one review: the one that claims the round jumps and opens, the other neither", async () => {
+  const shared = new FakeStorage();
+  const first = tab(shared);
+  const second = tab(shared);
+
+  first.arrive(roundOf(1));
+  second.arrive(roundOf(1));
+  assert.equal(readMemory(shared, KEY).replayed, 1, "claimed as it arrived, not when it answered");
+  await settled();
+  first.land();
+  second.land();
+
+  assert.deepEqual(first.calls, ["forget", "jump"]);
+  assert.deepEqual(first.opened, ["r1"]);
+  assert.deepEqual(second.calls, ["forget"], "no jump to nothing");
+  assert.deepEqual(second.opened, []);
+  assert.equal(second.reopen.hidden, false, "it is still there to open by hand");
+});
+
+test("the claim is the page's own: the claiming tab opens even when another answers first", async () => {
+  const shared = new FakeStorage();
+  let answer: (data: ReplayData) => void = () => undefined;
+  const slow = new Promise<ReplayData>((resolve) => (answer = resolve));
+  const first = tab(shared, () => slow);
+  const second = tab(shared);
+
+  first.arrive(roundOf(1));
+  second.arrive(roundOf(1));
+  await settled();
+  answer(cardsOf("r1"));
+  await settled();
+  first.land();
+
+  assert.deepEqual(first.opened, ["r1"]);
+  assert.deepEqual(second.opened, []);
+});
+
+test("a failed fetch: the jump played once, and a reload neither jumps nor opens again", async () => {
+  const shared = new FakeStorage();
+  const failing = tab(shared, () => Promise.reject(new Error("offline")));
+
+  failing.arrive(roundOf(1));
+  await settled();
+  failing.land();
+  assert.deepEqual(failing.opened, [], "nothing to open");
+  assert.equal(readMemory(shared, KEY).replayed, 1, "the round's turn is spent");
+
+  const reloaded = tab(shared);
+  reloaded.arrive(roundOf(1));
+  await settled();
+
+  assert.deepEqual(reloaded.calls, ["forget"]);
+  assert.deepEqual(reloaded.opened, []);
+  assert.equal(reloaded.reopen.hidden, false, "the replay can still be opened by hand");
+});
+
+test("a claim opens once: the same round asked for again opens nothing more", async () => {
+  const page = tab();
+  page.arrive(roundOf(1));
+  await settled();
+  page.land();
+
+  page.arrive(roundOf(1));
+  await settled();
+
+  assert.deepEqual(page.opened, ["r1"]);
 });

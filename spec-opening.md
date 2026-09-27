@@ -121,14 +121,25 @@ of the round, before any of it is drawn — about a second, no sheets, all deep
 stars. The room is opaque from its first frame, so the new round is drawn
 under it rather than in front of the reviewer, and the replay overlay opens as
 the jump lands (at once, if its cards come back after the landing). A page
-opened on such a round jumps the same way. It is `aria-hidden` and holds the page still while it plays: the page
-behind is `inert`, and keys are caught before anything on the page hears them —
-`Esc` lands at once, nothing typed reaches a text box, and a hand reopen of the
-replay mid-jump is ignored. The caret goes back where it was, without
-scrolling, before the replay opens — into the same box even when the round
-redrew it (a thread's reply box is found again by its tag, classes and
-`data-thread`; `caret-return.ts`). Reopening the replay by hand, or a round
-with no comments to replay, gets no jump.
+opened on such a round jumps the same way. It is `aria-hidden` and holds the
+page still while it plays: the page behind is `inert`, and keys are caught
+before anything on the page hears them — `Esc` lands at once, nothing typed
+reaches a text box, and a hand reopen of the replay mid-jump is ignored. The
+caret goes back where it was, without scrolling, before the replay opens —
+into the same box even when the round redrew it (a thread's reply box is
+found again by its tag, classes and `data-thread`; `caret-return.ts`).
+Reopening the replay by hand, or a round with no comments to replay, gets no
+jump.
+
+The round's one showing is claimed as the round arrives, not when its cards
+come back (`replay-wiring.ts`): the page that decides to jump writes the
+round as replayed at once, and only that page opens the replay as it lands.
+Another tab on the same review reads the round as taken, so it neither jumps
+nor opens — the replay is there to open by hand. If the cards cannot be
+fetched, the jump has played to no replay; the claim stands, so a reload
+neither jumps nor opens again, and the replay stays reachable by hand once it
+loads. A newer round arriving drops whatever an older round queued for the
+landing, jump or not, so an older replay never opens over it.
 
 If a later round arrives while a first round's opening is still up, the jump
 closes the opening properly first — its timers, frames and listeners stopped,
