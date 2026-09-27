@@ -197,8 +197,50 @@ export function installFakeElements(after: (undo: () => void) => void): FakeWind
   return page;
 }
 
+/** One `matchMedia` answer: its query, and whoever listens for it to change. */
+export class FakeMediaQuery {
+  readonly listeners: (() => void)[] = [];
+  readonly media: string;
+
+  constructor(media: string) {
+    this.media = media;
+  }
+
+  addEventListener(_type: "change", handler: () => void): void {
+    this.listeners.push(handler);
+  }
+
+  removeEventListener(_type: "change", handler: () => void): void {
+    const at = this.listeners.indexOf(handler);
+    if (at >= 0) this.listeners.splice(at, 1);
+  }
+}
+
 export class FakeWindow {
   private readonly listeners = new Map<string, (() => void)[]>();
+  devicePixelRatio = 1;
+  /** Every query asked, in order; a change is fired through `changeMedia`. */
+  readonly queries: FakeMediaQuery[] = [];
+
+  matchMedia(media: string): FakeMediaQuery {
+    const query = new FakeMediaQuery(media);
+    this.queries.push(query);
+    return query;
+  }
+
+  /** The browser's `change` on every live query for `media`. */
+  changeMedia(media: string): void {
+    for (const query of this.queries.filter((one) => one.media === media)) {
+      for (const handler of [...query.listeners]) handler();
+    }
+  }
+
+  /** How many `change` listeners are still on queries for `media`. */
+  mediaListeners(media: string): number {
+    return this.queries
+      .filter((one) => one.media === media)
+      .reduce((sum, one) => sum + one.listeners.length, 0);
+  }
 
   addEventListener(type: string, handler: () => void): void {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);

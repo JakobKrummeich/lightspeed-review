@@ -48,7 +48,11 @@ function viewOf(): { view: SkyBox; box: SkyBox } {
   };
 }
 
-/** Calls `changed` once a burst of resizes settles; what it returns stops listening. */
+/**
+ * Calls `changed` once a burst of resizes settles, or the pixel density moves
+ * (a zoom, or a drag to a screen of another density — which changes no size,
+ * so no resize comes); what it returns stops listening to both.
+ */
 function onSettledResize(changed: () => void): () => void {
   let settle: ReturnType<typeof setTimeout> | undefined;
   const onResize = (): void => {
@@ -56,10 +60,30 @@ function onSettledResize(changed: () => void): () => void {
     settle = setTimeout(changed, RESIZE_SETTLE_MS);
   };
   window.addEventListener("resize", onResize);
+  const unwatchDensity = onDensityChange(onResize);
   return () => {
     window.removeEventListener("resize", onResize);
+    unwatchDensity();
     clearTimeout(settle);
   };
+}
+
+/**
+ * A resolution query only says when the density leaves the one it names, so
+ * each change re-arms the watch at the new density.
+ */
+function onDensityChange(changed: () => void): () => void {
+  const now = (): MediaQueryList =>
+    window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+  let query = now();
+  const onChange = (): void => {
+    query.removeEventListener("change", onChange);
+    query = now();
+    query.addEventListener("change", onChange);
+    changed();
+  };
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
 }
 
 /**

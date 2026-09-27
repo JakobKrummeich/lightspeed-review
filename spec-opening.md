@@ -78,7 +78,10 @@ names and file paths, so the same round draws the same sky every time:
 
 When the window is resized the sky is laid out again for the new size (after
 the resize has settled for 150 ms), so the figures and names stay inside the
-room; a resize during the jump is ignored.
+room; so it is when the pixel density alone changes (the window dragged to a
+screen of another density: a `(resolution: …dppx)` query, re-armed at each new
+density), so the canvas is sized for the new pixels. Either during the jump is
+ignored.
 
 The light scheme draws it as a star atlas — ink cores in a thin accent wash on
 the paper; the dark one as a night sky — white cores in a wide glow.

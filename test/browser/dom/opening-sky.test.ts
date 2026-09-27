@@ -176,6 +176,37 @@ test("with no canvas context to measure in, names fall back to the estimate", (t
   assert.equal(session?.width, 13 * 9 + 12);
 });
 
+test("a new pixel density alone lays the sky out again, and the watch re-arms at it", (t) => {
+  // Dragging the window to a screen of another density changes no size: no resize comes.
+  const { field, window } = room(t);
+  const painter = fakePaint();
+  const sky = mountOpeningSky(asPanelRoot(field), CHAPTERS, MOVING, painter.paint);
+  assert.equal(
+    window.mediaListeners("(resolution: 1dppx)"),
+    1,
+    "watching the density it opened on",
+  );
+
+  window.devicePixelRatio = 2;
+  window.changeMedia("(resolution: 1dppx)");
+  t.mock.timers.tick(150);
+  assert.deepEqual(painter.calls, ["paint still=false", "resize"], "the canvas is sized again");
+  assert.equal(window.mediaListeners("(resolution: 1dppx)"), 0, "the old density let go");
+  assert.equal(window.mediaListeners("(resolution: 2dppx)"), 1, "re-armed at the new one");
+
+  window.devicePixelRatio = 1;
+  window.changeMedia("(resolution: 2dppx)");
+  t.mock.timers.tick(150);
+  assert.equal(painter.calls.filter((call) => call === "resize").length, 2, "and again back");
+
+  sky.stop();
+  assert.equal(
+    window.queries.reduce((sum, one) => sum + one.listeners.length, 0),
+    0,
+    "stop leaves no density watch behind",
+  );
+});
+
 test("from the jump on, and after the room closes, a resize changes nothing", (t) => {
   const { field, window } = room(t);
   const painter = fakePaint();
