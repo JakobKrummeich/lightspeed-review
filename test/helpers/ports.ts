@@ -1,6 +1,12 @@
 import { createServer, type Socket } from "node:net";
 
 /**
+ * A port nothing listens on and no test can take: it is privileged, so a
+ * command pointed here finds no server — never the machine's real one.
+ */
+export const NO_SERVER_PORT = 1;
+
+/**
  * "Is a server running?" tests need a real port, not the port-0 trick: the
  * question predates the server.
  */
