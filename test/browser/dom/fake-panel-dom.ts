@@ -17,11 +17,14 @@ export class FakeNode {
   private locked: boolean | undefined;
   private shown: boolean | undefined;
   private hint: string | undefined;
+  private classes: string | undefined;
   private data: Record<string, string | undefined> | undefined;
   private html = "";
   private children: FakeNode[] = [];
   /** Set on adoption: a card's head folds on a press anywhere inside it, found by walking up. */
   private parent: FakeNode | undefined;
+  /** Thrown away by its parent's `innerHTML` write. */
+  private dropped = false;
   private readonly listeners = new Map<string, ((event: unknown) => void)[]>();
 
   constructor(tag = "div", attributes = "") {
@@ -34,17 +37,36 @@ export class FakeNode {
   }
 
   set innerHTML(html: string) {
+    for (const child of this.children) child.dropped = true;
     this.html = html;
     this.children = parseNodes(html);
   }
 
   get classList(): { contains(name: string): boolean } {
-    const classes = this.attribute("class").split(" ");
+    const classes = this.className.split(" ");
     return { contains: (name: string) => classes.includes(name) };
   }
 
   get id(): string {
     return this.attribute("id");
+  }
+
+  get tagName(): string {
+    return this.tag.toUpperCase();
+  }
+
+  /** Markup's `class` or set since: a popup is built by hand and names its class in code. */
+  get className(): string {
+    return this.classes ?? this.attribute("class");
+  }
+
+  set className(names: string) {
+    this.classes = names;
+  }
+
+  /** A node standing alone counts as on the page; one whose markup was replaced does not. */
+  get isConnected(): boolean {
+    return !this.dropped && (this.parent?.isConnected ?? true);
   }
 
   /**
@@ -134,8 +156,7 @@ export class FakeNode {
     const presence = /^\[([\w-]+)\]$/.exec(selector);
     if (presence) return new RegExp(`(^|\\s)${presence[1]}="`).test(this.attributes);
     if (selector.startsWith("#")) return this.attribute("id") === selector.slice(1);
-    if (selector.startsWith("."))
-      return this.attribute("class").split(" ").includes(selector.slice(1));
+    if (selector.startsWith(".")) return this.className.split(" ").includes(selector.slice(1));
     return this.tag === selector;
   }
 

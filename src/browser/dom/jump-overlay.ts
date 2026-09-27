@@ -14,6 +14,7 @@
  * page behind it is inert and no key reaches it — a popup's Esc included.
  */
 import { SKY_TIMES, layoutSky } from "../starfield.ts";
+import { caretReturn } from "./caret-return.ts";
 import { holdPageBehind } from "./page-hold.ts";
 import { claimRoom, evictRoom, leaveRoom } from "./room-claim.ts";
 import { paintSky, type SkyPainter } from "./starfield-canvas.ts";
@@ -48,7 +49,8 @@ export function playJump(host: JumpHost): void {
   // page and the caret back, and only then is either taken.
   evictRoom(host.root);
   if (host.still.reducedMotion || host.still.forcedColors) return host.land();
-  const before = document.activeElement;
+  // The round is drawn under the room: the caret's box may be redrawn by the landing.
+  const caretBack = caretReturn(document.activeElement);
   host.root.innerHTML = ROOM;
   const release = holdPageBehind(host.root);
   let painter: SkyPainter | undefined;
@@ -65,7 +67,7 @@ export function playJump(host: JumpHost): void {
     leaveRoom(host.root, land);
     host.root.innerHTML = "";
     release();
-    if (before instanceof HTMLElement) before.focus({ preventScroll: true });
+    caretBack({ preventScroll: true });
     host.land();
   };
   // Captured and kept: the page is out of reach, so no key of its own may act either.

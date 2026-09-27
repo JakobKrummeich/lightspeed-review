@@ -3,7 +3,6 @@ import type { FakeElement } from "./fake-dom.ts";
 
 /** A `fake-panel-dom` node plus the fields a floating element needs. */
 export class FakePopup extends FakeNode {
-  className = "";
   readonly style: Record<string, string> = {};
   size = { width: 352, height: 300 };
 

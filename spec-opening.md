@@ -125,7 +125,9 @@ opened on such a round jumps the same way. It is `aria-hidden` and holds the pag
 behind is `inert`, and keys are caught before anything on the page hears them —
 `Esc` lands at once, nothing typed reaches a text box, and a hand reopen of the
 replay mid-jump is ignored. The caret goes back where it was, without
-scrolling, before the replay opens. Reopening the replay by hand, or a round
+scrolling, before the replay opens — into the same box even when the round
+redrew it (a thread's reply box is found again by its tag, classes and
+`data-thread`; `caret-return.ts`). Reopening the replay by hand, or a round
 with no comments to replay, gets no jump.
 
 If a later round arrives while a first round's opening is still up, the jump

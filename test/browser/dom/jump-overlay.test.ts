@@ -50,6 +50,14 @@ class FakeDocument {
     return event;
   }
 
+  /** The whole page, the way the browser searches it: every body child and all beneath. */
+  querySelectorAll(selector: string): FakeNode[] {
+    return this.body.children.flatMap((child) => [
+      ...(child.matches(selector) ? [child] : []),
+      ...child.querySelectorAll(selector),
+    ]);
+  }
+
   keydownCount(): number {
     return this.listeners.filter((known) => known.type === "keydown").length;
   }
@@ -207,6 +215,51 @@ test("the page is inert while the jump plays and handed back, caret and all, on 
 
   assert.deepEqual(whenLanded, { inert: false, caret: true }, "handed back before the replay");
   assert.deepEqual(writing.focusCalls, [{ preventScroll: true }]);
+});
+
+/** The page with two thread reply boxes, the second holding the caret, as a round starts to arrive. */
+function replyingThenJump(t: TestContext, boxes: string) {
+  const { page: doc, root, behind } = page(t);
+  behind.innerHTML = boxes;
+  const writing = behind.querySelectorAll("textarea")[1];
+  assert.ok(writing);
+  doc.activeElement = writing;
+  let lands = 0;
+  playJump({
+    root: asPanelRoot(root),
+    still: MOVING,
+    land: () => (lands += 1),
+    paint: fakePaint().paint,
+  });
+  // The round is drawn under the room: the panel replaces every reply box.
+  behind.innerHTML = boxes;
+  const [other, again] = behind.querySelectorAll("textarea");
+  return { doc, writing, other, again, lands: () => lands };
+}
+
+test("a reply box the round redrew mid-jump gets the caret back: its twin, found by name", (t) => {
+  const box = (thread: string) =>
+    `<textarea class="lsr-thread-reply-box" data-thread="${thread}"></textarea>`;
+  const state = replyingThenJump(t, box("t0") + box("t1"));
+  assert.equal(state.writing.isConnected, false, "the box the caret was in is gone");
+
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.equal(state.lands(), 1);
+  assert.equal(state.doc.activeElement, state.again, "the same thread's new box");
+  assert.deepEqual(state.again?.focusCalls, [{ preventScroll: true }]);
+  assert.equal(state.other?.focusCalls.length, 0, "not the other thread's");
+});
+
+test("a gone element with nothing that names it is not guessed at", (t) => {
+  const state = replyingThenJump(t, "<textarea></textarea><textarea></textarea>");
+
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.equal(state.lands(), 1);
+  assert.equal(state.other?.focusCalls.length, 0);
+  assert.equal(state.again?.focusCalls.length, 0);
+  assert.equal(state.writing.focusCalls.length, 0, "nor focused where nobody sees it");
 });
 
 test("no canvas to paint: the tunnel and the flash still carry the jump", (t) => {

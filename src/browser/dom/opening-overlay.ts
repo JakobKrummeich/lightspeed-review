@@ -1,5 +1,6 @@
 import { renderOpening } from "../opening-view.ts";
 import type { SkyChapter } from "../starfield.ts";
+import { caretReturn } from "./caret-return.ts";
 import { mountOpeningSky, type OpeningSky } from "./opening-sky.ts";
 import { holdPageBehind } from "./page-hold.ts";
 import { claimRoom, evictRoom, leaveRoom } from "./room-claim.ts";
@@ -53,7 +54,7 @@ export function mountOpening(host: OpeningHost): void {
   // closes the first by its own way out (`room-claim.ts`), which hands the
   // page and the caret back before this room takes them.
   evictRoom(host.root);
-  const before = document.activeElement;
+  const caretBack = caretReturn(document.activeElement);
   host.root.innerHTML = stack;
   const release = holdPageBehind(host.root);
   let sky: OpeningSky | undefined = undefined;
@@ -77,7 +78,7 @@ export function mountOpening(host: OpeningHost): void {
     host.root.innerHTML = "";
     document.removeEventListener("keydown", onKey);
     release();
-    if (before instanceof HTMLElement) before.focus();
+    caretBack();
     host.onClose();
   };
 
