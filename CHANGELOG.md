@@ -17,10 +17,13 @@ round arrives by a jump into hyperspace.
   wraps to a second line and ends in an ellipsis past two; names are measured
   in their own font, so CJK and wide ones keep apart too; a name that would
   overlap gives its place to the next chapter's). Its **Open the review**
-  button waits 1.5 s after the names; `Esc` still skips.
+  button stands in the middle of the constellations, in a box the layout
+  keeps clear of stars, figure lines and names, and waits 1.5 s after the
+  names; `Esc` still skips.
   A screen reader hears the chapter names in the sheet's label. The last
   reason's button now reads **Enlighten me**.
-- The last press jumps into the review: the stars streak outward, the edges
+- The last press jumps into the review from the middle of the sky, where the
+  button stood: the stars streak outward, the edges
   close in and a flash covers the swap, a second in all. This replaces the
   flood of light.
 - Rounds 2 and later arrive the same way: when the replay will open on its

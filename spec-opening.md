@@ -33,8 +33,10 @@ there is nothing to look at instead of the reason being read.
   constellation per chapter, and the chapter names come up under their
   figures; a long name wraps onto a second line (at most 240 px wide), and
   one longer than two lines ends in an ellipsis. Its button, **Open the
-  review**, is held back until the names have been up for 1.5 s — the sheet
-  takes the caret meanwhile, so `Esc` still works. A screen reader hears every
+  review**, stands in the middle of the constellations, in a box the layout
+  keeps clear of stars, figure lines and names. It is held back until the
+  names have been up for 1.5 s — the sheet takes the caret meanwhile, so
+  `Esc` still works. A screen reader hears every
   chapter name in the sheet's `aria-label` ("3 chapters: …"); the names on
   screen are eye-only.
 
@@ -65,12 +67,17 @@ names and file paths, so the same round draws the same sky every time:
 - one star per file, at most 600; a star's brightness grows with the log of
   the lines it changed, from a floor of 0.15, so a file that changed no lines
   (a rename, a binary) is still a faint star rather than nothing;
+- a box in the middle of the sky (320 × 140 px, `src/browser/sky-keep-out.ts`)
+  is kept clear for the button: no star, figure line or name falls inside it;
 - each chapter's stars cluster round a point on an arc (a closer arc for three
-  chapters or fewer, a ring past six); the figure is the minimum spanning tree
-  over the chapter's seven brightest stars, and the rest of its files stay
-  loose around it;
-- a name is placed under its figure and kept clear of the others and of the
-  strip the button stands in; the box it is checked in is the whole name, two
+  chapters or fewer, a ring past six), pushed clear of the middle box, and a
+  star that would land in the box is reflected out of it; the figure is the
+  minimum spanning tree over the chapter's seven brightest stars, with no
+  line crossing the box (`src/browser/sky-figure.ts`; the tree splits into a
+  forest when it must), and the rest of its files stay loose around it;
+- a name is placed under its figure's lowest star — or under and aside,
+  over, or over and aside when that spot is taken — and kept clear of the others
+  and of the middle box; the box it is checked in is the whole name, two
   lines of it when it wraps. The page measures each name with the canvas's
   `measureText` in the font the names are set in (`opening-sky.ts`) and hands
   the widths to `layoutSky`, which stays pure; only with no canvas context
@@ -107,8 +114,9 @@ The ceremony costs presses, so every press pays something back:
   beat behind the sheet carrying them.
 - **The button.** It breathes on its own, lifts to meet the pointer, and
   squashes under the press.
-- **The jump.** The last press sends the reviewer into hyperspace: the names
-  go, every star streaks outward from where it stands with deep stars around
+- **The jump.** The last press sends the reviewer into hyperspace from the
+  middle of the sky, where the button stood: the names go, every star
+  streaks outward from where it stands with deep stars around
   them so even a one-file review fills the screen, the edges close in, and at
   800 ms a flash covers the swap. The review is underneath when it fades, a
   second after the press.

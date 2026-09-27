@@ -463,23 +463,26 @@ constellation sheet (last; no text; section aria-label "3 chapters: …"):
 │         \  *──*                  *──*  \      stars gather │
 │          *                            *     (1.7 s), MST   │
 │       CLI verbs                   Browser chat   figure    │
-│        5 files          *──*        5 files    fades in    │
-│                        /    *                  .lsr-sky-names
-│                       *                        (2.4 s)     │
+│        5 files                      5 files    fades in    │
+│                ┌ keep-out 320×140 ┐                        │
+│                │ ( Open the review )│         held 1.5 s   │
+│                └────────────────────┘         after names  │
+│                         *──*                   .lsr-sky-names
+│                        /    *                  (2.4 s)     │
+│                       *                                    │
 │                  Session state                             │
 │                     4 files                                │
-│                                                            │
-│                 ( Open the review )            held 1.5 s  │
-│                                                after names │
 └────────────────────────────────────────────────────────────┘
 ```
 
 - Sheets cross mid-room: leaving lifts up+fades, arriving rises from below
   (`data-at="top|under|gone"`). Press flash `data-flare`. The sky sheet only
   exists when the round has chapters; its button carries `data-held` and the
-  sheet (`tabindex="-1"`) holds the caret until it is shown.
-- Final press: `data-jump` — names go, stars streak outward from where they
-  stand, `.lsr-sky-tunnel` closes the edges, `data-bloom` flashes at 800 ms,
+  sheet (`tabindex="-1"`) holds the caret until it is shown. The button
+  stands in the middle of the sky, in a keep-out box `layoutSky` leaves free
+  of stars, figure lines and names (`sky-keep-out.ts`).
+- Final press: `data-jump` — launched from the middle, where the button
+  stood: names go, stars streak outward from where they stand, `.lsr-sky-tunnel` closes the edges, `data-bloom` flashes at 800 ms,
   the room closes at 1 s. Esc skips at any point.
 - Reduced motion: still sky, figures formed, names at once, no jump. Forced
   colours: canvas hidden, names only.
