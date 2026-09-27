@@ -167,7 +167,10 @@ test("a presence check the server never answers reads as nobody listening, answe
  */
 test("bare invocation in a repo with no config reports the config, not an empty review list", async () => {
   const repoRoot = newRepo("lsr-cli-noconf-");
-  // No config names a state directory, so the view reads the default one.
+  // No config names a state directory, so the view reads the default one. No
+  // config names a port either, and none can without defeating the test: home
+  // asks no server once the config is missing (home-input.ts), so the machine's
+  // real one on the default port is never reached.
   const home = mkdtempSync(join(tmpdir(), "lsr-cli-home-dir-"));
   storeSession(join(home, ".lightspeed"), "/somewhere/else", "feat/tokens");
 
@@ -550,6 +553,7 @@ test("feedback reads a ledger outside any repository, with no model configured",
   assert.match(stdout, new RegExp(`path: ${nowhere}/state/feedback$`, "m"));
 });
 
+/** No config, so no port: `feedback` reads files and never asks a server. */
 test("feedback with no config file reads the default ledger", async () => {
   const { stdout, code } = await runCli(["feedback"], mkdtempSync(join(tmpdir(), "lsr-cli-bare-")));
 
