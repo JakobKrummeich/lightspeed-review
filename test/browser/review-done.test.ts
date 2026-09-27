@@ -14,6 +14,8 @@ test("the finish is a dialog with the news and the two ways out", () => {
   );
   // The mark is decoration: the sentence carries the meaning for whoever cannot see it.
   assert.match(html, /<span class="lsr-done-mark" aria-hidden="true">✓<\/span>/);
+  // The title is the news; a line over it saying the same thing another way was one too many.
+  assert.doesNotMatch(html, /Nothing left to read/i);
 });
 
 test("ending is the sidebar's Send & End, so the card says what goes with it", () => {

@@ -11,7 +11,6 @@ export function renderReviewDone(queued: number, sendsQueue = true): string {
   <div class="lsr-done-card" role="dialog" aria-modal="true" aria-label="Every file is approved">
     <span class="lsr-done-nova" aria-hidden="true"><i class="lsr-done-point"></i><i class="lsr-done-ring"></i><i class="lsr-done-ring"></i><i class="lsr-done-flare"></i></span>
     <span class="lsr-done-mark" aria-hidden="true">✓</span>
-    <p class="lsr-done-eyebrow">Nothing left to read</p>
     <h2 class="lsr-done-title">Every file is approved</h2>
     <p class="lsr-done-note">End the review to hand it back to the agent, or keep looking — nothing is sent until you say so.${queuedLine(sendsQueue ? queued : 0)}</p>
     <div class="lsr-done-actions">

@@ -498,7 +498,6 @@ ended overlay, whose word is last.
 ┌ .lsr-done-overlay (scrim, z19) ────────────────────┐
 │          ┌ .lsr-done-card ──────────────────┐      │
 │          │ (✓)                              │      │ .lsr-done-mark (accent badge)
-│          │ NOTHING LEFT TO READ             │      │ .lsr-done-eyebrow
 │          │ Every file is approved           │      │ .lsr-done-title
 │          │ End the review to hand it back   │      │ .lsr-done-note
 │          │ to the agent, or keep looking —  │      │  (+ "Your 2 queued notes
