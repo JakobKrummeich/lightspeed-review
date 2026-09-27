@@ -1,5 +1,55 @@
 # Changelog
 
+## 3.5.0
+
+The opening shows the review's shape before it hands it over, and every new
+round arrives by a jump into hyperspace.
+
+- The round's files drift as faint stars behind the reasons, one star per
+  file (at most 600), brighter the more lines it changed. The sky is seeded
+  from the chapter names and file paths, so the same round draws the same
+  sky every time. A resize lays it out again for the new size, and it
+  follows the machine's scheme when that changes mid-opening, repainting in
+  the new inks.
+- A new last sheet, with no words on it: the stars gather into one
+  constellation per chapter and the chapter names come up under their
+  figures, with each chapter's file count (at most eight names; a long name
+  wraps to a second line and ends in an ellipsis past two; names are measured
+  in their own font, so CJK and wide ones keep apart too; a name that would
+  overlap gives its place to the next chapter's). Its **Open the review**
+  button stands in the middle of the constellations, in a box the layout
+  keeps clear of stars, figure lines and names, and waits 1.5 s after the
+  names; `Esc` still skips.
+  A screen reader hears the chapter names in the sheet's label. The last
+  reason's button now reads **Enlighten me**.
+- The last press jumps into the review from the middle of the sky, where the
+  button stood: the stars streak outward, the edges
+  close in and a flash covers the swap, a second in all. This replaces the
+  flood of light.
+- Rounds 2 and later arrive the same way: when the replay will open on its
+  own for a new round, the same one-second jump starts before the round is
+  drawn, the new diff swaps in under it, and the replay opens as it lands.
+  `Esc` lands at once;
+  nothing else on the page hears a key while it plays. A round that arrives
+  while the first round's opening is still up closes the opening first.
+- A round's replay is claimed for one tab the moment the round arrives, not
+  when its cards come back: the tab on screen that jumps is the one that
+  opens it, and other tabs on the review neither jump nor open (two tabs that
+  hear of the round in the same instant may both show it, as before). A tab
+  in the background leaves the round to the tab on screen, and claims it when
+  it comes back only if nobody did. A replay whose cards could not be fetched
+  does not open on its own after a reload either, but its reopen control
+  stays and fetches them again.
+- While the opening is up the page behind it is inert, so `Tab` stays on the
+  top sheet, and the room never scrolls: a long reason on a short screen
+  keeps the sky and the flash centred.
+- Light scheme draws the sky as a star atlas — ink cores in a thin wash on
+  the paper; dark as a night sky — white cores in a wide glow.
+- Under `prefers-reduced-motion` the sky is still, the constellations are
+  already formed and the last press lands at once, with no jump. Under forced
+  colours the sky is not drawn: the chapter names stand alone.
+- The motes are gone: the drifting stars take their place.
+
 ## 3.4.0
 
 The review lights up at the moments a turn changes hands: sending, the

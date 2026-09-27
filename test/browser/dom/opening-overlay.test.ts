@@ -1,11 +1,17 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { playJump } from "../../../src/browser/dom/jump-overlay.ts";
 import { mountOpening } from "../../../src/browser/dom/opening-overlay.ts";
+import type { paintSky } from "../../../src/browser/dom/starfield-canvas.ts";
+import type { Stillness } from "../../../src/browser/dom/stillness.ts";
+import { SKY_TIMES, type SkyChapter } from "../../../src/browser/starfield.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
 /** Listeners removed by identity, so a leak shows as a second close. */
 class FakeDocument {
   activeElement: FakeNode | null = null;
+  /** The page behind the room, and the room's root among it. */
+  body: { children: FakeNode[] } = { children: [] };
   private listeners = new Map<string, ((event: unknown) => void)[]>();
 
   addEventListener(type: string, handler: (event: unknown) => void): void {
@@ -31,12 +37,28 @@ class FakeDocument {
 interface Mounted {
   root: FakeNode;
   page: FakeDocument;
+  /** The review behind the room. */
+  behind: FakeNode;
+  /** A sibling something else already made inert. */
+  away: FakeNode & { inert?: boolean };
   opens: number;
   closes: number;
 }
 
-function mounted(t: TestContext, intents: string[], held?: FakeNode): Mounted {
-  installFakeElements((undo) => t.after(undo));
+const MOVING: Stillness = { reducedMotion: false, forcedColors: false };
+
+interface Room {
+  held?: FakeNode;
+  chapters?: SkyChapter[];
+  still?: Stillness;
+  paint?: typeof paintSky;
+}
+
+function mounted(t: TestContext, intents: string[], room: Room = {}): Mounted {
+  const { held, chapters = [], still = MOVING, paint } = room;
+  const window = installFakeElements((undo) => t.after(undo)) as unknown as Record<string, number>;
+  window.innerWidth = 1440;
+  window.innerHeight = 900;
   const page = new FakeDocument();
   const globals = globalThis as Record<string, unknown>;
   const before = globals.document;
@@ -47,12 +69,19 @@ function mounted(t: TestContext, intents: string[], held?: FakeNode): Mounted {
   // Whatever held the caret at load — where the close must put it back.
   page.activeElement = held ?? null;
   const root = new FakeNode("div", 'id="lsr-opening"');
-  const state: Mounted = { root, page, opens: 0, closes: 0 };
+  const behind = new FakeNode("main", 'id="lsr-review"');
+  const away: FakeNode & { inert?: boolean } = new FakeNode("div", 'id="lsr-done-popup"');
+  away.inert = true;
+  page.body.children = [behind, root, away];
+  const state: Mounted = { root, page, behind, away, opens: 0, closes: 0 };
   mountOpening({
     root: asPanelRoot(root),
     intents,
+    chapters,
+    stillness: () => still,
     onOpen: () => (state.opens += 1),
     onClose: () => (state.closes += 1),
+    paint,
   });
   return state;
 }
@@ -118,7 +147,7 @@ test("every press strikes the room, and the strike is over before the next one",
   assert.equal(field.dataset.flare, "true");
 });
 
-test("the last press floods the room, and the review is under the light when it fades", (t) => {
+test("the last press jumps, the flash covers the swap, and the room goes as it lands", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const state = mounted(t, ["one"]);
   const field = room(state.root);
@@ -126,16 +155,33 @@ test("the last press floods the room, and the review is under the light when it 
   press(state.root, 0);
   press(state.root, 1);
 
+  assert.equal(field.dataset.jump, "true", "the jump replaces the bloom's flood");
+  assert.equal(field.dataset.bloom, "false", "the flash comes at the end of the jump");
+  t.mock.timers.tick(SKY_TIMES.flashAtMs);
   assert.equal(field.dataset.bloom, "true");
-  assert.notEqual(state.root.innerHTML, "", "the room is still up while it floods");
+  assert.notEqual(state.root.innerHTML, "", "the room is still up under the flash");
   assert.equal(state.closes, 0);
 
-  t.mock.timers.tick(260);
+  t.mock.timers.tick(SKY_TIMES.jumpMs - SKY_TIMES.flashAtMs);
 
   assert.equal(state.root.innerHTML, "");
   assert.equal(state.closes, 1);
 });
 
+test("a reviewer who asked for less motion, or forced colours, lands at once: no jump", (t) => {
+  for (const still of [
+    { reducedMotion: true, forcedColors: false },
+    { reducedMotion: false, forcedColors: true },
+  ]) {
+    const state = mounted(t, ["one"], { still });
+
+    press(state.root, 0);
+    press(state.root, 1);
+
+    assert.equal(state.root.innerHTML, "", JSON.stringify(still));
+    assert.equal(state.closes, 1);
+  }
+});
 test("nothing answers a press once the room is on its way out", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const state = mounted(t, ["one"]);
@@ -150,11 +196,11 @@ test("nothing answers a press once the room is on its way out", (t) => {
 
   assert.equal(field.dataset.flare, "false");
 
-  t.mock.timers.tick(260);
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
   assert.equal(state.closes, 1, "one way out, however many times it was pressed");
 });
 
-test("Esc leaves at once and without the flood: it is a way out, not a reward", (t) => {
+test("Esc leaves at once and without the flash: it is a way out, not a reward", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const state = mounted(t, ["one", "two"]);
   const field = room(state.root);
@@ -185,7 +231,7 @@ test("the last sheet opens the review: nothing left on screen, and one close", (
   assert.notEqual(state.root.innerHTML, "", "a reason still standing is a reason still shown");
 
   press(state.root, 2);
-  t.mock.timers.tick(260);
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
 
   assert.equal(state.root.innerHTML, "");
   assert.equal(state.closes, 1);
@@ -220,7 +266,7 @@ test("the wrapper is opened once, however the reviewer leaves it", (t) => {
 
 test("focus goes back where it was, so a keyboard reviewer lands on the page", (t) => {
   const held = new FakeNode("button", 'id="lsr-panel-rail"');
-  const state = mounted(t, ["one"], held);
+  const state = mounted(t, ["one"], { held });
 
   state.page.press("Escape");
 
@@ -233,4 +279,230 @@ test("nothing to open is nothing shown: no stack, no listener, nothing reported"
   assert.equal(state.root.innerHTML, "");
   assert.equal(state.page.keydownCount(), 0);
   assert.deepEqual([state.opens, state.closes], [0, 0]);
+});
+
+const CHAPTERS: SkyChapter[] = [
+  { name: "Session state", files: [{ path: "src/state.ts", lines: 40 }] },
+  { name: "Docs", files: [{ path: "README.md", lines: 2 }] },
+];
+
+function skySheet(root: FakeNode): FakeNode {
+  const sheet = root.querySelectorAll(".lsr-opening-sheet").at(-1);
+  assert.ok(sheet?.dataset.sky === "true", "the last sheet is the sky");
+  return sheet;
+}
+
+function names(root: FakeNode): FakeNode {
+  const layer = root.querySelector(".lsr-sky-names");
+  assert.ok(layer, "the room has a layer for the names");
+  return layer;
+}
+
+test("the constellation sheet comes after every reason, and the files gather as it opens", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { root } = mounted(t, ["one", "two"], { chapters: CHAPTERS });
+  const field = room(root);
+
+  press(root, 0);
+  press(root, 1);
+  assert.equal(field.dataset.sky, "false", "no gathering while a reason is read");
+
+  press(root, 2);
+
+  assert.deepEqual(places(root), ["gone", "gone", "gone", "top"]);
+  assert.equal(field.dataset.sky, "true");
+});
+
+test("the names come once the figures have formed, and the button 1.5 s after them", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { root } = mounted(t, ["one"], { chapters: CHAPTERS });
+  press(root, 0);
+  press(root, 1);
+  const sky = skySheet(root);
+  const button = sky.querySelector(".lsr-opening-press");
+
+  assert.equal(names(root).dataset.on, "false");
+  assert.equal(button?.dataset.held, "true");
+  assert.equal(sky.focused, true, "the sheet holds the caret while its button cannot");
+
+  t.mock.timers.tick(SKY_TIMES.namesAtMs);
+  assert.equal(names(root).dataset.on, "true");
+  assert.equal(button?.dataset.held, "true", "the chapters are looked at first");
+
+  t.mock.timers.tick(SKY_TIMES.heldAfterNamesMs - 1);
+  assert.equal(button?.dataset.held, "true");
+  t.mock.timers.tick(1);
+  assert.equal(button?.dataset.held, "false");
+  assert.equal(button?.focused, true);
+});
+
+test("every caret move may scroll its own sheet, so a button under a tall reason is seen", (t) => {
+  // The room clips (`overflow: clip`), so it cannot scroll whatever focus does; the sheet does
+  // scroll (`overflow-y: auto`), and a `preventScroll` focus left its button below the fold
+  // on a short screen (WCAG 2.4.11). Every sheet, the held sky sheet and the revealed button.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { root } = mounted(t, ["one", "two"], { chapters: CHAPTERS });
+  press(root, 0);
+  press(root, 1);
+  press(root, 2);
+  t.mock.timers.tick(SKY_TIMES.namesAtMs + SKY_TIMES.heldAfterNamesMs);
+
+  const moved = [...root.querySelectorAll(".lsr-opening-sheet"), ...presses(root)].flatMap(
+    (node) => node.focusCalls,
+  );
+  assert.ok(moved.length >= 5, "every sheet and the revealed button took the caret");
+  for (const options of moved) assert.notEqual(options?.preventScroll, true);
+});
+
+test("the names are laid in from the layout, one per chapter it could name", (t) => {
+  const { root } = mounted(t, ["one"], { chapters: CHAPTERS });
+
+  assert.equal(names(root).querySelectorAll(".lsr-sky-name").length, 2);
+});
+
+test("still, the sky is formed and named at once; the button still waits its 1.5 s", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const still = { reducedMotion: true, forcedColors: false };
+  const { root } = mounted(t, ["one"], { chapters: CHAPTERS, still });
+  press(root, 0);
+  press(root, 1);
+  const button = skySheet(root).querySelector(".lsr-opening-press");
+
+  t.mock.timers.tick(0);
+  assert.equal(names(root).dataset.on, "true");
+  t.mock.timers.tick(SKY_TIMES.heldAfterNamesMs);
+  assert.equal(button?.dataset.held, "false");
+});
+
+test("a button on a sheet already gone answers nothing, even holding the caret", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const state = mounted(t, ["one"], { chapters: CHAPTERS });
+  press(state.root, 0);
+  press(state.root, 1);
+
+  press(state.root, 1);
+  press(state.root, 0);
+
+  assert.deepEqual(places(state.root), ["gone", "gone", "top"]);
+  assert.equal(state.closes, 0);
+});
+
+test("the sky's button jumps into the review", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const state = mounted(t, ["one"], { chapters: CHAPTERS });
+  press(state.root, 0);
+  press(state.root, 1);
+  t.mock.timers.tick(SKY_TIMES.namesAtMs + SKY_TIMES.heldAfterNamesMs);
+  const field = room(state.root);
+
+  press(state.root, 2);
+  assert.equal(field.dataset.jump, "true");
+  assert.equal(names(state.root).dataset.on, "false", "the names go as the stars leave");
+
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+  assert.equal(state.root.innerHTML, "");
+  assert.equal(state.closes, 1);
+});
+
+test("Esc leaves the sky before its button shows, and nothing it started runs on", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const state = mounted(t, ["one"], { chapters: CHAPTERS });
+  press(state.root, 0);
+  press(state.root, 1);
+  const button = skySheet(state.root).querySelector(".lsr-opening-press");
+
+  state.page.press("Escape");
+  t.mock.timers.tick(SKY_TIMES.namesAtMs + SKY_TIMES.heldAfterNamesMs);
+
+  assert.equal(state.root.innerHTML, "");
+  assert.equal(state.closes, 1);
+  assert.equal(button?.dataset.held, "true", "the held button was never revealed");
+});
+
+test("the page behind the room is inert while it is up, so Tab cannot wander into it", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const state = mounted(t, ["one"], { chapters: CHAPTERS });
+  const behind = state.behind as FakeNode & { inert?: boolean };
+
+  assert.equal(behind.inert, true, "the review is out of reach while the room is up");
+  assert.equal((state.root as FakeNode & { inert?: boolean }).inert, undefined, "the room is not");
+
+  press(state.root, 0);
+  press(state.root, 1);
+  t.mock.timers.tick(SKY_TIMES.namesAtMs + SKY_TIMES.heldAfterNamesMs);
+  press(state.root, 2);
+  assert.equal(behind.inert, true, "still out of reach mid-jump");
+  t.mock.timers.tick(SKY_TIMES.jumpMs);
+
+  assert.equal(behind.inert, false, "the landing hands the page back");
+  assert.equal(state.away.inert, true, "what something else made inert stays so");
+});
+
+test("Esc hands the page back too, before the caret goes home", (t) => {
+  const held = new FakeNode("button");
+  const state = mounted(t, ["one", "two"], { held });
+  const behind = state.behind as FakeNode & { inert?: boolean };
+  let inertAtFocus: boolean | undefined;
+  const focus = held.focus.bind(held);
+  held.focus = (options) => {
+    inertAtFocus = behind.inert;
+    focus(options);
+  };
+
+  state.page.press("Escape");
+
+  assert.equal(behind.inert, false);
+  assert.equal(inertAtFocus, false, "an inert page cannot take the caret back");
+});
+
+test("a strike still lit when the room closes is put out with it, not after", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const state = mounted(t, ["one", "two"]);
+  const field = room(state.root);
+
+  press(state.root, 0);
+  state.page.press("Escape");
+  t.mock.timers.tick(160);
+
+  // The room is gone; a timer left behind would still be writing to it.
+  assert.equal(field.dataset.flare, "true", "nothing the room started runs after it");
+});
+
+test("only the sheet on top can be reached: the invisible ones are inert, not just faded", (t) => {
+  const { root } = mounted(t, ["one", "two"]);
+  const reachable = (): (boolean | undefined)[] =>
+    root
+      .querySelectorAll(".lsr-opening-sheet")
+      .map((sheet) => !(sheet as FakeNode & { inert?: boolean }).inert);
+
+  assert.deepEqual(reachable(), [true, false, false]);
+  press(root, 0);
+  assert.deepEqual(reachable(), [false, true, false], "a peeled sheet's button is out of Tab");
+});
+
+test("a sky that throws while mounting closes the room and hands the page back whole", (t) => {
+  const errors = t.mock.method(console, "error", () => {});
+  const state = mounted(t, ["one"], {
+    chapters: CHAPTERS,
+    paint: () => {
+      throw new Error("no canvas today");
+    },
+  });
+
+  assert.equal(state.closes, 1, "closed by its own way out: the review is shown");
+  assert.equal(state.root.innerHTML, "");
+  assert.equal((state.behind as FakeNode & { inert?: boolean }).inert, false, "not left inert");
+  assert.equal(state.away.inert, true, "what was inert before stays so");
+  assert.equal(state.page.keydownCount(), 0);
+  assert.equal(errors.mock.callCount(), 1, "said, not swallowed");
+
+  // Nothing half-built holds the root: the next room's claim runs no stale close.
+  let lands = 0;
+  playJump({
+    root: asPanelRoot(state.root),
+    still: { reducedMotion: true, forcedColors: false },
+    land: () => (lands += 1),
+  });
+  assert.equal(lands, 1);
+  assert.equal(state.closes, 1);
 });

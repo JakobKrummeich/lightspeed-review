@@ -5,25 +5,24 @@ import { currentRound } from "../conversation-rounds.ts";
 import { clampFocus } from "../focus-mode.ts";
 import { showIntentFor } from "../intent-view.ts";
 import { opensFor } from "../opening-view.ts";
+import { skyChapters } from "../starfield.ts";
 import { readMemory, reviewPlace, updateMemory, type ReviewPlace } from "../review-memory.ts";
-import { agentRoundReply } from "../round-replay.ts";
 import { effectiveFormat, readViewFormat, roomQuery } from "../view-format.ts";
 import { saveLater } from "./save-later.ts";
 import { mountAnnotationPopup } from "./annotation-popup.ts";
 import { lockSelectionToColumn } from "./column-lock.ts";
-import { createDiff2HtmlRenderer } from "../diff2html-adapter.ts";
 import { mountDiffView } from "./diff-mount.ts";
 import { wireFinish } from "./finish.ts";
 import { wireIntent } from "./intent-mount.ts";
 import { mountOpening } from "./opening-overlay.ts";
+import { reducedMotion, stillness } from "./stillness.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
 import { mountPanelLight } from "./panel-light.ts";
 import type { LinePlace } from "./line-numbers.ts";
-import { createReplayRefresher } from "./replay-refresh.ts";
-import { mountReplayOverlay, type ReplayOpening } from "./replay-overlay.ts";
 import { mountPanelRail, type MountedRail } from "./panel-rail.ts";
 import { mountSchemeToggle } from "./scheme-toggle.ts";
-import { fetchReplay, fetchSession, type SessionData } from "./session-api.ts";
+import { fetchSession, type SessionData } from "./session-api.ts";
+import { wireReplay, type WiredReplay } from "./replay-wiring.ts";
 import { mountStatusBanner, type MountedStatusBanner } from "./status-mount.ts";
 import { mountTabBeacon, type MountedBeacon } from "./tab-beacon-mount.ts";
 import { trackReader } from "./reader-place.ts";
@@ -154,11 +153,11 @@ async function main(): Promise<void> {
   });
   lockSelectionToColumn(page.diffRoot);
 
-  const refreshReplay = wireOverlays(page, live, session);
+  const replay = wireOverlays(page, live, session);
 
   // `reader.place`, not a flag: where the reviewer stands is only answerable
   // at the moment a round lands.
-  wireSessionEvents({ page, live, diff, ...side, finish, refreshReplay, place: reader.place });
+  wireSessionEvents({ page, live, diff, ...side, ...replay, finish, place: reader.place });
 }
 
 /** A place is only handed back to the round it was read in — see `review-memory.ts`. */
@@ -206,11 +205,6 @@ function roomWatch(): {
       room.shut.addEventListener("change", refresh);
     },
   };
-}
-
-/** Asked each time, not once: the preference can change under an open page. */
-function reducedMotion(): boolean {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function mountScheme(schemeSwitch: HTMLElement): void {
@@ -289,55 +283,16 @@ function mountPanelSide(
 }
 
 /**
- * Closing the replay lands at the top of the diff, where a new round starts
- * anyway. Returns the refresh run on load and every re-group.
- */
-function wireReplay(page: Page, live: LiveSession): (fresh: SessionData) => void {
-  const replayOverlay = mountReplayOverlay({
-    root: page.replayRoot,
-    renderer: createDiff2HtmlRenderer(),
-    onClose: () => {
-      page.reviewRoot.scrollTop = 0;
-    },
-  });
-  let replay: ReplayOpening | undefined;
-  page.replayReopen.addEventListener("click", () => {
-    // Manual reopen ignores the once-per-round memory on purpose.
-    if (replay !== undefined) replayOverlay.open(replay);
-  });
-  // Ordering (which round a response belongs to, what failed fetches leave)
-  // lives in the refresher.
-  const replayRefresh = createReplayRefresher({
-    fetch: () => fetchReplay(page.key),
-    wasReplayed: (shown) => readMemory(localStorage, page.key).replayed === shown,
-    markReplayed: (shown) => updateMemory(localStorage, page.key, { replayed: shown }),
-    open: (opening) => replayOverlay.open(opening),
-    offer: (opening) => {
-      replay = opening;
-      page.replayReopen.hidden = opening === undefined;
-    },
-  });
-  return (fresh) =>
-    replayRefresh({
-      round: live.round,
-      roundReply: agentRoundReply(fresh.conversation, fresh.rounds),
-      ended: fresh.status === "ended",
-    });
-}
-
-/**
  * The one place that knows a round never opens on both overlays: opening for
  * a first round, replay after a commented one.
  */
-function wireOverlays(
-  page: Page,
-  live: LiveSession,
-  session: SessionData,
-): (fresh: SessionData) => void {
-  const refreshReplay = wireReplay(page, live);
-  refreshReplay(session);
+function wireOverlays(page: Page, live: LiveSession, session: SessionData): WiredReplay {
+  const replay = wireReplay(page, live);
+  // A page opened on a round not yet replayed arrives by the jump as well.
+  replay.arriving(session);
+  replay.refreshReplay(session);
   wireOpening(page, session, live.round);
-  return refreshReplay;
+  return replay;
 }
 
 /**
@@ -356,6 +311,8 @@ function wireOpening(page: Page, session: SessionData, round: number): void {
   mountOpening({
     root: page.openingRoot,
     intents: session.intents,
+    chapters: skyChapters(session.groups),
+    stillness,
     onOpen: () => updateMemory(localStorage, page.key, { unwrapped: true }),
     onClose: () => {
       // Lands on the home screen: the survey is what the reasons were about.

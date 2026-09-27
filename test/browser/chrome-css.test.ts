@@ -200,6 +200,8 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
   // for a moved file — a span in the header button, a sibling of the diff, never over it.
   // `.lsr-done-title`: the done card's heading, a leaf on an overlay, which must wrap before it
   // reaches the ✓ beside it.
+  // `.lsr-sky-title`: a chapter name on the opening's sky, a leaf in a room with no diff in it,
+  // clamped to two lines — a name that is one long token must still break inside them.
   assert.deepEqual(
     wrapping,
     [
@@ -208,6 +210,7 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
       ".lsr-gate-path",
       ".lsr-panel-scroll",
       ".lsr-popup",
+      ".lsr-sky-title",
       "textarea",
     ],
     "a new mid-token wrap is a deliberate choice: say so here, and check it cannot reach the diff",
@@ -847,6 +850,25 @@ test("the room grows with the longest reason instead of scrolling it", () => {
   assert.match(sheet, /align-content: safe center;/, "a scrolled sheet must keep its top");
 });
 
+test("no room scrolls: focus inside it must not push the sky off centre", () => {
+  // `overflow: hidden` is still a scroll container, and focus() scrolls one: a tall reason
+  // left the sky, the names and the flash 89px off at 1440×900. `clip` cannot be scrolled.
+  for (const selector of [".lsr-opening-overlay", ".lsr-jump-overlay"]) {
+    const body = rulesFor(selector).join("");
+    assert.match(body, /overflow: clip;/, selector);
+    assert.doesNotMatch(body, /overflow: hidden;/, selector);
+  }
+});
+
+test("the round jump's room is opaque from its first frame: the new round swaps under it", () => {
+  // The page draws the new round in the same task the jump starts in; a room that faded in
+  // showed that draw through it for 250 ms. Only the stars come in on their own clock.
+  const room = rulesFor(".lsr-jump-overlay").join("");
+  assert.doesNotMatch(room, /animation:/, "the room itself never fades in");
+  assert.doesNotMatch(room, /opacity:/);
+  assert.match(rulesFor(".lsr-jump-overlay .lsr-sky-canvas").join(""), /animation: lsr-jump-in /);
+});
+
 test("the opening is painted for both schemes at once, never for one of them", () => {
   // A hand-picked scheme overrides the machine's: prefers-color-scheme would follow the machine
   // while the page follows the pick, so every local uses light-dark().
@@ -858,7 +880,7 @@ test("the opening is painted for both schemes at once, never for one of them", (
     "halo",
     "edge",
     "pool",
-    "dust",
+    "tunnel",
     "flash",
     "bloom-core",
     "bloom-edge",
@@ -885,13 +907,19 @@ test("a reviewer who asked for less motion gets the handover without the movemen
   const quiet = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\n\}/.exec(bare)?.[1] ?? "";
 
   // Lights go out rather than fade: a quarter-second of white is worse than no reward.
-  assert.match(quiet, /\.lsr-opening-motes,\s*\.lsr-opening-bloom \{\s*display: none;/);
+  assert.match(
+    quiet,
+    /\.lsr-sky-tunnel,\s*\.lsr-opening-bloom,\s*\.lsr-jump-overlay \{\s*display: none;/,
+  );
   assert.match(quiet, /\.lsr-opening-overlay\[data-flare="true"\]::after \{\s*opacity: 0;/);
   assert.match(
     quiet,
     /\.lsr-opening-sheet\[data-at="top"\] \.lsr-opening-body \{\s*animation: none;/,
   );
-  assert.match(quiet, /\.lsr-opening-press \{\s*animation: none;/);
+  assert.match(
+    quiet,
+    /\.lsr-opening-press,\s*\.lsr-opening-press\[data-held="false"\] \{\s*animation: none;/,
+  );
 });
 
 test("the busy marker holds still for that reviewer rather than going away", () => {

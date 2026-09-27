@@ -9,7 +9,7 @@ import {
 } from "../../src/browser/approved-form.ts";
 import { renderClosingSummary, type ClosedReview } from "../../src/browser/closing-summary.ts";
 import { renderIntent } from "../../src/browser/intent-view.ts";
-import { renderOpening } from "../../src/browser/opening-view.ts";
+import { renderOpening, renderSkyNames } from "../../src/browser/opening-view.ts";
 import { renderProgressBar } from "../../src/browser/progress-bar.ts";
 import { renderReplayOverlay } from "../../src/browser/round-replay.ts";
 import type { ApprovedFormData } from "../../src/rounds/approved-form.ts";
@@ -213,9 +213,17 @@ const AREA_OWNERS: AreaOwner[] = [
   {
     module: "src/browser/opening-view.ts",
     area: "opening.css",
-    // Two reasons is the smallest stack drawing every sheet the opening has: the
-    // cover, a reason with a way on, and the last one that opens the review.
-    render: () => renderOpening(["sign the tokens", "drop the legacy /login handler"]),
+    // Two reasons and a chapter is the smallest stack drawing every sheet the
+    // opening has: the cover, a reason with a way on, the last reason, and the
+    // sky with its held button — plus the names laid over the sky.
+    render: () =>
+      renderOpening(
+        ["sign the tokens", "drop the legacy /login handler"],
+        [{ name: "Schema", files: [{ path: "src/db.ts", lines: 4 }] }],
+      ) +
+      renderSkyNames([
+        { chapter: 0, name: "Schema", files: 1, x: 10, y: 10, width: 80, height: 38 },
+      ]),
     marker: "lsr-opening-sheet",
   },
   {

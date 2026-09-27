@@ -1,8 +1,10 @@
 /*
  * The opening is a room, not a card on a scrim: the field is opaque and
  * full-bleed, so until the last press there is no review behind it to look at
- * instead of the reason being read. It never meets the replay overlay, because
- * a first round has no previous round to replay.
+ * instead of the reason being read. A later round can still arrive while it
+ * is up (another tab moved the review on): the round jump then closes it the
+ * way Esc would before taking its root (`dom/room-claim.ts`), so the two rooms
+ * never paint at once.
  *
  * The locals below are declared here rather than on `:root` because nothing
  * else on the page is in this room. All of them go through `light-dark()`: the
@@ -10,7 +12,8 @@
  * a `prefers-color-scheme` query would paint this room the machine's way while
  * the rest of the page followed the pick.
  */
-.lsr-opening-overlay {
+.lsr-opening-overlay,
+.lsr-jump-overlay {
   /* Darker than the page's own dark, because a room is not a surface: the
      room has to read as unlit space with a lamp over it. */
   /* stylelint-disable function-disallowed-list -- the room's one dark, mixed into nothing else, so not a token */
@@ -37,10 +40,10 @@
     transparent,
     color-mix(in oklab, var(--lsr-accent) 10%, transparent)
   );
-  /* A shade denser in the dark room, where a faint mote would vanish. */
-  --lsr-opening-dust: light-dark(
-    color-mix(in oklab, var(--lsr-accent) 55%, transparent),
-    color-mix(in oklab, var(--lsr-accent) 65%, transparent)
+  /* The jump's vignette: the paper's edge closing in, or the dark deepening. */
+  --lsr-opening-tunnel: light-dark(
+    color-mix(in oklab, var(--lsr-text) 22%, transparent),
+    color-mix(in oklab, var(--lsr-opening-room) 88%, transparent)
   );
   --lsr-opening-flash: light-dark(
     color-mix(in oklab, var(--lsr-accent) 20%, transparent),
@@ -51,7 +54,9 @@
     color-mix(in oklab, var(--lsr-accent) 22%, var(--lsr-white)),
     var(--lsr-strong)
   );
+}
 
+.lsr-opening-overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -60,14 +65,16 @@
   justify-content: center;
   gap: var(--lsr-space-4);
   padding: var(--lsr-space-6);
-  overflow: hidden;
+  /* Not `hidden`: that is still a scroll container, and focus() scrolls one. */
+  overflow: clip;
   background: var(--lsr-opening-room);
   z-index: 18;
 }
 
 /* The light itself: four gradients on one layer, of which the scheme decides
  * which two you can see — lamp and pool in the dark, halo and edges on paper. */
-.lsr-opening-overlay::before {
+.lsr-opening-overlay::before,
+.lsr-jump-overlay::before {
   content: "";
   position: absolute;
   inset: -10%;
@@ -91,7 +98,8 @@
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 42%, var(--lsr-opening-flash), transparent 56%);
+  /* From the middle, where the sky sheet's button stands. */
+  background: radial-gradient(circle at 50% 50%, var(--lsr-opening-flash), transparent 56%);
   transition: opacity 520ms ease;
 }
 
@@ -100,25 +108,84 @@
   transition-duration: 90ms;
 }
 
-/* Each mote's `--life`, `--delay` and `--drift` are the renderer's: it hands
- * every one of them its own. */
-.lsr-opening-motes {
+/*
+ * The sky (`dom/opening-sky.ts`): every file a star, painted on one canvas that
+ * is decoration only. The files drift while the reasons are read and gather
+ * into their chapters on the last sheet; the names come once the figures have
+ * formed. Shared with the round jump (`jump.css`), which is the same room.
+ */
+.lsr-sky-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.lsr-sky-tunnel {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  overflow: hidden;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse 70% 70% at 50% 50%,
+    transparent 35%,
+    var(--lsr-opening-tunnel) 100%
+  );
 }
 
-.lsr-opening-mote {
+.lsr-sky-names {
   position: absolute;
-  bottom: -0.625rem;
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 999px;
+  inset: 0;
+  pointer-events: none;
   opacity: 0;
-  background: var(--lsr-opening-dust);
-  box-shadow: 0 0 0.5rem var(--lsr-opening-lamp);
-  animation: lsr-opening-rise var(--life) linear var(--delay) infinite;
+  transition: opacity 500ms ease;
+}
+
+.lsr-sky-names[data-on="true"] {
+  opacity: 1;
+}
+
+/* Centred under its cluster at the left/top the layout gave it. As wide as
+ * its text up to the layout's width — `max-content`, so a name near the right
+ * edge does not wrap early against the room's edge — and a longer name takes
+ * the second line the layout budgeted, then ends in an ellipsis. */
+.lsr-sky-name {
+  position: absolute;
+  width: max-content;
+  transform: translateX(-50%);
+  color: var(--lsr-strong);
+  font-size: var(--lsr-size-meta);
+  font-weight: 700;
+  line-height: var(--lsr-leading-tight);
+  text-align: center;
+  text-shadow: 0 0 0.75rem var(--lsr-opening-room);
+}
+
+.lsr-sky-title {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.lsr-sky-count {
+  display: block;
+  color: var(--lsr-muted);
+  font-size: var(--lsr-size-label);
+  font-weight: 500;
+}
+
+/* The jump: the words go, and the vignette closes in as the stars rush past. */
+.lsr-opening-overlay[data-jump="true"] .lsr-opening-stack {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.lsr-opening-overlay[data-jump="true"] .lsr-sky-tunnel {
+  opacity: 1;
+  transition: opacity 800ms ease-in;
 }
 
 /*
@@ -173,6 +240,28 @@
 .lsr-opening-sheet[data-at="top"] {
   transform: none;
   opacity: 1;
+}
+
+/* The sky sheet has no words: its button stands in the middle of the
+ * constellations, in the box the layout keeps clear (`sky-keep-out.ts`) —
+ * the window's centre, where the jump launches from. The dots have said all
+ * they had to. */
+.lsr-opening-sheet[data-sky="true"] {
+  position: fixed;
+  inset: 0;
+  place-content: center;
+  padding: 0;
+  overflow: visible;
+  outline: none;
+}
+
+.lsr-opening-sheet[data-sky="true"] .lsr-opening-press {
+  margin: 0;
+}
+
+.lsr-opening-overlay[data-sky="true"] .lsr-opening-dots {
+  opacity: 0;
+  transition: opacity 340ms ease;
 }
 
 .lsr-opening-lead {
@@ -232,6 +321,19 @@
     filter 160ms ease;
 }
 
+/* Held back until the chapters have been looked at: hidden, so neither a
+ * pointer nor the Tab key can reach it early. */
+.lsr-opening-press[data-held="true"] {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.lsr-opening-press[data-held="false"] {
+  animation:
+    lsr-opening-land 520ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    lsr-opening-pulse 2.4s 520ms infinite;
+}
+
 .lsr-opening-press:hover {
   transform: translateY(-1px) scale(1.03);
   filter: brightness(1.07);
@@ -265,33 +367,25 @@
   box-shadow: 0 0 0.75rem color-mix(in oklab, var(--lsr-accent) 60%, transparent);
 }
 
-.lsr-opening-bloom {
+.lsr-opening-bloom,
+.lsr-jump-bloom {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
+  /* From the centre, where the button stood and the stars streak out from. */
   background: radial-gradient(
-    circle at 50% 42%,
+    circle at 50% 50%,
     var(--lsr-opening-bloom-core),
     var(--lsr-opening-bloom-edge)
   );
   transition: opacity 320ms ease;
 }
 
-.lsr-opening-overlay[data-bloom="true"] .lsr-opening-bloom {
+.lsr-opening-overlay[data-bloom="true"] .lsr-opening-bloom,
+.lsr-jump-overlay[data-bloom="true"] .lsr-jump-bloom {
   opacity: 0.95;
   transition-duration: 140ms;
-}
-
-@keyframes lsr-opening-rise {
-  8% {
-    opacity: 0.9;
-  }
-
-  100% {
-    transform: translateY(-30rem) translateX(var(--drift));
-    opacity: 0;
-  }
 }
 
 @keyframes lsr-opening-land {
@@ -308,5 +402,14 @@
 
   100% {
     box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* The system paints the page: a drawn sky would ignore its colours, so there
+ * is none. The names are text, and take the system's colours like any other. */
+@media (forced-colors: active) {
+  .lsr-sky-canvas,
+  .lsr-sky-tunnel {
+    display: none;
   }
 }

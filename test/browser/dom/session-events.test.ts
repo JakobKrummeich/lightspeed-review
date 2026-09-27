@@ -200,6 +200,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
         if (ended) log.push("beacon ended");
       },
     },
+    arriving: () => log.push("arriving"),
     refreshReplay: () => log.push("replay"),
     place: () => place,
   };
@@ -240,6 +241,34 @@ test("the first open catches a round that landed between the page's load and its
 
   assert.ok(log.includes("diff regrouped"));
   assert.equal(live.round, 1);
+});
+
+test("a new round's arrival starts before any of it is drawn, so its jump covers the swap", async (t) => {
+  const { stream, server, log, roots } = world(t).page();
+  server.serving = session(1);
+  let intentAtArrival: string | undefined;
+  const wiredLog = log.push.bind(log);
+  log.push = (...entries: string[]) => {
+    if (entries.includes("arriving")) intentAtArrival = roots.intent.innerHTML;
+    return wiredLog(...entries);
+  };
+
+  stream().emit("open");
+  await settled();
+
+  assert.equal(log[0], "arriving", "first, before the diff or the replay");
+  assert.ok(log.indexOf("arriving") < log.indexOf("diff regrouped"));
+  assert.equal(intentAtArrival, "as the reviewer left it", "nothing of the round is drawn yet");
+});
+
+test("news inside the round is not an arrival: no jump", async (t) => {
+  const { stream, server, log } = world(t).page();
+  server.serving = session(0, [said]);
+
+  stream().emit("open");
+  await settled();
+
+  assert.equal(log.includes("arriving"), false);
 });
 
 test("a reconnect onto a new round draws it exactly as a session event would", async (t) => {
@@ -411,7 +440,7 @@ test("an older answer landing last does not put the old round back", async (t) =
   await settled();
 
   assert.equal(live.round, 1);
-  assert.deepEqual(log, ["diff regrouped", "replay", "panel 0 said", "banner"]);
+  assert.deepEqual(log, ["arriving", "diff regrouped", "replay", "panel 0 said", "banner"]);
 });
 
 test("a session that cannot be fetched is logged, not thrown", async (t) => {
@@ -572,6 +601,7 @@ test("a round the feedback answer carried is still drawn by the reopen it overto
   assert.deepEqual(log, [
     "panel 1 said",
     "banner",
+    "arriving",
     "diff regrouped",
     "replay",
     "panel 1 said",

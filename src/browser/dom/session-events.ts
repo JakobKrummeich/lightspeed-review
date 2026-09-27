@@ -54,6 +54,8 @@ export interface Wired {
   finish: TurnAware;
   /** The tab's title and favicon, for a reviewer who is looking elsewhere. */
   beacon: MountedBeacon;
+  /** A new round is about to be drawn: its jump, if it has one, covers the page first. */
+  arriving(fresh: SessionData): void;
   refreshReplay(fresh: SessionData): void;
   place(): ReviewerPlace;
 }
@@ -192,11 +194,14 @@ function waits(wired: Wired, fresh: SessionData): boolean {
 
 function applyRound(wired: Wired, fresh: SessionData): void {
   const { page, live, diff, panel, banner, railControl } = wired;
+  const next = currentRound(fresh.rounds);
+  const change = next === live.round ? "same-round" : "regrouped";
+  // Before anything of the round is drawn: its jump takes the window first,
+  // and the page swaps under the room rather than in front of the reviewer.
+  if (change === "regrouped") wired.arriving(fresh);
   page.intentRoot.innerHTML = renderIntent(fresh);
   // Stamped before the redraw: the redraw reports this round's opening folds,
   // which must not be written under the old round's number.
-  const next = currentRound(fresh.rounds);
-  const change = next === live.round ? "same-round" : "regrouped";
   live.round = next;
   diff.update(fresh, change);
   // The replay is about a new round; inside a round only the review ending

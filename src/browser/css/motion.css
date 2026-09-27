@@ -11,9 +11,17 @@
     transition: none;
   }
 
-  .lsr-opening-motes,
-  .lsr-opening-bloom {
+  /* The sky stays, formed and still (`dom/starfield-canvas.ts` draws it
+   * once); the jump never plays, so its vignette and flash have nothing to do. */
+  .lsr-sky-tunnel,
+  .lsr-opening-bloom,
+  .lsr-jump-overlay {
     display: none;
+  }
+
+  .lsr-sky-names,
+  .lsr-opening-overlay[data-sky="true"] .lsr-opening-dots {
+    transition: none;
   }
 
   .lsr-opening-overlay::after,
@@ -26,7 +34,8 @@
     animation: none;
   }
 
-  .lsr-opening-press {
+  .lsr-opening-press,
+  .lsr-opening-press[data-held="false"] {
     animation: none;
     transition: none;
   }

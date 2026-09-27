@@ -17,11 +17,14 @@ export class FakeNode {
   private locked: boolean | undefined;
   private shown: boolean | undefined;
   private hint: string | undefined;
+  private classes: string | undefined;
   private data: Record<string, string | undefined> | undefined;
   private html = "";
   private children: FakeNode[] = [];
   /** Set on adoption: a card's head folds on a press anywhere inside it, found by walking up. */
   private parent: FakeNode | undefined;
+  /** Thrown away by its parent's `innerHTML` write. */
+  private dropped = false;
   private readonly listeners = new Map<string, ((event: unknown) => void)[]>();
 
   constructor(tag = "div", attributes = "") {
@@ -34,17 +37,36 @@ export class FakeNode {
   }
 
   set innerHTML(html: string) {
+    for (const child of this.children) child.dropped = true;
     this.html = html;
     this.children = parseNodes(html);
   }
 
   get classList(): { contains(name: string): boolean } {
-    const classes = this.attribute("class").split(" ");
+    const classes = this.className.split(" ");
     return { contains: (name: string) => classes.includes(name) };
   }
 
   get id(): string {
     return this.attribute("id");
+  }
+
+  get tagName(): string {
+    return this.tag.toUpperCase();
+  }
+
+  /** Markup's `class` or set since: a popup is built by hand and names its class in code. */
+  get className(): string {
+    return this.classes ?? this.attribute("class");
+  }
+
+  set className(names: string) {
+    this.classes = names;
+  }
+
+  /** A node standing alone counts as on the page; one whose markup was replaced does not. */
+  get isConnected(): boolean {
+    return !this.dropped && (this.parent?.isConnected ?? true);
   }
 
   /**
@@ -88,9 +110,15 @@ export class FakeNode {
   }
 
   focused = false;
+  /** Every `focus()` call's options, in order. */
+  readonly focusCalls: (FocusOptions | undefined)[] = [];
 
-  focus(): void {
+  /** Takes the caret, and — under a fake document that tracks one — becomes its active element. */
+  focus(options?: FocusOptions): void {
     this.focused = true;
+    this.focusCalls.push(options);
+    const page = (globalThis as { document?: { activeElement?: unknown } }).document;
+    if (page && "activeElement" in page) page.activeElement = this;
   }
 
   setSelectionRange(start: number, end: number): void {
@@ -128,8 +156,7 @@ export class FakeNode {
     const presence = /^\[([\w-]+)\]$/.exec(selector);
     if (presence) return new RegExp(`(^|\\s)${presence[1]}="`).test(this.attributes);
     if (selector.startsWith("#")) return this.attribute("id") === selector.slice(1);
-    if (selector.startsWith("."))
-      return this.attribute("class").split(" ").includes(selector.slice(1));
+    if (selector.startsWith(".")) return this.className.split(" ").includes(selector.slice(1));
     return this.tag === selector;
   }
 
@@ -194,11 +221,69 @@ export function installFakeElements(after: (undo: () => void) => void): FakeWind
   return page;
 }
 
+/** One `matchMedia` answer: its query, and whoever listens for it to change. */
+export class FakeMediaQuery {
+  readonly listeners: (() => void)[] = [];
+  readonly media: string;
+
+  constructor(media: string) {
+    this.media = media;
+  }
+
+  addEventListener(_type: "change", handler: () => void): void {
+    this.listeners.push(handler);
+  }
+
+  removeEventListener(_type: "change", handler: () => void): void {
+    const at = this.listeners.indexOf(handler);
+    if (at >= 0) this.listeners.splice(at, 1);
+  }
+}
+
 export class FakeWindow {
   private readonly listeners = new Map<string, (() => void)[]>();
+  devicePixelRatio = 1;
+  /** Every query asked, in order; a change is fired through `changeMedia`. */
+  readonly queries: FakeMediaQuery[] = [];
+
+  matchMedia(media: string): FakeMediaQuery {
+    const query = new FakeMediaQuery(media);
+    this.queries.push(query);
+    return query;
+  }
+
+  /** The browser's `change` on every live query for `media`. */
+  changeMedia(media: string): void {
+    for (const query of this.queries.filter((one) => one.media === media)) {
+      for (const handler of [...query.listeners]) handler();
+    }
+  }
+
+  /** How many `change` listeners are still on queries for `media`. */
+  mediaListeners(media: string): number {
+    return this.queries
+      .filter((one) => one.media === media)
+      .reduce((sum, one) => sum + one.listeners.length, 0);
+  }
 
   addEventListener(type: string, handler: () => void): void {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
+  }
+
+  removeEventListener(type: string, handler: () => void): void {
+    this.listeners.set(
+      type,
+      (this.listeners.get(type) ?? []).filter((known) => known !== handler),
+    );
+  }
+
+  /** Runs every `type` listener, as the browser would on that event. */
+  fire(type: string): void {
+    for (const handler of this.listeners.get(type) ?? []) handler();
+  }
+
+  listening(type: string): number {
+    return (this.listeners.get(type) ?? []).length;
   }
 
   leave(): void {
