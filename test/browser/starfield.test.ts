@@ -12,6 +12,7 @@ import {
   seedOf,
   skyChapters,
   type SkyChapter,
+  type SkyLabel,
 } from "../../src/browser/starfield.ts";
 import { warpField, warpSpeed, warpStreaks } from "../../src/browser/warp-field.ts";
 
@@ -196,13 +197,72 @@ test("no more than eight names, the largest chapters first, none overlapping", (
     sky.labels.every((label) => label.chapter < MOST_NAMES),
     "a small chapter took a name",
   );
-  for (const [index, a] of sky.labels.entries()) {
-    for (const b of sky.labels.slice(index + 1)) {
+  assertApart(sky.labels);
+});
+
+/** Side by side or one wholly above the other, whatever height each name takes. */
+function assertApart(labels: SkyLabel[]): void {
+  for (const [index, a] of labels.entries()) {
+    for (const b of labels.slice(index + 1)) {
       const apart =
-        Math.abs(a.x - b.x) >= (a.width + b.width) / 2 || Math.abs(a.y - b.y) >= a.height;
+        Math.abs(a.x - b.x) >= (a.width + b.width) / 2 ||
+        a.y >= b.y + b.height ||
+        b.y >= a.y + a.height;
       assert.ok(apart, `${a.name} overlaps ${b.name}`);
     }
   }
+}
+
+test("a name that would overlap is passed over for the next largest, still up to eight", () => {
+  // At phone width the fourth chapter's name lands on another; cutting to the top eight
+  // before asking would leave seven names up and the ninth chapter's room unused.
+  const sky = layoutSky(chapters([80, 60, 52, 45, 40, 35, 30, 22, 15, 11, 6, 4]), {
+    width: 375,
+    height: 540,
+  });
+
+  assert.equal(sky.labels.length, MOST_NAMES);
+  assert.deepEqual(
+    sky.labels.map((label) => label.chapter),
+    [0, 1, 2, 4, 5, 6, 7, 8],
+  );
+  assertApart(sky.labels);
+});
+
+test("a long chapter name takes a second line rather than an ellipsis at 24 characters", () => {
+  const long = "Parser learns streaming tokens from the new lexer";
+  const named = (name: string, box = BOX) =>
+    layoutSky([{ name, files: [{ path: "a.ts", lines: 3 }] }], box).labels[0];
+
+  const short = named("Docs");
+  const wide = named(long);
+  assert.equal(short?.height, 38, "one line and its count");
+  assert.equal(wide?.width, 240, "as wide as a name may be");
+  assert.equal(wide?.height, 38 + 18, "a second line, budgeted before the overlap check");
+  assert.equal(named("Session state, its store")?.width, 24 * 9 + 12, "fits: one line");
+  assert.equal(named("Session state, its store")?.height, 38);
+
+  const phone = named(long, { width: 200, height: 400 });
+  assert.equal(phone?.width, 200 - 24, "never wider than the sky it stands in");
+});
+
+test("two-line names still keep off each other and inside the sky", () => {
+  const sizes = [30, 25, 20, 18, 15, 12];
+  const sky = layoutSky(
+    sizes.map((count, chapter) => ({
+      name: `Chapter ${chapter + 1} with a name long enough to wrap onto a second line`,
+      files: Array.from({ length: count }, (_unused, index) => ({
+        path: `c${chapter}/f${index}`,
+        lines: index + 1,
+      })),
+    })),
+    { width: 1024, height: 472 },
+  );
+
+  assert.ok(sky.labels.length > 1);
+  assert.ok(sky.labels.every((label) => label.height === 56));
+  assert.ok(sky.labels.every((label) => label.y + label.height <= 472));
+  assertApart(sky.labels);
 });
 
 test("a name says which chapter and how many files it has", () => {

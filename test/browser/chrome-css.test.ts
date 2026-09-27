@@ -200,6 +200,8 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
   // for a moved file — a span in the header button, a sibling of the diff, never over it.
   // `.lsr-done-title`: the done card's heading, a leaf on an overlay, which must wrap before it
   // reaches the ✓ beside it.
+  // `.lsr-sky-title`: a chapter name on the opening's sky, a leaf in a room with no diff in it,
+  // clamped to two lines — a name that is one long token must still break inside them.
   assert.deepEqual(
     wrapping,
     [
@@ -208,6 +210,7 @@ test("only the panel, the popup and the compose boxes wrap mid-token", () => {
       ".lsr-gate-path",
       ".lsr-panel-scroll",
       ".lsr-popup",
+      ".lsr-sky-title",
       "textarea",
     ],
     "a new mid-token wrap is a deliberate choice: say so here, and check it cannot reach the diff",

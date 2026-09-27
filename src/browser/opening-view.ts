@@ -97,13 +97,14 @@ function skySheet(chapters: readonly SkyChapter[]): Sheet {
 
 /**
  * The names under their constellations, placed by `layoutSky`. Eye-only: the
- * sky sheet's label already says every one of them.
+ * sky sheet's label already says every one of them. The title is its own
+ * element so the stylesheet can clamp it to the two lines the layout allowed.
  */
 export function renderSkyNames(labels: readonly SkyLabel[]): string {
   return labels
     .map(
       (label) =>
-        `<span class="lsr-sky-name" style="left:${label.x.toFixed(1)}px;top:${label.y.toFixed(1)}px;max-width:${label.width.toFixed(0)}px">${escapeHtml(label.name)}<small class="lsr-sky-count">${filesLabel(label.files)}</small></span>`,
+        `<span class="lsr-sky-name" style="left:${label.x.toFixed(1)}px;top:${label.y.toFixed(1)}px;max-width:${label.width.toFixed(0)}px"><span class="lsr-sky-title">${escapeHtml(label.name)}</span><small class="lsr-sky-count">${filesLabel(label.files)}</small></span>`,
     )
     .join("");
 }

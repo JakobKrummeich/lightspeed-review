@@ -145,20 +145,28 @@
   opacity: 1;
 }
 
-/* Centred under its cluster at the left/top the layout gave it; the layout's
- * width is the most it may take, and a longer name ends in an ellipsis. */
+/* Centred under its cluster at the left/top the layout gave it. As wide as
+ * its text up to the layout's width — `max-content`, so a name near the right
+ * edge does not wrap early against the room's edge — and a longer name takes
+ * the second line the layout budgeted, then ends in an ellipsis. */
 .lsr-sky-name {
   position: absolute;
+  width: max-content;
   transform: translateX(-50%);
-  overflow: hidden;
   color: var(--lsr-strong);
   font-size: var(--lsr-size-meta);
   font-weight: 700;
   line-height: var(--lsr-leading-tight);
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   text-shadow: 0 0 0.75rem var(--lsr-opening-room);
+}
+
+.lsr-sky-title {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .lsr-sky-count {

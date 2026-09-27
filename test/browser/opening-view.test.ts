@@ -153,8 +153,8 @@ test("each name stands where the layout put it, with its file count, and is text
 
   assert.equal(
     html,
-    '<span class="lsr-sky-name" style="left:120.0px;top:80.5px;max-width:90px">Docs &lt;b&gt;<small class="lsr-sky-count">1 file</small></span>' +
-      '<span class="lsr-sky-name" style="left:300.0px;top:40.0px;max-width:120px">Session state<small class="lsr-sky-count">12 files</small></span>',
+    '<span class="lsr-sky-name" style="left:120.0px;top:80.5px;max-width:90px"><span class="lsr-sky-title">Docs &lt;b&gt;</span><small class="lsr-sky-count">1 file</small></span>' +
+      '<span class="lsr-sky-name" style="left:300.0px;top:40.0px;max-width:120px"><span class="lsr-sky-title">Session state</span><small class="lsr-sky-count">12 files</small></span>',
   );
   assert.equal(renderSkyNames([]), "");
 });

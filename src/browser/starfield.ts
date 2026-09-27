@@ -94,8 +94,14 @@ export const SKY_TIMES = {
 } as const;
 
 const EDGE = 12;
+/** A one-line name and its count, px; each further line of the name adds `NAME_LINE`. */
 const NAME_HEIGHT = 38;
+const NAME_LINE = 18;
 const NAME_GAP = 6;
+/** The widest a name may be; a longer one takes a second line, then an ellipsis. */
+const NAME_WIDEST = 240;
+/** A bold meta-size character, generously: a name wider than its box is clipped. */
+const CHAR_WIDTH = 9;
 
 /** Park–Miller: tiny, repeatable, and good enough to scatter stars. */
 export function seeded(seed: number): () => number {
@@ -245,13 +251,23 @@ function spanningTree(points: { x: number; y: number }[]): [number, number][] {
   return edges;
 }
 
-/** Wide enough for the longer of its two lines, capped where the stylesheet ellipsizes. */
-function labelWidth(name: string, files: number): number {
-  return Math.min(200, Math.max(name.length, `${files} files`.length) * 9 + 12);
+/**
+ * The box a name takes: one line while it fits, then two at the widest a name
+ * may be (the stylesheet clamps it there and ends a longer one in an
+ * ellipsis). The count's line decides the width only when it is the longer.
+ */
+function nameBox(name: string, files: number, box: SkyBox): { width: number; height: number } {
+  const widest = Math.min(NAME_WIDEST, box.width - EDGE * 2);
+  const nameWidth = name.length * CHAR_WIDTH + 12;
+  const width = Math.min(widest, Math.max(nameWidth, `${files} files`.length * CHAR_WIDTH + 12));
+  const lines = nameWidth > width ? 2 : 1;
+  return { width, height: NAME_HEIGHT + (lines - 1) * NAME_LINE };
 }
 
+/** Side by side with a gap between them, or one wholly above the other. */
 function overlaps(a: SkyLabel, b: SkyLabel): boolean {
-  return Math.abs(a.x - b.x) < (a.width + b.width) / 2 + NAME_GAP && Math.abs(a.y - b.y) < a.height;
+  const across = Math.abs(a.x - b.x) < (a.width + b.width) / 2 + NAME_GAP;
+  return across && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
 interface Constellation {
@@ -265,24 +281,25 @@ interface Constellation {
 
 /**
  * The largest chapters by stars get a name, under their cluster; a name that
- * would overlap one already placed is left off — the stars still say it.
+ * would overlap one already placed is left off — the stars still say it — and
+ * the next largest is asked instead, until `MOST_NAMES` are up.
  */
 function names(constellations: Constellation[], box: SkyBox): SkyLabel[] {
   const placed: SkyLabel[] = [];
   const ranked = constellations
     .filter((one) => one.stars > 0)
-    .sort((a, b) => b.stars - a.stars || a.chapter - b.chapter)
-    .slice(0, MOST_NAMES);
+    .sort((a, b) => b.stars - a.stars || a.chapter - b.chapter);
   for (const one of ranked) {
-    const width = labelWidth(one.name, one.files);
+    if (placed.length === MOST_NAMES) break;
+    const { width, height } = nameBox(one.name, one.files, box);
     const label = {
       chapter: one.chapter,
       name: one.name,
       files: one.files,
       width,
-      height: NAME_HEIGHT,
+      height,
       x: clamp(one.centre[0], width / 2 + EDGE, box.width - width / 2 - EDGE),
-      y: clamp(one.centre[1] + one.radius * 0.8 + 10, EDGE, box.height - NAME_HEIGHT - EDGE),
+      y: clamp(one.centre[1] + one.radius * 0.8 + 10, EDGE, box.height - height - EDGE),
     };
     if (!placed.some((other) => overlaps(label, other))) placed.push(label);
   }
