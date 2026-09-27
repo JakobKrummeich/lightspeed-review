@@ -348,7 +348,7 @@
 }
 
 /*
- * Two lines, not the compose box's four: a tall box in every card would push
+ * Two lines, shorter than the compose box: a tall box in every card would push
  * the threads under it off the screen. Grown to its placeholder where the
  * browser can, so a narrow card wraps the hint rather than clipping it.
  */
@@ -382,6 +382,21 @@
   background: transparent;
   color: var(--lsr-muted);
   padding: 0 var(--lsr-space-1);
+}
+
+/*
+ * The compose box stands on its fill alone, a line taller than a popup's box.
+ * Transparent rather than no border: forced colours paint it, and there the
+ * fill is gone. Without a border the caret needs a ring of its own.
+ */
+#lsr-general-comment {
+  min-height: calc(4.5rem + 1lh);
+  border-color: transparent;
+}
+
+#lsr-general-comment:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 0;
 }
 
 .lsr-compose-actions {

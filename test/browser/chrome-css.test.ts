@@ -961,3 +961,18 @@ test("the round's announcement holds still too: no fold flight, no orbiting spar
 test("a diff's hunk header is the top band of its block, with no strip of ground above it", () => {
   assert.match(rulesFor(".lsr-file-diff:has(> .d2h-wrapper)").join(""), /padding-top: 0;/);
 });
+
+test("the compose box stands on its fill, a line taller than a popup's box", () => {
+  const box = rulesFor("#lsr-general-comment").join("");
+
+  // Transparent rather than none: forced colours paint a transparent border, so the box keeps
+  // its edge there, where its fill is gone.
+  assert.match(box, /border-color: transparent;/);
+  assert.match(box, /min-height: calc\(4\.5rem \+ 1lh\);/);
+});
+
+test("the borderless compose box still shows where the caret is", () => {
+  const focused = rulesFor("#lsr-general-comment:focus-visible").join("");
+
+  assert.match(focused, /outline: 2px solid var\(--lsr-accent\);/);
+});
