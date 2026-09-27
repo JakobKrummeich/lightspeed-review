@@ -1005,3 +1005,22 @@ test("a thread's reply box stands on its fill like the compose box, with the sam
     /outline: 2px solid var\(--lsr-accent\);/,
   );
 });
+
+test("the header's firefly stands inline in the presence line, smaller than the foot's", () => {
+  const box = rulesFor(".lsr-presence .lsr-firefly").join("");
+
+  // The presence line is a line box: an inline span would drop its width and height.
+  assert.match(box, /display: inline-block;/);
+  assert.match(rulesFor(".lsr-presence .lsr-firefly > i").join(""), /scale: 0\.75;/);
+});
+
+test("the firefly's spark stays lit in forced colours, in the system's text colour", () => {
+  // Forced colours repaint a background as Canvas: the spark would vanish into the page.
+  const forced = [...bare.matchAll(/@media \(forced-colors: active\) \{([\s\S]*?)\n\}/g)]
+    .map(([, body]) => body)
+    .join("");
+  const spark = /\.lsr-firefly i i i \{([^}]*)\}/.exec(forced)?.[1] ?? "";
+
+  assert.match(spark, /forced-color-adjust: none;/);
+  assert.match(spark, /background: var\(--lsr-system-text\);/);
+});

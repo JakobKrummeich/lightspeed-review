@@ -48,9 +48,9 @@ test("says no status word beside the presence label, in any status", () => {
   assert.doesNotMatch(ended, /lsr-status|>ended</, "an ended review says so only in its overlay");
 });
 
-/** What the header shows, as opposed to what its tooltip carries; the dot says nothing. */
+/** What the header shows, as opposed to what its tooltip carries; the dot or firefly says nothing. */
 function presenceText(html: string): string | undefined {
-  return /<p class="lsr-presence"[^>]*>(?:<span class="lsr-presence-dot" aria-hidden="true"><\/span>)?([^<]*)<\/p>/
+  return /<p class="lsr-presence"[^>]*>(?:<span class="lsr-(?:presence-dot|firefly)" aria-hidden="true">(?:<i><i><i><\/i><\/i><\/i>)?<\/span>)?([^<]*)<\/p>/
     .exec(html)?.[1]
     ?.replaceAll("&#39;", "'");
 }
@@ -215,4 +215,29 @@ test("marks the presence with a dot hidden from assistive tech", () => {
   const html = renderStatusBanner(banner({ agentWaiting: true }));
 
   assert.match(html, /<span class="lsr-presence-dot" aria-hidden="true"><\/span>Agent listening/);
+});
+
+/**
+ * The foot's firefly, in the header too: the corner is where a reviewer back from
+ * elsewhere looks first, and a still dot said "working" no louder than "listening".
+ */
+test("a firefly stands beside the word while the agent holds the turn, working or reading", () => {
+  const working: Turn = { holder: "agent", mode: "working", at: "2025-01-01T00:07:00.000Z" };
+  for (const turn of [working, READING]) {
+    const html = renderStatusBanner(banner({ turn }));
+
+    assert.match(
+      html,
+      /<span class="lsr-firefly" aria-hidden="true"><i><i><i><\/i><\/i><\/i><\/span>Agent (working|reading)</,
+    );
+    assert.doesNotMatch(html, /lsr-presence-dot/, "one mark, not a dot beside a firefly");
+  }
+});
+
+test("the reviewer's turn keeps the still dot, and a lost connection neither", () => {
+  const listening = renderStatusBanner(banner({ agentWaiting: true }));
+  assert.doesNotMatch(listening, /lsr-firefly/);
+
+  const lost = renderStatusBanner(banner({ turn: READING, connected: false }));
+  assert.doesNotMatch(lost, /lsr-firefly|lsr-presence-dot/);
 });

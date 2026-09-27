@@ -291,3 +291,16 @@
     transform: translateY(3px);
   }
 }
+
+/*
+ * Forced colours repaint the spark's fill as Canvas, and the firefly would go
+ * out on the page it lights. Kept out of their reach and painted in the
+ * reader's own text colour, with no glow: a halo is the page's palette.
+ */
+@media (forced-colors: active) {
+  .lsr-firefly i i i {
+    forced-color-adjust: none;
+    background: var(--lsr-system-text);
+    box-shadow: none;
+  }
+}

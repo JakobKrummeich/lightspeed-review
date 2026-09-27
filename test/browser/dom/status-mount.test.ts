@@ -172,3 +172,24 @@ test("the header greys to connection lost while the stream is down, and comes ba
   assert.doesNotMatch(root.innerHTML, /Connection lost/);
   assert.match(root.innerHTML, />Agent listening</);
 });
+
+test("the header's firefly flies on the page's one clock across redraws", (t) => {
+  // Every presence frame that changes the tooltip redraws the header; a new firefly
+  // starting its drift from the top would jump back to the middle of its box.
+  const root = stubDocument(t);
+  const layers = [{ startTime: 1234 }, { startTime: 1234 }, { startTime: 1234 }];
+  const proto = FakeNode.prototype as unknown as Record<string, unknown>;
+  proto.getAnimations = (options: { subtree?: boolean }) => (options.subtree ? layers : []);
+  t.after(() => {
+    delete proto.getAnimations;
+  });
+  const banner = mountStatusBanner(session());
+
+  banner.setPresence({ waiting: false, turn: AGENTS_TURN, items: 2 });
+
+  assert.ok(root.querySelector(".lsr-firefly"), "the agent's turn draws a firefly");
+  assert.deepEqual(
+    layers.map((layer) => layer.startTime),
+    [0, 0, 0],
+  );
+});
