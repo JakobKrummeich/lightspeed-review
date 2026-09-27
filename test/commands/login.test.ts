@@ -8,6 +8,10 @@ import { authStateDir, runLogin, type LoginDeps } from "../../src/commands/login
 import { ReviewError } from "../../src/errors.ts";
 import { lightspeedAuthPath } from "../../src/llm/pi-auth.ts";
 import { expandHome } from "../../src/paths.ts";
+import { isolateHome } from "../helpers/isolated-home.ts";
+
+// The default state dir is resolved here, under a HOME of this file's own.
+isolateHome();
 
 const oauthCredential: Credential = {
   type: "oauth",

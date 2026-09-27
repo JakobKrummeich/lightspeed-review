@@ -5,6 +5,10 @@ import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, loadLedgerConfig, loadServiceConfig } from "../src/config.ts";
 import { ReviewError } from "../src/errors.ts";
+import { isolateHome } from "./helpers/isolated-home.ts";
+
+// Every default below is read under a HOME of this file's own.
+isolateHome();
 
 function repoWithConfig(contents: string | undefined): string {
   const repoRoot = mkdtempSync(join(tmpdir(), "lsr-config-"));
