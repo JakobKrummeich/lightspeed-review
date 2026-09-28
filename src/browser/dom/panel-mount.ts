@@ -34,8 +34,8 @@ import {
 } from "../review-memory.ts";
 import { deliveryFacts, handedOnTurn } from "../delivery.ts";
 import { foldPress, groupPress } from "./panel-folds.ts";
+import { keepDraft } from "./panel-draft.ts";
 import type { PanelLight } from "./panel-light.ts";
-import { saveLater } from "./save-later.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
 import { threadsOf } from "../../threads.ts";
@@ -101,17 +101,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     scrollHost: root.querySelector<HTMLElement>(".lsr-panel-scroll"),
     composeHost: root.querySelector<HTMLElement>(".lsr-compose"),
   };
-  // Draft stored on a delay: typing is a burst, and every keystroke would
-  // restringify every queued pill.
-  const rememberDraft = saveLater(() =>
-    updateMemory(storage, key, { draft: generalCommentBox(root)?.value ?? "" }),
-  );
-  // Pagehide mid-sentence is exactly what the delay would lose; cut it short.
-  window.addEventListener("pagehide", () => rememberDraft.now());
-  // Written back, not rendered into markup: a draft ending in whitespace or
-  // looking like a tag would not survive textarea markup.
-  const composeBox = generalCommentBox(root);
-  if (composeBox) composeBox.value = remembered.draft;
+  keepDraft(root, storage, key, remembered.draft);
   // Newest talk and the current-round line are at the bottom; opening at the
   // top would hide both behind an unsuspected scroll.
   toBottom(view.scrollHost);
@@ -119,9 +109,6 @@ export function mountPanel(options: PanelOptions): MountedPanel {
   lockControls(view);
 
   root.addEventListener("click", (event) => handleClick(view, event));
-  root.addEventListener("input", (event) => {
-    if (event.target === generalCommentBox(root)) rememberDraft.soon();
-  });
   // Both guard their own box, so neither can act on the other's Enter.
   root.addEventListener("keydown", (event) => {
     handleComposeKey(view, event);
