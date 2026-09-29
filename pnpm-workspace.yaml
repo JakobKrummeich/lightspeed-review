@@ -3,8 +3,9 @@ allowBuilds:
   "@google/genai": false
   protobufjs: false
 # pi-ai 0.99.1 and the pi-telemetry it pins were inside pnpm's 24h
-# minimumReleaseAge when pi-ai was bumped; both leave it by 2026-09-30 18:18 UTC.
-# Drop this block after that — it is there for the bump alone.
+# minimumReleaseAge when pi-ai was bumped; both are out of it by
+# 2026-09-30 18:21 UTC. Drop this block after that — it is there for the bump
+# alone.
 minimumReleaseAgeExclude:
   - "@earendil-works/pi-ai@0.99.1"
   - "@earendil-works/pi-telemetry@0.99.1"
