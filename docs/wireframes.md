@@ -380,7 +380,8 @@ or general comment in the draft cards — are a `button.lsr-draft-text`: a click
 Enter or Space swaps them for a `textarea.lsr-draft-edit` in place, filled with
 them, focused, caret at the end. Enter saves (Shift/Alt/Ctrl/Cmd+Enter break
 the line, as in every comment box), Escape puts the words back, leaving the
-box saves; saved empty, the pill is taken back as by its ×. Only the words
+box saves (switching to another window or app does not: the box stays open,
+words and caret kept); saved empty, the pill is taken back as by its ×. Only the words
 change — the pill keeps its place in the queue, its kind, anchor and round.
 A queued resolve has no words to press. Items from a v2 session, which carry no id, render as read-only
 legacy threads (`data-legacy`, no id, toggle or reply box). Each `--to main`

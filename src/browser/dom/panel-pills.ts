@@ -100,7 +100,8 @@ export function editKey<V extends EditView>(view: V, event: KeyboardEvent, draw:
 }
 
 /**
- * Leaving the box saves it; a box dropped by a redraw is not leaving it. The
+ * Leaving the box saves it; a box dropped by a redraw is not leaving it, nor is
+ * a switch to another window (`windowLeft`). The
  * save's redraw replaces what the focus was headed for — the next control on a
  * Tab, a reply box clicked into — so the focus is put on its twin in the fresh
  * column, or it would land nowhere.
@@ -108,7 +109,7 @@ export function editKey<V extends EditView>(view: V, event: KeyboardEvent, draw:
 export function editBlur<V extends EditView>(view: V, event: FocusEvent, draw: Draw<V>): void {
   const box = event.target;
   if (!(box instanceof HTMLElement) || !box.classList.contains("lsr-draft-edit")) return;
-  if (redrawing.has(view.options.root)) return;
+  if (redrawing.has(view.options.root) || windowLeft(event)) return;
   const before = view.state.pending;
   const edited = view.state.editing;
   const saved = saveEdit(view, (box as HTMLTextAreaElement).value, draw, false);
@@ -249,6 +250,16 @@ function editBox(root: HTMLElement): HTMLTextAreaElement | null {
 
 function wordsOf(pill: QueuedPill): string {
   return pill.type === "resolve" ? "" : pill.comment;
+}
+
+/**
+ * The window lost the focus — another window or app took it — not the box:
+ * nothing in the page is taking it, and the page no longer has it. The box
+ * stays open with its words; the browser gives it the focus back on return.
+ */
+function windowLeft(event: FocusEvent): boolean {
+  const page = (globalThis as { document?: Document }).document;
+  return event.relatedTarget === null && page?.hasFocus?.() === false;
 }
 
 /** No `document` outside a browser; there is then nothing focused to keep. */

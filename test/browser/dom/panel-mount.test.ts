@@ -2260,3 +2260,24 @@ test("a Shift+Tab onto the × of the pill saved empty focuses no other pill's ×
 
   assert.equal(page.activeElement, null);
 });
+
+test("switching to another window leaves the box open with its words; leaving it after saves", (t) => {
+  const page = trackFocus(t) as { activeElement: unknown; hasFocus?: () => boolean };
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation]);
+  const box = openEdit(root);
+  box.value = "wrap it all";
+
+  // The window lost the focus, not the box: nothing in the page took it.
+  page.hasFocus = () => false;
+  root.dispatch("focusout", { target: box, relatedTarget: null });
+
+  assert.equal(editBoxOf(root), box, "still open, not redrawn");
+  assert.equal(box.value, "wrap it all");
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, round: 0 }]);
+
+  page.hasFocus = () => true;
+  root.dispatch("focusout", { target: box, relatedTarget: null });
+  assert.equal(editBoxOf(root), null);
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, comment: "wrap it all", round: 0 }]);
+});
