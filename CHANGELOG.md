@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- The **Between rounds** replay no longer repeats what you already read in
+  the conversation panel. An answer the panel showed before the round
+  arrived is left off its card, and the round reply keeps only the parts
+  you have not seen; what changed is always shown. Words the agent sent
+  together with the new round still appear. A replay left with nothing
+  new — no unread words and no change — no longer opens on its own;
+  **Replay last round** still opens it. Which replies you have seen is
+  remembered across reloads.
 - **Send N to Agent** counts what you did, not the pills it took: every new
   comment is one, and every thread you replied in or resolved is one however
   many replies and toggles went into it, so a reply and a resolve on one

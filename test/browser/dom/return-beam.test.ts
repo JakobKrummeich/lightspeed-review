@@ -2,7 +2,10 @@ import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { mountPanelLight } from "../../../src/browser/dom/panel-light.ts";
 import { returnBeam } from "../../../src/browser/dom/return-beam.ts";
-import type { ConversationEntry } from "../../../src/session-store.ts";
+import { readMemory } from "../../../src/browser/review-memory.ts";
+import { trackSeenReplies } from "../../../src/browser/seen-replies.ts";
+import type { ConversationEntry, RoundMark } from "../../../src/session-store.ts";
+import { FakeStorage } from "../fake-storage.ts";
 import { asElement, FakeBox, installLightDom } from "./fake-light-dom.ts";
 
 /**
@@ -188,17 +191,31 @@ const answered: ConversationEntry = {
   prompts: [{ type: "reply", thread: "t1", comment: "because" }],
 };
 
+const ROUNDS: RoundMark[] = [{ index: 0, at: "2025-01-01T00:00:00.000Z" }];
+const talk = (...conversation: ConversationEntry[]) => ({ conversation, rounds: ROUNDS });
+const noMemory = () => trackSeenReplies(new FakeStorage(), "k");
+
 test("the panel's light beams only for what the agent said since the last draw", (t) => {
   const { document, root } = page(t);
-  const light = mountPanelLight(asElement(root), [asked]);
+  const light = mountPanelLight(asElement(root), [asked], noMemory());
 
-  light.drawn([asked]);
+  light.drawn(talk(asked));
   assert.deepEqual(beams(document), [], "nothing new");
-  light.drawn([asked, answered]);
+  light.drawn(talk(asked, answered));
   assert.equal(beams(document).length, 1);
   t.mock.timers.tick(1800);
-  light.drawn([asked, answered]);
+  light.drawn(talk(asked, answered));
   assert.deepEqual(beams(document), [], "drawn once is seen");
+});
+
+test("every draw files what the agent said as seen in the review's memory", (t) => {
+  const { root } = page(t);
+  const storage = new FakeStorage();
+  const light = mountPanelLight(asElement(root), [asked], trackSeenReplies(storage, "k"));
+
+  light.drawn(talk(asked, answered));
+
+  assert.deepEqual(readMemory(storage, "k").seen, ["t1 2025-01-01T00:02:00.000Z"]);
 });
 
 test("every firefly the panel draws flies on the page's one clock, not from its own start", (t) => {
@@ -211,7 +228,7 @@ test("every firefly the panel draws flies on the page's one clock, not from its 
   });
   root.append(firefly);
 
-  mountPanelLight(asElement(root), []).drawn([]);
+  mountPanelLight(asElement(root), [], noMemory()).drawn(talk());
 
   assert.deepEqual(
     layers.map((layer) => layer.startTime),
@@ -224,7 +241,7 @@ test("the panel's light hands a send to Warp Send", (t) => {
   const send = new FakeBox("button", "", { id: "lsr-send" });
   root.append(send);
 
-  mountPanelLight(asElement(root), []).sent(false);
+  mountPanelLight(asElement(root), [], noMemory()).sent(false);
 
   assert.equal(send.getAttribute("data-light"), "flare");
 });

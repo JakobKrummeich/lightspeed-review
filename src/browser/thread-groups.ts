@@ -76,7 +76,12 @@ function splitMain(thread: Thread): (Thread & { main: boolean })[] {
 }
 
 function keyOf(thread: Thread & { main: boolean }): string {
-  return thread.main ? `${MAIN_THREAD}@${thread.at}` : thread.id;
+  return thread.main ? mainCardKey(thread.at) : thread.id;
+}
+
+/** The card of the `main` post said at `at`: each is its own card, so its time names it. */
+export function mainCardKey(at: string): string {
+  return `${MAIN_THREAD}@${at}`;
 }
 
 /**

@@ -1805,7 +1805,7 @@ function mountLit(t: TestContext, initial: SessionData = session()) {
         asked.push(
           `sent ended=${ended} queued=${queuedIn(root)} box=${root.querySelector("#lsr-general-comment")?.value}`,
         ),
-      drawn: (conversation) => asked.push(`drawn ${conversation.length}`),
+      drawn: (talk) => asked.push(`drawn ${talk.conversation.length}`),
     },
   });
   return { root, panel, asked };

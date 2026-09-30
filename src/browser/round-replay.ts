@@ -1,5 +1,7 @@
 import { roundOf } from "./conversation-rounds.ts";
 import type { DiffRenderer } from "./diff-renderer.ts";
+import { saidKey } from "./message-news.ts";
+import { mainCardKey } from "./thread-groups.ts";
 import { MAIN_THREAD } from "../threads.ts";
 import { escapeHtml } from "../escape-html.ts";
 import type {
@@ -9,7 +11,7 @@ import type {
   ReplayState,
   ReplayStatus,
 } from "../rounds/replay.ts";
-import type { ConversationEntry, RoundMark } from "../session-store.ts";
+import type { ConversationEntry, FeedbackPrompt, RoundMark } from "../session-store.ts";
 
 /**
  * Pure; `dom/replay-overlay.ts` holds the clicks. Only the current card
@@ -18,6 +20,11 @@ import type { ConversationEntry, RoundMark } from "../session-store.ts";
 export interface ReplayView {
   data: ReplayData;
   roundReply?: string;
+  /**
+   * The agent's messages the conversation panel drew before this round came
+   * (`saidKey`): the replay tells what is new, and never repeats them.
+   */
+  seen: ReadonlySet<string>;
   /** 0-based; clamped rather than trusted. */
   current: number;
 }
@@ -57,7 +64,7 @@ export function renderReplayOverlay(view: ReplayView, renderer: DiffRenderer): s
 <p class="lsr-replay-eyebrow">Between rounds</p>
 <p class="lsr-replay-progress">Comment ${current + 1} of ${total}</p>
 </header>
-${renderCard(comment, view.roundReply, renderer)}
+${renderCard(comment, answerOf(comment, view.roundReply, view.seen), renderer)}
 <footer class="lsr-replay-nav">
 <button type="button" class="lsr-replay-prev"${current === 0 ? " disabled" : ""}>Previous</button>
 <span class="lsr-replay-dots" aria-label="Which comment is on screen">${dots(total, current)}</span>
@@ -87,7 +94,7 @@ function dots(total: number, current: number): string {
 
 function renderCard(
   comment: ReplayComment,
-  roundReply: string | undefined,
+  answer: Answer | undefined,
   renderer: DiffRenderer,
 ): string {
   const status = knownStatus(comment.status);
@@ -97,7 +104,7 @@ function renderCard(
 <span class="lsr-replay-chip" data-status="${status}">${STATUS_LABEL[status]}</span>
 </header>
 ${quote(comment)}
-${answerNote(comment, roundReply)}
+${answerNote(answer)}
 ${changes(comment, renderer)}
 </article>`;
 }
@@ -113,20 +120,62 @@ function quote(comment: ReplayComment): string {
 </blockquote>`;
 }
 
+interface Answer {
+  label: "The agent's answer" | "The agent's round reply";
+  text: string;
+}
+
 /**
  * The round reply is labelled as exactly that: the label keeps the blob from
- * passing as a per-comment answer. Neither: no section, not an empty frame.
+ * passing as a per-comment answer. A note the panel already showed is left
+ * off, and does not fall back to the round reply either: the comment was
+ * answered, just not anew — the round reply there would pass as its answer.
  */
-function answerNote(comment: ReplayComment, roundReply: string | undefined): string {
+function answerOf(
+  comment: ReplayComment,
+  roundReply: string | undefined,
+  seen: ReadonlySet<string>,
+): Answer | undefined {
+  if (comment.note !== undefined) {
+    if (comment.note === "" || noteSeen(comment, seen)) return undefined;
+    return { label: "The agent's answer", text: comment.note };
+  }
   // A status-only card (history rewritten, commits gone) borrows nothing: the
   // round reply beside "cannot be shown" would read as this comment's answer.
-  const text = comment.note ?? (comment.state === "ok" ? roundReply : undefined);
-  if (text === undefined || text === "") return "";
-  const label = comment.note !== undefined ? "The agent's answer" : "The agent's round reply";
+  if (comment.state !== "ok" || roundReply === undefined || roundReply === "") return undefined;
+  return { label: "The agent's round reply", text: roundReply };
+}
+
+/** A note without its thread or stamp cannot be told seen, so it counts as new. */
+function noteSeen(comment: ReplayComment, seen: ReadonlySet<string>): boolean {
+  if (comment.id === null || comment.note_at === undefined) return false;
+  return seen.has(saidKey(comment.id, comment.note_at));
+}
+
+/** No answer: no section, not an empty frame. */
+function answerNote(answer: Answer | undefined): string {
+  if (answer === undefined) return "";
   return `<div class="lsr-replay-answer">
-<p class="lsr-replay-label">${label}</p>
-<p class="lsr-replay-note">${escapeHtml(text)}</p>
+<p class="lsr-replay-label">${answer.label}</p>
+<p class="lsr-replay-note">${escapeHtml(answer.text)}</p>
 </div>`;
+}
+
+/**
+ * Whether the replay has anything the reviewer has not seen: a change, or the
+ * agent's words the panel never drew. Without either every card would be the
+ * reviewer's own comment over "No code change", so it does not open on its
+ * own (the reopen control still offers it). A status-only card counts only
+ * when a change is there but too big to show: "history was rewritten" says
+ * nothing new about the code.
+ */
+export function replayHasNews(view: Pick<ReplayView, "data" | "roundReply" | "seen">): boolean {
+  return view.data.comments.some(
+    (comment) =>
+      comment.state === "oversize" ||
+      (comment.state === "ok" && comment.answers.length > 0) ||
+      answerOf(comment, view.roundReply, view.seen) !== undefined,
+  );
 }
 
 /**
@@ -191,11 +240,13 @@ function withNewline(text: string): string {
  * boundary (a `reply` carries the old stamp, a `publish --to` note the new);
  * what they share is coming after the comments they answer. Only the agent's
  * top-level words count here (`--to main`, or a 2.x message): a note in an
- * item's thread is shown on that item's own card.
+ * item's thread is shown on that item's own card. Words the panel already drew
+ * (`seen`) are left out: the replay tells only what the reviewer has not read.
  */
 export function agentRoundReply(
   conversation: readonly ConversationEntry[],
   rounds: readonly RoundMark[],
+  seen: ReadonlySet<string>,
 ): string | undefined {
   const made = rounds.at(-2)?.index;
   if (made === undefined) return undefined;
@@ -205,12 +256,22 @@ export function agentRoundReply(
   const said = conversation
     .slice(lastComment + 1)
     .filter((entry) => entry.role === "agent" && roundOf(entry, rounds) >= made)
-    .flatMap((entry) => entry.prompts)
-    .filter(
-      (prompt) =>
-        prompt.type === "message" || (prompt.type === "reply" && prompt.thread === MAIN_THREAD),
-    )
-    .map((prompt) => (prompt.type === "resolve" ? "" : prompt.comment.trim()))
-    .filter((text) => text !== "");
+    .flatMap((entry) => entry.prompts.flatMap((prompt) => topLevelWords(entry.at, prompt)))
+    .filter((words) => words.text !== "" && (words.key === undefined || !seen.has(words.key)))
+    .map((words) => words.text);
   return said.length === 0 ? undefined : said.join("\n\n");
+}
+
+/**
+ * The agent's top-level words, under the key the panel files them by
+ * (`saidKey`, of the card they draw on). A legacy message has no card key to
+ * name here, so it never reads as seen.
+ */
+function topLevelWords(at: string, prompt: FeedbackPrompt): { key?: string; text: string }[] {
+  if (prompt.type === "reply" && prompt.thread === MAIN_THREAD) {
+    return [{ key: saidKey(mainCardKey(at), at), text: prompt.comment.trim() }];
+  }
+  if (prompt.type !== "message") return [];
+  const text = prompt.comment.trim();
+  return [prompt.id === undefined ? { text } : { key: saidKey(prompt.id, at), text }];
 }

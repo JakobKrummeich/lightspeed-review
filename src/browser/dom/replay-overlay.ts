@@ -11,6 +11,8 @@ export interface ReplayOverlayHost {
 export interface ReplayOpening {
   data: ReplayData;
   roundReply?: string;
+  /** What the panel had drawn before the round came: left off the cards. */
+  seen: ReadonlySet<string>;
 }
 
 export interface ReplayOverlayControl {
@@ -50,7 +52,7 @@ export function mountReplayOverlay(host: ReplayOverlayHost): ReplayOverlayContro
   const draw = (): void => {
     if (open === undefined) return;
     host.root.innerHTML = renderReplayOverlay(
-      { data: open.data, roundReply: open.roundReply, current },
+      { data: open.data, roundReply: open.roundReply, seen: open.seen, current },
       host.renderer,
     );
     const last = open.data.comments.length - 1;

@@ -4,7 +4,12 @@ import type { Arrivals } from "../../../src/browser/dom/jump-overlay.ts";
 import type { ReplayOpening } from "../../../src/browser/dom/replay-overlay.ts";
 import { wireReplay, type ReplayHosts } from "../../../src/browser/dom/replay-wiring.ts";
 import type { SessionData } from "../../../src/browser/dom/session-api.ts";
+import { currentRound } from "../../../src/browser/conversation-rounds.ts";
+import { createDiff2HtmlRenderer } from "../../../src/browser/diff2html-adapter.ts";
+import { agentMessages } from "../../../src/browser/message-news.ts";
 import { readMemory } from "../../../src/browser/review-memory.ts";
+import { renderReplayOverlay } from "../../../src/browser/round-replay.ts";
+import { trackSeenReplies } from "../../../src/browser/seen-replies.ts";
 import type { ReplayComment, ReplayData } from "../../../src/rounds/replay.ts";
 import type { ConversationEntry, RoundMark } from "../../../src/session-store.ts";
 import { FakeStorage } from "../fake-storage.ts";
@@ -103,6 +108,7 @@ function tab(
 ) {
   const flight = fakeArrivals();
   const opened: string[] = [];
+  const openings: ReplayOpening[] = [];
   const reopen = new FakeNode("button", "hidden");
   const page: ReplayHosts = {
     key: KEY,
@@ -113,27 +119,42 @@ function tab(
   };
   const live = { round: 0, drawn: roundOf(1) };
   let served: ReplayData = { comments: [] };
-  const wired = wireReplay(page, live, {
+  const seen = trackSeenReplies(storage, KEY);
+  const wired = wireReplay(page, live, seen, {
     arrivals: () => flight.arrival,
     fetch: answer ?? (async () => served),
     storage,
     visibility,
     overlay: () => ({
-      open: (opening: ReplayOpening) => opened.push(opening.data.comments[0]?.id ?? "?"),
+      open: (opening: ReplayOpening) => {
+        openings.push(opening);
+        opened.push(opening.data.comments[0]?.id ?? "?");
+      },
     }),
   });
+  /** The conversation panel drawing `session`, as its light reports every draw. */
+  const draw = (session: SessionData): void =>
+    seen.drawn(agentMessages(session.conversation), currentRound(session.rounds));
   /** The page's own order for a new round: arriving, the draw, then the replay asked for. */
   const arrive = (fresh: SessionData, commentedOn = true): void => {
     served = commentedOn ? cardsOf(`r${fresh.rounds.length - 1}`) : { comments: [] };
     wired.arriving(fresh);
     live.round = fresh.rounds.length - 1;
     wired.refreshReplay(fresh);
+    draw(fresh);
+  };
+  /** The page loading on `session`: `main.ts` draws the panel, then wires the replay. */
+  const load = (session: SessionData): void => {
+    live.round = currentRound(session.rounds);
+    draw(session);
+    wired.arriving(session);
+    wired.refreshReplay(session);
   };
   /** The review ends inside the round: the page draws it, no arrival. */
   const end = (): void => {
     live.drawn = { ...live.drawn, status: "ended" };
   };
-  return { ...flight, opened, reopen, storage, visibility, arrive, end };
+  return { ...flight, opened, openings, reopen, storage, visibility, arrive, load, draw, end };
 }
 
 test("a round whose replay opens arrives by the jump, and the replay opens as it lands", async () => {
@@ -394,4 +415,145 @@ test("a reopen that fails again stays offered", async () => {
 
   assert.deepEqual(page.opened, []);
   assert.equal(page.reopen.hidden, false);
+});
+
+/** Round marks up to `last`, a day apart. */
+function marks(last: number): RoundMark[] {
+  return Array.from({ length: last + 1 }, (_, index) => ({
+    index,
+    at: `2025-01-0${index + 1}T00:00:00.000Z`,
+  }));
+}
+
+/** The reviewer's comment `t1`, made in round 1. */
+const ASK: ConversationEntry = {
+  role: "reviewer",
+  at: "2025-01-02T01:00:00.000Z",
+  roundIndex: 1,
+  prompts: [
+    { type: "annotation", id: "t1", file: "a.ts", group: "A", selected_text: "x", comment: "why?" },
+  ],
+};
+
+function agentSaid(at: string, roundIndex: number, thread: string, comment: string) {
+  const entry: ConversationEntry = {
+    role: "agent",
+    at,
+    roundIndex,
+    prompts: [{ type: "reply", thread, comment }],
+  };
+  return entry;
+}
+
+/** Said in round 1, while the reviewer had the page open: the panel drew them. */
+const EARLY_NOTE = agentSaid("2025-01-02T02:00:00.000Z", 1, "t1", "looking at it");
+const EARLY_MAIN = agentSaid("2025-01-02T02:30:00.000Z", 1, "main", "renaming first");
+/** Said as round 2 was published: they come with the round. */
+const LATE_NOTE = agentSaid("2025-01-03T00:30:00.000Z", 2, "t1", "done: renamed");
+const LATE_MAIN = agentSaid("2025-01-03T00:31:00.000Z", 2, "main", "rebased too");
+
+function session(last: number, ...conversation: ConversationEntry[]): SessionData {
+  return { rounds: marks(last), conversation, status: "open" } as unknown as SessionData;
+}
+
+/** The server's card for `t1`: its note is the agent's last words in the thread. */
+function answeredCard(note: ConversationEntry, answers: ReplayComment["answers"] = []): ReplayData {
+  const [said] = note.prompts;
+  const words = said?.type === "reply" ? said.comment : "";
+  const [card] = cardsOf("t1").comments;
+  return { comments: [{ ...card!, answers, note: words, note_at: note.at }] };
+}
+
+const A_CHANGE: ReplayComment["answers"] = [
+  {
+    file: "a.ts",
+    hunks: [{ header: "@@ -1 +1 @@", body: "-x\n+y", insertions: 1, deletions: 1 }],
+  },
+];
+
+/** The first card as the reviewer would read it. */
+function shown(opening: ReplayOpening | undefined): string {
+  assert.ok(opening, "a replay was opened");
+  return renderReplayOverlay({ ...opening, current: 0 }, createDiff2HtmlRenderer());
+}
+
+test("words the panel drew before the round came are not repeated in its replay", async () => {
+  const page = tab(new FakeStorage(), async () => answeredCard(EARLY_NOTE, A_CHANGE));
+  page.draw(session(1, ASK, EARLY_NOTE, EARLY_MAIN));
+
+  page.arrive(session(2, ASK, EARLY_NOTE, EARLY_MAIN, LATE_MAIN));
+  await settled();
+  page.land();
+
+  const html = shown(page.openings[0]);
+  assert.doesNotMatch(html, /looking at it/, "the thread's answer was read in the panel");
+  assert.doesNotMatch(html, /lsr-replay-answer"/);
+  assert.match(html, /lsr-replay-diff/, "what changed still shows");
+  assert.equal(page.openings[0]?.roundReply, "rebased too", "only the round reply not yet read");
+});
+
+test("words that come with the round are shown, though the panel draws them before it opens", async () => {
+  const page = tab(new FakeStorage(), async () => answeredCard(LATE_NOTE));
+  page.draw(session(1, ASK, EARLY_NOTE, EARLY_MAIN));
+
+  // `arrive` draws the round's conversation right after asking for the replay,
+  // as `applyRound` does — the replay only opens once the jump lands after it.
+  page.arrive(session(2, ASK, EARLY_NOTE, EARLY_MAIN, LATE_NOTE, LATE_MAIN));
+  await settled();
+  page.land();
+
+  assert.match(shown(page.openings[0]), /lsr-replay-note">done: renamed</);
+  assert.equal(page.openings[0]?.roundReply, "rebased too");
+});
+
+test("a redraw that brings the round's words ahead of the round does not count them seen", async () => {
+  const page = tab(new FakeStorage(), async () => answeredCard(LATE_NOTE));
+  page.draw(session(1, ASK, EARLY_NOTE));
+  const next = session(2, ASK, EARLY_NOTE, LATE_NOTE, LATE_MAIN);
+
+  // A feedback event redraws the panel from a session that already holds round 2.
+  page.draw(next);
+  page.arrive(next);
+  await settled();
+  page.land();
+
+  assert.match(shown(page.openings[0]), /lsr-replay-note">done: renamed</);
+  assert.equal(page.openings[0]?.roundReply, "rebased too");
+});
+
+test("what the panel drew survives a reload; what came with the round still shows", async () => {
+  const shared = new FakeStorage();
+  const before = tab(shared);
+  before.draw(session(1, ASK, EARLY_NOTE, EARLY_MAIN));
+
+  // The tab was closed; the agent answered and published; the reviewer opens the review.
+  const reloaded = tab(shared, async () => answeredCard(LATE_NOTE));
+  reloaded.load(session(2, ASK, EARLY_NOTE, EARLY_MAIN, LATE_NOTE, LATE_MAIN));
+  await settled();
+  reloaded.land();
+
+  assert.match(shown(reloaded.openings[0]), /done: renamed/);
+  assert.equal(reloaded.openings[0]?.roundReply, "rebased too", "renaming first was read");
+
+  // Once that page drew them, they are read: a reload opened by hand leaves them out.
+  const again = tab(shared, async () => answeredCard(LATE_NOTE, A_CHANGE));
+  again.load(session(2, ASK, EARLY_NOTE, EARLY_MAIN, LATE_NOTE, LATE_MAIN));
+  await settled();
+  assert.deepEqual(again.opened, [], "the round had its showing");
+  again.reopen.dispatch("click", {});
+  assert.doesNotMatch(shown(again.openings[0]), /done: renamed/);
+  assert.equal(again.openings[0]?.roundReply, undefined);
+});
+
+test("a round whose words were all read and that changed nothing does not open on its own", async () => {
+  const page = tab(new FakeStorage(), async () => answeredCard(EARLY_NOTE));
+  page.draw(session(1, ASK, EARLY_NOTE));
+
+  page.arrive(session(2, ASK, EARLY_NOTE));
+  await settled();
+  page.land();
+
+  assert.deepEqual(page.opened, []);
+  assert.equal(page.reopen.hidden, false, "still there to open by hand");
+  assert.equal(readMemory(page.storage, KEY).replayed, 2, "and the round's showing is spent");
 });

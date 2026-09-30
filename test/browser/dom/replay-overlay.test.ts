@@ -91,7 +91,7 @@ function click(root: FakeNode, selector: string): void {
 test("opening draws the first card and hands the caret to the primary button", (t) => {
   const { root, overlay } = mounted(t);
 
-  overlay.open({ data: data(3) });
+  overlay.open({ data: data(3), seen: new Set() });
 
   assert.equal(progress(root), "Comment 1 of 3");
   assert.equal(root.querySelector(".lsr-replay-next")?.focused, true);
@@ -99,7 +99,7 @@ test("opening draws the first card and hands the caret to the primary button", (
 
 test("Next and Previous walk the cards, and the dots jump straight to one", (t) => {
   const { root, overlay } = mounted(t);
-  overlay.open({ data: data(3) });
+  overlay.open({ data: data(3), seen: new Set() });
 
   click(root, ".lsr-replay-next");
   assert.equal(progress(root), "Comment 2 of 3");
@@ -115,7 +115,7 @@ test("Next and Previous walk the cards, and the dots jump straight to one", (t) 
 
 test("Done on the last card closes, empties the landmark and reports the close once", (t) => {
   const { root, overlay, closes } = mounted(t);
-  overlay.open({ data: data(2) });
+  overlay.open({ data: data(2), seen: new Set() });
 
   click(root, ".lsr-replay-next");
   click(root, ".lsr-replay-next");
@@ -126,7 +126,7 @@ test("Done on the last card closes, empties the landmark and reports the close o
 
 test("Skip to the diff closes from any card", (t) => {
   const { root, overlay, closes } = mounted(t);
-  overlay.open({ data: data(3) });
+  overlay.open({ data: data(3), seen: new Set() });
 
   click(root, ".lsr-replay-skip");
 
@@ -136,7 +136,7 @@ test("Skip to the diff closes from any card", (t) => {
 
 test("Esc closes, and its listener does not outlive the dialog it was for", (t) => {
   const { root, overlay, closes, page } = mounted(t);
-  overlay.open({ data: data(2) });
+  overlay.open({ data: data(2), seen: new Set() });
 
   page.press("a");
   assert.notEqual(root.innerHTML, "", "an ordinary key is not a way out");
@@ -154,20 +154,34 @@ test("focus goes back where it was, which is how the header control keeps the ca
   const { root, overlay, page } = mounted(t);
   const reopen = new FakeNode("button", 'id="lsr-replay-reopen"');
   page.activeElement = reopen;
-  overlay.open({ data: data(1) });
+  overlay.open({ data: data(1), seen: new Set() });
 
   click(root, ".lsr-replay-skip");
 
   assert.equal(reopen.focused, true);
 });
 
+test("a card's answer the panel already showed is left off; the other cards keep theirs", (t) => {
+  const { root, overlay } = mounted(t);
+  const stamped = data(2).comments.map((card) => ({
+    ...card,
+    note_at: "2025-01-01T00:07:00.000Z",
+  }));
+
+  overlay.open({ data: { comments: stamped }, seen: new Set(["c0 2025-01-01T00:07:00.000Z"]) });
+
+  assert.equal(root.querySelector(".lsr-replay-note"), null, "c0's answer was read in the panel");
+  click(root, ".lsr-replay-next");
+  assert.equal(root.querySelector(".lsr-replay-note")?.textContent, "note for c1");
+});
+
 test("reopening starts the replay over from the first card", (t) => {
   const { root, overlay } = mounted(t);
-  overlay.open({ data: data(3) });
+  overlay.open({ data: data(3), seen: new Set() });
   click(root, ".lsr-replay-next");
   click(root, ".lsr-replay-skip");
 
-  overlay.open({ data: data(3) });
+  overlay.open({ data: data(3), seen: new Set() });
 
   assert.equal(progress(root), "Comment 1 of 3");
 });
@@ -175,7 +189,7 @@ test("reopening starts the replay over from the first card", (t) => {
 test("nothing to show is nothing shown: no dialog, no listener, no close to report", (t) => {
   const { root, overlay, closes, page } = mounted(t);
 
-  overlay.open({ data: { comments: [] } });
+  overlay.open({ data: { comments: [] }, seen: new Set() });
 
   assert.equal(root.innerHTML, "");
   assert.equal(page.keydownCount(), 0);

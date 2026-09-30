@@ -53,7 +53,7 @@ const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resol
 test("a round this page claimed is offered and auto-shown, spending the claim", async () => {
   const h = harness([3]);
 
-  h.refresh({ round: 3, roundReply: undefined, ended: false });
+  h.refresh({ round: 3, roundReply: undefined, ended: false, seen: new Set() });
   h.pending[0]?.resolve(dataOf("first"));
   await settled();
 
@@ -66,7 +66,7 @@ test("a round this page did not claim is offered for reopening but not shown", a
   // Shown before, or claimed by another tab on the same review.
   const h = harness();
 
-  h.refresh({ round: 3, roundReply: undefined, ended: false });
+  h.refresh({ round: 3, roundReply: undefined, ended: false, seen: new Set() });
   h.pending[0]?.resolve(dataOf("again"));
   await settled();
 
@@ -77,9 +77,9 @@ test("a round this page did not claim is offered for reopening but not shown", a
 test("an ended review and an empty round both leave nothing to reopen", async () => {
   const h = harness([3, 4]);
 
-  h.refresh({ round: 3, roundReply: undefined, ended: true });
+  h.refresh({ round: 3, roundReply: undefined, ended: true, seen: new Set() });
   h.pending[0]?.resolve(dataOf("ended"));
-  h.refresh({ round: 4, roundReply: undefined, ended: false });
+  h.refresh({ round: 4, roundReply: undefined, ended: false, seen: new Set() });
   h.pending[1]?.resolve({ comments: [] });
   await settled();
 
@@ -90,8 +90,8 @@ test("an ended review and an empty round both leave nothing to reopen", async ()
 test("a stale response landing after the newer one is dropped", async () => {
   const h = harness([4, 5]);
 
-  h.refresh({ round: 4, roundReply: "old", ended: false });
-  h.refresh({ round: 5, roundReply: "new", ended: false });
+  h.refresh({ round: 4, roundReply: "old", ended: false, seen: new Set() });
+  h.refresh({ round: 5, roundReply: "new", ended: false, seen: new Set() });
   h.pending[1]?.resolve(dataOf("new"));
   await settled();
   h.pending[0]?.resolve(dataOf("old"));
@@ -105,8 +105,8 @@ test("a stale response landing after the newer one is dropped", async () => {
 test("a stale response landing before the newer one is dropped too", async () => {
   const h = harness([4, 5]);
 
-  h.refresh({ round: 4, roundReply: "old", ended: false });
-  h.refresh({ round: 5, roundReply: "new", ended: false });
+  h.refresh({ round: 4, roundReply: "old", ended: false, seen: new Set() });
+  h.refresh({ round: 5, roundReply: "new", ended: false, seen: new Set() });
   h.pending[0]?.resolve(dataOf("old"));
   await settled();
   h.pending[1]?.resolve(dataOf("new"));
@@ -120,10 +120,10 @@ test("a stale response landing before the newer one is dropped too", async () =>
 test("a failed re-group fetch withdraws the previous round's cards", async () => {
   const h = harness([4, 5]);
 
-  h.refresh({ round: 4, roundReply: undefined, ended: false });
+  h.refresh({ round: 4, roundReply: undefined, ended: false, seen: new Set() });
   h.pending[0]?.resolve(dataOf("shown"));
   await settled();
-  h.refresh({ round: 5, roundReply: undefined, ended: false });
+  h.refresh({ round: 5, roundReply: undefined, ended: false, seen: new Set() });
   h.pending[1]?.reject(new Error("gone"));
   await settled();
 
@@ -134,7 +134,7 @@ test("a failed re-group fetch withdraws the previous round's cards", async () =>
 test("a failed fetch says so, so the reopen can stay and ask again", async () => {
   const h = harness([4]);
 
-  h.refresh({ round: 4, roundReply: undefined, ended: false });
+  h.refresh({ round: 4, roundReply: undefined, ended: false, seen: new Set() });
   h.pending[0]?.reject(new Error("boom"));
   await settled();
 
@@ -144,7 +144,7 @@ test("a failed fetch says so, so the reopen can stay and ask again", async () =>
 
 test("a retry fetches the same round again and opens it: asked by hand, no claim needed", async () => {
   const h = harness();
-  h.refresh({ round: 4, roundReply: "said", ended: false });
+  h.refresh({ round: 4, roundReply: "said", ended: false, seen: new Set() });
   h.pending[0]?.reject(new Error("boom"));
   await settled();
 
@@ -158,7 +158,7 @@ test("a retry fetches the same round again and opens it: asked by hand, no claim
 
 test("a retry spends the round's claim, so nothing opens it twice", async () => {
   const h = harness([4]);
-  h.refresh({ round: 4, roundReply: undefined, ended: false });
+  h.refresh({ round: 4, roundReply: undefined, ended: false, seen: new Set() });
   h.pending[0]?.reject(new Error("boom"));
   await settled();
 
@@ -173,13 +173,74 @@ test("a retry spends the round's claim, so nothing opens it twice", async () => 
 test("a failure the newer round superseded, or one on an ended review, offers no retry", async () => {
   const h = harness();
 
-  h.refresh({ round: 4, roundReply: undefined, ended: false });
-  h.refresh({ round: 5, roundReply: undefined, ended: true });
+  h.refresh({ round: 4, roundReply: undefined, ended: false, seen: new Set() });
+  h.refresh({ round: 5, roundReply: undefined, ended: true, seen: new Set() });
   h.pending[0]?.reject(new Error("stale"));
   h.pending[1]?.reject(new Error("ended"));
   await settled();
 
   assert.equal(h.failures.count, 0);
+});
+
+/** The default card's note, as the panel keys it once drawn. */
+const NOTE = "renamed it";
+const noteSeen = (id: string): Set<string> => new Set([`${id} 2025-01-01T00:07:00.000Z`]);
+
+function seenCard(id: string): ReplayData {
+  const [comment] = dataOf(id).comments;
+  return { comments: [{ ...comment!, note: NOTE, note_at: "2025-01-01T00:07:00.000Z" }] };
+}
+
+test("a claimed round with nothing the reviewer has not seen is offered, not opened", async () => {
+  const h = harness([3]);
+
+  h.refresh({ round: 3, roundReply: undefined, ended: false, seen: noteSeen("quiet") });
+  h.pending[0]?.resolve(seenCard("quiet"));
+  await settled();
+
+  assert.deepEqual(h.offers, [undefined, "quiet"], "the reopen still offers it");
+  assert.deepEqual(h.opened, []);
+  assert.equal(h.claims.length, 0, "the claim is spent: the round had its showing");
+});
+
+test("words the panel has not shown open the round's replay as before", async () => {
+  const h = harness([3]);
+
+  h.refresh({ round: 3, roundReply: undefined, ended: false, seen: noteSeen("other") });
+  h.pending[0]?.resolve(seenCard("quiet"));
+  await settled();
+
+  assert.deepEqual(h.opened, ["quiet"]);
+});
+
+test("asked for by hand, a replay with nothing new opens all the same", async () => {
+  const h = harness();
+  h.refresh({ round: 3, roundReply: undefined, ended: false, seen: noteSeen("quiet") });
+  h.pending[0]?.reject(new Error("boom"));
+  await settled();
+
+  h.retry();
+  h.pending[1]?.resolve(seenCard("quiet"));
+  await settled();
+
+  assert.deepEqual(h.opened, ["quiet"]);
+});
+
+test("the opening carries what the panel had drawn, so the cards leave it out", async () => {
+  const seen = noteSeen("first");
+  let carried: ReadonlySet<string> | undefined;
+  const refresher = createReplayRefresher({
+    fetch: () => Promise.resolve(dataOf("first")),
+    claimed: () => true,
+    open: (opening) => (carried = opening.seen),
+    offer: () => {},
+    failed: () => {},
+  });
+
+  refresher.refresh({ round: 3, roundReply: undefined, ended: false, seen });
+  await settled();
+
+  assert.equal(carried, seen);
 });
 
 test("with nothing asked yet, a retry asks nothing", () => {

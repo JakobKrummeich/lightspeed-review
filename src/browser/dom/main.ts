@@ -18,6 +18,7 @@ import { mountOpening } from "./opening-overlay.ts";
 import { reducedMotion, stillness } from "./stillness.ts";
 import { mountPanel, type MountedPanel } from "./panel-mount.ts";
 import { mountPanelLight } from "./panel-light.ts";
+import { trackSeenReplies, type SeenReplies } from "../seen-replies.ts";
 import type { LinePlace } from "./line-numbers.ts";
 import { mountPanelRail, type MountedRail } from "./panel-rail.ts";
 import { mountSchemeToggle } from "./scheme-toggle.ts";
@@ -145,7 +146,7 @@ async function main(): Promise<void> {
   finish.attach(side);
   wireSelection(page.diffRoot, side.panel);
 
-  const replay = wireOverlays(page, live, session);
+  const replay = wireOverlays(page, live, session, side.seen);
 
   // `reader.place`, not a flag: where the reviewer stands is only answerable
   // at the moment a round lands.
@@ -249,6 +250,7 @@ function mountPanelSide(
   beacon: MountedBeacon;
   railControl: MountedRail;
   panel: MountedPanel;
+  seen: SeenReplies;
 } {
   const banner = mountStatusBanner(session);
   // The header's word for the turn, and the tab's for a reviewer not looking at it.
@@ -258,7 +260,9 @@ function mountPanelSide(
     page: document.body,
     onToggle,
   });
-  const light = mountPanelLight(page.panelRoot, session.conversation);
+  // Read before the panel's first draw below, which files what it shows as seen.
+  const seen = trackSeenReplies(localStorage, page.key);
+  const light = mountPanelLight(page.panelRoot, session.conversation, seen);
   const panel = mountPanel({
     root: page.panelRoot,
     key: page.key,
@@ -285,16 +289,21 @@ function mountPanelSide(
     light,
   });
   // The mount's render is the panel's first draw; the talk it shows is not news.
-  light.drawn(session.conversation);
-  return { banner, beacon, railControl, panel };
+  light.drawn(session);
+  return { banner, beacon, railControl, panel, seen };
 }
 
 /**
  * The one place that knows a round never opens on both overlays: opening for
  * a first round, replay after a commented one.
  */
-function wireOverlays(page: Page, live: LiveSession, session: SessionData): WiredReplay {
-  const replay = wireReplay(page, live);
+function wireOverlays(
+  page: Page,
+  live: LiveSession,
+  session: SessionData,
+  seen: SeenReplies,
+): WiredReplay {
+  const replay = wireReplay(page, live, seen);
   // A page opened on a round not yet replayed arrives by the jump as well.
   replay.arriving(session);
   replay.refreshReplay(session);

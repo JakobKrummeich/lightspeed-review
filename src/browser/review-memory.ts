@@ -42,6 +42,12 @@ export interface ReviewMemory {
   folds: Record<string, ThreadFold>;
   /** The resolved group starts folded; unfolding it is a choice kept per review. */
   resolvedShown: boolean;
+  /**
+   * The agent's messages the conversation panel has drawn (`saidKey` in
+   * `message-news.ts`), oldest first: the round replay leaves out words the
+   * reviewer already had in front of them. Not round-stamped: threads outlive rounds.
+   */
+  seen: string[];
 }
 
 /**
@@ -80,6 +86,13 @@ const KEY_PREFIX = "lsr:memory:";
  */
 export const MEMORY_SESSION_LIMIT = 8;
 
+/**
+ * Far past what one round's replay can ask about (the agent's words since the
+ * last round's comments), and ~8 KB at most: the oldest go first, and they are
+ * the ones no replay will ask about again.
+ */
+export const SEEN_REPLY_LIMIT = 200;
+
 export function readMemory(storage: ReviewMemoryStorage, sessionKey: string): ReviewMemory {
   const stored = attempt(() => storage.getItem(storageKey(sessionKey)));
   return parseMemory(stored ?? undefined) ?? emptyMemory();
@@ -106,7 +119,8 @@ export function updateMemory(
   sessionKey: string,
   patch: Partial<ReviewMemory>,
 ): void {
-  const next = { ...rebased(readMemory(storage, sessionKey), patch.round), ...patch };
+  const merged = { ...rebased(readMemory(storage, sessionKey), patch.round), ...patch };
+  const next = { ...merged, seen: merged.seen.slice(-SEEN_REPLY_LIMIT) };
   if (isEmpty(next)) {
     attempt(() => storage.removeItem(storageKey(sessionKey)));
     return;
@@ -136,10 +150,11 @@ function nothingUnsent(memory: ReviewMemory): boolean {
 
 /**
  * Dropping the record while either overlay's flag stands would give it a
- * second turn on next load — the one thing both must never do.
+ * second turn on next load — the one thing both must never do. Seen replies
+ * likewise: dropped, the replay would repeat what the panel already showed.
  */
 function nothingShownYet(memory: ReviewMemory): boolean {
-  return memory.replayed === undefined && !memory.unwrapped;
+  return memory.replayed === undefined && !memory.unwrapped && memory.seen.length === 0;
 }
 
 function noPlaceKept(memory: ReviewMemory): boolean {
@@ -152,7 +167,8 @@ function noPlaceKept(memory: ReviewMemory): boolean {
 }
 
 /**
- * Gives ground on quota: first other reviews, then this review's place. Queue
+ * Gives ground on quota: first other reviews, then this review's place and
+ * seen replies. Queue
  * and draft go last — the only things not recoverable by scrolling.
  */
 function write(storage: ReviewMemoryStorage, sessionKey: string, memory: ReviewMemory): void {
@@ -161,9 +177,10 @@ function write(storage: ReviewMemoryStorage, sessionKey: string, memory: ReviewM
   if (put(storage, key, memory)) return;
   evictOthers(storage, key);
   if (put(storage, key, memory)) return;
-  // Still no room: keep going without the place. A thrown error would lose
-  // the page; a reload loses the queue either way.
-  put(storage, key, { ...memory, ...emptyPlace(), round: undefined });
+  // Still no room: keep going without the place, and without the seen replies
+  // (the worst that costs is a replay repeating a reply). A thrown error would
+  // lose the page; a reload loses the queue either way.
+  put(storage, key, { ...memory, ...emptyPlace(), round: undefined, seen: [] });
 }
 
 /**
@@ -247,6 +264,9 @@ function parseMemory(text: string | undefined): ReviewMemory | undefined {
     focus: asInteger(value.focus),
     folds: restoredFolds(value.folds),
     resolvedShown: value.resolvedShown === true,
+    seen: asArray(value.seen)
+      .filter((entry) => typeof entry === "string")
+      .slice(-SEEN_REPLY_LIMIT),
   };
 }
 
@@ -306,6 +326,7 @@ function emptyMemory(): ReviewMemory {
     ...emptyPlace(),
     folds: {},
     resolvedShown: false,
+    seen: [],
   };
 }
 

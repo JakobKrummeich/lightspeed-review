@@ -234,7 +234,7 @@ function draw(view: PanelView): void {
   if (focused !== undefined) replyBox(options.root, focused)?.focus();
   if (following) toBottom(scrollHost);
   // After the scroll: whether a new card is in sight decides how it is lit.
-  options.light?.drawn(state.conversation);
+  options.light?.drawn(state);
   options.onPending(tallyOf(state.pending));
   // Queue stored on every change, no delay: a pill is one gesture, and the
   // thing a reload must not lose.

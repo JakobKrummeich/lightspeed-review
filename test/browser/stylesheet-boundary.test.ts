@@ -138,12 +138,16 @@ const REPLAY_CARD: ReplayComment = {
 function replayOverlay(): string {
   const renderer = { renderFile: (diff: string) => `<pre>${diff}</pre>` };
   return [
-    renderReplayOverlay({ data: { comments: [REPLAY_CARD, REPLAY_CARD] }, current: 0 }, renderer),
+    renderReplayOverlay(
+      { data: { comments: [REPLAY_CARD, REPLAY_CARD] }, current: 0, seen: new Set() },
+      renderer,
+    ),
     renderReplayOverlay(
       {
         data: { comments: [{ ...REPLAY_CARD, note: undefined, answers: [] }] },
         roundReply: "the round reply",
         current: 0,
+        seen: new Set(),
       },
       renderer,
     ),
@@ -151,6 +155,7 @@ function replayOverlay(): string {
       {
         data: { comments: [{ ...REPLAY_CARD, state: "unreachable", status: "unknown" }] },
         current: 0,
+        seen: new Set(),
       },
       renderer,
     ),

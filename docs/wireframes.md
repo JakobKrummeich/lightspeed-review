@@ -609,6 +609,13 @@ hue the reviewer's words wear in the sidechat and on the "commented last
 round" badge. No stripe down its edge: tint and label already set it apart
 from the agent's answer on the bare card below it.
 
+Only what the reviewer has not read: an answer the conversation panel already
+drew (`seen` in the review's memory) leaves the card without its
+`.lsr-replay-answer` block — no empty frame, no round reply in its place — and
+the round reply keeps only the parts not yet drawn. WHAT CHANGED always stays.
+A replay with no unread words and no change to show does not open on its own;
+`#lsr-replay-reopen` still offers it.
+
 ## 10. Ended overlay — closing summary (status-banner.ts)
 
 Topmost (z20). Scrim over the still-visible diff, one summary card.

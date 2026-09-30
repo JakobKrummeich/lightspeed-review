@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   MEMORY_SESSION_LIMIT,
   readMemory,
+  SEEN_REPLY_LIMIT,
   reviewPlace,
   updateMemory,
   type ReviewMemoryStorage,
@@ -63,6 +64,7 @@ test("a review nobody has touched remembers nothing", () => {
     focus: undefined,
     folds: {},
     resolvedShown: false,
+    seen: [],
   });
 });
 
@@ -209,6 +211,7 @@ test("fields stored as the wrong type fall back rather than travel", () => {
     focus: undefined,
     folds: {},
     resolvedShown: false,
+    seen: [],
   });
 });
 
@@ -510,6 +513,7 @@ test("a store too small even for that keeps the queue and lets the place go", ()
       scroll: 0,
       folds: {},
       resolvedShown: false,
+      seen: [],
     }).length +
     8;
 
@@ -569,6 +573,47 @@ test("a new round leaves the unwrapping standing, the way it leaves the replay",
   const memory = readMemory(storage, "abc123");
   assert.equal(memory.unwrapped, true, "the wrapper is opened once per review, not per round");
   assert.equal(memory.scroll, 0, "the place did not survive it");
+});
+
+test("the agent replies the panel showed come back after a reload, and are worth a record alone", () => {
+  const storage = new FakeStorage();
+
+  updateMemory(storage, "abc123", { seen: ["t1 2025-01-01T00:02:00.000Z"] });
+
+  assert.deepEqual(readMemory(storage, "abc123").seen, ["t1 2025-01-01T00:02:00.000Z"]);
+  // Dropped, the next load would take every reply for unread and the replay
+  // would repeat what the reviewer already read.
+  assert.ok(record(storage, "abc123"), "seen replies alone are worth keeping a record for");
+});
+
+test("a new round leaves the seen replies standing: threads outlive rounds", () => {
+  const storage = new FakeStorage();
+  updateMemory(storage, "abc123", { round: 1, scroll: 900, seen: ["t1 a"] });
+
+  updateMemory(storage, "abc123", { round: 2, groups: [2] });
+
+  assert.deepEqual(readMemory(storage, "abc123").seen, ["t1 a"]);
+});
+
+test("only the newest seen replies are kept, so a long review cannot grow the record for good", () => {
+  const storage = new FakeStorage();
+  const said = Array.from({ length: SEEN_REPLY_LIMIT + 5 }, (_, index) => `t${index} at`);
+
+  updateMemory(storage, "abc123", { seen: said });
+
+  const kept = readMemory(storage, "abc123").seen;
+  assert.equal(kept.length, SEEN_REPLY_LIMIT);
+  assert.deepEqual(kept, said.slice(5), "the oldest are the ones let go");
+});
+
+test("a seen list of the wrong shape keeps only its strings, capped on the way in too", () => {
+  const storage = new FakeStorage();
+  const tooMany = Array.from({ length: SEEN_REPLY_LIMIT + 1 }, (_, index) => `t${index} at`);
+  storage.setItem("lsr:memory:abc123", JSON.stringify({ v: 1, at: 1, seen: [7, ...tooMany] }));
+  storage.setItem("lsr:memory:other", JSON.stringify({ v: 1, at: 1, seen: "t1 at" }));
+
+  assert.deepEqual(readMemory(storage, "abc123").seen, tooMany.slice(1));
+  assert.deepEqual(readMemory(storage, "other").seen, []);
 });
 
 test("a corrupt unwrapped flag reads as a review nobody has opened yet", () => {
