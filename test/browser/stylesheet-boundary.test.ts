@@ -132,7 +132,7 @@ const REPLAY_CARD: ReplayComment = {
 
 /**
  * The overlay in the three shapes that draw different elements: an answered card
- * with hunks and dots, an unanswered one falling back to the round reply, and a
+ * with hunks and dots, an unanswered one under the round reply's block, and a
  * card whose commits a rebase took away. One shape leaves the others unguarded.
  */
 function replayOverlay(): string {

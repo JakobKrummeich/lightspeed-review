@@ -64,7 +64,8 @@ export function renderReplayOverlay(view: ReplayView, renderer: DiffRenderer): s
 <p class="lsr-replay-eyebrow">Between rounds</p>
 <p class="lsr-replay-progress">Comment ${current + 1} of ${total}</p>
 </header>
-${renderCard(comment, view, renderer)}
+${roundReplyNote(view.roundReply)}
+${renderCard(comment, view.seen, renderer)}
 <footer class="lsr-replay-nav">
 <button type="button" class="lsr-replay-prev"${current === 0 ? " disabled" : ""}>Previous</button>
 <span class="lsr-replay-dots" aria-label="Which comment is on screen">${dots(total, current)}</span>
@@ -92,12 +93,29 @@ function dots(total: number, current: number): string {
   ).join("");
 }
 
+/**
+ * The agent's top-level words for the round, above every card rather than on
+ * one: they answer no single comment, and one block shows them once however
+ * many cards there are.
+ */
+function roundReplyNote(roundReply: string | undefined): string {
+  if (!hasRoundReply(roundReply)) return "";
+  return `<div class="lsr-replay-answer lsr-replay-round">
+<p class="lsr-replay-label">The agent's round reply</p>
+<p class="lsr-replay-note">${escapeHtml(roundReply)}</p>
+</div>`;
+}
+
+function hasRoundReply(roundReply: string | undefined): roundReply is string {
+  return roundReply !== undefined && roundReply !== "";
+}
+
 function renderCard(
   comment: ReplayComment,
-  view: Pick<ReplayView, "roundReply" | "seen">,
+  seen: ReadonlySet<string>,
   renderer: DiffRenderer,
 ): string {
-  const answer = answerOf(comment, view.roundReply, view.seen);
+  const answer = answerOf(comment, seen);
   const status = knownStatus(comment.status);
   return `<article class="lsr-replay-card">
 <header class="lsr-replay-file">
@@ -106,7 +124,7 @@ function renderCard(
 </header>
 ${quote(comment)}
 ${answerNote(answer)}
-${changes(comment, noChangeLine(comment, answer, view.seen), renderer)}
+${changes(comment, noChangeLine(answer), renderer)}
 </article>`;
 }
 
@@ -121,30 +139,12 @@ function quote(comment: ReplayComment): string {
 </blockquote>`;
 }
 
-interface Answer {
-  label: "The agent's answer" | "The agent's round reply";
-  text: string;
-}
-
-/**
- * The round reply is labelled as exactly that: the label keeps the blob from
- * passing as a per-comment answer. A note the panel already showed is left
- * off, and does not fall back to the round reply either: the comment was
- * answered, just not anew — the round reply there would pass as its answer.
- */
-function answerOf(
-  comment: ReplayComment,
-  roundReply: string | undefined,
-  seen: ReadonlySet<string>,
-): Answer | undefined {
-  if (comment.note !== undefined) {
-    if (comment.note === "" || noteSeen(comment, seen)) return undefined;
-    return { label: "The agent's answer", text: comment.note };
+/** The card's own note, unless empty or already shown by the panel. */
+function answerOf(comment: ReplayComment, seen: ReadonlySet<string>): string | undefined {
+  if (comment.note === undefined || comment.note === "" || noteSeen(comment, seen)) {
+    return undefined;
   }
-  // A status-only card (history rewritten, commits gone) borrows nothing: the
-  // round reply beside "cannot be shown" would read as this comment's answer.
-  if (comment.state !== "ok" || roundReply === undefined || roundReply === "") return undefined;
-  return { label: "The agent's round reply", text: roundReply };
+  return comment.note;
 }
 
 /** A note without its thread or stamp cannot be told seen, so it counts as new. */
@@ -154,44 +154,37 @@ function noteSeen(comment: ReplayComment, seen: ReadonlySet<string>): boolean {
 }
 
 /** No answer: no section, not an empty frame. */
-function answerNote(answer: Answer | undefined): string {
+function answerNote(answer: string | undefined): string {
   if (answer === undefined) return "";
   return `<div class="lsr-replay-answer">
-<p class="lsr-replay-label">${answer.label}</p>
-<p class="lsr-replay-note">${escapeHtml(answer.text)}</p>
+<p class="lsr-replay-label">The agent's answer</p>
+<p class="lsr-replay-note">${escapeHtml(answer)}</p>
 </div>`;
 }
 
 /**
  * Whether the replay has anything the reviewer has not seen: a change, or the
- * agent's words the panel never drew. Without either every card would be the
- * reviewer's own comment over "No code change", so it does not open on its
- * own (the reopen control still offers it). A status-only card counts only
- * when a change is there but too big to show: "history was rewritten" says
- * nothing new about the code.
+ * agent's words the panel never drew, on a card or in the round reply.
+ * Without either every card would be the reviewer's own comment over "No code
+ * change", so it does not open on its own (the reopen control still offers
+ * it). A status-only card counts only when a change is there but too big to
+ * show: "history was rewritten" says nothing new about the code.
  */
 export function replayHasNews(view: Pick<ReplayView, "data" | "roundReply" | "seen">): boolean {
-  return view.data.comments.some(
-    (comment) =>
-      comment.state === "oversize" ||
-      (comment.state === "ok" && comment.answers.length > 0) ||
-      answerOf(comment, view.roundReply, view.seen) !== undefined,
+  return (
+    hasRoundReply(view.roundReply) ||
+    view.data.comments.some(
+      (comment) =>
+        comment.state === "oversize" ||
+        (comment.state === "ok" && comment.answers.length > 0) ||
+        answerOf(comment, view.seen) !== undefined,
+    )
   );
 }
 
-/**
- * What an empty answer set says: it points to a reply only when the card holds
- * one. An answer left off as already read is named as read, in its thread;
- * with no words at all there is nothing to point to.
- */
-function noChangeLine(
-  comment: ReplayComment,
-  answer: Answer | undefined,
-  seen: ReadonlySet<string>,
-): string {
-  if (answer !== undefined) return "No code change — see the reply.";
-  if (noteSeen(comment, seen)) return "No code change — you read the reply in its thread.";
-  return "No code change.";
+/** What an empty answer set says: it points to a reply only when the card holds one. */
+function noChangeLine(answer: string | undefined): string {
+  return answer === undefined ? "No code change." : "No code change — see the reply.";
 }
 
 /**

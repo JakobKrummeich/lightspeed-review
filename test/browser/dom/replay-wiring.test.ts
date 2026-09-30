@@ -575,6 +575,22 @@ test("a round whose words were all read and that changed nothing does not open o
   assert.equal(readMemory(page.storage, KEY).replayed, 2, "and the round's showing is spent");
 });
 
+test("every card's words read but a round reply unread: the replay opens and shows it above the card", async () => {
+  const page = tab(new FakeStorage(), async () => answeredCard(EARLY_NOTE));
+  page.draw(session(1, ASK, EARLY_NOTE));
+
+  page.arrive(session(2, ASK, EARLY_NOTE, LATE_MAIN));
+  await settled();
+  page.land();
+
+  assert.equal(page.opened.length, 1);
+  const html = shown(page.openings[0]);
+  const card = html.indexOf('<article class="lsr-replay-card">');
+  assert.match(html.slice(0, card), /The agent's round reply[\s\S]*rebased too/);
+  assert.doesNotMatch(html.slice(card), /rebased too|looking at it/);
+  assert.match(html.slice(card), /lsr-replay-nochange">No code change\.</);
+});
+
 test("back on screen to a round whose words were all read and that changed nothing: nothing opens", async () => {
   const page = tab(
     new FakeStorage(),

@@ -162,6 +162,14 @@
   gap: var(--lsr-space-2);
 }
 
+/* The round reply sits above the card, outside its scroll: a long one scrolls
+ * inside its own block so the card and the nav stay in reach. */
+.lsr-replay-round {
+  max-height: 12rem;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
 /* The agent's words keep the line breaks the agent wrote them with. */
 .lsr-replay-note {
   margin: 0;

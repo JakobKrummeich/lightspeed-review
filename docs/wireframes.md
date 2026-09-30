@@ -585,6 +585,8 @@ drawn, the round swaps under it, and the replay opens as it lands.
 ```
 ┌ .lsr-replay-overlay (z18) ─────────────────────────────────┐
 │   BETWEEN ROUNDS                        Comment 2 of 4     │ .lsr-replay-eyebrow / -progress
+│   THE AGENT'S ROUND REPLY                                  │ .lsr-replay-round (only when
+│   unread --to main posts and messages                      │  unread; above every card)
 │   ┌ article.lsr-replay-card ───────────────────────────┐   │
 │   │ src/path/file.ts                     [addressed]   │   │ .lsr-replay-path + -chip
 │   │                                                    │   │  (addressed│unchanged│
@@ -613,12 +615,13 @@ from the agent's answer on the bare card below it.
 Only what the reviewer has not read: an answer the conversation panel already
 showed (`seen` in the review's memory: drawn while the tab was visible and the
 panel open) leaves the card without its `.lsr-replay-answer` block — no empty
-frame, no round reply in its place — and the round reply keeps only the parts
-not yet shown. WHAT CHANGED always stays. With no code change its line points
-to a reply only when the card holds one: "No code change — see the reply."
-beside an answer, "No code change — you read the reply in its thread." when
-the answer was left off as read, and "No code change." with no words at all.
-A replay with no unread words and no change to show does not open on its own;
+frame. The round reply keeps only the parts not yet shown and is never a
+card's answer: it is its own `.lsr-replay-round` block above whichever card
+is on screen, drawn once, and not at all when nothing in it is unread. WHAT
+CHANGED always stays. With no code change its line points to a reply only
+when the card holds one: "No code change — see the reply." beside an answer,
+and "No code change." otherwise. A replay with no unread words (on a card or
+in the round reply) and no change to show does not open on its own;
 `#lsr-replay-reopen` still offers it.
 
 ## 10. Ended overlay — closing summary (status-banner.ts)

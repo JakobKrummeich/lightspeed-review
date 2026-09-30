@@ -219,7 +219,8 @@ Later rounds keep the between-rounds replay overlay they have today, so the two
 never stack: the replay answers "what became of my comments", which a first
 round has none of. It answers with what is new: the agent's words the
 conversation panel already showed are left off its cards (their changes stay),
-and a replay left with no unread words and no change does not open on its own
+the round reply's unread words sit in their own block above the cards, and a
+replay left with no unread words and no change does not open on its own
 (spec.md, "The between-rounds replay repeats nothing the panel already showed").
 
 ## What it never does
