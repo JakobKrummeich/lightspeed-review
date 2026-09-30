@@ -156,9 +156,10 @@ cannot take the showing from the tab on screen. When it comes back on screen
 and no tab has claimed the round meanwhile, it claims it and opens the replay
 at once, without a jump: the round was drawn while nobody watched, so there is
 no swap to cover. Only the latest round counts: a newer one arriving while
-hidden replaces the wait. If the cards cannot be fetched, the jump has
-played to no replay, and the claim stands: a reload neither jumps nor opens
-again. The reopen control stays offered all the same; pressed, it fetches the
+hidden replaces the wait. If the cards cannot be fetched, or come back with
+nothing new (see below), the jump has played to no replay — and a tab coming
+back on screen opens none — and the claim stands: a reload neither jumps nor
+opens again. The reopen control stays offered all the same; pressed, it fetches the
 cards again and opens them, so the replay is reachable in the same page as
 soon as the server answers. A newer round arriving drops whatever an older
 round queued for the landing, jump or not, so an older replay never opens
