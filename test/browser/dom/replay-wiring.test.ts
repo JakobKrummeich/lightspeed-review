@@ -557,3 +557,34 @@ test("a round whose words were all read and that changed nothing does not open o
   assert.equal(page.reopen.hidden, false, "still there to open by hand");
   assert.equal(readMemory(page.storage, KEY).replayed, 2, "and the round's showing is spent");
 });
+
+test("back on screen to a round whose words were all read and that changed nothing: nothing opens", async () => {
+  const page = tab(
+    new FakeStorage(),
+    async () => answeredCard(EARLY_NOTE),
+    fakeVisibility("hidden"),
+  );
+  page.draw(session(1, ASK, EARLY_NOTE));
+  page.arrive(session(2, ASK, EARLY_NOTE));
+  await settled();
+
+  page.visibility.flip("visible");
+
+  assert.deepEqual(page.opened, []);
+  assert.equal(page.reopen.hidden, false, "still there to open by hand");
+  assert.equal(readMemory(page.storage, KEY).replayed, 2, "and the round's showing is spent");
+});
+
+test("back on screen before a newsless round's cards came back: nothing opens when they do", async () => {
+  let answer: (data: ReplayData) => void = () => undefined;
+  const slow = new Promise<ReplayData>((resolve) => (answer = resolve));
+  const page = tab(new FakeStorage(), () => slow, fakeVisibility("hidden"));
+  page.draw(session(1, ASK, EARLY_NOTE));
+  page.arrive(session(2, ASK, EARLY_NOTE));
+
+  page.visibility.flip("visible");
+  answer(answeredCard(EARLY_NOTE));
+  await settled();
+
+  assert.deepEqual(page.opened, []);
+});

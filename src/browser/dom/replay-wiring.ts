@@ -3,7 +3,7 @@ import type { ReplayData } from "../../rounds/replay.ts";
 import { currentRound } from "../conversation-rounds.ts";
 import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
 import { arrivesByJump } from "../round-arrival.ts";
-import { agentRoundReply } from "../round-replay.ts";
+import { agentRoundReply, replayHasNews } from "../round-replay.ts";
 import type { SeenReplies } from "../seen-replies.ts";
 import { arrivals, type Arrivals } from "./jump-overlay.ts";
 import { createReplayRefresher, type ReplayRoundView } from "./replay-refresh.ts";
@@ -144,8 +144,9 @@ export function wireReplay(
     stopWaiting = undefined;
     if (claims.replayed() === round || live.drawn.status === "ended") return;
     claims.take(round);
-    // Cards still coming: the refresher opens them when they do.
-    if (replay !== undefined && claims.spend(round)) show(replay);
+    // Cards still coming: the refresher opens them when they do. Spent either
+    // way, and opened only with news, as the refresher opens a round on screen.
+    if (replay !== undefined && claims.spend(round) && replayHasNews(replay)) show(replay);
   };
   page.replayReopen.addEventListener("click", () => {
     // Manual reopen ignores the once-per-round memory on purpose. Not mid-jump:
