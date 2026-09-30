@@ -38,7 +38,7 @@ import { keepDraft } from "./panel-draft.ts";
 import type { PanelLight } from "./panel-light.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
-import { threadsOf } from "../../threads.ts";
+import { batchSize, threadsOf } from "../../threads.ts";
 import { presenceOf } from "../../turn.ts";
 
 export interface MountedPanel {
@@ -206,7 +206,7 @@ function queueComment(view: PanelView): void {
   updateMemory(storage, key, { draft: "" });
   enqueue(view, [{ type: "message", comment }]);
   // After the draw, which empties it: the same count queued twice is news twice.
-  announce(view, queuedAnnouncement(view.state.pending.length));
+  announce(view, queuedAnnouncement(batchSize(view.state.pending)));
 }
 
 function announce(view: PanelView, text: string): void {
@@ -248,7 +248,7 @@ function setStatus(view: PanelView, status: SessionData["status"]): void {
   // not. An end that sent nothing keeps them for the round after the reopen.
   const typed = generalCommentBox(view.options.root)?.value ?? "";
   if (view.composeHost) {
-    view.composeHost.innerHTML = renderCompose(view.state, view.state.pending.length);
+    view.composeHost.innerHTML = renderCompose(view.state, batchSize(view.state.pending));
   }
   const box = generalCommentBox(view.options.root);
   if (box) box.value = typed;
@@ -339,7 +339,7 @@ function addReply(view: PanelView, thread: string): void {
   enqueue(view, [{ type: "reply", thread, comment }]);
   // After the draw, which replaced the box: the fresh one takes the focus.
   replyBox(view.options.root, thread)?.focus();
-  announce(view, queuedAnnouncement(view.state.pending.length));
+  announce(view, queuedAnnouncement(batchSize(view.state.pending)));
 }
 
 /** Button and Enter alike: whose turn it is decides between the two verbs. */

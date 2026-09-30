@@ -14,6 +14,7 @@ import {
   writesLocked,
   type PanelState,
 } from "../conversation-panel.ts";
+import { batchSize } from "../../threads.ts";
 
 /** The part of the mounted panel the gates read; the mount's view is one of these. */
 export interface ComposeView {
@@ -48,7 +49,7 @@ export function composeFrozen(view: ComposeView): boolean {
  */
 export function lockControls(view: ComposeView): void {
   const frozen = composeFrozen(view);
-  const label = view.sending ? SENDING_LABEL : sendLabel(view.state, view.state.pending.length);
+  const label = view.sending ? SENDING_LABEL : sendLabel(view.state, batchSize(view.state.pending));
   patch(view, "#lsr-send", frozen, label);
   patch(view, "#lsr-send-end", view.sending || view.state.status === "ended", endLabel(view.state));
   patch(view, "#lsr-general-comment", frozen);

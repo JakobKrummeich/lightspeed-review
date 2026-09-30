@@ -162,13 +162,16 @@ export function openIds(conversation: ConversationEntry[], held: FeedbackPrompt[
 
 /**
  * How many items a batch holds, as the agent is handed them: one per thread it
- * touches, however many words went into that thread.
+ * touches, however many words went into that thread. The page counts its unsent
+ * queue by this too (`Send 3 to Agent`), where a new comment has no id yet —
+ * the server mints it on acceptance — so each unnamed one is its own item.
  */
-export function batchSize(prompts: FeedbackPrompt[]): number {
+export function batchSize(prompts: readonly FeedbackPrompt[]): number {
   const touched = prompts.map((prompt) =>
     prompt.type === "reply" || prompt.type === "resolve" ? prompt.thread : prompt.id,
   );
-  return new Set(touched.filter((id) => id !== undefined)).size;
+  const unnamed = touched.filter((id) => id === undefined).length;
+  return new Set(touched.filter((id) => id !== undefined)).size + unnamed;
 }
 
 export type BatchItemStatus = "new" | "reply" | "resolved" | "reopened";

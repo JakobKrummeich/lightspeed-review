@@ -102,7 +102,7 @@ function mount(
   };
 }
 
-/** What the tray counts: every queued pill, wherever the column draws it. */
+/** What the tray counts: one item per new comment and per thread touched, wherever the column draws its pills. */
 function queuedIn(root: FakeNode): number {
   const count = root.querySelector(".lsr-queue-count")?.textContent ?? "";
   return Number(/^(\d+)/.exec(count)?.[1] ?? 0);
@@ -1560,7 +1560,39 @@ test("while the agent works a thread reply and a resolve queue like everything e
   pressIn(root, ".lsr-thread-resolve");
 
   assert.deepEqual(sent, []);
-  assert.equal(queuedIn(root), 2);
+  assert.match(drawn(root), /1 reply not sent yet/, "the folded card still holds its reply");
+  assert.equal(queuedIn(root), 1, "one thread touched is one item");
+});
+
+test("a reply and a resolve in one thread are counted once, everywhere the queue is counted", (t) => {
+  installFakeElements((undo) => t.after(undo));
+  const tallies: unknown[] = [];
+  const root = new FakeNode();
+  const panel = mountPanel({
+    root: asPanelRoot(root),
+    key: "key",
+    session: session({ conversation: [opened, answered] }),
+    storage: new FakeStorage(),
+    onEnd: () => {},
+    onPending: (queued) => tallies.push(queued),
+    onJump: () => {},
+  });
+  panel.setTurn(WORKING);
+
+  replyBoxOf(root)!.value = "per-batch";
+  pressIn(root, ".lsr-thread-reply-add");
+  replyBoxOf(root)!.value = "and per-request later";
+  pressIn(root, ".lsr-thread-reply-add");
+  assert.equal(
+    root.querySelector("#lsr-queue-status")?.textContent,
+    "Queued — 1 waiting for your next Send",
+  );
+  pressIn(root, ".lsr-thread-resolve");
+
+  assert.equal(queuedIn(root), 1);
+  assert.deepEqual(tallies.at(-1), { comments: 0, replies: 1, resolves: 0 });
+  panel.setTurn(REVIEWERS);
+  assert.equal(root.querySelector("#lsr-send")?.textContent, "Send 1 to Agent");
 });
 
 /** Replying twice in a row is the reviewer's call; the waiting line is for the agent's turn only. */
@@ -1596,7 +1628,8 @@ test("the reviewer can reply twice in a row in a thread they spoke in last", (t)
   pressIn(root, ".lsr-thread-reply-add");
 
   assert.deepEqual(sent, []);
-  assert.equal(queuedIn(root), 2);
+  assert.equal(drawn(root).match(/data-delivery="draft"/g)?.length, 2, "both replies wait");
+  assert.equal(queuedIn(root), 1, "in one thread: one item");
 });
 
 /** Only the compose row was redrawn on the status change, so the scroll kept its footers. */

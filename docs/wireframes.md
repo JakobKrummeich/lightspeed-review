@@ -28,7 +28,8 @@ else is out-of-flow overlays.
 ```
 
 - Rail `#lsr-panel-rail`: thin full-height button between diff and panel,
-  `›`/`‹` glyph, small badge showing queued-comment count. Toggles
+  `›`/`‹` glyph, small badge showing the queued item count (one per new
+  comment, one per thread touched). Toggles
   `body[data-panel="open"|"collapsed"]`; collapsed sets the third column to 0.
 - Overlay z-order: annotation popup **10** (position:absolute, no scrim) →
   opening **18** = replay **18** → round popup **19** → ended **20**. All
@@ -396,8 +397,9 @@ waiting for your next Send" in a visually-hidden `role="status"`
 (`#lsr-queue-status`, `.lsr-visually-hidden`). Agent digesting — placeholder
 "Locked while the agent reads your feedback", textarea and primary disabled
 (the primary still counts the queue). Reviewer's turn (an agent
-listening or not) — "Send to Agent", or "Send N to Agent" while N pills wait,
-sends every pill in queue order plus the box. Sending — primary reads
+listening or not) — "Send to Agent", or "Send N to Agent" while N items wait
+(one per new comment, one per thread replied in or resolved), sends every pill
+in queue order plus the box. Sending — primary reads
 "Sending…", all compose controls disabled; ended — "This review has ended.",
 textarea and primary disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.

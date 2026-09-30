@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Send N to Agent** counts what you did, not the pills it took: every new
+  comment is one, and every thread you replied in or resolved is one however
+  many replies and toggles went into it, so a reply and a resolve on one
+  thread read **Send 1 to Agent**. The tray, the rail's badge, the
+  "Queued — N" announcement and the done and new-round cards count the same
+  way; the new-round card names a thread with a reply and a resolve as a
+  reply.
+
 ## 3.6.0
 
 - The constellation sheet names every chapter. Names were capped at eight,

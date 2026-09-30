@@ -253,6 +253,22 @@ test("on the reviewer's turn the button counts the queue it is about to send", (
   assert.match(renderPanel(panelState({ pending: [annotation] })), />Send 1 to Agent</);
 });
 
+test("the button and the tray count what the reviewer touched: one thread is one item", () => {
+  const html = renderPanel(
+    panelState({
+      pending: [
+        { type: "reply", thread: "t1", comment: "ok" },
+        { type: "reply", thread: "t1", comment: "and one more" },
+        { type: "resolve", thread: "t1", resolved: true },
+        annotation,
+      ],
+    }),
+  );
+
+  assert.match(html, />Send 2 to Agent</);
+  assert.match(html, /2 not sent yet · they go out with your next Send/);
+});
+
 test("the count is the reviewer's to send: a working turn queues and an ended review shows none", () => {
   assert.match(
     renderCompose({ status: "open", allApproved: false, turn: WORKING }, 3),

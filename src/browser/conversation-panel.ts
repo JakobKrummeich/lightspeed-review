@@ -1,4 +1,5 @@
 import { escapeHtml } from "../escape-html.ts";
+import { batchSize } from "../threads.ts";
 import { currentRound } from "./conversation-rounds.ts";
 import { agentTurnText } from "./turn-words.ts";
 import type { QueuedPill } from "./queued-pill.ts";
@@ -114,7 +115,7 @@ export function composePlaceholder(state: ComposeState): string {
  */
 export function renderPanel(state: PanelState): string {
   return `<div class="lsr-panel-scroll">${renderScroll(state)}</div>
-<section class="lsr-compose">${renderCompose(state, state.pending.length)}</section>`;
+<section class="lsr-compose">${renderCompose(state, batchSize(state.pending))}</section>`;
 }
 
 /**
@@ -131,7 +132,7 @@ export function renderScroll(state: PanelState): string {
   </section>
   ${renderDrafts(column)}
   <section class="lsr-queue">
-  ${state.pending.length === 0 ? `<p class="lsr-empty">${emptyTray(state)}</p>` : queueCount(state.pending.length)}
+  ${state.pending.length === 0 ? `<p class="lsr-empty">${emptyTray(state)}</p>` : queueCount(batchSize(state.pending))}
   </section>
 `;
 }

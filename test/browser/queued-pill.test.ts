@@ -9,6 +9,7 @@ import {
   type QueuedPill,
 } from "../../src/browser/queued-pill.ts";
 import type { FeedbackPrompt } from "../../src/session-store.ts";
+import { batchSize } from "../../src/threads.ts";
 
 const annotation: FeedbackPrompt = {
   type: "annotation",
@@ -90,4 +91,42 @@ test("the tally counts line and general comments as comments, apart from replies
 
   assert.deepEqual(tally, { comments: 2, replies: 1, resolves: 2 });
   assert.equal(queuedTotal(tally), 5);
+});
+
+test("everything queued in one thread is one item, named a reply when it holds one", () => {
+  // Two replies and a resolve on one thread is one thing the reviewer did there.
+  const tally = tallyOf([
+    { type: "reply", thread: "t1", comment: "ok" },
+    { type: "reply", thread: "t1", comment: "and one more" },
+    { type: "resolve", thread: "t1", resolved: true },
+  ]);
+
+  assert.deepEqual(tally, { comments: 0, replies: 1, resolves: 0 });
+  assert.equal(queuedTotal(tally), 1);
+});
+
+test("a thread only resolved or reopened is counted as a resolve, once", () => {
+  const tally = tallyOf([
+    { type: "resolve", thread: "t1", resolved: true },
+    { type: "resolve", thread: "t1", resolved: false },
+    { type: "reply", thread: "t2", comment: "ok" },
+  ]);
+
+  assert.deepEqual(tally, { comments: 0, replies: 1, resolves: 1 });
+});
+
+test("every new comment is an item of its own, and the total is the batch the agent is handed", () => {
+  const pills: FeedbackPrompt[] = [
+    annotation,
+    { ...annotation, comment: "and this one" },
+    { type: "message", comment: "and the tests" },
+    { type: "reply", thread: "t1", comment: "ok" },
+    { type: "resolve", thread: "t1", resolved: true },
+    { type: "resolve", thread: "t2", resolved: true },
+  ];
+  const tally = tallyOf(pills);
+
+  assert.deepEqual(tally, { comments: 3, replies: 1, resolves: 1 });
+  assert.equal(queuedTotal(tally), 5);
+  assert.equal(queuedTotal(tally), batchSize(pills));
 });
