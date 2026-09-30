@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.7.0
 
 - The **Between rounds** replay no longer repeats what you already read in
   the conversation panel. An answer the panel showed before the round
