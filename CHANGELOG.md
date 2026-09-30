@@ -5,7 +5,8 @@
 - The **Between rounds** replay no longer repeats what you already read in
   the conversation panel. An answer the panel showed before the round
   arrived is left off its card, and the round reply keeps only the parts
-  you have not seen; what changed is always shown. Words the agent sent
+  you have not seen; what changed is always shown. A card with no code
+  change points to a reply only when it shows one. Words the agent sent
   together with the new round still appear. A replay left with nothing
   new — no unread words and no change — no longer opens on its own;
   **Replay last round** still opens it. A reply counts as seen only once it

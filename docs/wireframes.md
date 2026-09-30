@@ -613,7 +613,10 @@ Only what the reviewer has not read: an answer the conversation panel already
 showed (`seen` in the review's memory: drawn while the tab was visible and the
 panel open) leaves the card without its `.lsr-replay-answer` block — no empty
 frame, no round reply in its place — and the round reply keeps only the parts
-not yet shown. WHAT CHANGED always stays.
+not yet shown. WHAT CHANGED always stays. With no code change its line points
+to a reply only when the card holds one: "No code change — see the reply."
+beside an answer, "No code change — you read the reply in its thread." when
+the answer was left off as read, and "No code change." with no words at all.
 A replay with no unread words and no change to show does not open on its own;
 `#lsr-replay-reopen` still offers it.
 

@@ -379,6 +379,23 @@ test("an answer the panel already showed is left off the card; what changed stil
   assert.match(html, /lsr-replay-diff/);
 });
 
+test("no change and an answer already read: the card points to no reply it does not hold", () => {
+  const html = render({
+    data: { comments: [comment({ answers: [], note_at: "2025-01-01T00:07:00.000Z" })] },
+    seen: NOTE_SEEN,
+  });
+
+  assert.doesNotMatch(html, /see the reply/);
+  assert.match(html, /No code change — you read the reply in its thread\./);
+});
+
+test("no change and no words from the agent at all: just no code change", () => {
+  const html = render({ data: { comments: [comment({ answers: [], note: undefined })] } });
+
+  assert.doesNotMatch(html, /see the reply/);
+  assert.match(html, /lsr-replay-nochange">No code change\.</);
+});
+
 test("an answer the panel has not shown stays on the card", () => {
   const html = render({
     data: { comments: [comment({ note_at: "2025-01-01T00:08:00.000Z" })] },

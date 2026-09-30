@@ -64,7 +64,7 @@ export function renderReplayOverlay(view: ReplayView, renderer: DiffRenderer): s
 <p class="lsr-replay-eyebrow">Between rounds</p>
 <p class="lsr-replay-progress">Comment ${current + 1} of ${total}</p>
 </header>
-${renderCard(comment, answerOf(comment, view.roundReply, view.seen), renderer)}
+${renderCard(comment, view, renderer)}
 <footer class="lsr-replay-nav">
 <button type="button" class="lsr-replay-prev"${current === 0 ? " disabled" : ""}>Previous</button>
 <span class="lsr-replay-dots" aria-label="Which comment is on screen">${dots(total, current)}</span>
@@ -94,9 +94,10 @@ function dots(total: number, current: number): string {
 
 function renderCard(
   comment: ReplayComment,
-  answer: Answer | undefined,
+  view: Pick<ReplayView, "roundReply" | "seen">,
   renderer: DiffRenderer,
 ): string {
+  const answer = answerOf(comment, view.roundReply, view.seen);
   const status = knownStatus(comment.status);
   return `<article class="lsr-replay-card">
 <header class="lsr-replay-file">
@@ -105,7 +106,7 @@ function renderCard(
 </header>
 ${quote(comment)}
 ${answerNote(answer)}
-${changes(comment, renderer)}
+${changes(comment, noChangeLine(comment, answer, view.seen), renderer)}
 </article>`;
 }
 
@@ -179,11 +180,26 @@ export function replayHasNews(view: Pick<ReplayView, "data" | "roundReply" | "se
 }
 
 /**
+ * What an empty answer set says: it points to a reply only when the card holds
+ * one. An answer left off as already read is named as read, in its thread;
+ * with no words at all there is nothing to point to.
+ */
+function noChangeLine(
+  comment: ReplayComment,
+  answer: Answer | undefined,
+  seen: ReadonlySet<string>,
+): string {
+  if (answer !== undefined) return "No code change — see the reply.";
+  if (noteSeen(comment, seen)) return "No code change — you read the reply in its thread.";
+  return "No code change.";
+}
+
+/**
  * An empty answer set is a fact (answered in words, or no edit), never
  * failure-styled. The unanswered marker sits here because it qualifies this
  * section: hunks matched mechanically, not vouched for.
  */
-function changes(comment: ReplayComment, renderer: DiffRenderer): string {
+function changes(comment: ReplayComment, noChange: string, renderer: DiffRenderer): string {
   if (comment.state !== "ok") {
     const sentence = Object.hasOwn(NO_ANSWERS, comment.state)
       ? NO_ANSWERS[comment.state]
@@ -197,7 +213,7 @@ function changes(comment: ReplayComment, renderer: DiffRenderer): string {
   if (comment.answers.length === 0) {
     return `<div class="lsr-replay-changes">
 <p class="lsr-replay-label">What changed${marker}</p>
-<p class="lsr-replay-nochange">No code change — see the reply.</p>
+<p class="lsr-replay-nochange">${noChange}</p>
 </div>`;
   }
   return `<div class="lsr-replay-changes">
