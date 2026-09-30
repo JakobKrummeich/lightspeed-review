@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { batchItems, openIds, threadsOf } from "../src/threads.ts";
+import { batchItems, batchSize, openIds, threadsOf } from "../src/threads.ts";
 import type { ConversationEntry } from "../src/session-types.ts";
 
 const asked: ConversationEntry = {
@@ -191,4 +191,38 @@ test("a new item is its own ask: no history, anchored in the round it was sent i
     reviewer: ["Rename shout → yell."],
   });
   assert.deepEqual(t2, { id: "t2", status: "new", reviewer: ["Also add a JSDoc comment."] });
+});
+
+test("a batch counts one item per thread it touches, however many words went into it", () => {
+  assert.equal(
+    batchSize([
+      { type: "reply", thread: "t1", comment: "ok" },
+      { type: "reply", thread: "t1", comment: "and one more" },
+      { type: "resolve", thread: "t1", resolved: true },
+      { type: "resolve", thread: "t2", resolved: false },
+    ]),
+    2,
+  );
+});
+
+test("a reply to a thread opened in the same batch is part of that thread's item", () => {
+  assert.equal(
+    batchSize([
+      { type: "message", id: "t5", comment: "why 2?" },
+      { type: "reply", thread: "t5", comment: "and why here" },
+    ]),
+    1,
+  );
+});
+
+test("a queued comment the server has not named yet is still an item of its own", () => {
+  // Pills in the page carry no id until the server accepts them.
+  assert.equal(
+    batchSize([
+      { type: "message", comment: "and the tests" },
+      { type: "message", comment: "and the docs" },
+      { type: "reply", thread: "t1", comment: "ok" },
+    ]),
+    3,
+  );
 });

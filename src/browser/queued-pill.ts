@@ -21,6 +21,24 @@ export function unstampedPill(pill: QueuedPill): FeedbackPrompt {
 }
 
 /**
+ * The reviewer's own words, rewritten in place: type, anchor, round and place
+ * in the queue stay, so the edited pill goes out exactly where the old one
+ * would have. Emptied, it is taken back — an empty comment is nothing to send,
+ * and a second gesture to remove it would be a chore. A resolve has no words.
+ */
+export function editPill(
+  pending: readonly QueuedPill[],
+  index: number,
+  comment: string,
+): QueuedPill[] {
+  const pill = pending[index];
+  if (pill === undefined || pill.type === "resolve") return [...pending];
+  const words = comment.trim();
+  if (words === "") return pending.filter((_, position) => position !== index);
+  return pending.map((one, position) => (position === index ? { ...pill, comment: words } : one));
+}
+
+/**
  * An unstamped pill is never called stale: absence of a stamp is absence of a
  * claim. Only a line comment can be: the badge warns that lines may not line
  * up, and a message, reply or resolve has none — one queued through the
@@ -35,24 +53,34 @@ export function stalePillRound(pill: QueuedPill, current: number): number | unde
 /**
  * What the queue holds, by kind: "your 1 comment stays queued" about a queued
  * reply read as a lost comment somewhere the reviewer never wrote one.
+ *
+ * Counted in items, not pills: "Send 2" for a reply and a resolve on one
+ * thread counted twice what the reviewer did once. Every new comment is an
+ * item; every existing thread touched is one, however many pills went into
+ * it. Summed, the kinds are `batchSize` in `src/threads.ts`, the number the
+ * agent is handed and every queue count on the page shows.
  */
 export interface QueueTally {
-  /** Line and general comments alike. */
+  /** Line and general comments alike: each opens a thread of its own. */
   comments: number;
+  /** Threads holding at least one queued reply, resolved as well or not. */
   replies: number;
-  /** Resolve and reopen toggles alike. */
+  /** Threads only resolved or reopened: toggles alike, and no words. */
   resolves: number;
 }
 
 export const NOTHING_QUEUED: QueueTally = { comments: 0, replies: 0, resolves: 0 };
 
+/** A thread with a reply and a resolve is named for its words: they are what the agent answers. */
 export function tallyOf(pills: readonly FeedbackPrompt[]): QueueTally {
-  const count = (types: readonly FeedbackPrompt["type"][]): number =>
-    pills.filter((pill) => types.includes(pill.type)).length;
+  const threadsOf = (type: "reply" | "resolve"): Set<string> =>
+    new Set(pills.flatMap((pill) => (pill.type === type ? [pill.thread] : [])));
+  const replied = threadsOf("reply");
+  const onlyResolved = [...threadsOf("resolve")].filter((thread) => !replied.has(thread));
   return {
-    comments: count(["annotation", "message"]),
-    replies: count(["reply"]),
-    resolves: count(["resolve"]),
+    comments: pills.filter((pill) => pill.type === "annotation" || pill.type === "message").length,
+    replies: replied.size,
+    resolves: onlyResolved.length,
   };
 }
 

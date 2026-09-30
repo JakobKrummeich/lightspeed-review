@@ -253,6 +253,22 @@ test("on the reviewer's turn the button counts the queue it is about to send", (
   assert.match(renderPanel(panelState({ pending: [annotation] })), />Send 1 to Agent</);
 });
 
+test("the button and the tray count what the reviewer touched: one thread is one item", () => {
+  const html = renderPanel(
+    panelState({
+      pending: [
+        { type: "reply", thread: "t1", comment: "ok" },
+        { type: "reply", thread: "t1", comment: "and one more" },
+        { type: "resolve", thread: "t1", resolved: true },
+        annotation,
+      ],
+    }),
+  );
+
+  assert.match(html, />Send 2 to Agent</);
+  assert.match(html, /2 not sent yet · they go out with your next Send/);
+});
+
 test("the count is the reviewer's to send: a working turn queues and an ended review shows none", () => {
   assert.match(
     renderCompose({ status: "open", allApproved: false, turn: WORKING }, 3),
@@ -764,11 +780,55 @@ test("a queued reply sits inside its card as an unsent message the reviewer can 
   const card = cardOf(html, "t2");
   assert.match(
     card,
-    /<div class="lsr-message lsr-draft" data-role="reviewer">\s*<p class="lsr-message-role">you <span class="lsr-message-delivery" data-delivery="draft">not sent yet<\/span><button type="button" class="lsr-pill-remove" data-index="0" title="Take back">×<\/button><\/p>\s*<p class="lsr-prompt-comment">ok, go<\/p>/,
+    /<div class="lsr-message lsr-draft" data-role="reviewer">\s*<p class="lsr-message-role">you <span class="lsr-message-delivery" data-delivery="draft">not sent yet<\/span><button type="button" class="lsr-pill-remove" data-index="0" title="Take back">×<\/button><\/p>\s*<button type="button" class="lsr-prompt-comment lsr-draft-text" data-index="0" title="Edit">ok, go<\/button>/,
   );
   assert.ok(card.indexOf("batched") < card.indexOf("ok, go"), "after what was already said");
   assert.ok(card.indexOf("ok, go") < card.indexOf("lsr-thread-foot"), "above the reply box");
   assert.doesNotMatch(html, /lsr-drafts|reply in/);
+});
+
+test("every queued comment's words are a press that opens them for editing; a resolve's are not", () => {
+  const html = renderScroll(
+    panelState({
+      conversation: exchange,
+      pending: [
+        annotation,
+        { type: "message", comment: "and the <b>migration</b>" },
+        { type: "reply", thread: "t2", comment: "ok, go" },
+        { type: "resolve", thread: "t9", resolved: true },
+      ],
+    }),
+  );
+
+  const presses = [
+    ...html.matchAll(/class="lsr-prompt-comment lsr-draft-text" data-index="(\d+)"/g),
+  ];
+  assert.deepEqual(
+    presses.map((press) => press[1]),
+    ["2", "0", "1"],
+    "the reply in its card, then the new comments; never the resolve",
+  );
+  assert.match(html, /data-index="1" title="Edit">and the &lt;b&gt;migration&lt;\/b&gt;<\/button>/);
+  assert.doesNotMatch(html, /lsr-draft-edit/, "nothing is open until pressed");
+});
+
+test("the pill being edited is drawn as a box in its place, filled in by the page", () => {
+  const pending = [annotation, { type: "reply", thread: "t2", comment: "ok, go" } as const];
+  const reply = renderScroll(panelState({ conversation: exchange, pending, editing: pending[1] }));
+  const comment = renderScroll(
+    panelState({ conversation: exchange, pending, editing: pending[0] }),
+  );
+
+  assert.match(
+    cardOf(reply, "t2"),
+    /<textarea class="lsr-draft-edit" data-index="1" aria-label="Edit your queued comment"><\/textarea>/,
+  );
+  assert.doesNotMatch(reply, /data-index="1" title="Edit"/, "in place of its words");
+  assert.match(comment, /lsr-drafts[\s\S]*<textarea class="lsr-draft-edit" data-index="0"/);
+  assert.match(comment, /data-index="1" title="Edit">ok, go/, "only the one pill opens");
+  // An equal pill is not the same pill: the one edited is the one pressed.
+  const twin = renderScroll(panelState({ pending: [annotation], editing: { ...annotation } }));
+  assert.doesNotMatch(twin, /lsr-draft-edit/);
 });
 
 test("a folded card still says it holds a reply not sent yet", () => {

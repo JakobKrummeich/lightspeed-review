@@ -3,9 +3,10 @@ import type { ReplayData } from "../../rounds/replay.ts";
 import { currentRound } from "../conversation-rounds.ts";
 import { readMemory, updateMemory, type ReviewMemoryStorage } from "../review-memory.ts";
 import { arrivesByJump } from "../round-arrival.ts";
-import { agentRoundReply } from "../round-replay.ts";
+import { agentRoundReply, replayHasNews } from "../round-replay.ts";
+import type { SeenReplies } from "../seen-replies.ts";
 import { arrivals, type Arrivals } from "./jump-overlay.ts";
-import { createReplayRefresher } from "./replay-refresh.ts";
+import { createReplayRefresher, type ReplayRoundView } from "./replay-refresh.ts";
 import {
   mountReplayOverlay,
   type ReplayOpening,
@@ -103,9 +104,27 @@ function roundClaims(storage: ReviewMemoryStorage, key: string) {
   };
 }
 
+/**
+ * The round as the replay is asked for it. Whether the panel has drawn it yet
+ * or not: on a new round `applyRound` asks before `panel.update`, a load after
+ * the panel's first draw, and a feedback redraw may beat both — `before`
+ * answers alike, so nothing the round brought is taken for read.
+ */
+function roundView(round: number, fresh: SessionData, seen: SeenReplies): ReplayRoundView {
+  const read = seen.before(round);
+  return {
+    round,
+    roundReply: agentRoundReply(fresh.conversation, fresh.rounds, read),
+    ended: fresh.status === "ended",
+    seen: read,
+  };
+}
+
+/** `seen`: what the conversation panel has shown, so the replay does not repeat it. */
 export function wireReplay(
   page: ReplayHosts,
   live: LiveSession,
+  seen: SeenReplies,
   deps: ReplayDeps = browserDeps(),
 ): WiredReplay {
   const replayOverlay = deps.overlay(page);
@@ -125,8 +144,9 @@ export function wireReplay(
     stopWaiting = undefined;
     if (claims.replayed() === round || live.drawn.status === "ended") return;
     claims.take(round);
-    // Cards still coming: the refresher opens them when they do.
-    if (replay !== undefined && claims.spend(round)) show(replay);
+    // Cards still coming: the refresher opens them when they do. Spent either
+    // way, and opened only with news, as the refresher opens a round on screen.
+    if (replay !== undefined && claims.spend(round) && replayHasNews(replay)) show(replay);
   };
   page.replayReopen.addEventListener("click", () => {
     // Manual reopen ignores the once-per-round memory on purpose. Not mid-jump:
@@ -170,11 +190,6 @@ export function wireReplay(
       claims.take(round);
       arrival.jump();
     },
-    refreshReplay: (fresh) =>
-      replayRefresh.refresh({
-        round: live.round,
-        roundReply: agentRoundReply(fresh.conversation, fresh.rounds),
-        ended: fresh.status === "ended",
-      }),
+    refreshReplay: (fresh) => replayRefresh.refresh(roundView(live.round, fresh, seen)),
   };
 }

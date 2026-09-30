@@ -32,6 +32,7 @@ export interface ColumnState {
   delivery: DeliveryFacts;
   folds: Record<string, ThreadFold>;
   resolvedShown: boolean;
+  editing?: QueuedPill | undefined;
 }
 
 /** A queued pill with the tray position its × takes back. */
@@ -165,7 +166,7 @@ function renderCardBody(
       ? `\n    <pre class="lsr-prompt-selection">${escapeHtml(card.item.selected_text)}</pre>`
       : "";
   const messages = card.messages.map((said) => `\n    ${renderMessage(said, state)}`).join("");
-  const unsent = replies.map((draft) => `\n    ${renderDraftBubble(draft)}`).join("");
+  const unsent = replies.map((draft) => `\n    ${renderDraftBubble(draft, state)}`).join("");
   const foot = renderThreadFoot({ ...card, label: cardLabel(card) }, resolved, state.mode);
   return `${selection}${messages}${unsent}${foot}`;
 }
@@ -192,15 +193,29 @@ function renderDelivery(delivery: keyof typeof DELIVERY_LABEL | "draft"): string
 
 /**
  * A queued reply sits where it will land, as the reviewer's next message —
- * drawn apart so it cannot pass for one already sent. Its × keeps the tray's
- * class and index, so taking it back is the same press as for any pill.
+ * drawn apart so it cannot pass for one already sent. Its × and its words
+ * keep the tray's classes and index, so taking it back or editing it is the
+ * same press as for any pill.
  */
-function renderDraftBubble(draft: Draft): string {
-  const comment = draft.pill.type === "resolve" ? "" : draft.pill.comment;
+function renderDraftBubble(draft: Draft, state: ColumnState): string {
   return `<div class="lsr-message lsr-draft" data-role="reviewer">
       <p class="lsr-message-role">you${renderDelivery("draft")}${renderRemove(draft.index)}</p>
-      <p class="lsr-prompt-comment">${escapeHtml(comment)}</p>
+      ${renderDraftWords(draft, state.editing)}
     </div>`;
+}
+
+/**
+ * The words are a button so a key opens them as well as a click; the box
+ * that replaces them is drawn empty and filled by the page (`panel-pills.ts`),
+ * as a reply box is: typed text need not survive a trip through markup.
+ */
+function renderDraftWords(draft: Draft, editing: QueuedPill | undefined): string {
+  const { pill, index } = draft;
+  if (pill.type === "resolve") return `<p class="lsr-prompt-comment"></p>`;
+  if (pill === editing) {
+    return `<textarea class="lsr-draft-edit" data-index="${index}" aria-label="Edit your queued comment"></textarea>`;
+  }
+  return `<button type="button" class="lsr-prompt-comment lsr-draft-text" data-index="${index}" title="Edit">${escapeHtml(pill.comment)}</button>`;
 }
 
 function renderRemove(index: number): string {
@@ -224,7 +239,7 @@ export function renderDrafts(state: ColumnState): string {
   if (loose.length === 0) return "";
   return `<section class="lsr-thread-group lsr-drafts" data-group="new">
   <h3 class="lsr-group-head">New · ${DRAFT_LABEL}</h3>
-  ${loose.map((draft) => renderDraftCard(draft, state.round)).join("\n  ")}
+  ${loose.map((draft) => renderDraftCard(draft, state)).join("\n  ")}
   </section>`;
 }
 
@@ -232,18 +247,17 @@ function threadsTo(pill: QueuedPill): pill is QueuedPill & { thread: string } {
   return pill.type === "reply" || pill.type === "resolve";
 }
 
-function renderDraftCard(draft: Draft, round: number): string {
+function renderDraftCard(draft: Draft, state: ColumnState): string {
   const { pill } = draft;
   const selection =
     pill.type === "annotation"
       ? `\n    <pre class="lsr-prompt-selection">${escapeHtml(pill.selected_text)}</pre>`
       : "";
-  const comment = pill.type === "resolve" ? "" : pill.comment;
   return `<article class="lsr-thread lsr-pill" data-draft="true">
-    <header class="lsr-thread-head">${draftWhere(pill)}${renderStaleBadge(pill, round)}${renderRemove(draft.index)}</header>${selection}
+    <header class="lsr-thread-head">${draftWhere(pill)}${renderStaleBadge(pill, state.round)}${renderRemove(draft.index)}</header>${selection}
     <div class="lsr-message lsr-draft" data-role="reviewer">
       <p class="lsr-message-role">you${renderDelivery("draft")}</p>
-      <p class="lsr-prompt-comment">${escapeHtml(comment)}</p>
+      ${renderDraftWords(draft, state.editing)}
     </div>
   </article>`;
 }

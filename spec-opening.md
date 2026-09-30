@@ -156,9 +156,10 @@ cannot take the showing from the tab on screen. When it comes back on screen
 and no tab has claimed the round meanwhile, it claims it and opens the replay
 at once, without a jump: the round was drawn while nobody watched, so there is
 no swap to cover. Only the latest round counts: a newer one arriving while
-hidden replaces the wait. If the cards cannot be fetched, the jump has
-played to no replay, and the claim stands: a reload neither jumps nor opens
-again. The reopen control stays offered all the same; pressed, it fetches the
+hidden replaces the wait. If the cards cannot be fetched, or come back with
+nothing new (see below), the jump has played to no replay — and a tab coming
+back on screen opens none — and the claim stands: a reload neither jumps nor
+opens again. The reopen control stays offered all the same; pressed, it fetches the
 cards again and opens them, so the replay is reachable in the same page as
 soon as the server answers. A newer round arriving drops whatever an older
 round queued for the landing, jump or not, so an older replay never opens
@@ -217,7 +218,11 @@ All of these, or it does not open at all:
 
 Later rounds keep the between-rounds replay overlay they have today, so the two
 never stack: the replay answers "what became of my comments", which a first
-round has none of.
+round has none of. It answers with what is new: the agent's words the
+conversation panel already showed are left off its cards (their changes stay),
+the round reply's unread words sit in their own block above the cards, and a
+replay left with no unread words and no change does not open on its own
+(spec.md, "The between-rounds replay repeats nothing the panel already showed").
 
 ## What it never does
 

@@ -14,6 +14,7 @@ import {
   writesLocked,
   type PanelState,
 } from "../conversation-panel.ts";
+import { batchSize } from "../../threads.ts";
 
 /** The part of the mounted panel the gates read; the mount's view is one of these. */
 export interface ComposeView {
@@ -33,7 +34,7 @@ export interface ComposeView {
 
 /**
  * Everything that writes — the compose row, a thread reply, a resolve toggle,
- * taking a pill back — reads this one answer: frozen while a send is on the
+ * taking a pill back or editing its words — reads this one answer: frozen while a send is on the
  * wire, while the agent digests, and on an ended review.
  */
 export function composeFrozen(view: ComposeView): boolean {
@@ -48,7 +49,7 @@ export function composeFrozen(view: ComposeView): boolean {
  */
 export function lockControls(view: ComposeView): void {
   const frozen = composeFrozen(view);
-  const label = view.sending ? SENDING_LABEL : sendLabel(view.state, view.state.pending.length);
+  const label = view.sending ? SENDING_LABEL : sendLabel(view.state, batchSize(view.state.pending));
   patch(view, "#lsr-send", frozen, label);
   patch(view, "#lsr-send-end", view.sending || view.state.status === "ended", endLabel(view.state));
   patch(view, "#lsr-general-comment", frozen);
@@ -82,6 +83,8 @@ const THREAD_CONTROLS = [
   ".lsr-thread-reply-add",
   ".lsr-thread-resolve",
   ".lsr-pill-remove",
+  ".lsr-draft-text",
+  ".lsr-draft-edit",
 ];
 
 function patch(view: ComposeView, id: string, disabled: boolean, label?: string): void {

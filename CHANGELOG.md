@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.7.0
+
+- The **Between rounds** replay no longer repeats what you already read in
+  the conversation panel. An answer the panel showed before the round
+  arrived is left off its card, and the round reply keeps only the parts
+  you have not seen, shown once in its own block above the cards rather
+  than on a card; what changed is always shown. A card with no code change
+  says "No code change — see the reply." only when it shows a reply, and
+  plain "No code change." otherwise. Words the agent sent
+  together with the new round still appear. A replay left with nothing
+  new — no unread words and no change — no longer opens on its own;
+  **Replay last round** still opens it. A reply counts as seen only once it
+  was on screen — drawn while the tab was visible and the panel open — and
+  which replies you have seen is remembered across reloads.
+- **Send N to Agent** counts what you did, not the pills it took: every new
+  comment is one, and every thread you replied in or resolved is one however
+  many replies and toggles went into it, so a reply and a resolve on one
+  thread read **Send 1 to Agent**. The tray, the rail's badge, the
+  "Queued — N" announcement and the done and new-round cards count the same
+  way; the new-round card names a thread with a reply and a resolve as a
+  reply.
+- Queued words can be edited before they are sent. Click the text of a
+  queued reply, line comment or general comment — or tab to it and press
+  Enter — and it opens in place as a box: Enter saves, Escape puts the words
+  back, clicking away saves (switching to another window leaves it open
+  as you left it), and saving it empty takes the item back as its
+  × does. The item keeps its place in the queue, its line and its round.
+  Like ×, it is locked while the agent reads your feedback and once the
+  review has ended.
+
 ## 3.6.0
 
 - The constellation sheet names every chapter. Names were capped at eight,

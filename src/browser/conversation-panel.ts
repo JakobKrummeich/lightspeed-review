@@ -1,4 +1,5 @@
 import { escapeHtml } from "../escape-html.ts";
+import { batchSize } from "../threads.ts";
 import { currentRound } from "./conversation-rounds.ts";
 import { agentTurnText } from "./turn-words.ts";
 import type { QueuedPill } from "./queued-pill.ts";
@@ -23,6 +24,12 @@ export interface PanelState {
   /** The reviewer's own card folds, remembered per review. */
   folds: Record<string, ThreadFold>;
   resolvedShown: boolean;
+  /**
+   * The queued pill whose words are open for editing, held by identity: an
+   * edit, a × or a Send replaces or drops the object, and a stale one then
+   * matches nothing, so no box can open on a pill that moved into its place.
+   */
+  editing?: QueuedPill;
 }
 
 export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
@@ -114,7 +121,7 @@ export function composePlaceholder(state: ComposeState): string {
  */
 export function renderPanel(state: PanelState): string {
   return `<div class="lsr-panel-scroll">${renderScroll(state)}</div>
-<section class="lsr-compose">${renderCompose(state, state.pending.length)}</section>`;
+<section class="lsr-compose">${renderCompose(state, batchSize(state.pending))}</section>`;
 }
 
 /**
@@ -131,7 +138,7 @@ export function renderScroll(state: PanelState): string {
   </section>
   ${renderDrafts(column)}
   <section class="lsr-queue">
-  ${state.pending.length === 0 ? `<p class="lsr-empty">${emptyTray(state)}</p>` : queueCount(state.pending.length)}
+  ${state.pending.length === 0 ? `<p class="lsr-empty">${emptyTray(state)}</p>` : queueCount(batchSize(state.pending))}
   </section>
 `;
 }
@@ -146,6 +153,7 @@ function columnOf(state: PanelState): ColumnState {
     delivery: state.delivery,
     folds: state.folds,
     resolvedShown: state.resolvedShown,
+    editing: state.editing,
   };
 }
 

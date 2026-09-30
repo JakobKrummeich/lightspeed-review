@@ -32,13 +32,26 @@ export function messageNews(
   return { seen: new Set(said.map((one) => one.said)), cards: [...new Set(cards)] };
 }
 
-/** A message is its card and its time: the agent says one thing per card per reply. */
+/**
+ * A message is its card and its time: the agent says one thing per card per
+ * reply. Card keys are stable across reloads, so this is what the review's
+ * memory files seen replies under, and what the round replay asks it by.
+ */
+export function saidKey(cardKey: string, at: string): string {
+  return `${cardKey} ${at}`;
+}
+
+/** When the message under a `saidKey` was said: card keys hold no space, so the stamp is the last word. */
+export function saidAt(key: string): string {
+  return key.slice(key.lastIndexOf(" ") + 1);
+}
+
 function agentSaid(conversation: ConversationEntry[]): { card: string; said: string }[] {
   return groupCards(conversation).flatMap((group) =>
     group.cards.flatMap((card) =>
       card.messages
         .filter((message) => message.role === "agent")
-        .map((message) => ({ card: card.key, said: `${card.key} ${message.at}` })),
+        .map((message) => ({ card: card.key, said: saidKey(card.key, message.at) })),
     ),
   );
 }

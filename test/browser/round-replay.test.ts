@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { DiffRenderer } from "../../src/browser/diff-renderer.ts";
+import { agentMessages } from "../../src/browser/message-news.ts";
 import {
   agentRoundReply,
   renderReplayOverlay,
+  replayHasNews,
   type ReplayView,
 } from "../../src/browser/round-replay.ts";
 import type { ReplayComment, ReplayData } from "../../src/rounds/replay.ts";
@@ -40,8 +42,20 @@ function comment(over: Partial<ReplayComment> = {}): ReplayComment {
 }
 
 function render(over: Partial<ReplayView> & { data?: ReplayData } = {}): string {
-  const view: ReplayView = { data: { comments: [comment()] }, current: 0, ...over };
+  const view: ReplayView = {
+    data: { comments: [comment()] },
+    current: 0,
+    seen: new Set(),
+    ...over,
+  };
   return renderReplayOverlay(view, renderer);
+}
+
+/** The overlay split at the card: what sits above it, and the card itself. */
+function parts(html: string): { top: string; card: string } {
+  const at = html.indexOf('<article class="lsr-replay-card">');
+  assert.notEqual(at, -1, "the overlay draws a card");
+  return { top: html.slice(0, at), card: html.slice(at) };
 }
 
 test("a card is the file, the verdict, the reviewer's words and the agent's answer", () => {
@@ -109,16 +123,39 @@ test("an oversized answer file says so instead of pretending nothing changed", (
   assert.doesNotMatch(html, /No code change/);
 });
 
-test("a comment the agent did not map is marked, and answered by the round reply as such", () => {
-  const html = render({
-    data: { comments: [comment({ note: undefined })] },
-    roundReply: "Round summary: renamed things.",
-  });
+test("a comment the agent did not map is marked, and borrows no answer from the round reply", () => {
+  const { top, card } = parts(
+    render({
+      data: { comments: [comment({ note: undefined, answers: [] })] },
+      roundReply: "Round summary: renamed things.",
+    }),
+  );
 
-  assert.match(html, /lsr-replay-unmapped">agent did not map this</);
-  assert.match(html, /The agent's round reply/);
-  assert.match(html, /lsr-replay-note">Round summary: renamed things\.</);
-  assert.doesNotMatch(html, /The agent's answer</);
+  assert.match(card, /lsr-replay-unmapped">agent did not map this</);
+  assert.doesNotMatch(card, /lsr-replay-answer"/, "the card holds no answer block");
+  assert.doesNotMatch(card, /Round summary/);
+  assert.match(card, /lsr-replay-nochange">No code change\.</, "and points to no reply");
+  assert.match(top, /The agent's round reply/);
+  assert.match(top, /lsr-replay-note">Round summary: renamed things\.</);
+});
+
+test("the round reply is its own block above the card, shown once on every card", () => {
+  const data = {
+    comments: [comment(), comment({ id: "c2", note: undefined }), comment({ id: "c3" })],
+  };
+  for (const current of [0, 1, 2]) {
+    const html = render({ data, current, roundReply: "Round summary." });
+    const { top, card } = parts(html);
+
+    assert.equal(html.match(/Round summary\./g)?.length, 1, `card ${current + 1}: once`);
+    assert.match(top, /lsr-replay-answer lsr-replay-round/);
+    assert.doesNotMatch(card, /Round summary|The agent's round reply/);
+  }
+});
+
+test("no round reply draws no block for it, not an empty one", () => {
+  assert.doesNotMatch(render(), /lsr-replay-round|The agent's round reply/);
+  assert.doesNotMatch(render({ roundReply: "" }), /lsr-replay-round|The agent's round reply/);
 });
 
 test("rewritten history is a status-only card that says what a rebase did", () => {
@@ -135,7 +172,12 @@ test("rewritten history is a status-only card that says what a rebase did", () =
   assert.match(html, /data-status="unknown">unknown</);
   assert.match(html, /lsr-replay-comment">this name says nothing</, "the comment itself stays");
   assert.doesNotMatch(html, /What changed/);
-  assert.doesNotMatch(html, /Round summary/, "status-only means no borrowed answer either");
+  assert.doesNotMatch(
+    parts(html).card,
+    /Round summary/,
+    "status-only means no borrowed answer either",
+  );
+  assert.match(parts(html).top, /Round summary/, "the round reply still shows, above the card");
 });
 
 test("the other unreadable states are status-only too, each named honestly", () => {
@@ -175,14 +217,14 @@ test("a state the union does not know is status-only with a plain sentence", () 
 test("the nav knows where it is: progress, dots, a first Previous and a last Done", () => {
   const data: ReplayData = { comments: [comment(), comment({ id: "c2" }), comment({ id: "c3" })] };
 
-  const first = renderReplayOverlay({ data, current: 0 }, renderer);
+  const first = renderReplayOverlay({ data, current: 0, seen: new Set() }, renderer);
   assert.match(first, /Comment 1 of 3/);
   assert.match(first, /lsr-replay-prev" disabled>Previous</);
   assert.match(first, /lsr-replay-next">Next</);
   assert.match(first, /data-index="0" aria-label="Comment 1" aria-current="true"/);
   assert.match(first, /data-index="2" aria-label="Comment 3" aria-current="false"/);
 
-  const last = renderReplayOverlay({ data, current: 2 }, renderer);
+  const last = renderReplayOverlay({ data, current: 2, seen: new Set() }, renderer);
   assert.match(last, /Comment 3 of 3/);
   assert.match(last, /lsr-replay-next">Done</);
   assert.doesNotMatch(last, /lsr-replay-prev" disabled/);
@@ -198,12 +240,21 @@ test("every card offers the way out, and the dialog says what it is", () => {
 test("a current index off either end lands on a real card instead of a blank dialog", () => {
   const data: ReplayData = { comments: [comment(), comment({ id: "c2" })] };
 
-  assert.match(renderReplayOverlay({ data, current: 9 }, renderer), /Comment 2 of 2/);
-  assert.match(renderReplayOverlay({ data, current: -1 }, renderer), /Comment 1 of 2/);
+  assert.match(
+    renderReplayOverlay({ data, current: 9, seen: new Set() }, renderer),
+    /Comment 2 of 2/,
+  );
+  assert.match(
+    renderReplayOverlay({ data, current: -1, seen: new Set() }, renderer),
+    /Comment 1 of 2/,
+  );
 });
 
 test("nothing to replay renders nothing at all", () => {
-  assert.equal(renderReplayOverlay({ data: { comments: [] }, current: 0 }, renderer), "");
+  assert.equal(
+    renderReplayOverlay({ data: { comments: [] }, current: 0, seen: new Set() }, renderer),
+    "",
+  );
 });
 
 test("the reviewer's words and the agent's arrive escaped, not parsed", () => {
@@ -261,6 +312,7 @@ test("the round reply is what the agent said after the comments it answers, both
       entry("agent", "and regrouped", 1),
     ],
     rounds,
+    new Set(),
   );
 
   assert.equal(reply, "renamed it\n\nand regrouped");
@@ -268,10 +320,14 @@ test("the round reply is what the agent said after the comments it answers, both
 
 test("a first round has no round reply, and neither does a silent agent", () => {
   assert.equal(
-    agentRoundReply([entry("agent", "hello", 0)], [{ index: 0, at: "2025-01-01T00:00:00.000Z" }]),
+    agentRoundReply(
+      [entry("agent", "hello", 0)],
+      [{ index: 0, at: "2025-01-01T00:00:00.000Z" }],
+      new Set(),
+    ),
     undefined,
   );
-  assert.equal(agentRoundReply([entry("reviewer", "fix this", 0)], rounds), undefined);
+  assert.equal(agentRoundReply([entry("reviewer", "fix this", 0)], rounds, new Set()), undefined);
 });
 
 test("the round reply is the agent's --to main; a note in an item's thread stays on that card", () => {
@@ -291,7 +347,132 @@ test("the round reply is the agent's --to main; a note in an item's thread stays
       ]),
     ],
     rounds,
+    new Set(),
   );
 
   assert.equal(reply, "also rebased");
+});
+
+/** The agent's words at `minute`, as `reply --to` writes them. */
+function replyAt(minute: number, thread: string, comment: string): ConversationEntry {
+  return {
+    role: "agent",
+    at: `2025-01-01T00:${String(minute).padStart(2, "0")}:00.000Z`,
+    roundIndex: 1,
+    prompts: [{ type: "reply", thread, comment }],
+  };
+}
+
+test("a round reply the panel already drew is left out; what it never drew stays", () => {
+  const asked: ConversationEntry = {
+    role: "reviewer",
+    at: "2025-01-01T00:01:00.000Z",
+    roundIndex: 0,
+    prompts: [{ type: "message", id: "t1", comment: "fix this" }],
+  };
+  const early = replyAt(2, "main", "on it, renaming first");
+  const late = replyAt(3, "main", "and rebased");
+  // Seen as the panel keys it: the reply was drawn before the round came.
+  const seen = agentMessages([asked, early]);
+
+  assert.equal(agentRoundReply([asked, early, late], rounds, seen), "and rebased");
+  assert.equal(
+    agentRoundReply([asked, early], rounds, seen),
+    undefined,
+    "all of it seen: no round reply at all, not an empty one",
+  );
+});
+
+test("an agent message the panel drew is seen too, keyed by its own thread", () => {
+  const asked = entry("reviewer", "fix this", 0);
+  const told: ConversationEntry = {
+    role: "agent",
+    at: "2025-01-01T00:06:00.000Z",
+    roundIndex: 1,
+    prompts: [{ type: "message", id: "t9", comment: "heads up: renamed the module" }],
+  };
+
+  assert.equal(agentRoundReply([asked, told], rounds, agentMessages([asked, told])), undefined);
+  assert.equal(agentRoundReply([asked, told], rounds, new Set()), "heads up: renamed the module");
+});
+
+/** The panel's key for the default comment's note: its thread and the moment it was said. */
+const NOTE_SEEN = new Set(["c1 2025-01-01T00:07:00.000Z"]);
+
+test("an answer the panel already showed is left off the card; what changed still shows", () => {
+  const html = render({
+    data: { comments: [comment({ note_at: "2025-01-01T00:07:00.000Z" })] },
+    seen: NOTE_SEEN,
+    roundReply: "Round summary: renamed things.",
+  });
+
+  assert.doesNotMatch(html, /lsr-replay-answer"/, "no answer block at all, not an empty one");
+  assert.doesNotMatch(html, /renamed it to total/);
+  assert.doesNotMatch(
+    parts(html).card,
+    /Round summary/,
+    "a seen answer is not replaced by the round reply",
+  );
+  assert.doesNotMatch(html, /agent did not map this/, "the comment was answered, just not anew");
+  assert.match(html, /What changed/);
+  assert.match(html, /lsr-replay-diff/);
+});
+
+test("no change and an answer already read: the card points to no reply it does not hold", () => {
+  const html = render({
+    data: { comments: [comment({ answers: [], note_at: "2025-01-01T00:07:00.000Z" })] },
+    seen: NOTE_SEEN,
+  });
+
+  assert.doesNotMatch(html, /see the reply|in its thread/);
+  assert.match(html, /lsr-replay-nochange">No code change\.</);
+});
+
+test("no change and no words from the agent at all: just no code change", () => {
+  const html = render({ data: { comments: [comment({ answers: [], note: undefined })] } });
+
+  assert.doesNotMatch(html, /see the reply/);
+  assert.match(html, /lsr-replay-nochange">No code change\.</);
+});
+
+test("an answer the panel has not shown stays on the card", () => {
+  const html = render({
+    data: { comments: [comment({ note_at: "2025-01-01T00:08:00.000Z" })] },
+    seen: NOTE_SEEN,
+  });
+
+  assert.match(html, /lsr-replay-note">renamed it to total</);
+});
+
+test("an answer with no stamp cannot be told seen, so it is shown", () => {
+  const html = render({ data: { comments: [comment()] }, seen: NOTE_SEEN });
+
+  assert.match(html, /The agent's answer/);
+});
+
+test("a replay has news while any card shows a change or words the panel did not", () => {
+  const silent = comment({
+    answers: [],
+    note_at: "2025-01-01T00:07:00.000Z",
+  });
+  const news = (over: Partial<ReplayComment>, roundReply?: string): boolean =>
+    replayHasNews({
+      data: { comments: [silent, comment({ ...silent, ...over })] },
+      seen: NOTE_SEEN,
+      ...(roundReply === undefined ? {} : { roundReply }),
+    });
+
+  assert.equal(news({}), false, "every answer seen and nothing changed: nothing new");
+  assert.equal(news({ answers: comment().answers }), true, "a change is news");
+  assert.equal(news({ note_at: "2025-01-01T00:08:00.000Z" }), true, "an unseen answer is");
+  assert.equal(news({ note: undefined }, "and rebased"), true, "so is an unseen round reply");
+  assert.equal(news({ state: "oversize" }), true, "a change too big to show is still a change");
+  assert.equal(news({ state: "unreachable" }), false, "history gone says nothing new");
+  assert.equal(
+    news({ state: "unreachable", note: undefined }, "and rebased"),
+    true,
+    "the round reply is news whatever the cards are",
+  );
+  assert.equal(news({}, "and rebased"), true, "every card's answer seen, the round reply unread");
+  assert.equal(news({}, ""), false, "an empty round reply is no news");
 });

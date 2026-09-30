@@ -1,4 +1,5 @@
 import type { ReplayData } from "../../rounds/replay.ts";
+import { replayHasNews } from "../round-replay.ts";
 import type { ReplayOpening } from "./replay-overlay.ts";
 
 /**
@@ -24,6 +25,8 @@ export interface ReplayRoundView {
   round: number;
   roundReply: string | undefined;
   ended: boolean;
+  /** What the panel had shown before this round came (`seen-replies.ts`). */
+  seen: ReadonlySet<string>;
 }
 
 export interface ReplayRefresher {
@@ -34,7 +37,7 @@ export interface ReplayRefresher {
 }
 
 /**
- * Auto-shows once per round, in the page that claimed it. Each call supersedes
+ * Auto-shows once per round, in the page that claimed it, when it has news. Each call supersedes
  * the last: a slow pre-regroup fetch can neither show the wrong round's cards
  * nor spend the new round's claim. Offer withdrawn on refresh start. A failure
  * never blocks the diff: the page reads on without the replay, and the reopen
@@ -52,10 +55,13 @@ export function createReplayRefresher(host: ReplayRefresherHost): ReplayRefreshe
       .then((data) => {
         if (mine !== generation) return;
         if (data.comments.length === 0 || view.ended) return;
-        const opening: ReplayOpening = { data, roundReply: view.roundReply };
+        const opening: ReplayOpening = { data, roundReply: view.roundReply, seen: view.seen };
         host.offer(opening);
-        // The claim is spent either way: a round opens on its own at most once.
-        if (host.claimed(view.round) || byHand) host.open(opening);
+        // The claim is spent either way: a round opens on its own at most once,
+        // and one with nothing new for the reviewer not at all — its jump has
+        // already played, as it has for a fetch that failed.
+        const claimed = host.claimed(view.round);
+        if (byHand || (claimed && replayHasNews(opening))) host.open(opening);
       })
       .catch(() => {
         if (mine === generation && !view.ended) host.failed();

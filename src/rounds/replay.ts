@@ -67,6 +67,11 @@ export interface ReplayComment {
   answers: ReplayAnswer[];
   /** The agent's last words in the comment's thread — a `publish --to` "done: …" note. */
   note?: string;
+  /**
+   * When `note` was said: with the comment's `id` it names the one message, so
+   * the page can leave out a note its conversation panel already showed.
+   */
+  note_at?: string;
 }
 
 /** What `GET /api/session/:key/replay` answers. */
@@ -81,7 +86,7 @@ interface Review {
   /** Reviewer annotations from rounds after `made`, for the `repeated` verdict. */
   later: AnnotationPrompt[];
   /** The agent's last words per thread id. */
-  answered: Map<string, string>;
+  answered: Map<string, AgentNote>;
   ask: ReadBetween;
   readFileAt: ReadFileAt;
 }
@@ -128,11 +133,18 @@ function annotations(
     .filter((prompt) => prompt.type === "annotation");
 }
 
-function agentAnswers(conversation: ConversationEntry[]): Map<string, string> {
-  const answers = new Map<string, string>();
+interface AgentNote {
+  note: string;
+  note_at: string;
+}
+
+function agentAnswers(conversation: ConversationEntry[]): Map<string, AgentNote> {
+  const answers = new Map<string, AgentNote>();
   for (const thread of threadsOf(conversation)) {
     const last = thread.messages.findLast((message) => message.role === "agent");
-    if (last !== undefined && thread.legacy !== true) answers.set(thread.id, last.comment);
+    if (last !== undefined && thread.legacy !== true) {
+      answers.set(thread.id, { note: last.comment, note_at: last.at });
+    }
   }
   return answers;
 }
@@ -163,7 +175,7 @@ function replayComment(review: Review, prompt: AnnotationPrompt): ReplayComment 
     selected_text: prompt.selected_text,
     comment: prompt.comment,
     ...contextOf(review, prompt),
-    ...(note === undefined ? {} : { note }),
+    ...note,
     ...outcomeOf(review, prompt),
   };
 }

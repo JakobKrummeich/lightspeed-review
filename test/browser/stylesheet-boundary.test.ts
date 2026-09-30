@@ -132,18 +132,22 @@ const REPLAY_CARD: ReplayComment = {
 
 /**
  * The overlay in the three shapes that draw different elements: an answered card
- * with hunks and dots, an unanswered one falling back to the round reply, and a
+ * with hunks and dots, an unanswered one under the round reply's block, and a
  * card whose commits a rebase took away. One shape leaves the others unguarded.
  */
 function replayOverlay(): string {
   const renderer = { renderFile: (diff: string) => `<pre>${diff}</pre>` };
   return [
-    renderReplayOverlay({ data: { comments: [REPLAY_CARD, REPLAY_CARD] }, current: 0 }, renderer),
+    renderReplayOverlay(
+      { data: { comments: [REPLAY_CARD, REPLAY_CARD] }, current: 0, seen: new Set() },
+      renderer,
+    ),
     renderReplayOverlay(
       {
         data: { comments: [{ ...REPLAY_CARD, note: undefined, answers: [] }] },
         roundReply: "the round reply",
         current: 0,
+        seen: new Set(),
       },
       renderer,
     ),
@@ -151,6 +155,7 @@ function replayOverlay(): string {
       {
         data: { comments: [{ ...REPLAY_CARD, state: "unreachable", status: "unknown" }] },
         current: 0,
+        seen: new Set(),
       },
       renderer,
     ),

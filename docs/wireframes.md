@@ -28,7 +28,8 @@ else is out-of-flow overlays.
 ```
 
 - Rail `#lsr-panel-rail`: thin full-height button between diff and panel,
-  `›`/`‹` glyph, small badge showing queued-comment count. Toggles
+  `›`/`‹` glyph, small badge showing the queued item count (one per new
+  comment, one per thread touched). Toggles
   `body[data-panel="open"|"collapsed"]`; collapsed sets the third column to 0.
 - Overlay z-order: annotation popup **10** (position:absolute, no scrim) →
   opening **18** = replay **18** → round popup **19** → ended **20**. All
@@ -339,8 +340,9 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │
 │ │ │ │ (round 1) [file.ts]      [×] │   │ │ │ .lsr-pill-round (stale badge)
 │ │ │ │ │ selection                  │   │ │ │ .lsr-pill-remove
-│ │ │ │ comment                      │   │ │ │
-│ │ │ └──────────────────────────────┘   │ │ │
+│ │ │ │ comment                      │   │ │ │ .lsr-draft-text: press (or
+│ │ │ └──────────────────────────────┘   │ │ │  Enter/Space) opens it as
+│ │ │                                    │ │ │  .lsr-draft-edit in place
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │ general comment queued on
 │ │ │ │ general comment text     [×] │   │ │ │  the agent's turn (no badge)
 │ │ │ └──────────────────────────────┘   │ │ │
@@ -373,7 +375,15 @@ reply typed in a thread's box and a Resolve/Reopen press are both pills: they
 travel with the next Send, so answering three threads is still one batch for
 the agent. The fold happens at the press (`data-resolved`, with "resolves on
 your next Send" in `.lsr-thread-queued`); pressing again removes the queued
-toggle. Items from a v2 session, which carry no id, render as read-only
+toggle. The words of every queued comment — a reply drawn in its card, a line
+or general comment in the draft cards — are a `button.lsr-draft-text`: a click,
+Enter or Space swaps them for a `textarea.lsr-draft-edit` in place, filled with
+them, focused, caret at the end. Enter saves (Shift/Alt/Ctrl/Cmd+Enter break
+the line, as in every comment box), Escape puts the words back, leaving the
+box saves (switching to another window or app does not: the box stays open,
+words and caret kept); saved empty, the pill is taken back as by its ×. Only the words
+change — the pill keeps its place in the queue, its kind, anchor and round.
+A queued resolve has no words to press. Items from a v2 session, which carry no id, render as read-only
 legacy threads (`data-legacy`, no id, toggle or reply box). Each `--to main`
 post is its own card with no toggle and no reply box (the general comment box
 answers it). The agent answering in a resolved thread reopens it. A thread the
@@ -382,8 +392,9 @@ agent spoke in since the reviewer's last Send carries `data-new="true"` and a
 latest activity last.
 
 The lock follows the turn (`composeMode`): reviewer's turn — everything is
-live; agent working — the box and the popup queue, pills are removable;
-agent digesting — the box, Send, the popup and pill removal are locked
+live; agent working — the box and the popup queue, pills are removable
+and editable; agent digesting — the box, Send, the popup, pill removal and
+pill editing are locked (an edit already open stays, disabled, words kept)
 ("Locked while the agent reads your feedback — you can still read and
 approve."), while reading, approving and ending stay open.
 
@@ -396,8 +407,9 @@ waiting for your next Send" in a visually-hidden `role="status"`
 (`#lsr-queue-status`, `.lsr-visually-hidden`). Agent digesting — placeholder
 "Locked while the agent reads your feedback", textarea and primary disabled
 (the primary still counts the queue). Reviewer's turn (an agent
-listening or not) — "Send to Agent", or "Send N to Agent" while N pills wait,
-sends every pill in queue order plus the box. Sending — primary reads
+listening or not) — "Send to Agent", or "Send N to Agent" while N items wait
+(one per new comment, one per thread replied in or resolved), sends every pill
+in queue order plus the box. Sending — primary reads
 "Sending…", all compose controls disabled; ended — "This review has ended.",
 textarea and primary disabled. The rail auto-reopens a
 shut panel when the agent replies or when approval crosses done.
@@ -573,6 +585,8 @@ drawn, the round swaps under it, and the replay opens as it lands.
 ```
 ┌ .lsr-replay-overlay (z18) ─────────────────────────────────┐
 │   BETWEEN ROUNDS                        Comment 2 of 4     │ .lsr-replay-eyebrow / -progress
+│   THE AGENT'S ROUND REPLY                                  │ .lsr-replay-round (only when
+│   unread --to main posts and messages                      │  unread; above every card)
 │   ┌ article.lsr-replay-card ───────────────────────────┐   │
 │   │ src/path/file.ts                     [addressed]   │   │ .lsr-replay-path + -chip
 │   │                                                    │   │  (addressed│unchanged│
@@ -597,6 +611,18 @@ rounded on every side, under a "You said" label in the violet itself — the
 hue the reviewer's words wear in the sidechat and on the "commented last
 round" badge. No stripe down its edge: tint and label already set it apart
 from the agent's answer on the bare card below it.
+
+Only what the reviewer has not read: an answer the conversation panel already
+showed (`seen` in the review's memory: drawn while the tab was visible and the
+panel open) leaves the card without its `.lsr-replay-answer` block — no empty
+frame. The round reply keeps only the parts not yet shown and is never a
+card's answer: it is its own `.lsr-replay-round` block above whichever card
+is on screen, drawn once, and not at all when nothing in it is unread. WHAT
+CHANGED always stays. With no code change its line points to a reply only
+when the card holds one: "No code change — see the reply." beside an answer,
+and "No code change." otherwise. A replay with no unread words (on a card or
+in the round reply) and no change to show does not open on its own;
+`#lsr-replay-reopen` still offers it.
 
 ## 10. Ended overlay — closing summary (status-banner.ts)
 

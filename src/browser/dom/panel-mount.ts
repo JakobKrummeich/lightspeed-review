@@ -35,10 +35,11 @@ import {
 import { deliveryFacts, handedOnTurn } from "../delivery.ts";
 import { foldPress, groupPress } from "./panel-folds.ts";
 import { keepDraft } from "./panel-draft.ts";
+import { editBlur, editKey, holdEdit, keepEdit, leaveEdit, pillPress } from "./panel-pills.ts";
 import type { PanelLight } from "./panel-light.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
-import { threadsOf } from "../../threads.ts";
+import { batchSize, threadsOf } from "../../threads.ts";
 import { presenceOf } from "../../turn.ts";
 
 export interface MountedPanel {
@@ -113,7 +114,10 @@ export function mountPanel(options: PanelOptions): MountedPanel {
   root.addEventListener("keydown", (event) => {
     handleComposeKey(view, event);
     handleReplyKey(view, event);
+    editKey(view, event, draw);
   });
+  root.addEventListener("focusout", (event) => editBlur(view, event, draw));
+  root.addEventListener("mousedown", (event) => holdEdit(view, event));
 
   return {
     queue(prompts: FeedbackPrompt[]) {
@@ -206,7 +210,7 @@ function queueComment(view: PanelView): void {
   updateMemory(storage, key, { draft: "" });
   enqueue(view, [{ type: "message", comment }]);
   // After the draw, which empties it: the same count queued twice is news twice.
-  announce(view, queuedAnnouncement(view.state.pending.length));
+  announce(view, queuedAnnouncement(batchSize(view.state.pending)));
 }
 
 function announce(view: PanelView, text: string): void {
@@ -222,13 +226,16 @@ function draw(view: PanelView): void {
   // pill queued mid-reply must not cost the reviewer the sentence, nor the focus.
   const typed = typedReplies(options.root);
   const focused = focusedReply(options.root);
-  if (scrollHost) scrollHost.innerHTML = renderScroll(state);
+  // So is a queued pill's words being edited, and the caret with them.
+  keepEdit(options.root, () => {
+    if (scrollHost) scrollHost.innerHTML = renderScroll(state);
+  });
   announce(view, "");
   restoreReplies(options.root, typed);
   if (focused !== undefined) replyBox(options.root, focused)?.focus();
   if (following) toBottom(scrollHost);
   // After the scroll: whether a new card is in sight decides how it is lit.
-  options.light?.drawn(state.conversation);
+  options.light?.drawn(state);
   options.onPending(tallyOf(state.pending));
   // Queue stored on every change, no delay: a pill is one gesture, and the
   // thing a reload must not lose.
@@ -248,7 +255,7 @@ function setStatus(view: PanelView, status: SessionData["status"]): void {
   // not. An end that sent nothing keeps them for the round after the reopen.
   const typed = generalCommentBox(view.options.root)?.value ?? "";
   if (view.composeHost) {
-    view.composeHost.innerHTML = renderCompose(view.state, view.state.pending.length);
+    view.composeHost.innerHTML = renderCompose(view.state, batchSize(view.state.pending));
   }
   const box = generalCommentBox(view.options.root);
   if (box) box.value = typed;
@@ -270,6 +277,10 @@ function drawNote(view: PanelView): void {
 function handleClick(view: PanelView, event: Event): void {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
+  // First, while the index it read is the drawn one; any other press then
+  // leaves an open box before it acts.
+  if (pillPress(view, target, draw)) return;
+  leaveEdit(view, target, draw);
   if (controlPress(view, target)) return;
   // Last: anywhere on a card's head folds it, but its own presses act instead.
   if (groupPress(view, target) || foldPress(view, target)) draw(view);
@@ -281,23 +292,13 @@ function controlPress(view: PanelView, target: HTMLElement): boolean {
     jumpPress(view, target);
     return true;
   }
-  return threadPress(view, target) || pillPress(view, target) || composePress(view, target);
+  return threadPress(view, target) || composePress(view, target);
 }
 
 function composePress(view: PanelView, target: HTMLElement): boolean {
   if (target.id === "lsr-send") press(view);
   else if (target.id === "lsr-send-end") void send(view, true);
   else return false;
-  return true;
-}
-
-/** Taking a pill back writes to the queue, so it is locked with the rest. */
-function pillPress(view: PanelView, target: HTMLElement): boolean {
-  if (!target.classList.contains("lsr-pill-remove")) return false;
-  if (composeFrozen(view)) return true;
-  const index = Number(target.dataset.index);
-  view.state.pending = view.state.pending.filter((_, position) => position !== index);
-  draw(view);
   return true;
 }
 
@@ -339,7 +340,7 @@ function addReply(view: PanelView, thread: string): void {
   enqueue(view, [{ type: "reply", thread, comment }]);
   // After the draw, which replaced the box: the fresh one takes the focus.
   replyBox(view.options.root, thread)?.focus();
-  announce(view, queuedAnnouncement(view.state.pending.length));
+  announce(view, queuedAnnouncement(batchSize(view.state.pending)));
 }
 
 /** Button and Enter alike: whose turn it is decides between the two verbs. */

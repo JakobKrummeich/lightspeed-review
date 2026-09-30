@@ -12,6 +12,8 @@ export interface MountedRail {
   setQueued(count: number): void;
   /** Opens the panel; true if it was folded. */
   expand(): boolean;
+  /** The panel is open, not folded to the rail. */
+  isOpen(): boolean;
 }
 
 /**
@@ -53,5 +55,6 @@ export function mountPanelRail(options: PanelRailOptions): MountedRail {
       set({ ...state, collapsed: false });
       return folded;
     },
+    isOpen: () => !state.collapsed,
   };
 }

@@ -215,6 +215,27 @@ test("a comment the agent answered carries its last words as the note, beside th
   assert.equal(card?.answers[0]?.hunks.length, 1, "only the hunk the anchor overlaps");
 });
 
+test("a note says when it was said, so the page can tell whether its panel already showed it", () => {
+  const record = session({
+    conversation: [
+      reviewerEntry(0, [annotation()]),
+      agentReply("evt-1", "looking into it", 0),
+      agentReply("evt-1", "done: moved the guard", 1),
+    ],
+  });
+
+  const [card] = replay(record, answersWith(patchFor("src/a.ts"))).comments;
+
+  assert.equal(card?.note, "done: moved the guard");
+  assert.equal(card?.note_at, "2024-01-02T13:00:00.000Z", "the last answer's stamp, not the first");
+});
+
+test("an unanswered comment has no note stamp either", () => {
+  const [card] = replay(session(), answersWith(patchFor("src/a.ts"))).comments;
+
+  assert.equal(card?.note_at, undefined);
+});
+
 test("the reviewer's own replies in the thread are never read as the agent's note", () => {
   const record = session({
     conversation: [
