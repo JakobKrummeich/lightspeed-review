@@ -190,6 +190,42 @@
 }
 
 /*
+ * A queued pill's words are a press that opens them for editing, so a key
+ * reaches them: a button, dressed as the text it is. The text caret says what
+ * a press does; the ring appears only for the keyboard.
+ */
+.lsr-draft-text {
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-weight: inherit;
+  text-align: start;
+  white-space: pre-wrap;
+  cursor: text;
+}
+
+/* Locked, the words are still read: only the press goes, not half their ink. */
+.lsr-draft-text[disabled] {
+  opacity: 1;
+  cursor: default;
+}
+
+.lsr-draft-text:focus-visible,
+.lsr-draft-edit:focus-visible {
+  outline: 2px solid var(--lsr-accent);
+  outline-offset: 2px;
+}
+
+/* The box in the words' place, grown to them where the browser can. */
+.lsr-draft-edit {
+  display: block;
+  min-height: calc(2lh + 2 * var(--lsr-space-2) + 2px);
+  field-sizing: content;
+}
+
+/*
  * The card's head is its fold: a press anywhere on it but the file jump folds
  * or unfolds the card, and the chevron at the end says which way it goes.
  */

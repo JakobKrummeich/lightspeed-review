@@ -35,6 +35,7 @@ import {
 import { deliveryFacts, handedOnTurn } from "../delivery.ts";
 import { foldPress, groupPress } from "./panel-folds.ts";
 import { keepDraft } from "./panel-draft.ts";
+import { editBlur, editKey, keepEdit, pillPress } from "./panel-pills.ts";
 import type { PanelLight } from "./panel-light.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
@@ -113,7 +114,9 @@ export function mountPanel(options: PanelOptions): MountedPanel {
   root.addEventListener("keydown", (event) => {
     handleComposeKey(view, event);
     handleReplyKey(view, event);
+    editKey(view, event, draw);
   });
+  root.addEventListener("focusout", (event) => editBlur(view, event, draw));
 
   return {
     queue(prompts: FeedbackPrompt[]) {
@@ -222,7 +225,10 @@ function draw(view: PanelView): void {
   // pill queued mid-reply must not cost the reviewer the sentence, nor the focus.
   const typed = typedReplies(options.root);
   const focused = focusedReply(options.root);
-  if (scrollHost) scrollHost.innerHTML = renderScroll(state);
+  // So is a queued pill's words being edited, and the caret with them.
+  keepEdit(options.root, () => {
+    if (scrollHost) scrollHost.innerHTML = renderScroll(state);
+  });
   announce(view, "");
   restoreReplies(options.root, typed);
   if (focused !== undefined) replyBox(options.root, focused)?.focus();
@@ -281,23 +287,13 @@ function controlPress(view: PanelView, target: HTMLElement): boolean {
     jumpPress(view, target);
     return true;
   }
-  return threadPress(view, target) || pillPress(view, target) || composePress(view, target);
+  return threadPress(view, target) || pillPress(view, target, draw) || composePress(view, target);
 }
 
 function composePress(view: PanelView, target: HTMLElement): boolean {
   if (target.id === "lsr-send") press(view);
   else if (target.id === "lsr-send-end") void send(view, true);
   else return false;
-  return true;
-}
-
-/** Taking a pill back writes to the queue, so it is locked with the rest. */
-function pillPress(view: PanelView, target: HTMLElement): boolean {
-  if (!target.classList.contains("lsr-pill-remove")) return false;
-  if (composeFrozen(view)) return true;
-  const index = Number(target.dataset.index);
-  view.state.pending = view.state.pending.filter((_, position) => position !== index);
-  draw(view);
   return true;
 }
 

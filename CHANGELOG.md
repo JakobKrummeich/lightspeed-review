@@ -9,6 +9,13 @@
   "Queued — N" announcement and the done and new-round cards count the same
   way; the new-round card names a thread with a reply and a resolve as a
   reply.
+- Queued words can be edited before they are sent. Click the text of a
+  queued reply, line comment or general comment — or tab to it and press
+  Enter — and it opens in place as a box: Enter saves, Escape puts the words
+  back, clicking away saves, and saving it empty takes the item back as its
+  × does. The item keeps its place in the queue, its line and its round.
+  Like ×, it is locked while the agent reads your feedback and once the
+  review has ended.
 
 ## 3.6.0
 

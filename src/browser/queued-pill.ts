@@ -21,6 +21,24 @@ export function unstampedPill(pill: QueuedPill): FeedbackPrompt {
 }
 
 /**
+ * The reviewer's own words, rewritten in place: type, anchor, round and place
+ * in the queue stay, so the edited pill goes out exactly where the old one
+ * would have. Emptied, it is taken back — an empty comment is nothing to send,
+ * and a second gesture to remove it would be a chore. A resolve has no words.
+ */
+export function editPill(
+  pending: readonly QueuedPill[],
+  index: number,
+  comment: string,
+): QueuedPill[] {
+  const pill = pending[index];
+  if (pill === undefined || pill.type === "resolve") return [...pending];
+  const words = comment.trim();
+  if (words === "") return pending.filter((_, position) => position !== index);
+  return pending.map((one, position) => (position === index ? { ...pill, comment: words } : one));
+}
+
+/**
  * An unstamped pill is never called stale: absence of a stamp is absence of a
  * claim. Only a line comment can be: the badge warns that lines may not line
  * up, and a message, reply or resolve has none — one queued through the

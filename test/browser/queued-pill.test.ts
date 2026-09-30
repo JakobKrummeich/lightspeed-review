@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  editPill,
   stalePillRound,
   tallyOf,
   queuedTotal,
@@ -129,4 +130,38 @@ test("every new comment is an item of its own, and the total is the batch the ag
   assert.deepEqual(tally, { comments: 3, replies: 1, resolves: 1 });
   assert.equal(queuedTotal(tally), 5);
   assert.equal(queuedTotal(tally), batchSize(pills));
+});
+
+test("an edit changes a pill's words and nothing else: type, anchor, round and place stay", () => {
+  const pills: QueuedPill[] = [
+    { type: "message", comment: "first", round: 0 },
+    { ...annotation, round: 1 },
+    { type: "reply", thread: "t1", comment: "per-batch" },
+  ];
+
+  const edited = editPill(pills, 1, "  this name says what it holds  ");
+
+  assert.deepEqual(edited, [
+    pills[0],
+    { ...annotation, comment: "this name says what it holds", round: 1 },
+    pills[2],
+  ]);
+  assert.deepEqual(pills[1], { ...annotation, round: 1 }, "the queue it was given is untouched");
+});
+
+test("an edit down to nothing takes the pill back, as its × does", () => {
+  const pills: QueuedPill[] = [
+    { type: "message", comment: "keep" },
+    { type: "reply", thread: "t1", comment: "drop" },
+  ];
+
+  assert.deepEqual(editPill(pills, 1, "  \n "), [{ type: "message", comment: "keep" }]);
+});
+
+test("a resolve has no words to edit, and an index past the queue edits nothing", () => {
+  const pills: QueuedPill[] = [{ type: "resolve", thread: "t1", resolved: true }];
+
+  assert.deepEqual(editPill(pills, 0, "words"), pills);
+  assert.deepEqual(editPill(pills, 3, "words"), pills);
+  assert.deepEqual(editPill(pills, -1, ""), pills);
 });

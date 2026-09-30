@@ -340,8 +340,9 @@ Fixed 352px right column. Scrolling history + queue above a pinned compose box.
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │
 │ │ │ │ (round 1) [file.ts]      [×] │   │ │ │ .lsr-pill-round (stale badge)
 │ │ │ │ │ selection                  │   │ │ │ .lsr-pill-remove
-│ │ │ │ comment                      │   │ │ │
-│ │ │ └──────────────────────────────┘   │ │ │
+│ │ │ │ comment                      │   │ │ │ .lsr-draft-text: press (or
+│ │ │ └──────────────────────────────┘   │ │ │  Enter/Space) opens it as
+│ │ │                                    │ │ │  .lsr-draft-edit in place
 │ │ │ ┌ .lsr-pill ───────────────────┐   │ │ │ general comment queued on
 │ │ │ │ general comment text     [×] │   │ │ │  the agent's turn (no badge)
 │ │ │ └──────────────────────────────┘   │ │ │
@@ -374,7 +375,14 @@ reply typed in a thread's box and a Resolve/Reopen press are both pills: they
 travel with the next Send, so answering three threads is still one batch for
 the agent. The fold happens at the press (`data-resolved`, with "resolves on
 your next Send" in `.lsr-thread-queued`); pressing again removes the queued
-toggle. Items from a v2 session, which carry no id, render as read-only
+toggle. The words of every queued comment — a reply drawn in its card, a line
+or general comment in the draft cards — are a `button.lsr-draft-text`: a click,
+Enter or Space swaps them for a `textarea.lsr-draft-edit` in place, filled with
+them, focused, caret at the end. Enter saves (Shift/Alt/Ctrl/Cmd+Enter break
+the line, as in every comment box), Escape puts the words back, leaving the
+box saves; saved empty, the pill is taken back as by its ×. Only the words
+change — the pill keeps its place in the queue, its kind, anchor and round.
+A queued resolve has no words to press. Items from a v2 session, which carry no id, render as read-only
 legacy threads (`data-legacy`, no id, toggle or reply box). Each `--to main`
 post is its own card with no toggle and no reply box (the general comment box
 answers it). The agent answering in a resolved thread reopens it. A thread the
@@ -383,8 +391,9 @@ agent spoke in since the reviewer's last Send carries `data-new="true"` and a
 latest activity last.
 
 The lock follows the turn (`composeMode`): reviewer's turn — everything is
-live; agent working — the box and the popup queue, pills are removable;
-agent digesting — the box, Send, the popup and pill removal are locked
+live; agent working — the box and the popup queue, pills are removable
+and editable; agent digesting — the box, Send, the popup, pill removal and
+pill editing are locked (an edit already open stays, disabled, words kept)
 ("Locked while the agent reads your feedback — you can still read and
 approve."), while reading, approving and ending stay open.
 

@@ -1855,3 +1855,248 @@ test("a panel sent to its foot shows the newest talk, wherever it stood", (t) =>
 
   assert.equal(host.scrollTop, host.scrollHeight);
 });
+
+/** A page that tracks focus, so a redraw's hold on the caret can be seen. */
+function trackFocus(t: TestContext): { activeElement: unknown } {
+  const globals = globalThis as { document?: unknown };
+  const before = globals.document;
+  const page = { activeElement: null as unknown };
+  globals.document = page;
+  t.after(() => {
+    globals.document = before;
+  });
+  return page;
+}
+
+function editBoxOf(root: FakeNode): FakeNode | null {
+  return root.querySelector(".lsr-draft-edit");
+}
+
+/** Presses the words of the `index`-th queued pill. */
+function openEdit(root: FakeNode, index = 0): FakeNode {
+  const words = root
+    .querySelectorAll(".lsr-draft-text")
+    .find((one) => one.dataset.index === String(index));
+  assert.ok(words, `no words to press for pill ${index}`);
+  root.dispatch("click", { target: words });
+  const box = editBoxOf(root);
+  assert.ok(box, "the press opened a box");
+  return box;
+}
+
+const pendingOf = (storage: FakeStorage): unknown[] => readMemory(storage, "key").pending;
+
+test("a queued comment's words open as a box filled with them, focused, caret at the end", (t) => {
+  const { root, panel } = mount(t);
+  panel.queue([annotation]);
+  const words = root.querySelector(".lsr-draft-text");
+  assert.equal(words?.tagName, "BUTTON", "a key opens it as well as a click");
+
+  const box = openEdit(root);
+
+  assert.equal(box.value, "wrap in a transaction");
+  assert.equal(box.focused, true);
+  assert.deepEqual([box.selectionStart, box.selectionEnd], [21, 21]);
+  assert.equal(root.querySelector(".lsr-draft-text"), null, "the box stands in the words' place");
+});
+
+test("Enter saves the edit where the pill stood, anchor and round kept, stored at once", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation, { type: "message", comment: "and the changelog" }]);
+  const box = openEdit(root, 0);
+  box.value = "  wrap it all  ";
+
+  const soft = keydown(box, { key: "Enter", shiftKey: true });
+  root.dispatch("keydown", soft);
+  assert.equal(soft.defaultPrevented, false, "Shift+Enter still breaks the line");
+  const save = keydown(box, { key: "Enter" });
+  root.dispatch("keydown", save);
+
+  assert.equal(save.defaultPrevented, true);
+  assert.equal(editBoxOf(root), null, "closed");
+  assert.deepEqual(pendingOf(storage), [
+    { ...annotation, comment: "wrap it all", round: 0 },
+    { type: "message", comment: "and the changelog", round: 0 },
+  ]);
+  const words = root.querySelector(".lsr-draft-text");
+  assert.equal(words?.textContent, "wrap it all");
+  assert.equal(words?.focused, true, "the keyboard is back on the words it edited");
+});
+
+test("Escape puts the words back as they were", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation]);
+  const box = openEdit(root);
+  box.value = "something else entirely";
+
+  const cancel = keydown(box, { key: "Escape" });
+  root.dispatch("keydown", cancel);
+
+  assert.equal(cancel.defaultPrevented, true);
+  assert.equal(editBoxOf(root), null);
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, round: 0 }]);
+  assert.equal(root.querySelector(".lsr-draft-text")?.focused, true);
+});
+
+test("an Escape that picks an IME candidate does not cancel the edit", (t) => {
+  const { root, panel } = mount(t);
+  panel.queue([annotation]);
+  const box = openEdit(root);
+
+  root.dispatch("keydown", keydown(box, { key: "Escape", isComposing: true }));
+  root.dispatch("keydown", keydown(box, { key: "a" }));
+
+  assert.equal(editBoxOf(root), box);
+});
+
+test("an edit saved empty takes the pill back, as its × does", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation]);
+  const box = openEdit(root);
+  box.value = "   ";
+
+  root.dispatch("keydown", keydown(box, { key: "Enter" }));
+
+  assert.equal(queuedIn(root), 0);
+  assert.deepEqual(pendingOf(storage), []);
+  assert.equal(root.querySelector(".lsr-drafts"), null);
+});
+
+test("leaving the box saves it, as the panel keeps typed words everywhere else", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([{ type: "message", comment: "the migration is missing" }]);
+  const box = openEdit(root);
+  box.value = "the migration and its rollback are missing";
+
+  root.dispatch("focusout", { target: box });
+  // Only the box's own leaving: focus moving between anything else saves nothing.
+  root.dispatch("focusout", { target: root.querySelector("#lsr-general-comment") });
+
+  assert.equal(editBoxOf(root), null);
+  assert.deepEqual(pendingOf(storage), [
+    { type: "message", comment: "the migration and its rollback are missing", round: 0 },
+  ]);
+});
+
+test("a reply queued in its card is edited in place and goes out edited", async (t) => {
+  const { root } = mount(t, session({ conversation: [opened, answered] }));
+  const sent = stubFetch(t);
+  replyBoxOf(root)!.value = "per-batch";
+  pressIn(root, ".lsr-thread-reply-add");
+  pressIn(root, ".lsr-thread-resolve");
+  root.dispatch("click", { target: root.querySelector(".lsr-thread-fold") });
+
+  const box = openEdit(root, 0);
+  box.value = "per-request, then";
+  root.dispatch("keydown", keydown(box, { key: "Enter" }));
+  root.dispatch("click", { target: root.querySelector("#lsr-send") });
+  await tick(0);
+
+  assert.deepEqual(sent[0]?.prompts, [
+    { type: "reply", thread: "t1", comment: "per-request, then" },
+    { type: "resolve", thread: "t1", resolved: true },
+  ]);
+});
+
+test("while the agent digests or the review is over, no box opens", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation]);
+  panel.setTurn(READING, 1);
+
+  assert.equal(root.querySelector(".lsr-draft-text")?.disabled, true);
+  root.dispatch("click", { target: root.querySelector(".lsr-draft-text") });
+  assert.equal(editBoxOf(root), null);
+
+  panel.setTurn(REVIEWERS);
+  panel.update(session({ status: "ended" }));
+  root.dispatch("click", { target: root.querySelector(".lsr-draft-text") });
+  assert.equal(editBoxOf(root), null);
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, round: 0 }]);
+});
+
+test("a box open when the lock falls keeps its words, disabled, and saves nothing until it lifts", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation]);
+  openEdit(root).value = "wrap it all";
+
+  panel.setTurn(READING, 1);
+  const locked = editBoxOf(root)!;
+  assert.equal(locked.disabled, true);
+  assert.equal(locked.value, "wrap it all");
+  root.dispatch("focusout", { target: locked });
+  root.dispatch("keydown", keydown(locked, { key: "Enter" }));
+  assert.equal(editBoxOf(root)?.value, "wrap it all", "still open, words kept");
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, round: 0 }]);
+
+  panel.setTurn(WORKING);
+  root.dispatch("keydown", keydown(editBoxOf(root), { key: "Enter" }));
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, comment: "wrap it all", round: 0 }]);
+});
+
+test("a redraw mid-edit keeps the words being typed and the caret in the box", (t) => {
+  const page = trackFocus(t);
+  const { root, panel } = mount(t);
+  panel.queue([annotation]);
+  const box = openEdit(root);
+  box.value = "wrap it in a tra";
+  box.setSelectionRange(4, 7);
+
+  panel.update(session({ conversation: [reply] }));
+  panel.queue([{ type: "message", comment: "and the changelog" }]);
+
+  const fresh = editBoxOf(root)!;
+  assert.notEqual(fresh, box, "the scroll was redrawn");
+  assert.equal(fresh.value, "wrap it in a tra");
+  assert.equal(page.activeElement, fresh);
+  assert.deepEqual([fresh.selectionStart, fresh.selectionEnd], [4, 7]);
+});
+
+test("a redraw mid-edit elsewhere leaves the focus where the reviewer put it", (t) => {
+  const page = trackFocus(t);
+  const { root, panel, box } = mount(t);
+  panel.queue([annotation]);
+  openEdit(root).value = "wrap it all";
+  box()!.focus();
+
+  panel.update(session({ conversation: [reply] }));
+
+  assert.equal(editBoxOf(root)?.value, "wrap it all");
+  assert.equal(page.activeElement, box());
+});
+
+test("a box blurred by its own redraw is not saved by it", (t) => {
+  // Chrome fires focusout on a focused element the redraw removes.
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation]);
+  const box = openEdit(root);
+  box.value = "half-typ";
+  const scroll = root.querySelector(".lsr-panel-scroll")!;
+  const write = Object.getOwnPropertyDescriptor(FakeNode.prototype, "innerHTML")!;
+  Object.defineProperty(scroll, "innerHTML", {
+    get: () => write.get!.call(scroll),
+    set: (html: string) => {
+      root.dispatch("focusout", { target: editBoxOf(root) });
+      write.set!.call(scroll, html);
+    },
+  });
+
+  panel.update(session({ conversation: [reply] }));
+
+  assert.equal(editBoxOf(root)?.value, "half-typ", "still open, still typing");
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, round: 0 }]);
+});
+
+test("a × pressed after a blur-save redrew the column takes back nothing else", (t) => {
+  // The press lands on the × the save's redraw threw away; its index is from before.
+  const { root, panel } = mount(t);
+  panel.queue([annotation, { type: "message", comment: "keep me" }]);
+  const box = openEdit(root, 0);
+  const staleRemove = root.querySelector(".lsr-pill-remove");
+  box.value = "";
+
+  root.dispatch("focusout", { target: box });
+  root.dispatch("click", { target: staleRemove });
+
+  assert.match(shown(root), /keep me/);
+  assert.equal(queuedIn(root), 1);
+});

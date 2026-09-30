@@ -24,6 +24,12 @@ export interface PanelState {
   /** The reviewer's own card folds, remembered per review. */
   folds: Record<string, ThreadFold>;
   resolvedShown: boolean;
+  /**
+   * The queued pill whose words are open for editing, held by identity: an
+   * edit, a × or a Send replaces or drops the object, and a stale one then
+   * matches nothing, so no box can open on a pill that moved into its place.
+   */
+  editing?: QueuedPill;
 }
 
 export type ComposeState = Pick<PanelState, "status" | "allApproved" | "turn">;
@@ -147,6 +153,7 @@ function columnOf(state: PanelState): ColumnState {
     delivery: state.delivery,
     folds: state.folds,
     resolvedShown: state.resolvedShown,
+    editing: state.editing,
   };
 }
 
