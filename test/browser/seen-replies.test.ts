@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readMemory, updateMemory } from "../../src/browser/review-memory.ts";
+import { readMemory, SEEN_REPLY_LIMIT, updateMemory } from "../../src/browser/review-memory.ts";
 import { trackSeenReplies, type SeenReplies } from "../../src/browser/seen-replies.ts";
 import { FakeStorage } from "./fake-storage.ts";
 
@@ -74,7 +74,7 @@ test("another tab's seen words are kept when this one stores its own", () => {
 
   show(here, ["t1 a"], 1);
 
-  assert.deepEqual(readMemory(storage, KEY).seen, ["t9 x", "t1 a"]);
+  assert.deepEqual(readMemory(storage, KEY).seen, ["t1 a", "t9 x"], "kept by when they were said");
 });
 
 test("a draw with nothing new writes nothing", () => {
@@ -117,4 +117,39 @@ test("words shown after a round was asked for do not move that round's answer", 
 
   assert.deepEqual([...asked], ["t1 a"]);
   assert.deepEqual([...seen.before(2)], ["t1 a"]);
+});
+
+/** `count` messages a minute apart, each on its own card: `c0` said first. */
+function saidInOrder(count: number): string[] {
+  return Array.from(
+    { length: count },
+    (_, index) => `c${index} ${new Date(Date.UTC(2025, 0, 1) + index * 60_000).toISOString()}`,
+  );
+}
+
+test("past the cap the oldest said go first, whatever order the panel drew them in", () => {
+  const storage = new FakeStorage();
+  const said = saidInOrder(SEEN_REPLY_LIMIT + 5);
+  // The panel draws by group, not by time: the newest may come first.
+  show(trackSeenReplies(storage, KEY), [...said].reverse(), 1);
+
+  assert.deepEqual(readMemory(storage, KEY).seen, said.slice(5), "the newest kept, oldest first");
+});
+
+test("a reload that shows what is already kept, or older, writes nothing", () => {
+  const storage = new FakeStorage();
+  const said = saidInOrder(SEEN_REPLY_LIMIT + 5);
+  show(trackSeenReplies(storage, KEY), said, 1);
+  const writes: string[] = [];
+  const setItem = storage.setItem.bind(storage);
+  storage.setItem = (key, value) => {
+    writes.push(key);
+    setItem(key, value);
+  };
+
+  // The five the cap let go come back as unknown to the reloaded page.
+  show(trackSeenReplies(storage, KEY), [...said].reverse(), 1);
+
+  assert.deepEqual(writes, []);
+  assert.deepEqual(readMemory(storage, KEY).seen, said.slice(5));
 });

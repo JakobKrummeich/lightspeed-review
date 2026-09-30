@@ -6,7 +6,13 @@
  * folded card still counts, the words were in front of the reviewer. Keys are
  * `saidKey`s (`message-news.ts`).
  */
-import { readMemory, updateMemory, type ReviewMemoryStorage } from "./review-memory.ts";
+import { saidAt } from "./message-news.ts";
+import {
+  readMemory,
+  SEEN_REPLY_LIMIT,
+  updateMemory,
+  type ReviewMemoryStorage,
+} from "./review-memory.ts";
 
 export interface SeenReplies {
   /** After every draw of the panel: what it drew, and the round of the session it drew. */
@@ -52,11 +58,35 @@ export function trackSeenReplies(storage: ReviewMemoryStorage, sessionKey: strin
       for (const key of fresh) seen.add(key);
       // Read again, not taken from this page: another tab's are kept.
       const stored = readMemory(storage, sessionKey).seen;
-      updateMemory(storage, sessionKey, { seen: [...new Set([...stored, ...fresh])] });
+      const kept = newestSaid([...stored, ...fresh]);
+      // Nothing newer than what is kept — words the cap let go, shown again
+      // by a reload — changes nothing, so writes nothing.
+      if (kept.length === stored.length && kept.every((key, index) => key === stored[index])) {
+        return;
+      }
+      updateMemory(storage, sessionKey, { seen: kept });
     },
     before(round) {
       reach(round);
       return prior;
     },
   };
+}
+
+/**
+ * The newest `SEEN_REPLY_LIMIT` by when they were said, oldest first — the
+ * order the review's memory trims from. The panel draws by group, not time,
+ * so the order they were shown in says nothing of their age. Ties go by key,
+ * so the same words always keep the same order.
+ */
+function newestSaid(keys: readonly string[]): string[] {
+  const byAge = (one: string, other: string): number =>
+    codeOrder(saidAt(one), saidAt(other)) || codeOrder(one, other);
+  return [...new Set(keys)].sort(byAge).slice(-SEEN_REPLY_LIMIT);
+}
+
+/** Code-unit order, as ISO stamps sort by time; no locale may reorder them. */
+function codeOrder(one: string, other: string): number {
+  if (one === other) return 0;
+  return one < other ? -1 : 1;
 }

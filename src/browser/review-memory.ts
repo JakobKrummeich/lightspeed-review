@@ -44,7 +44,8 @@ export interface ReviewMemory {
   resolvedShown: boolean;
   /**
    * The agent's messages the conversation panel has shown (`saidKey` in
-   * `message-news.ts`), oldest first: the round replay leaves out words the
+   * `message-news.ts`), oldest said first (`seen-replies.ts` keeps them so,
+   * and trimming from the front keeps the newest): the round replay leaves out words the
    * reviewer already had in front of them. Not round-stamped: threads outlive rounds.
    */
   seen: string[];
@@ -88,8 +89,8 @@ export const MEMORY_SESSION_LIMIT = 8;
 
 /**
  * Far past what one round's replay can ask about (the agent's words since the
- * last round's comments), and ~8 KB at most: the oldest go first, and they are
- * the ones no replay will ask about again.
+ * last round's comments), and ~8 KB at most: the oldest said go first, and
+ * they are the ones no replay will ask about again.
  */
 export const SEEN_REPLY_LIMIT = 200;
 

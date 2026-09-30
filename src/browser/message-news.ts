@@ -41,6 +41,11 @@ export function saidKey(cardKey: string, at: string): string {
   return `${cardKey} ${at}`;
 }
 
+/** When the message under a `saidKey` was said: card keys hold no space, so the stamp is the last word. */
+export function saidAt(key: string): string {
+  return key.slice(key.lastIndexOf(" ") + 1);
+}
+
 function agentSaid(conversation: ConversationEntry[]): { card: string; said: string }[] {
   return groupCards(conversation).flatMap((group) =>
     group.cards.flatMap((card) =>
