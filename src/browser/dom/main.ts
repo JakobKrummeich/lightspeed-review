@@ -143,21 +143,28 @@ async function main(): Promise<void> {
     (file, anchor) => diff.reveal(file, anchor),
   );
   finish.attach(side);
-  const { panel } = side;
-  // Queueing leaves a shut panel shut: the popup already showed the words,
-  // and the rail counts them.
-  mountAnnotationPopup({
-    diffRoot: page.diffRoot,
-    locked: () => panel.writesLocked(),
-    onQueue: (prompts) => panel.queue(prompts),
-  });
-  lockSelectionToColumn(page.diffRoot);
+  wireSelection(page.diffRoot, side.panel);
 
   const replay = wireOverlays(page, live, session);
 
   // `reader.place`, not a flag: where the reviewer stands is only answerable
   // at the moment a round lands.
   wireSessionEvents({ page, live, diff, ...side, ...replay, finish, place: reader.place });
+}
+
+/**
+ * What selecting text in the diff does: the popup that turns it into a comment
+ * for the panel's queue, and the lock that keeps a selection in one column.
+ * Queueing leaves a shut panel shut: the popup already showed the words, and
+ * the rail counts them.
+ */
+function wireSelection(diffRoot: HTMLElement, panel: MountedPanel): void {
+  mountAnnotationPopup({
+    diffRoot,
+    locked: () => panel.writesLocked(),
+    onQueue: (prompts) => panel.queue(prompts),
+  });
+  lockSelectionToColumn(diffRoot);
 }
 
 /** A place is only handed back to the round it was read in — see `review-memory.ts`. */
