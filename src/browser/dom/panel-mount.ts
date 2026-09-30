@@ -35,7 +35,7 @@ import {
 import { deliveryFacts, handedOnTurn } from "../delivery.ts";
 import { foldPress, groupPress } from "./panel-folds.ts";
 import { keepDraft } from "./panel-draft.ts";
-import { editBlur, editKey, keepEdit, pillPress } from "./panel-pills.ts";
+import { editBlur, editKey, holdEdit, keepEdit, leaveEdit, pillPress } from "./panel-pills.ts";
 import type { PanelLight } from "./panel-light.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
 import type { SessionData } from "./session-api.ts";
@@ -117,6 +117,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     editKey(view, event, draw);
   });
   root.addEventListener("focusout", (event) => editBlur(view, event, draw));
+  root.addEventListener("mousedown", (event) => holdEdit(view, event));
 
   return {
     queue(prompts: FeedbackPrompt[]) {
@@ -276,6 +277,10 @@ function drawNote(view: PanelView): void {
 function handleClick(view: PanelView, event: Event): void {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
+  // First, while the index it read is the drawn one; any other press then
+  // leaves an open box before it acts.
+  if (pillPress(view, target, draw)) return;
+  leaveEdit(view, target, draw);
   if (controlPress(view, target)) return;
   // Last: anywhere on a card's head folds it, but its own presses act instead.
   if (groupPress(view, target) || foldPress(view, target)) draw(view);
@@ -287,7 +292,7 @@ function controlPress(view: PanelView, target: HTMLElement): boolean {
     jumpPress(view, target);
     return true;
   }
-  return threadPress(view, target) || pillPress(view, target, draw) || composePress(view, target);
+  return threadPress(view, target) || composePress(view, target);
 }
 
 function composePress(view: PanelView, target: HTMLElement): boolean {

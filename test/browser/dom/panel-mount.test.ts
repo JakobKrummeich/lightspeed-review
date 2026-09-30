@@ -2100,3 +2100,162 @@ test("a × pressed after a blur-save redrew the column takes back nothing else",
   assert.match(shown(root), /keep me/);
   assert.equal(queuedIn(root), 1);
 });
+
+/**
+ * A mouse press as the browser gives it: mousedown first, where focus would
+ * leave the box (the box's blur-save redraws the column), then the click.
+ * `blurred` says whether mousedown moved the focus, as it does unless held.
+ */
+function mousePress(root: FakeNode, target: FakeNode): { blurred: boolean } {
+  const down = { target, defaultPrevented: false, preventDefault: () => {} };
+  down.preventDefault = () => {
+    down.defaultPrevented = true;
+  };
+  root.dispatch("mousedown", down);
+  const box = editBoxOf(root);
+  const blurred = !down.defaultPrevented && box !== null;
+  if (blurred) root.dispatch("focusout", { target: box, relatedTarget: target });
+  // As Chrome does: a click whose mousedown target was redrawn away lands on no control.
+  if (target.isConnected) root.dispatch("click", { target });
+  return { blurred };
+}
+
+function pillControl(root: FakeNode, selector: string, index: number): FakeNode {
+  const found = root.querySelectorAll(selector).find((one) => one.dataset.index === String(index));
+  assert.ok(found, `no ${selector} for pill ${index}`);
+  return found;
+}
+
+test("a × pressed while a box is open lands on the first press: box saved, the right pill gone", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([
+    annotation,
+    { type: "message", comment: "keep me" },
+    { type: "message", comment: "take me back" },
+  ]);
+  // Emptied: its save takes pill 0 back and moves every later pill up one.
+  openEdit(root, 0).value = "";
+
+  const press = mousePress(root, pillControl(root, ".lsr-pill-remove", 2));
+
+  assert.equal(press.blurred, false, "the box kept the focus through the press");
+  assert.deepEqual(pendingOf(storage), [{ type: "message", comment: "keep me", round: 0 }]);
+  assert.equal(editBoxOf(root), null);
+});
+
+test("a × pressed while another pill's box is open keeps that box's words", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation, { type: "message", comment: "take me back" }]);
+  openEdit(root, 0).value = "wrap it all";
+
+  mousePress(root, pillControl(root, ".lsr-pill-remove", 1));
+
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, comment: "wrap it all", round: 0 }]);
+});
+
+test("the × of the pill being edited takes it back, typed words and all", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([annotation, { type: "message", comment: "keep me" }]);
+  openEdit(root, 0).value = "wrap it all";
+
+  mousePress(root, pillControl(root, ".lsr-pill-remove", 0));
+
+  assert.deepEqual(pendingOf(storage), [{ type: "message", comment: "keep me", round: 0 }]);
+  assert.equal(editBoxOf(root), null);
+});
+
+test("another pill's words pressed while a box is open: the first is saved, the second opens", (t) => {
+  const { root, panel, storage } = mount(t);
+  panel.queue([
+    annotation,
+    { type: "message", comment: "the migration" },
+    { type: "message", comment: "the changelog" },
+  ]);
+  openEdit(root, 0).value = "";
+
+  const press = mousePress(root, pillControl(root, ".lsr-draft-text", 2));
+
+  assert.equal(press.blurred, false);
+  assert.equal(editBoxOf(root)?.value, "the changelog", "the pill pressed, not the one moved up");
+  assert.deepEqual(pendingOf(storage), [
+    { type: "message", comment: "the migration", round: 0 },
+    { type: "message", comment: "the changelog", round: 0 },
+  ]);
+});
+
+test("a thread's control pressed while a box is open saves the box and acts at once", (t) => {
+  const { root, panel, storage } = mount(t, session({ conversation: [opened, answered] }));
+  panel.queue([annotation]);
+  openEdit(root, 0).value = "wrap it all";
+
+  const resolve = root
+    .querySelectorAll(".lsr-thread-resolve")
+    .find((one) => one.dataset.thread === "t1");
+  mousePress(root, resolve!);
+
+  assert.equal(editBoxOf(root), null);
+  assert.deepEqual(pendingOf(storage), [
+    { ...annotation, comment: "wrap it all", round: 0 },
+    { type: "resolve", thread: "t1", resolved: true, round: 0 },
+  ]);
+});
+
+test("a drag out of the box lets go on no control: the box stays open", (t) => {
+  const { root, panel } = mount(t);
+  panel.queue([annotation]);
+  const box = openEdit(root, 0);
+  box.value = "wrap it all";
+
+  root.dispatch("click", { target: root.querySelector(".lsr-panel-scroll") });
+
+  assert.equal(editBoxOf(root)?.value, "wrap it all");
+});
+
+test("leaving the box for a thread's reply box, by Tab or click, lands in the reply box", (t) => {
+  const page = trackFocus(t);
+  const { root, panel, storage } = mount(t, session({ conversation: [opened, answered] }));
+  panel.queue([annotation]);
+  const box = openEdit(root, 0);
+  box.value = "wrap it all";
+  replyBoxOf(root)!.value = "per-batch";
+
+  // The focus is on its way to a reply box the save's redraw replaces.
+  root.dispatch("focusout", { target: box, relatedTarget: replyBoxOf(root) });
+
+  assert.deepEqual(pendingOf(storage), [{ ...annotation, comment: "wrap it all", round: 0 }]);
+  assert.equal(page.activeElement, replyBoxOf(root), "the fresh reply box, not nowhere");
+  assert.equal(replyBoxOf(root)?.value, "per-batch");
+});
+
+test("a Tab out of a box saved empty lands on the next pill's words, found by pill not index", (t) => {
+  const page = trackFocus(t);
+  const { root, panel } = mount(t);
+  panel.queue([annotation, { type: "message", comment: "the migration" }]);
+  const box = openEdit(root, 0);
+  box.value = "";
+
+  root.dispatch("focusout", {
+    target: box,
+    relatedTarget: pillControl(root, ".lsr-draft-text", 1),
+  });
+
+  const words = page.activeElement as FakeNode;
+  assert.equal(words.textContent, "the migration");
+  assert.equal(words.dataset.index, "0", "moved up one with the pill before it gone");
+});
+
+test("a Shift+Tab onto the × of the pill saved empty focuses no other pill's ×", (t) => {
+  const page = trackFocus(t);
+  const { root, panel } = mount(t);
+  panel.queue([annotation, { type: "message", comment: "the migration" }]);
+  const box = openEdit(root, 0);
+  box.value = "";
+  page.activeElement = null;
+
+  root.dispatch("focusout", {
+    target: box,
+    relatedTarget: pillControl(root, ".lsr-pill-remove", 0),
+  });
+
+  assert.equal(page.activeElement, null);
+});

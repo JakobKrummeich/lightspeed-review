@@ -17,33 +17,40 @@ interface EditView extends ComposeView {
 
 type Draw<V> = (view: V) => void;
 
-/** True when the press was on a pill's × or its words, acted on or refused. */
+/**
+ * True when the press was on a pill's × or its words, acted on or refused.
+ * Asked first of every click: the pill is named by the index the press read
+ * while it is still the drawn one, before an open box's save — which, saved
+ * empty, moves every later pill up one — and then acted on by identity. A
+ * control a redraw threw away is refused: its index is from before.
+ */
 export function pillPress<V extends EditView>(
   view: V,
   target: HTMLElement,
   draw: Draw<V>,
 ): boolean {
-  if (target.classList.contains("lsr-pill-remove")) removePress(view, target, draw);
-  else if (target.classList.contains("lsr-draft-text")) editPress(view, target, draw);
-  else return false;
+  const remove = target.classList.contains("lsr-pill-remove");
+  if (!remove && !target.classList.contains("lsr-draft-text")) return false;
+  const pill = target.isConnected ? view.state.pending[Number(target.dataset.index)] : undefined;
+  if (composeFrozen(view) || pill === undefined) return true;
+  if (remove) takeBack(view, pill, draw);
+  else {
+    settleEdit(view);
+    openEdit(view, pill, draw);
+  }
   return true;
 }
 
-/**
- * Taking a pill back writes to the queue, so it is locked with the rest. A ×
- * a redraw threw away is refused: its index is from before, and a pill saved
- * empty on the box's blur has since moved every later pill up one.
- */
-function removePress<V extends EditView>(view: V, target: HTMLElement, draw: Draw<V>): void {
-  if (composeFrozen(view) || !target.isConnected) return;
-  const index = Number(target.dataset.index);
-  view.state.pending = view.state.pending.filter((_, position) => position !== index);
+/** A pill taken back takes its own open box with it, typed words and all; any other is saved. */
+function takeBack<V extends EditView>(view: V, pill: QueuedPill, draw: Draw<V>): void {
+  const { state } = view;
+  if (pill === state.editing) delete state.editing;
+  settleEdit(view);
+  state.pending = state.pending.filter((one) => one !== pill);
   draw(view);
 }
 
-function editPress<V extends EditView>(view: V, target: HTMLElement, draw: Draw<V>): void {
-  const pill = view.state.pending[Number(target.dataset.index)];
-  if (composeFrozen(view) || pill === undefined) return;
+function openEdit<V extends EditView>(view: V, pill: QueuedPill, draw: Draw<V>): void {
   view.state.editing = pill;
   draw(view);
   // After the draw, which drew the box empty: filled here, not in markup.
@@ -52,6 +59,34 @@ function editPress<V extends EditView>(view: V, target: HTMLElement, draw: Draw<
   box.value = wordsOf(pill);
   box.focus();
   box.setSelectionRange(box.value.length, box.value.length);
+}
+
+/**
+ * A mouse press on a control while a box is open keeps the focus in the box.
+ * Left to move, it would blur the box on mousedown, whose save redraws the
+ * column and throws the pressed control away before its click: the press
+ * would be lost, and a second one needed. The click then leaves the box
+ * itself (`leaveEdit`).
+ */
+export function holdEdit(view: EditView, event: MouseEvent): void {
+  const target = event.target;
+  if (view.state.editing === undefined || !(target instanceof HTMLElement)) return;
+  if (pressable(target)) event.preventDefault();
+}
+
+/**
+ * A press on any other control while a box is open is the box's leaving
+ * (`holdEdit` kept the focus in it): saved and drawn closed before the control
+ * acts. A click on no control — a drag out of the box let go elsewhere —
+ * leaves it open.
+ */
+export function leaveEdit<V extends EditView>(view: V, target: HTMLElement, draw: Draw<V>): void {
+  if (pressable(target) && settleEdit(view)) draw(view);
+}
+
+/** A card's head folds on a press anywhere on it, so it is a control too. */
+function pressable(target: HTMLElement): boolean {
+  return target.closest("button") !== null || target.closest("[data-fold]") !== null;
 }
 
 export function editKey<V extends EditView>(view: V, event: KeyboardEvent, draw: Draw<V>): void {
@@ -64,12 +99,60 @@ export function editKey<V extends EditView>(view: V, event: KeyboardEvent, draw:
   } else if (submitsOnEnter(event, field)) saveEdit(view, field.value, draw, true);
 }
 
-/** Leaving the box saves it; a box dropped by a redraw is not leaving it. */
-export function editBlur<V extends EditView>(view: V, event: Event, draw: Draw<V>): void {
+/**
+ * Leaving the box saves it; a box dropped by a redraw is not leaving it. The
+ * save's redraw replaces what the focus was headed for — the next control on a
+ * Tab, a reply box clicked into — so the focus is put on its twin in the fresh
+ * column, or it would land nowhere.
+ */
+export function editBlur<V extends EditView>(view: V, event: FocusEvent, draw: Draw<V>): void {
   const box = event.target;
   if (!(box instanceof HTMLElement) || !box.classList.contains("lsr-draft-edit")) return;
   if (redrawing.has(view.options.root)) return;
-  saveEdit(view, (box as HTMLTextAreaElement).value, draw, false);
+  const before = view.state.pending;
+  const edited = view.state.editing;
+  const saved = saveEdit(view, (box as HTMLTextAreaElement).value, draw, false);
+  if (saved === false) return;
+  // Pills by identity: one saved empty moved every later pill up one.
+  refocusTwin(view.options.root, event.relatedTarget, (index) => {
+    const was = before[Number(index)];
+    return positionOf(view.state.pending, was === edited ? saved : was);
+  });
+}
+
+function refocusTwin(
+  root: HTMLElement,
+  headed: EventTarget | null,
+  moved: (index: string) => string | undefined,
+): void {
+  if (!(headed instanceof HTMLElement) || headed.isConnected) return;
+  twinOf(root, headed, moved)?.focus();
+}
+
+function positionOf(
+  pending: readonly QueuedPill[],
+  pill: QueuedPill | undefined,
+): string | undefined {
+  const index = pill === undefined ? -1 : pending.indexOf(pill);
+  return index < 0 ? undefined : String(index);
+}
+
+/** Same kind of control, same data — a pill's index as it now stands, or none if it is gone. */
+function twinOf(
+  root: HTMLElement,
+  gone: HTMLElement,
+  moved: (index: string) => string | undefined,
+): HTMLElement | undefined {
+  const want: Record<string, string | undefined> = { ...gone.dataset };
+  if (want.index !== undefined) {
+    want.index = moved(want.index);
+    if (want.index === undefined) return undefined;
+  }
+  const same = (one: HTMLElement): boolean =>
+    one.className === gone.className &&
+    Object.keys(want).length === Object.keys(one.dataset).length &&
+    Object.entries(want).every(([name, value]) => one.dataset[name] === value);
+  return [...root.querySelectorAll<HTMLElement>(gone.tagName.toLowerCase())].find(same);
 }
 
 /**
@@ -115,21 +198,34 @@ function heldEdit(root: HTMLElement): HeldEdit | undefined {
   return { value, focused: box === activeElement(), start, end };
 }
 
-/** Refused while frozen: the box stays open, disabled, words kept, as the compose box does. */
+/**
+ * The pill as saved, undefined if saved empty (and so taken back), false if
+ * refused: while frozen the box stays open, disabled, words kept, as the
+ * compose box does.
+ */
 function saveEdit<V extends EditView>(
   view: V,
   comment: string,
   draw: Draw<V>,
   back: boolean,
-): void {
+): QueuedPill | undefined | false {
   const { state } = view;
-  if (composeFrozen(view) || state.editing === undefined) return;
-  const index = state.pending.indexOf(state.editing);
-  const next = editPill(state.pending, index, comment);
+  const before = state.pending;
+  const index = state.editing === undefined ? -1 : before.indexOf(state.editing);
+  if (!settleEdit(view, comment)) return false;
   // Emptied, the pill is gone and the focus has nowhere of its own to go back to.
-  const kept = next.length === state.pending.length ? next[index] : undefined;
-  state.pending = next;
+  const kept = state.pending.length === before.length ? state.pending[index] : undefined;
   closeEdit(view, draw, back ? kept : undefined);
+  return kept;
+}
+
+/** The open box's words into its pill, and the box closed; not drawn. False when refused. */
+function settleEdit(view: EditView, comment = editBox(view.options.root)?.value): boolean {
+  const { state } = view;
+  if (composeFrozen(view) || state.editing === undefined || comment === undefined) return false;
+  state.pending = editPill(state.pending, state.pending.indexOf(state.editing), comment);
+  delete state.editing;
+  return true;
 }
 
 /** Back onto the words just closed, so the keyboard stays where it was. */

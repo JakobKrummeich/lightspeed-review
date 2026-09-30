@@ -206,7 +206,7 @@ function renderDraftBubble(draft: Draft, state: ColumnState): string {
 
 /**
  * The words are a button so a key opens them as well as a click; the box
- * that replaces them is drawn empty and filled by the page (`panel-edit.ts`),
+ * that replaces them is drawn empty and filled by the page (`panel-pills.ts`),
  * as a reply box is: typed text need not survive a trip through markup.
  */
 function renderDraftWords(draft: Draft, editing: QueuedPill | undefined): string {
