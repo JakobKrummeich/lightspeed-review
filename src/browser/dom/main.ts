@@ -255,14 +255,26 @@ function mountPanelSide(
   const banner = mountStatusBanner(session);
   // The header's word for the turn, and the tab's for a reviewer not looking at it.
   const beacon = mountTabBeacon(document, session, reducedMotion);
+  // Read before the panel's first draw below, which files what it shows as seen.
+  const seen = trackSeenReplies(localStorage, page.key);
+  // Seen means shown: drawn while the tab is on screen and the panel open.
+  const light = mountPanelLight(
+    page.panelRoot,
+    session.conversation,
+    seen,
+    () => document.visibilityState === "visible" && railControl.isOpen(),
+  );
   const railControl = mountPanelRail({
     rail: page.rail,
     page: document.body,
-    onToggle,
+    onToggle: () => {
+      onToggle();
+      // Opened, the panel shows what it drew while shut.
+      light.shown();
+    },
   });
-  // Read before the panel's first draw below, which files what it shows as seen.
-  const seen = trackSeenReplies(localStorage, page.key);
-  const light = mountPanelLight(page.panelRoot, session.conversation, seen);
+  // Back on screen, the tab shows what it drew while hidden.
+  document.addEventListener("visibilitychange", light.shown);
   const panel = mountPanel({
     root: page.panelRoot,
     key: page.key,

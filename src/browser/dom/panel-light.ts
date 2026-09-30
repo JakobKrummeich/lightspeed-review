@@ -1,8 +1,9 @@
 /**
  * The panel's two light moments behind one handle, so the panel mount says
  * when and this module says what: Warp Send on a send that went out, the
- * return beam on a draw that brought the agent's words. Every draw is also
- * filed as seen, for the round replay not to repeat it.
+ * return beam on a draw that brought the agent's words. What a draw holds is
+ * filed as seen once it is in front of the reviewer, for the round replay not
+ * to repeat it.
  */
 import { currentRound } from "../conversation-rounds.ts";
 import { agentMessages, messageNews } from "../message-news.ts";
@@ -23,19 +24,26 @@ export interface PanelLight {
   sent(ended: boolean): void;
   /** After every draw of the conversation, the first one at mount included. */
   drawn(talk: DrawnTalk): void;
+  /** The panel may have come on screen — the tab shown, the panel opened. */
+  shown(): void;
 }
 
 /**
  * `conversation` is what the page opened on: seen, so never news to the beam.
- * `seen` keeps its own account of what was drawn: the beam's resets with the
- * page, the replay's outlives it.
+ * `seen` keeps its own account of what was shown: the beam's resets with the
+ * page, the replay's outlives it. `onScreen` says whether the reviewer can
+ * see the panel now: a hidden tab or a shut panel draws words nobody read.
  */
 export function mountPanelLight(
   root: HTMLElement,
   conversation: ConversationEntry[],
   seen: SeenReplies,
+  onScreen: () => boolean,
 ): PanelLight {
   let beamed = agentMessages(conversation);
+  const shown = (): void => {
+    if (onScreen()) seen.shown();
+  };
   return {
     sent: (ended) => warpSend(root, ended),
     drawn: (talk) => {
@@ -43,7 +51,9 @@ export function mountPanelLight(
       const news = messageNews(beamed, talk.conversation);
       beamed = news.seen;
       seen.drawn(news.seen, currentRound(talk.rounds));
+      shown();
       if (news.cards.length > 0) returnBeam(root, news.cards);
     },
+    shown,
   };
 }

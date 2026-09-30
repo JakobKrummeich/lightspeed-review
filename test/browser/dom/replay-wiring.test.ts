@@ -132,9 +132,14 @@ function tab(
       },
     }),
   });
-  /** The conversation panel drawing `session`, as its light reports every draw. */
-  const draw = (session: SessionData): void =>
+  /**
+   * The conversation panel drawing `session`, as its light reports every draw;
+   * `onScreen` false is a hidden tab or a shut panel, drawing unseen.
+   */
+  const draw = (session: SessionData, onScreen = true): void => {
     seen.drawn(agentMessages(session.conversation), currentRound(session.rounds));
+    if (onScreen) seen.shown();
+  };
   /** The page's own order for a new round: arriving, the draw, then the replay asked for. */
   const arrive = (fresh: SessionData, commentedOn = true): void => {
     served = commentedOn ? cardsOf(`r${fresh.rounds.length - 1}`) : { comments: [] };
@@ -154,7 +159,19 @@ function tab(
   const end = (): void => {
     live.drawn = { ...live.drawn, status: "ended" };
   };
-  return { ...flight, opened, openings, reopen, storage, visibility, arrive, load, draw, end };
+  return {
+    ...flight,
+    opened,
+    openings,
+    reopen,
+    storage,
+    visibility,
+    arrive,
+    load,
+    draw,
+    end,
+    shown: () => seen.shown(),
+  };
 }
 
 test("a round whose replay opens arrives by the jump, and the replay opens as it lands", async () => {
@@ -587,4 +604,19 @@ test("back on screen before a newsless round's cards came back: nothing opens wh
   await settled();
 
   assert.deepEqual(page.opened, []);
+});
+
+test("words drawn while nobody could see the panel still show in the replay", async () => {
+  const page = tab(new FakeStorage(), async () => answeredCard(EARLY_NOTE));
+  page.draw(session(1, ASK));
+  page.draw(session(1, ASK, EARLY_NOTE, EARLY_MAIN), false);
+
+  page.arrive(session(2, ASK, EARLY_NOTE, EARLY_MAIN));
+  // The panel opened as the round landed: the old words are shown only now.
+  page.shown();
+  await settled();
+  page.land();
+
+  assert.match(shown(page.openings[0]), /lsr-replay-note">looking at it</);
+  assert.equal(page.openings[0]?.roundReply, "renaming first");
 });

@@ -11,7 +11,7 @@ export interface ReplayOverlayHost {
 export interface ReplayOpening {
   data: ReplayData;
   roundReply?: string;
-  /** What the panel had drawn before the round came: left off the cards. */
+  /** What the panel had shown before the round came: left off the cards. */
   seen: ReadonlySet<string>;
 }
 

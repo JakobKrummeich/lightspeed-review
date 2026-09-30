@@ -43,7 +43,7 @@ export interface ReviewMemory {
   /** The resolved group starts folded; unfolding it is a choice kept per review. */
   resolvedShown: boolean;
   /**
-   * The agent's messages the conversation panel has drawn (`saidKey` in
+   * The agent's messages the conversation panel has shown (`saidKey` in
    * `message-news.ts`), oldest first: the round replay leaves out words the
    * reviewer already had in front of them. Not round-stamped: threads outlive rounds.
    */

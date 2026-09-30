@@ -21,7 +21,7 @@ export interface ReplayView {
   data: ReplayData;
   roundReply?: string;
   /**
-   * The agent's messages the conversation panel drew before this round came
+   * The agent's messages the conversation panel showed before this round came
    * (`saidKey`): the replay tells what is new, and never repeats them.
    */
   seen: ReadonlySet<string>;
@@ -240,7 +240,7 @@ function withNewline(text: string): string {
  * boundary (a `reply` carries the old stamp, a `publish --to` note the new);
  * what they share is coming after the comments they answer. Only the agent's
  * top-level words count here (`--to main`, or a 2.x message): a note in an
- * item's thread is shown on that item's own card. Words the panel already drew
+ * item's thread is shown on that item's own card. Words the panel already showed
  * (`seen`) are left out: the replay tells only what the reviewer has not read.
  */
 export function agentRoundReply(

@@ -120,7 +120,7 @@ function roundView(round: number, fresh: SessionData, seen: SeenReplies): Replay
   };
 }
 
-/** `seen`: what the conversation panel has drawn, so the replay does not repeat it. */
+/** `seen`: what the conversation panel has shown, so the replay does not repeat it. */
 export function wireReplay(
   page: ReplayHosts,
   live: LiveSession,

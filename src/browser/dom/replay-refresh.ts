@@ -25,7 +25,7 @@ export interface ReplayRoundView {
   round: number;
   roundReply: string | undefined;
   ended: boolean;
-  /** What the panel had drawn before this round came (`seen-replies.ts`). */
+  /** What the panel had shown before this round came (`seen-replies.ts`). */
   seen: ReadonlySet<string>;
 }
 

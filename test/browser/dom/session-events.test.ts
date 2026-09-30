@@ -185,6 +185,7 @@ function wirePage(key: string, place: ReviewerPlace, latest: () => FakeEventSour
     },
     railControl: {
       setQueued: () => {},
+      isOpen: () => !rail.folded,
       expand: () => {
         log.push("rail expand");
         const { folded } = rail;
