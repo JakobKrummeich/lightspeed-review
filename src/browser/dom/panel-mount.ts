@@ -2,7 +2,6 @@ import {
   composeNote,
   queuedAnnouncement,
   queuesInstead,
-  renderCompose,
   renderPanel,
   renderScroll,
   writesLocked,
@@ -13,13 +12,10 @@ import { sameTurn } from "../agent-presence.ts";
 import { submitsOnEnter } from "./enter-key.ts";
 import type { LinePlace } from "./line-numbers.ts";
 import { atBottom, placeOn, toBottom } from "./panel-dom.ts";
-import { composeFrozen, lockControls, sayNotSent, type ComposeView } from "./panel-lock.ts";
+import { composeFrozen, lockControls, type ComposeView } from "./panel-lock.ts";
 import {
   clearGeneralComment,
-  deliver,
-  echoSent,
   generalCommentBox,
-  onTheWire,
   replyBox,
   focusedReply,
   restoreReplies,
@@ -35,6 +31,7 @@ import {
 import { deliveryFacts, handedOnTurn } from "../delivery.ts";
 import { foldPress, groupPress } from "./panel-folds.ts";
 import { keepDraft } from "./panel-draft.ts";
+import { send, setStatus } from "./panel-send.ts";
 import { editBlur, editKey, holdEdit, keepEdit, leaveEdit, pillPress } from "./panel-pills.ts";
 import type { PanelLight } from "./panel-light.ts";
 import type { FeedbackPrompt, Turn } from "../../session-store.ts";
@@ -156,7 +153,7 @@ export function mountPanel(options: PanelOptions): MountedPanel {
     end() {
       // Not awaited, as the button's own press is not: the send reports
       // through `onEnd`, and a failure leaves the controls full to press again.
-      void send(view, true);
+      void send(view, true, draw);
     },
   };
 }
@@ -246,24 +243,6 @@ function draw(view: PanelView): void {
   lockControls(view);
 }
 
-/** The only thing that replaces the compose box, and only when it must. */
-function setStatus(view: PanelView, status: SessionData["status"]): void {
-  if (status === view.state.status) return;
-  view.state.status = status;
-  // Carried across the re-render, as the answer box is across a redraw: the row
-  // is replaced, and the words in it are the reviewer's whether they went out or
-  // not. An end that sent nothing keeps them for the round after the reopen.
-  const typed = generalCommentBox(view.options.root)?.value ?? "";
-  if (view.composeHost) {
-    view.composeHost.innerHTML = renderCompose(view.state, batchSize(view.state.pending));
-  }
-  const box = generalCommentBox(view.options.root);
-  if (box) box.value = typed;
-  // The fresh row knows nothing of a send in flight, and the status change the
-  // send itself causes must not hand the buttons back early.
-  setSending(view, view.sending);
-}
-
 /**
  * Note written into the existing live region, not a compose redraw: that
  * would throw away a half-typed comment, and ticking the last file is exactly
@@ -297,7 +276,7 @@ function controlPress(view: PanelView, target: HTMLElement): boolean {
 
 function composePress(view: PanelView, target: HTMLElement): boolean {
   if (target.id === "lsr-send") press(view);
-  else if (target.id === "lsr-send-end") void send(view, true);
+  else if (target.id === "lsr-send-end") void send(view, true, draw);
   else return false;
   return true;
 }
@@ -349,7 +328,7 @@ function press(view: PanelView): void {
   // into a review that is over, locked, or under a send still on the wire.
   if (composeFrozen(view)) return;
   if (queuesInstead(view.state)) queueComment(view);
-  else void send(view, false);
+  else void send(view, false, draw);
 }
 
 function jumpPress(view: PanelView, target: HTMLElement): void {
@@ -374,58 +353,4 @@ function handleReplyKey(view: PanelView, event: KeyboardEvent): void {
   const thread = field.dataset.thread;
   if (thread === undefined) return;
   if (submitsOnEnter(event, field as HTMLTextAreaElement)) addReply(view, thread);
-}
-
-async function send(view: PanelView, ended: boolean): Promise<void> {
-  const { options, state } = view;
-  // One press at a time: a second mid-wire would send the same prompts twice.
-  if (view.sending) return;
-  const prompts = onTheWire(view.state, options.root, ended);
-  if (prompts === undefined) return;
-  // Conversation before the send, so the echo below can tell whether it is
-  // still the one it was written for.
-  const before = state.conversation;
-  setSending(view, true);
-  const delivery = await deliver(options.key, prompts, ended);
-  if (!delivery.sent) {
-    setSending(view, false);
-    sayNotSent(view, delivery.why);
-    return;
-  }
-  // Not a duplicate of the server's copy: this half is instant and holds even
-  // with a dead SSE stream; the `feedback` event brings the server's copy —
-  // the truth, and all another tab ever sees.
-  echoSent(state, before, prompts);
-  clearSent(view, prompts, ended);
-  draw(view);
-  if (ended) setStatus(view, "ended");
-  // After the status: lifting the send lock must never reopen a closed review.
-  setSending(view, false);
-  // Not left to the SSE round trip: every control must stop at the moment the
-  // reviewer said done.
-  if (ended) options.onEnd(prompts);
-}
-
-/**
- * Cleared only for what actually went out. An end on the agent's turn sends
- * nothing — the button says `End without Sending` and the round card promises
- * the queue — so the pills and the half-typed comment stay exactly where the
- * reviewer left them, to go out when the review is reopened.
- */
-function clearSent(view: PanelView, prompts: FeedbackPrompt[], ended: boolean): void {
-  if (prompts.length === 0) return;
-  const { options, state } = view;
-  // Lit before the box empties and the draw takes the drafts away, which both
-  // follow at once: the light is laid over them and holds neither up.
-  options.light?.sent(ended);
-  state.pending = [];
-  clearGeneralComment(options.root);
-  // Both halves at once, ahead of the delayed write: a reload must not offer
-  // to send what the server now owns.
-  updateMemory(options.storage, options.key, { pending: [], draft: "" });
-}
-
-function setSending(view: PanelView, sending: boolean): void {
-  view.sending = sending;
-  lockControls(view);
 }
