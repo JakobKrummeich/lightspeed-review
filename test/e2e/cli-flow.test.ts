@@ -432,6 +432,33 @@ test("an ended review refuses open and work; only --reopen starts a new round", 
   });
 });
 
+/**
+ * `end` is the one verb the loop above leaves to the reviewer, and the only one
+ * cli.ts hands its positionals straight to, unparsed: without this, nothing
+ * runs the agent's way out of a review across the process boundary.
+ */
+test("the agent's end closes a live review on its own turn, and a second end says it already was", async () => {
+  await withLoop(async (loop) => {
+    const { origin, repoRoot, key } = loop;
+    const opened = await openAnsweredWith(loop, [question]);
+    assert.equal(opened.code, 0, opened.stdout);
+    assert.equal(answerOf(opened.stdout).turn, "agent digesting");
+
+    const ended = await runCli(["end", "feature", "main"], repoRoot);
+    assert.equal(ended.code, 0, ended.stdout);
+    assert.match(ended.stdout, /^turn: ended$/m);
+    assert.match(ended.stdout, /the review session is closed/);
+    assert.match(ended.stdout, /lightspeed open feature main --reopen/);
+    const closed = await sessionData(origin, key);
+    assert.equal(closed.status, "ended");
+    assert.equal(closed.endedBy, "agent");
+
+    const again = await runCli(["end", "feature", "main"], repoRoot);
+    assert.equal(again.code, 0, again.stdout);
+    assert.match(again.stdout, /already ended/);
+  });
+});
+
 test("a removed verb answers where the next step is instead of running", async () => {
   await withLoop(async ({ repoRoot }) => {
     const { stdout, code } = await runCli(["wait", "feature", "main"], repoRoot);
