@@ -24,19 +24,19 @@ test("digesting: the rule is talk or work, never both, with ambiguity asked firs
 
   assert.deepEqual(Object.keys(rule), ["talk", "work", "ambiguity", "rule"]);
   assert.match(
-    rule.talk!,
+    rule.talk,
     /lightspeed reply --to t1 '<answer>' --to t4 '<answer>' feat\/tokens main/,
   );
-  assert.match(rule.work!, /lightspeed work '<plan>' feat\/tokens main/);
-  assert.match(rule.work!, /clear change requests go straight here/);
-  assert.match(rule.rule!, /never both/);
+  assert.match(rule.work, /lightspeed work '<plan>' feat\/tokens main/);
+  assert.match(rule.work, /clear change requests go straight here/);
+  assert.match(rule.rule, /never both/);
 });
 
 test("the reply line names at most three items, and the main chat when none is open", () => {
   const many = nextRule("agent digesting", TARGET, ["t1", "t2", "t3", "t4"]);
-  assert.doesNotMatch(many.talk!, /t4/);
-  assert.match(nextRule("agent digesting", TARGET).talk!, /--to main '<answer>'/);
-  assert.doesNotMatch(nextRule("agent digesting", TARGET).talk!, /t1/);
+  assert.doesNotMatch(many.talk, /t4/);
+  assert.match(nextRule("agent digesting", TARGET).talk, /--to main '<answer>'/);
+  assert.doesNotMatch(nextRule("agent digesting", TARGET).talk, /t1/);
 });
 
 test("a line with no session to read names a placeholder id, never a made-up one", () => {
@@ -75,10 +75,10 @@ test("working: publish, waiting with no timeout; a question goes in the new roun
   const rule = nextRule("agent working", TARGET, ["t5"]);
 
   assert.deepEqual(Object.keys(rule), ["publish", "stuck"]);
-  assert.match(rule.publish!, /lightspeed publish feat\/tokens main --intent .* --to t5 'done: /);
-  assert.ok(rule.publish!.endsWith(WAITS_FOR_SEND));
-  assert.match(rule.stuck!, /while nothing has changed since work/);
-  assert.match(nextRule("agent working", TARGET).publish!, /--to main 'done: /);
+  assert.match(rule.publish, /lightspeed publish feat\/tokens main --intent .* --to t5 'done: /);
+  assert.ok(rule.publish.endsWith(WAITS_FOR_SEND));
+  assert.match(rule.stuck, /while nothing has changed since work/);
+  assert.match(nextRule("agent working", TARGET).publish, /--to main 'done: /);
 });
 
 test("the reviewer's turn: the only move is to listen by re-running open", () => {

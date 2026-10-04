@@ -269,13 +269,34 @@ export function shownIds(ids: readonly string[]): string[] {
  * the last lines they read, so those lines carry the protocol. `ids` makes
  * the reply line concrete: the open items the agent is holding right now;
  * `resolved`, the ones the reviewer just closed, whose meaning is spelled out.
+ *
+ * Typed per turn because `skill.ts` prints these lines by key: under a bare
+ * `Record<string, string>` a renamed key still compiled and printed
+ * `undefined` into every agent's instructions (64889b3, `WORKING.blocked`).
  */
+export function nextRule(
+  turn: "agent digesting",
+  target: string,
+  ids?: readonly string[],
+  resolved?: readonly Resolved[],
+): DigestingRule;
+export function nextRule(
+  turn: "agent working",
+  target: string,
+  ids?: readonly string[],
+): WorkingRule;
+export function nextRule(
+  turn: TurnLabel,
+  target: string,
+  ids?: readonly string[],
+  resolved?: readonly Resolved[],
+): Record<string, string>;
 export function nextRule(
   turn: TurnLabel,
   target: string,
   ids: readonly string[] = [],
   resolved: readonly Resolved[] = [],
-): Record<string, string> {
+): DigestingRule | WorkingRule | Record<string, string> {
   if (turn === "agent digesting") return digestingRule(target, ids, resolved);
   if (turn === "agent working") return workingRule(target, shownIds(ids)[0]!);
   if (turn === "ended") {
@@ -284,11 +305,20 @@ export function nextRule(
   return { listen: `The reviewer holds the turn → ${helpReattach(target)}` };
 }
 
+interface DigestingRule {
+  /** Only when the batch closed threads. */
+  resolved?: string;
+  talk: string;
+  work: string;
+  ambiguity: string;
+  rule: string;
+}
+
 function digestingRule(
   target: string,
   ids: readonly string[],
   resolved: readonly Resolved[],
-): Record<string, string> {
+): DigestingRule {
   return {
     ...(resolved.length === 0 ? {} : { resolved: resolvedMeaning(resolved) }),
     talk:
@@ -328,7 +358,12 @@ function resolvedMeaning(resolved: readonly Resolved[]): string {
   ].join(". ");
 }
 
-function workingRule(target: string, id: string): Record<string, string> {
+interface WorkingRule {
+  publish: string;
+  stuck: string;
+}
+
+function workingRule(target: string, id: string): WorkingRule {
   return {
     publish: `Edit, test and commit, then → ${publishCall(target, id)} — ${WAITS_FOR_SEND}`,
     stuck:
