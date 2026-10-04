@@ -64,9 +64,9 @@ test("the skill never says blocking", () => {
 
 test("the skill quotes the next rule the CLI prints, not a paraphrase of it", () => {
   const digesting = nextRule("agent digesting", "<branch>", ["t4", "t2"]);
-  assert.ok(skill.includes(digesting.talk!));
-  assert.ok(skill.includes(digesting.work!));
-  assert.ok(skill.includes(nextRule("agent working", "<branch>", ["t4"]).publish!));
+  assert.ok(skill.includes(digesting.talk));
+  assert.ok(skill.includes(digesting.work));
+  assert.ok(skill.includes(nextRule("agent working", "<branch>", ["t4"]).publish));
 });
 
 /** `poll` is gone, not renamed: a skill still naming it teaches a command the CLI
