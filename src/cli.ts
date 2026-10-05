@@ -103,9 +103,9 @@ function groupingContext(): { repoRoot: string; config: LightspeedConfig } {
   return { repoRoot, config: loadConfig(repoRoot) };
 }
 
-interface SessionContext extends ResolvedSession {
+interface SessionContext<C extends ServiceConfig> extends ResolvedSession {
   repoRoot: string;
-  config: ServiceConfig;
+  config: C;
 }
 
 function refuseTextAsBranch(input: Omit<TextAsBranchInput, "isRef">): void {
@@ -122,14 +122,18 @@ function refuseTextAsBranch(input: Omit<TextAsBranchInput, "isRef">): void {
  * is the only layer that has both halves: the store knows what is open in this
  * repository, and the dispatch knows which command asked. Below it, a 404 off
  * the wire and a missing file on disk would each have to invent the same sentence.
+ *
+ * The context is the caller's to load because `publish` alone needs `model`
+ * (`groupingContext`); when it built its own copy of this body it lost the
+ * catch and printed the session's hash key instead of naming the live review.
  */
-async function onSession<T>(
+async function onSession<T, C extends ServiceConfig>(
+  { repoRoot, config }: { repoRoot: string; config: C },
   verb: string,
   branch: string | undefined,
   base: string | undefined,
-  run: (context: SessionContext) => T | Promise<T>,
+  run: (context: SessionContext<C>) => T | Promise<T>,
 ): Promise<T> {
-  const { repoRoot, config } = repoContext();
   await assertServerSharesState(config.port, config.stateDir);
   const sessions = new SessionStore(config.stateDir).list();
   refuseTextAsBranch({ verb, repoRoot, branch, sessions });
@@ -162,43 +166,39 @@ async function openCommand(args: string[]): Promise<StructuredOutput> {
 
 async function replyCommand(args: string[]): Promise<StructuredOutput> {
   const { notes, branch, base } = parseReplyArgs(args);
-  return await onSession("reply", branch, base, ({ config, ...target }) =>
+  return await onSession(repoContext(), "reply", branch, base, ({ config, ...target }) =>
     runReply({ ...target, port: config.port, notes }),
   );
 }
 
 async function publishCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, model, intents, notes } = parsePublishArgs(args);
-  const { repoRoot, config } = groupingContext();
-  await assertServerSharesState(config.port, config.stateDir);
-  const sessions = new SessionStore(config.stateDir).list();
-  refuseTextAsBranch({ verb: "publish", repoRoot, branch, sessions });
-  const target = resolveSession(sessions, repoRoot, branch, base);
-  return await runPublish({
-    repoRoot,
-    ...target,
-    config: model === undefined ? config : { ...config, model },
-    intents,
-    notes,
-  });
+  return await onSession(groupingContext(), "publish", branch, base, ({ config, ...target }) =>
+    runPublish({
+      ...target,
+      config: model === undefined ? config : { ...config, model },
+      intents,
+      notes,
+    }),
+  );
 }
 
 async function workCommand(args: string[]): Promise<StructuredOutput> {
   const { message, branch, base } = parseWorkArgs(args);
-  return await onSession("work", branch, base, ({ config, ...target }) =>
+  return await onSession(repoContext(), "work", branch, base, ({ config, ...target }) =>
     runWork({ ...target, port: config.port, plan: message }),
   );
 }
 
 async function approvalsCommand(args: string[]): Promise<StructuredOutput> {
   const { branch, base, full } = parseApprovalsArgs(args);
-  return await onSession("approvals", branch, base, ({ config, ...target }) =>
+  return await onSession(repoContext(), "approvals", branch, base, ({ config, ...target }) =>
     runApprovals({ ...target, stateDir: config.stateDir, full }),
   );
 }
 
 async function endCommand(args: string[]): Promise<StructuredOutput> {
-  return await onSession("end", args[0], args[1], ({ config, ...target }) =>
+  return await onSession(repoContext(), "end", args[0], args[1], ({ config, ...target }) =>
     runEnd({ ...target, port: config.port, stateDir: config.stateDir }),
   );
 }
