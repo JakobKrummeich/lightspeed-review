@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `publish` on a branch and base with no review refuses `session_not_found`
+  the way every other session verb does: it names the branch and base and the
+  live reviews in this repository, and the `publish` command to run instead,
+  rather than printing the session's hash key.
+
 ## 3.7.0
 
 - The **Between rounds** replay no longer repeats what you already read in
