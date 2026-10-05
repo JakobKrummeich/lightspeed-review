@@ -251,6 +251,28 @@ test("a session the server does not know is named the same way as one on disk", 
 });
 
 /**
+ * `publish` reads its own config (it needs `model`) and refuses a missing review
+ * from the session file before any grouping, so it is the verb most likely to
+ * skip the shared catch — and then it printed the session key, a hash.
+ */
+test("a publish about a review nothing holds names the reviews that are held", async () => {
+  const repoRoot = emptyRepo();
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+  git(repoRoot, "branch", "other/branch");
+
+  const { stdout, code } = await runCli(
+    ["publish", "other/branch", "main", "--intent", "why"],
+    repoRoot,
+  );
+
+  assert.equal(code, 2);
+  assert.match(stdout, /^ {2}code: session_not_found$/m);
+  assert.match(stdout, /message: no review session for other\/branch against main/);
+  assert.match(stdout, /1 live session in this repo: feature\/greeting against main/);
+  assert.match(stdout, /lightspeed publish feature\/greeting main/);
+});
+
+/**
  * No server and no review: "restart the server and re-attach" pointed at a
  * review that never existed, and the `open` it named failed on --intent.
  */
