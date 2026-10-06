@@ -1316,6 +1316,45 @@ test("a degraded ledger is reported with a reason and a help line, not an error"
   }, "broken");
 });
 
+/** pi-ai 1.0.3 renamed the provider; the old id still works, so the rename is help, not an error. */
+test("a model under a renamed provider's old id opens the review with the edit as help", async () => {
+  await withHarness(async (harness) => {
+    const config = { ...harness.config, model: "azure-openai-responses/gpt-5" };
+    await open(harness, { config });
+    toWorking(harness.store);
+    await publish(harness, {
+      config,
+      deps: { ...harness.deps, extractDiff: () => extractedAt(2) },
+    });
+
+    for (const shown of harness.announced) {
+      const help = shown.help as string[];
+      assert.equal(help.length, 1);
+      assert.match(help[0] ?? "", /set `"model": "azure\/gpt-5"`/);
+    }
+    assert.equal(harness.announced.length, 2, "open and publish both said it");
+  });
+});
+
+test("a degraded ledger and a renamed provider share one help list", async () => {
+  await withHarness(async (harness) => {
+    await open(harness, { config: { ...harness.config, model: "azure-openai-responses/gpt-5" } });
+
+    const help = harness.announced[0]!.help as string[];
+    assert.equal(help.length, 2);
+    assert.match(help[0] ?? "", /ledger/i);
+    assert.match(help[1] ?? "", /azure-openai-responses/);
+  }, "broken");
+});
+
+test("a config naming current provider ids adds no help line", async () => {
+  await withHarness(async (harness) => {
+    await open(harness);
+
+    assert.equal(harness.announced[0]?.help, undefined);
+  });
+});
+
 /** Read top to bottom, the same two facts in the same order: a flip reads as a different block. */
 function roundBeforeTurn(block: StructuredOutput | undefined): void {
   const keys = Object.keys(block ?? {});

@@ -16,6 +16,7 @@ import {
 } from "./pi-auth.ts";
 import { loadPiProviders } from "./pi-models.ts";
 import { applyConfiguredProviders, applyPiProviders } from "./providers.ts";
+import { currentProviderId } from "./renamed-providers.ts";
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import { openCall } from "../open-call.ts";
 
@@ -85,7 +86,8 @@ async function builtinModels(stateDir: string): Promise<MutableModels> {
  */
 function resolveModel(models: Models, reference: string): Model<Api> {
   const separator = reference.indexOf("/");
-  const providerId = separator === -1 ? "" : reference.slice(0, separator);
+  // A renamed provider's old id still resolves; `open`/`publish` print the edit.
+  const providerId = currentProviderId(separator === -1 ? "" : reference.slice(0, separator));
   const modelId = reference.slice(separator + 1);
   const model = providerId === "" ? undefined : models.getModel(providerId, modelId);
   if (!model) {

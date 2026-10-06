@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createModels } from "@earendil-works/pi-ai";
 import type { ApiKeyCredential, Credential, CredentialStore } from "@earendil-works/pi-ai";
+import { azureProvider } from "@earendil-works/pi-ai/providers/azure";
 import {
   loadPiProviders,
   resolvePiConfigValue,
@@ -226,4 +227,38 @@ test("repo provider overrides take precedence over Pi models.json providers", as
     assert.ok(model);
     assert.equal((await models.getAuth(model))?.auth.baseUrl, "http://repo-proxy.example.test/v1");
   });
+});
+
+/**
+ * pi-ai 1.0.3 renamed `azure-openai-responses` to `azure` and pi migrates nothing. Under its
+ * old id the entry would be an unknown provider: one that only sets a baseUrl builds an empty
+ * provider and overrides nothing; one that adds a model without its own api is config_invalid.
+ */
+test("a Pi models.json entry under a renamed provider's old id applies to the current builtin", async () => {
+  const models = createModels({ credentials: storedKey("stored-key") });
+  models.setProvider(azureProvider());
+
+  applyPiProviders(
+    models,
+    loadPiProviders(
+      piModelsFile({
+        providers: {
+          "azure-openai-responses": {
+            baseUrl: "https://corp.openai.azure.com/openai/v1",
+            modelOverrides: { "gpt-5": { name: "Corp GPT-5" } },
+          },
+        },
+      }),
+    ),
+  );
+
+  assert.equal(models.getProvider("azure-openai-responses"), undefined);
+  const model = models.getModel("azure", "gpt-5");
+  assert.equal(model?.name, "Corp GPT-5");
+  assert.equal(model?.baseUrl, "https://corp.openai.azure.com/openai/v1");
+  assert.equal(
+    models.getModel("azure", "deepseek-v4-pro")?.api,
+    "openai-completions",
+    "the whole builtin catalogue stays, Foundry chat models included",
+  );
 });

@@ -406,3 +406,14 @@ test("no configured providers leaves the collection exactly as it was", () => {
   assert.deepEqual(models.getProviders(), before);
   assert.equal(models.getProvider("faux"), before[0]);
 });
+
+/** pi-ai 1.0.3 renamed `azure-openai-responses` to `azure`: the old key still overrides it. */
+test("a provider entry under a renamed provider's old id overrides the current builtin", async () => {
+  const models = createModels({ credentials: storedKey("k") });
+  models.setProvider(storedKeyProvider("azure"));
+
+  apply(models, { "azure-openai-responses": { baseUrl: "http://localhost:3001" } });
+
+  assert.equal(models.getProvider("azure-openai-responses"), undefined);
+  assert.equal((await models.getAuth("azure"))?.auth.baseUrl, "http://localhost:3001");
+});

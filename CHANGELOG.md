@@ -6,6 +6,18 @@
   the way every other session verb does: it names the branch and base and the
   live reviews in this repository, and the `publish` command to run instead,
   rather than printing the session's hash key.
+- Grouping runs on pi-ai 1.0.4. pi-ai renamed the Azure provider from
+  `azure-openai-responses` to `azure`, so Azure models are now
+  `azure/<model>` — e.g. `"model": "azure/gpt-5"` in
+  `.lightspeed.conf.json`. The old name still works: a `model` or a
+  `providers` entry under `azure-openai-responses` resolves to `azure`, and
+  `open` and `publish` print a help line with the exact edit. pi's own
+  `auth.json` and `models.json` entries under the old name keep working too —
+  the credential is read, never rewritten, and a `models.json` entry applies
+  to `azure` — until you rename them as pi asks. The `api` value
+  `azure-openai-responses` for a provider you define is unchanged.
+- Azure AI Foundry chat models served over Chat Completions, starting with
+  `azure/deepseek-v4-pro`, can group a review.
 
 ## 3.7.0
 

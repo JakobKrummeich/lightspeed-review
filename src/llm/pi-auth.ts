@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Credential, CredentialInfo, CredentialStore } from "@earendil-works/pi-ai";
+import { legacyProviderId } from "./renamed-providers.ts";
 
 /**
  * The credential file the pi agent writes on `pi auth login`. Its shape is one
@@ -28,8 +29,14 @@ export function piAuthStore(path = piAuthPath()): CredentialStore {
   };
 
   return {
+    // A credential under a renamed provider's old id still authenticates, but
+    // only by reading: `modify` and `delete` take the id they are given, so a
+    // refresh or a login writes the current id and the old entry stays as pi
+    // left it — pi tells its users to rename that key themselves.
     async read(providerId) {
-      return (await readAll(path))[providerId];
+      const all = await readAll(path);
+      const legacy = legacyProviderId(providerId);
+      return all[providerId] ?? (legacy === undefined ? undefined : all[legacy]);
     },
     async list(): Promise<readonly CredentialInfo[]> {
       const all = await readAll(path);

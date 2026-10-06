@@ -22,6 +22,7 @@ import { CONFIG_FILENAME, type ProviderApi, type ProviderConfig } from "../confi
 import { piModels } from "./pi-provider-models.ts";
 import type { PiProviderConfig } from "./pi-models.ts";
 import { overridePiBuiltin, piProviderAuth } from "./pi-provider-auth.ts";
+import { withCurrentProviderIds } from "./renamed-providers.ts";
 import { mergeHeaders } from "./provider-headers.ts";
 import { ReviewError } from "../errors.ts";
 
@@ -53,7 +54,7 @@ export function applyConfiguredProviders(
   models: MutableModels,
   providers: Record<string, ProviderConfig> | undefined,
 ): void {
-  for (const [id, config] of Object.entries(providers ?? {})) {
+  for (const [id, config] of Object.entries(withCurrentProviderIds(providers ?? {}))) {
     const builtin = models.getProvider(id);
     if (!builtin) {
       models.setProvider(customProvider(id, config));
@@ -69,7 +70,9 @@ export function applyPiProviders(
   models: MutableModels,
   providers: Record<string, PiProviderConfig>,
 ): void {
-  for (const [id, config] of Object.entries(providers)) {
+  // Under its old id an entry would be an unknown provider: one with only a
+  // baseUrl would build an empty one and quietly override nothing.
+  for (const [id, config] of Object.entries(withCurrentProviderIds(providers))) {
     const builtin = models.getProvider(id);
     const catalog = piModels(id, builtin?.getModels() ?? [], config);
     if (builtin) {

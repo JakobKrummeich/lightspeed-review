@@ -338,3 +338,17 @@ test("a provider with no credentials at all reports pi_auth_missing", async () =
     (error: unknown) => error instanceof ReviewError && error.code === "pi_auth_missing",
   );
 });
+
+/** pi-ai 1.0.3 renamed `azure-openai-responses` to `azure`; a config written before still runs. */
+test("a model under a renamed provider's old id resolves to the current provider", async () => {
+  const { models, seen } = fauxModels([fauxAssistantMessage("ok")], {
+    id: "azure",
+    model: "gpt-5",
+  });
+
+  const result = await call(models, [userMessage], "off", "azure-openai-responses/gpt-5");
+
+  assert.equal(result.text, "ok");
+  assert.equal(seen.model?.provider, "azure");
+  assert.equal(seen.model?.id, "gpt-5");
+});
