@@ -51,15 +51,29 @@ export interface ReplayDeps {
   overlay(page: ReplayHosts): ReplayOverlayControl;
 }
 
-/** Runs `back` once, the next time the tab comes on screen; the returned call stops waiting. */
-function onReturn(page: PageVisibility, back: () => void): () => void {
-  const changed = (): void => {
-    if (page.visibilityState === "hidden") return;
-    page.removeEventListener("visibilitychange", changed);
-    back();
+/**
+ * At most one wait for the tab to come back on screen, run once when it does.
+ * A newer wait replaces the older, so only the latest round counts on the
+ * return; held here so no caller has to clear a stale wait by hand.
+ */
+function returnWatch(page: PageVisibility): { wait(back: () => void): void; stop(): void } {
+  let changed: (() => void) | undefined = undefined;
+  const stop = (): void => {
+    if (changed !== undefined) page.removeEventListener("visibilitychange", changed);
+    changed = undefined;
   };
-  page.addEventListener("visibilitychange", changed);
-  return () => page.removeEventListener("visibilitychange", changed);
+  return {
+    wait(back) {
+      stop();
+      changed = () => {
+        if (page.visibilityState === "hidden") return;
+        stop();
+        back();
+      };
+      page.addEventListener("visibilitychange", changed);
+    },
+    stop,
+  };
 }
 
 /** Closing the replay lands at the top of the diff, where a new round starts anyway. */
@@ -134,14 +148,13 @@ export function wireReplay(
   const arrival = deps.arrivals(page.openingRoot);
   const claims = roundClaims(deps.storage, page.key);
   /** Waiting for a hidden tab to come back to a round it left unclaimed. */
-  let stopWaiting: (() => void) | undefined = undefined;
+  const returning = returnWatch(deps.visibility);
   // Opened as the arrival's jump lands, or at once when there was none.
   const show = (opening: ReplayOpening): void =>
     arrival.onLanding(() => replayOverlay.open(opening));
   // Back on screen: the round is this tab's if no tab took it meanwhile. No
   // jump — the round was drawn while nobody watched, there is no swap to cover.
   const cameBack = (round: number): void => {
-    stopWaiting = undefined;
     if (claims.replayed() === round || live.drawn.status === "ended") return;
     claims.take(round);
     // Cards still coming: the refresher opens them when they do. Spent either
@@ -175,13 +188,12 @@ export function wireReplay(
     arriving: (fresh) => {
       // An older round's replay, queued for a landing or a return, is not this round's.
       arrival.forget();
-      stopWaiting?.();
-      stopWaiting = undefined;
+      returning.stop();
       if (!arrivesByJump(fresh, claims.replayed())) return;
       const round = currentRound(fresh.rounds);
       // A background tab leaves the showing to a tab on screen, until it is one.
       if (deps.visibility.visibilityState === "hidden") {
-        stopWaiting = onReturn(deps.visibility, () => cameBack(round));
+        returning.wait(() => cameBack(round));
         return;
       }
       // Claimed now, not when the cards come back: another tab on this review
