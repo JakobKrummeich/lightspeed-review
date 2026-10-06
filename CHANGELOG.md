@@ -16,6 +16,13 @@
   the credential is read, never rewritten, and a `models.json` entry applies
   to `azure` — until you rename them as pi asks. The `api` value
   `azure-openai-responses` for a provider you define is unchanged.
+- A provider you defined yourself under the key `azure` in
+  `.lightspeed.conf.json` now collides with pi-ai's builtin `azure`
+  provider: the entry is rejected as a `config_invalid` override of a
+  provider pi-ai ships, and grouping silently falls back to one chapter
+  with that as its reason. Rename the key —
+  e.g. `providers.azure-foundry` — and the matching `model` prefix, e.g.
+  `"model": "azure-foundry/my-deployment"`.
 - Azure AI Foundry chat models served over Chat Completions, starting with
   `azure/deepseek-v4-pro`, can group a review.
 
