@@ -16,7 +16,7 @@ import {
 } from "./pi-auth.ts";
 import { loadPiProviders } from "./pi-models.ts";
 import { applyConfiguredProviders, applyPiProviders } from "./providers.ts";
-import { currentProviderId } from "./renamed-providers.ts";
+import { appliedProviderEntries, currentProviderId } from "./renamed-providers.ts";
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import { openCall } from "../open-call.ts";
 
@@ -127,11 +127,10 @@ function rejectFailedReply(reply: AssistantMessage, input: GroupingCallInput): v
  * headers stay out of every message.
  */
 function configuredEndpoint(input: GroupingCallInput): string | undefined {
-  const providerId = input.model.slice(0, input.model.indexOf("/"));
-  const baseUrl = input.providers?.[providerId]?.baseUrl;
-  return baseUrl === undefined
-    ? undefined
-    : `Check that ${baseUrl} is reachable — it is \`providers.${providerId}.baseUrl\` in .lightspeed.conf.json`;
+  const providerId = currentProviderId(input.model.slice(0, input.model.indexOf("/")));
+  const applied = appliedProviderEntries(input.providers ?? {}).find(({ id }) => id === providerId);
+  if (applied?.entry.baseUrl === undefined) return undefined;
+  return `Check that ${applied.entry.baseUrl} is reachable — it is \`providers.${applied.key}.baseUrl\` in .lightspeed.conf.json`;
 }
 
 function authError(detail: string, reference: string, endpoint?: string): ReviewError {

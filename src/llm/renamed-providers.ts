@@ -30,11 +30,22 @@ export function legacyProviderId(id: string): string | undefined {
  * what the user wrote after the rename, the old one what they forgot to delete.
  */
 export function withCurrentProviderIds<T>(entries: Record<string, T>): Record<string, T> {
-  const current = Object.entries(entries).filter(([id]) => !RENAMED_PROVIDERS.has(id));
-  const renamed = Object.entries(entries)
-    .filter(([id]) => RENAMED_PROVIDERS.has(id) && !(currentProviderId(id) in entries))
-    .map(([id, entry]): [string, T] => [currentProviderId(id), entry]);
-  return Object.fromEntries([...current, ...renamed]);
+  return Object.fromEntries(appliedProviderEntries(entries).map(({ id, entry }) => [id, entry]));
+}
+
+/** The entries `withCurrentProviderIds` applies, each with the key the file wrote it under. */
+export function appliedProviderEntries<T>(
+  entries: Record<string, T>,
+): { id: string; key: string; entry: T }[] {
+  const all = Object.entries(entries).map(([key, entry]) => ({
+    id: currentProviderId(key),
+    key,
+    entry,
+  }));
+  return [
+    ...all.filter(({ id, key }) => id === key),
+    ...all.filter(({ id, key }) => id !== key && !(id in entries)),
+  ];
 }
 
 /**

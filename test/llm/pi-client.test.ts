@@ -352,3 +352,57 @@ test("a model under a renamed provider's old id resolves to the current provider
   assert.equal(seen.model?.provider, "azure");
   assert.equal(seen.model?.id, "gpt-5");
 });
+
+test("a failure names the provider entry that was applied, under whichever id either side used", async () => {
+  for (const [model, providers, key, url] of [
+    [
+      "azure/gpt-5",
+      { "azure-openai-responses": { baseUrl: "http://legacy" } },
+      "azure-openai-responses",
+      "http://legacy",
+    ],
+    [
+      "azure-openai-responses/gpt-5",
+      { azure: { baseUrl: "http://current" } },
+      "azure",
+      "http://current",
+    ],
+    [
+      "azure-openai-responses/gpt-5",
+      {
+        azure: { baseUrl: "http://current" },
+        "azure-openai-responses": { baseUrl: "http://legacy" },
+      },
+      "azure",
+      "http://current",
+    ],
+  ] satisfies [string, Record<string, ProviderConfig>, string, string][]) {
+    const { models } = fauxModels(
+      [fauxAssistantMessage("", { stopReason: "error", errorMessage: "Connection error." })],
+      { id: "azure", model: "gpt-5" },
+    );
+    const error: unknown = await runGroupingCall({
+      model,
+      thinking: "off",
+      stateDir: "/tmp/lsr",
+      providers,
+      systemPrompt: "group these files",
+      messages: [userMessage],
+      models,
+    }).then(
+      () => assert.fail("expected runGroupingCall to throw"),
+      (thrown: unknown) => thrown,
+    );
+
+    assert.ok(error instanceof ReviewError);
+    const endpoint = error.suggestions.filter((suggestion) => suggestion.includes("baseUrl"));
+    assert.deepEqual(
+      endpoint.map((suggestion) => [
+        suggestion.includes(url),
+        suggestion.includes(`providers.${key}.baseUrl`),
+      ]),
+      [[true, true]],
+      `${model} with ${Object.keys(providers).join(", ")}: ${error.suggestions.join(" | ")}`,
+    );
+  }
+});
