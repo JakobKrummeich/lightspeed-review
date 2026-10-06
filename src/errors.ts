@@ -49,7 +49,7 @@ export interface ReviewErrorInput {
 }
 
 /**
- * AxiError plus a `detail` line, matching the spec's error payload shape
+ * AxiError plus a `detail` line, matching the README's error payload shape
  * `error: {code, message, detail}` + `help[]`.
  */
 export class ReviewError extends AxiError {
