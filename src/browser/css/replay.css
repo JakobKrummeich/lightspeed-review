@@ -85,7 +85,7 @@
 
 /* Grey for both `unchanged` and `unknown` on purpose: neither is failure, and
  * only `addressed` and `repeated` carry news worth a hue. No animation
- * anywhere here: the spec says serious. */
+ * anywhere here: the replay's tone is serious. */
 .lsr-replay-chip {
   font-size: var(--lsr-size-label);
   line-height: var(--lsr-leading-tight);

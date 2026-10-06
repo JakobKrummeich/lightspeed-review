@@ -108,7 +108,7 @@ test("an empty answer set is a fact, worded as decided and styled as nothing at 
   assert.match(html, /No code change — see the reply\./);
   assert.match(html, /data-status="unchanged">unchanged</);
   assert.doesNotMatch(html, /<pre>/, "there is no diff to draw");
-  assert.doesNotMatch(html, /ignored/, "the word the spec barred");
+  assert.doesNotMatch(html, /ignored/, "`ignored` is served as `unchanged`");
   assert.doesNotMatch(html, /fail/i);
 });
 

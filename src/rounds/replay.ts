@@ -28,7 +28,7 @@ export type ReadFileAt = (commit: string, path: string) => string | undefined;
 
 /**
  * The ledger's verdict vocabulary with one word swapped: `ignored` is served as
- * `unchanged`, decided in the spec — "ignored" implies bad faith the data
+ * `unchanged` — "ignored" implies bad faith the data
  * cannot prove, and a question the agent answered in words is the same empty
  * diff as a comment it walked past.
  */
@@ -265,7 +265,7 @@ function sideName(made: SessionRound, path: string, side: AnnotationSide): strin
 }
 
 /**
- * The mechanical fallback, decided in the spec: same-file hunks only, chosen by
+ * The mechanical fallback: same-file hunks only, chosen by
  * anchor overlap, and no inference beyond that. An empty patch means the file
  * was not touched, which is an empty answer set — a fact, not a failure.
  */
