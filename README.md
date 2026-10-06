@@ -819,12 +819,14 @@ A ledger failure never fails a review: it is reported as
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
 - Select lines, comment, send. The agent sees the selection verbatim. In
-  side-by-side a selection stays in the column it started in; one that spans
-  several files becomes one annotation per file, each carrying the comment.
+  side-by-side a selection stays in the column it started in. A selection that
+  spans several files becomes one annotation per file, each carrying the
+  comment.
 - Enter presses the box's button — Send (or Queue), Reply, or the popup's
-  queue. Shift+Enter, Alt+Enter, Ctrl+Enter and Cmd+Enter type a newline
-  instead; Enter in an empty box does nothing, and neither does one that picks
-  an IME candidate.
+  queue — and in a queued note being edited it saves the edit. Shift+Enter,
+  Alt+Enter, Ctrl+Enter and Cmd+Enter type a newline instead, and an Enter that
+  picks an IME candidate does nothing. Enter in an empty compose, reply or
+  annotation box does nothing; a queued note saved empty is removed.
 - A binary file is listed with "Binary file — no diff to show."; `open` and
   `publish` count those files as `diff.binary_skipped`.
 - Approving the last unapproved file opens an "Every file is approved" card:
