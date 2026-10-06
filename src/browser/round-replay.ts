@@ -15,7 +15,7 @@ import type { ConversationEntry, FeedbackPrompt, RoundMark } from "../session-st
 
 /**
  * Pure; `dom/replay-overlay.ts` holds the clicks. Only the current card
- * renders — cards are static by spec (no morph), so a move is a one-card redraw.
+ * renders — cards are static (no morph), so a move is a one-card redraw.
  */
 export interface ReplayView {
   data: ReplayData;
@@ -41,7 +41,7 @@ const STATUS_LABEL: Record<ReplayStatus, string> = {
 };
 
 /**
- * Neutral wording and styling (spec bars failure styling). Literal-keyed like
+ * Neutral wording and styling (no state is styled as failure). Literal-keyed like
  * `NO_DIFF` in `approved-form.ts`: a new server state stops compiling until
  * answered here.
  */
