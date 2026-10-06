@@ -503,6 +503,15 @@ pulling the tests out of it would leave the group behind them empty.
 | `lightspeed login <provider>`                               | Sign in to a subscription provider — a human, in their own terminal                                               |
 | `lightspeed logout <provider>`                              | Drop lightspeed's stored credential for one provider                                                              |
 
+`[base]` defaults to `main` wherever a branch is named without one. `open`
+also takes `--base <ref>` (which wins over the positional base) and `--no-open`,
+which creates the review and prints its URL without opening a browser. Bare
+`lightspeed --all` lists the live reviews of every repository instead of just
+this one's. `login` is refused `login_needs_terminal` unless stdin and stderr
+are both terminals — the flow asks questions only a person can answer, so an
+agent must never run it — and it stores the credential in
+`<stateDir>/auth.json` with mode 600, never in pi's own file.
+
 `wait`, `ask`, `say` and `start` were removed in 3.0. They answer
 `error: 'wait' was removed in 3.0, run lightspeed for your next step` (exit 2),
 so an agent still running a stale skill is pointed at home rather than left
@@ -531,7 +540,14 @@ A review is in one of three live states:
 **End** is available in every state, and `lightspeed end` closes the review from
 the agent's side — `lightspeed end <branch>` on a review already ended just says
 so, and ending while working with the branch's own commits that no round has
-shown yet warns that the reviewer never saw them. Delivery of a Send to a listening agent is what moves the turn
+shown yet warns that the reviewer never saw them. A waiting command whose
+review ended answers `ended: true`, which is not by itself an approval: it
+carries `endedBy` (`reviewer` or `agent`) and
+`approval: {verdict, approved, unapproved, swept, total}`. `verdict` is
+`signed-off` when every file is approved, `partial` when some are, `none` when
+none are and `empty` when the review holds no files; `swept` counts the
+approvals, inside `approved`, that came from a sweep lane — accepted, never
+read. Delivery of a Send to a listening agent is what moves the turn
 to digesting; `reply` hands it back; `work` moves it to working; `publish` opens
 the next round and hands it back, and the reviewer's queue drops into that round.
 `reply` from working is refused unless nothing has changed since `work` — HEAD
@@ -754,6 +770,12 @@ omission or byte-budget cut is marked and counted. `--format jsonl` and
 `--format md` print raw text a pipe reads whole, so they stay uncapped unless
 you pass those flags yourself.
 
+What is written is capped too, so one pathological round cannot fill a disk:
+the selected text at 4 KB, the copied context (±30 lines around the selection)
+at 8 KB, a comment or note at 16 KB, and a round patch or response patch at
+64 KB or 2000 lines. A cut field ends on a whole character and is named in the
+record's `truncated` list. A binary file gets no per-file record.
+
 ### Verdicts
 
 When the next `publish` opens a round on the same branch, every earlier comment is
@@ -796,7 +818,19 @@ A ledger failure never fails a review: it is reported as
   reads as an empty heading.
 - Grouped, unified diff by default; a per-session toggle switches to
   side-by-side above 1400px.
-- Select lines, comment, send. The agent sees the selection verbatim.
+- Select lines, comment, send. The agent sees the selection verbatim. In
+  side-by-side a selection stays in the column it started in; one that spans
+  several files becomes one annotation per file, each carrying the comment.
+- Enter presses the box's button — Send (or Queue), Reply, or the popup's
+  queue. Shift+Enter, Alt+Enter, Ctrl+Enter and Cmd+Enter type a newline
+  instead; Enter in an empty box does nothing, and neither does one that picks
+  an IME candidate.
+- A binary file is listed with "Binary file — no diff to show."; `open` and
+  `publish` count those files as `diff.binary_skipped`.
+- Approving the last unapproved file opens an "Every file is approved" card:
+  **End review** is Send & End (on your turn queued notes go with it);
+  **Keep looking** or `Esc` closes it. A page that opens with every file
+  already approved shows no card.
 - The conversation is threads, grouped by whose move it is: **Resolved** on top
   (folded until you open it), **Waiting on agent**, and **Needs you** at the
   bottom next to the compose box. Each thread is named by its file and line or
@@ -823,7 +857,8 @@ A ledger failure never fails a review: it is reported as
   open in it and where you had scrolled to. Sending the queue is what clears
   it. A new round does not put you
   back where you were in the diff it replaced — that diff is gone — but it does
-  keep anything you have not sent yet.
+  keep anything you have not sent yet. The browser's `localStorage` keeps this
+  for at most 8 reviews; the one written to least recently is dropped first.
 
 ## Judging the grouping prompt
 
