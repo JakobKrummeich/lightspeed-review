@@ -22,6 +22,7 @@ import { CONFIG_FILENAME, type ProviderApi, type ProviderConfig } from "../confi
 import { piModels } from "./pi-provider-models.ts";
 import type { PiProviderConfig } from "./pi-models.ts";
 import { overridePiBuiltin, piProviderAuth } from "./pi-provider-auth.ts";
+import { appliedProviderEntries, withCurrentProviderIds } from "./renamed-providers.ts";
 import { mergeHeaders } from "./provider-headers.ts";
 import { ReviewError } from "../errors.ts";
 
@@ -53,13 +54,13 @@ export function applyConfiguredProviders(
   models: MutableModels,
   providers: Record<string, ProviderConfig> | undefined,
 ): void {
-  for (const [id, config] of Object.entries(providers ?? {})) {
+  for (const { id, key, entry: config } of appliedProviderEntries(providers ?? {})) {
     const builtin = models.getProvider(id);
     if (!builtin) {
       models.setProvider(customProvider(id, config));
       continue;
     }
-    rejectWholeProviderKeys(id, config);
+    rejectWholeProviderKeys(key, config);
     models.setProvider(overrideBuiltin(builtin, config));
   }
 }
@@ -69,7 +70,9 @@ export function applyPiProviders(
   models: MutableModels,
   providers: Record<string, PiProviderConfig>,
 ): void {
-  for (const [id, config] of Object.entries(providers)) {
+  // Under its old id an entry would be an unknown provider: one with only a
+  // baseUrl would build an empty one and quietly override nothing.
+  for (const [id, config] of Object.entries(withCurrentProviderIds(providers))) {
     const builtin = models.getProvider(id);
     const catalog = piModels(id, builtin?.getModels() ?? [], config);
     if (builtin) {
@@ -80,16 +83,16 @@ export function applyPiProviders(
   }
 }
 
-function rejectWholeProviderKeys(id: string, config: ProviderConfig): void {
+function rejectWholeProviderKeys(providerKey: string, config: ProviderConfig): void {
   const ignored = (["name", "api", "model"] as const).filter((key) => config[key] !== undefined);
   if (ignored.length === 0) return;
   throw new ReviewError({
     code: "config_invalid",
-    message: `${CONFIG_FILENAME} provider \`${id}\` overrides a provider pi-ai ships, so \`${ignored.join("`, `")}\` would decide nothing`,
+    message: `${CONFIG_FILENAME} provider \`${providerKey}\` overrides a provider pi-ai ships, so \`${ignored.join("`, `")}\` would decide nothing`,
     detail:
       "an override may set `baseUrl`, `apiKey` and `headers`; the models, the api and the name stay the builtin's",
     suggestions: [
-      `Drop \`${ignored.join("`, `")}\` from \`providers.${id}\`, or give the provider an id pi-ai does not ship`,
+      `Drop \`${ignored.join("`, `")}\` from \`providers.${providerKey}\`, or give the provider an id pi-ai does not ship`,
     ],
   });
 }

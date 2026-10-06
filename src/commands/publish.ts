@@ -19,14 +19,7 @@ import {
 import { publishRefusal } from "../server.ts";
 import { refusalError, sessionGone, type SessionRef } from "./api-client.ts";
 import { allValues, lastValue, scanArgs } from "./args.ts";
-import {
-  helpLedgerDegraded,
-  ledgerReport,
-  makeRound,
-  publishedRound,
-  resolveDeps,
-  type RoundDeps,
-} from "./round.ts";
+import { makeRound, publishedRound, resolveDeps, roundHelp, type RoundDeps } from "./round.ts";
 import { reviewUrl } from "./server-address.ts";
 import { branchAndBase, takeToPairs } from "./to-args.ts";
 
@@ -115,14 +108,13 @@ export async function runPublish(input: PublishInput): Promise<StructuredOutput>
     { ...input, verb: "publish", rerun: publishLine(target, input.intents, input.notes) },
     run,
   );
-  const ledger = ledgerReport(outcome.created);
   run.announce(
     urlLast(
       {
         ...publishedRound(outcome),
         ...(outcome.created.rerun === true ? { rerun: true } : {}),
         message: `published; ${waitClause(outcome.created.turn)}`,
-        ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
+        ...roundHelp(outcome.created, input.config),
         ...ifKilled(outcome.created.turn, recovery),
       },
       outcome.created.url,

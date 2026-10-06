@@ -19,14 +19,7 @@ import {
 import { refusalError } from "./api-client.ts";
 import { refuseLiveElsewhere } from "./live-elsewhere.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
-import {
-  helpLedgerDegraded,
-  ledgerReport,
-  makeRound,
-  publishedRound,
-  resolveDeps,
-  type RoundDeps,
-} from "./round.ts";
+import { makeRound, publishedRound, resolveDeps, roundHelp, type RoundDeps } from "./round.ts";
 import { reviewUrl } from "./server-address.ts";
 
 export interface OpenArgs {
@@ -113,7 +106,6 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
     return await run.listen({ ...input, port: input.config.port });
   }
   if (input.open !== false) run.openBrowser(outcome.created.url);
-  const ledger = ledgerReport(outcome.created);
   // Written out before the wait rather than returned after it: the reviewer's
   // url is no use to anybody after they have sent.
   run.announce(
@@ -121,7 +113,7 @@ export async function runOpen(input: OpenInput): Promise<StructuredOutput> {
       {
         ...publishedRound(outcome),
         message: "the review is open — give the reviewer the url; waiting for their first Send",
-        ...(ledger.status === "degraded" ? { help: [helpLedgerDegraded(ledger)] } : {}),
+        ...roundHelp(outcome.created, input.config),
         ...ifKilled(outcome.created.turn, reattachCall(target)),
       },
       outcome.created.url,

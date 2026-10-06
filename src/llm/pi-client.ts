@@ -16,6 +16,7 @@ import {
 } from "./pi-auth.ts";
 import { loadPiProviders } from "./pi-models.ts";
 import { applyConfiguredProviders, applyPiProviders } from "./providers.ts";
+import { appliedProviderEntries, currentProviderId } from "./renamed-providers.ts";
 import { ReviewError, type ReviewErrorCode } from "../errors.ts";
 import { openCall } from "../open-call.ts";
 
@@ -85,7 +86,8 @@ async function builtinModels(stateDir: string): Promise<MutableModels> {
  */
 function resolveModel(models: Models, reference: string): Model<Api> {
   const separator = reference.indexOf("/");
-  const providerId = separator === -1 ? "" : reference.slice(0, separator);
+  // A renamed provider's old id still resolves; `open`/`publish` print the edit.
+  const providerId = currentProviderId(separator === -1 ? "" : reference.slice(0, separator));
   const modelId = reference.slice(separator + 1);
   const model = providerId === "" ? undefined : models.getModel(providerId, modelId);
   if (!model) {
@@ -125,11 +127,10 @@ function rejectFailedReply(reply: AssistantMessage, input: GroupingCallInput): v
  * headers stay out of every message.
  */
 function configuredEndpoint(input: GroupingCallInput): string | undefined {
-  const providerId = input.model.slice(0, input.model.indexOf("/"));
-  const baseUrl = input.providers?.[providerId]?.baseUrl;
-  return baseUrl === undefined
-    ? undefined
-    : `Check that ${baseUrl} is reachable — it is \`providers.${providerId}.baseUrl\` in .lightspeed.conf.json`;
+  const providerId = currentProviderId(input.model.slice(0, input.model.indexOf("/")));
+  const applied = appliedProviderEntries(input.providers ?? {}).find(({ id }) => id === providerId);
+  if (applied?.entry.baseUrl === undefined) return undefined;
+  return `Check that ${applied.entry.baseUrl} is reachable — it is \`providers.${applied.key}.baseUrl\` in .lightspeed.conf.json`;
 }
 
 function authError(detail: string, reference: string, endpoint?: string): ReviewError {

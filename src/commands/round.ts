@@ -8,6 +8,7 @@ import {
 } from "../llm/grouping.ts";
 import type { GroupingResult } from "../llm/grouping.ts";
 import type { PreviousGroup } from "../llm/prompts.ts";
+import { renamedProviderHelp } from "../llm/renamed-providers.ts";
 import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { currentGroupingMode } from "../rounds/session-round.ts";
@@ -201,7 +202,21 @@ export function ledgerReport(created: CreatedSession): LedgerReport {
   return created.ledger ?? { status: "off" };
 }
 
+/**
+ * Advice for a round that opened anyway, shared by `open` and `publish` so
+ * neither prints a help line the other forgets: a failing ledger, and a config
+ * still naming a provider by the id pi-ai renamed.
+ */
+export function roundHelp(created: CreatedSession, config: LightspeedConfig): { help?: string[] } {
+  const ledger = ledgerReport(created);
+  const help = [
+    ...(ledger.status === "degraded" ? [helpLedgerDegraded(ledger)] : []),
+    ...renamedProviderHelp(config),
+  ];
+  return help.length === 0 ? {} : { help };
+}
+
 /** A failing ledger loses mining data, not the review, so it is help and not an error. */
-export function helpLedgerDegraded(ledger: LedgerReport): string {
+function helpLedgerDegraded(ledger: LedgerReport): string {
   return `The feedback ledger could not be written (${ledger.reason ?? "unknown"}) — fix ${ledger.path ?? "the state dir"} or set \`"feedbackLog": "off"\` in .lightspeed.conf.json`;
 }

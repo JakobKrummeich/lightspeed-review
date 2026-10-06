@@ -406,3 +406,32 @@ test("no configured providers leaves the collection exactly as it was", () => {
   assert.deepEqual(models.getProviders(), before);
   assert.equal(models.getProvider("faux"), before[0]);
 });
+
+/** pi-ai 1.0.3 renamed `azure-openai-responses` to `azure`: the old key still overrides it. */
+test("a provider entry under a renamed provider's old id overrides the current builtin", async () => {
+  const models = createModels({ credentials: storedKey("k") });
+  models.setProvider(storedKeyProvider("azure"));
+
+  apply(models, { "azure-openai-responses": { baseUrl: "http://localhost:3001" } });
+
+  assert.equal(models.getProvider("azure-openai-responses"), undefined);
+  assert.equal((await models.getAuth("azure"))?.auth.baseUrl, "http://localhost:3001");
+});
+
+test("a whole-provider key under a renamed provider's old id is named where the file wrote it", () => {
+  const models = createModels();
+  models.setProvider(storedKeyProvider("azure"));
+  try {
+    applyConfiguredProviders(models, { "azure-openai-responses": { name: "my azure" } });
+    throw new Error("expected `name` on a renamed builtin id to be rejected");
+  } catch (error) {
+    assert.ok(error instanceof ReviewError, `expected ReviewError, got ${String(error)}`);
+    assert.equal(error.code, "config_invalid");
+    assert.ok(
+      error.suggestions.some((suggestion) =>
+        suggestion.includes("`providers.azure-openai-responses`"),
+      ),
+      error.suggestions.join(" | "),
+    );
+  }
+});

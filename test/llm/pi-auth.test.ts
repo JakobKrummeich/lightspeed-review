@@ -184,3 +184,47 @@ test("layered delete only ever touches the primary, never pi's file", async () =
   assert.deepEqual(JSON.parse(readFileSync(ownPath, "utf8")), {});
   assert.deepEqual(JSON.parse(readFileSync(piPath, "utf8")), { anthropic: piKey, openai: piKey });
 });
+
+const azureKey = { type: "api_key", key: "azure-key" } as const;
+
+/** pi-ai 1.0.3 renamed the provider; an auth.json nobody has edited since keeps the old key. */
+test("a credential under a renamed provider's old id still reads for the current id", async () => {
+  const path = authFile(JSON.stringify({ "azure-openai-responses": azureKey }));
+
+  assert.deepEqual(await piAuthStore(path).read("azure"), azureKey);
+  rmSync(path, { force: true });
+});
+
+test("a credential under the current id beats the one under the old id", async () => {
+  const fresh = { type: "api_key", key: "fresh" } as const;
+  const path = authFile(JSON.stringify({ "azure-openai-responses": azureKey, azure: fresh }));
+
+  assert.deepEqual(await piAuthStore(path).read("azure"), fresh);
+  rmSync(path, { force: true });
+});
+
+test("only a renamed provider falls back: other ids never read another's credential", async () => {
+  const path = authFile(JSON.stringify({ "azure-openai-responses": azureKey }));
+
+  assert.equal(await piAuthStore(path).read("openai"), undefined);
+  rmSync(path, { force: true });
+});
+
+/** pi owns the old key: lightspeed reads it, and leaves renaming it to the user pi told to. */
+test("a write for the current id lands under it and leaves the old entry as it was", async () => {
+  const path = authFile(JSON.stringify({ "azure-openai-responses": azureKey }));
+  const written = { type: "api_key", key: "written" } as const;
+
+  const seen: unknown[] = [];
+  await piAuthStore(path).modify("azure", async (current) => {
+    seen.push(current);
+    return written;
+  });
+
+  assert.deepEqual(seen, [undefined], "the write sees the current id's own entry, which is none");
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), {
+    "azure-openai-responses": azureKey,
+    azure: written,
+  });
+  rmSync(path, { force: true });
+});
