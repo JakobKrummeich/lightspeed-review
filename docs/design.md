@@ -251,8 +251,9 @@ from the press alike, so the two can never draw different reviews.
 
 **The arrival is announced once.** The header offer alone was missable, so a
 held round is also announced by a card over the review. Dismissing it folds it
-into the header offer, which keeps a slow spark circling until pressed — the
-page's one ongoing animation, allowed because it tells the reviewer nothing new.
+into the header offer, which keeps a slow spark circling until pressed —
+allowed because it tells the reviewer nothing new: it holds the place they said
+they would come back to.
 Under `prefers-reduced-motion` the spark does not exist.
 
 **Whose turn it is lives in the panel, not a tooltip.** A `title` is hover-only;
@@ -295,8 +296,9 @@ sideways. A diff is code at its own width and may still scroll.
 **Approval is derived, never stored per group.** A group is nothing but its
 files, so a group whose files are all ticked is approved, and the mark cannot
 drift from the boxes it is made of. Unticking a file reopens its diff — the
-reviewer asking to look again; unticking a chapter opens nothing — a withdrawal,
-not a request to read. Only what changed hands is opened or shut: a file the
+reviewer asking to look again; unticking a chapter leaves the chapter where it
+is — a withdrawal, not a request to read — though the files inside do reopen
+behind it. Only what changed hands is opened or shut: a file the
 reviewer opened by hand is theirs to close.
 
 **Approval across rounds.** Carrying a tick forward only on a matching blob sha
@@ -318,7 +320,8 @@ decided in one place (`approvedFormData()` in `src/server/session-files.ts`) and
 never guessed; a round that stored no commit is `unrecorded`, explicitly not a
 rebase, so the reviewer is not sent hunting one that never happened.
 
-**One state is stated in words.** Only `changed after approval` carries a pill;
+**One state is stated in words.** Of the approval states, only
+`changed after approval` carries a pill;
 approved and unapproved read from the tick. Dimming stops at the group rather
 than stacking, since opacity multiplies and a dimmed file in a dimmed group would
 all but vanish.
