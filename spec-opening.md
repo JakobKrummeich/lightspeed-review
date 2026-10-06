@@ -222,7 +222,7 @@ round has none of. It answers with what is new: the agent's words the
 conversation panel already showed are left off its cards (their changes stay),
 the round reply's unread words sit in their own block above the cards, and a
 replay left with no unread words and no change does not open on its own
-(spec.md, "The between-rounds replay repeats nothing the panel already showed").
+(docs/design.md, "The replay repeats nothing the panel already showed").
 
 ## What it never does
 
