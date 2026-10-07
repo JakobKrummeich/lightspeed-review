@@ -92,8 +92,13 @@ export async function handleFeedback(
  * nothing is never refused — the reviewer can always walk away — but an ending
  * Send's words are: no command ever hands them to an agent that holds the turn,
  * whose next call only hears that the review ended.
+ *
+ * A 409 the page reads, never the CLI: its code is not one of `REFUSAL_CODES`.
  */
-function lockedOut(session: SessionRecord, feedback: FeedbackRequest): DomainErrorBody | undefined {
+function lockedOut(
+  session: SessionRecord,
+  feedback: FeedbackRequest,
+): DomainErrorBody<"agent_holds_turn"> | undefined {
   if (session.status === "ended" || session.turn.holder !== "agent") return undefined;
   if (feedback.ended) return feedback.prompts.length === 0 ? undefined : wordsOnEnd();
   const message =
@@ -110,7 +115,7 @@ function lockedOut(session: SessionRecord, feedback: FeedbackRequest): DomainErr
   };
 }
 
-function wordsOnEnd(): DomainErrorBody {
+function wordsOnEnd(): DomainErrorBody<"agent_holds_turn"> {
   return {
     error: {
       code: "agent_holds_turn",
