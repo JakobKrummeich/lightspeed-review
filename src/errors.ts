@@ -41,6 +41,23 @@ export type ReviewErrorCode =
   | "browser_bundle_missing"
   | "internal_error";
 
+/**
+ * The codes a 422 refusal (`DomainErrorBody`) may carry, and the only ones
+ * `api-client.ts` relays from one: any other reaches the agent as
+ * `internal_error`, a lightspeed bug rather than a move it can fix — which is
+ * how `turn_not_yours` first shipped, when the client kept a list of its own.
+ * One list both ends read: a refusal with a code not on it fails typecheck on
+ * the server, and adding the code here is all the client needs to relay it.
+ */
+export const REFUSAL_CODES = [
+  "turn_not_yours",
+  "turn_still_yours",
+  "nothing_to_publish",
+  "feedback_item_unknown",
+] as const satisfies readonly ReviewErrorCode[];
+
+export type RefusalCode = (typeof REFUSAL_CODES)[number];
+
 export interface ReviewErrorInput {
   code: ReviewErrorCode;
   message: string;

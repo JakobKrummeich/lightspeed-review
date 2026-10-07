@@ -1,4 +1,4 @@
-import { ReviewError, type ReviewErrorCode } from "../errors.ts";
+import { REFUSAL_CODES, ReviewError, type RefusalCode } from "../errors.ts";
 import type { DomainErrorBody } from "../server.ts";
 import { openCall } from "../open-call.ts";
 import type { ReviewCloser } from "../session-types.ts";
@@ -101,18 +101,12 @@ export function parseBody(status: number, body: string, about?: SessionRef): unk
 }
 
 /** Listed rather than accepted wholesale so the closed `ReviewErrorCode` set
- * stays true — and as a set rather than one hardcoded code, which is how
- * `turn_not_yours` first reached agents as `internal_error`: a bug in
- * lightspeed, they read, instead of an illegal move they could fix. */
-const DOMAIN_ERROR_CODES = new Set<ReviewErrorCode>([
-  "turn_not_yours",
-  "turn_still_yours",
-  "nothing_to_publish",
-  "feedback_item_unknown",
-]);
-
-function isDomainCode(code: unknown): code is ReviewErrorCode {
-  return typeof code === "string" && DOMAIN_ERROR_CODES.has(code as ReviewErrorCode);
+ * stays true — and the list the server's refusals are typed by, not one of this
+ * file's own: a list here that did not follow the server's (then one hardcoded
+ * code) is how `turn_not_yours` first reached agents as `internal_error`, a bug
+ * in lightspeed, they read, instead of an illegal move they could fix. */
+function isRefusalCode(code: unknown): code is RefusalCode {
+  return (REFUSAL_CODES as readonly unknown[]).includes(code);
 }
 
 /** 422 is the server rejecting the request's content with a structured error,
@@ -121,7 +115,7 @@ function isDomainCode(code: unknown): code is ReviewErrorCode {
 function domainError(body: string): ReviewError {
   const parsed = readErrorBody(body);
   const { code, message, detail } = parsed.error ?? {};
-  if (!isDomainCode(code) || typeof message !== "string") {
+  if (!isRefusalCode(code) || typeof message !== "string") {
     return new ReviewError({
       code: "internal_error",
       message: "the review server answered 422 without a readable error",

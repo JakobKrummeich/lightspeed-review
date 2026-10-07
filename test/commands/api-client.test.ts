@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { apiRequest, jsonPost, parseBody } from "../../src/commands/api-client.ts";
-import { ReviewError } from "../../src/errors.ts";
+import { REFUSAL_CODES, ReviewError } from "../../src/errors.ts";
+import type { DomainErrorBody } from "../../src/server.ts";
 
 interface Harness {
   url: string;
@@ -120,6 +121,32 @@ test("a 422 carrying a code this client has never seen is relayed, not swallowed
   assert.deepEqual(parsed.suggestions, [
     "Run `lightspeed wait feature-auth main` to block until the reviewer sends",
   ]);
+});
+
+test("every code a server refusal may carry is relayed under its own name", () => {
+  for (const code of REFUSAL_CODES) {
+    const body: DomainErrorBody = { error: { code, message: "refused" }, help: ["fix it"] };
+
+    const parsed = parseBody(422, JSON.stringify(body));
+
+    assert.ok(parsed instanceof ReviewError, code);
+    assert.equal(parsed.code, code);
+  }
+});
+
+/** The other half of the list: a server refusal cannot be built with a code the
+ * client would turn into `internal_error`. */
+test("a refusal body with a code off the list does not compile", () => {
+  const offList: DomainErrorBody = {
+    // @ts-expect-error -- agent_holds_turn is the page's 409, never a 422 the CLI relays
+    error: { code: "agent_holds_turn", message: "the agent holds the turn" },
+    help: ["wait for the agent"],
+  };
+
+  const parsed = parseBody(422, JSON.stringify(offList));
+
+  assert.ok(parsed instanceof ReviewError);
+  assert.equal(parsed.code, "internal_error", "what the agent would read if it compiled");
 });
 
 test("a 422 without a readable error is a lightspeed bug, not a silent success", () => {
