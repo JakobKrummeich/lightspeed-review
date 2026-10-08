@@ -47,7 +47,9 @@ function modelFromPiConfig(
   locationDefaults: Model<Api> | undefined,
 ): Model<Api> {
   const { api, baseUrl } = piModelLocation(definition, config, locationDefaults);
-  if (!api || !baseUrl) throw piProviderError(provider, definition.id, "api and baseUrl");
+  if (!api || !baseUrl) {
+    throw piProviderError(provider, definition.id, "api and baseUrl", LOCATION_DETAIL);
+  }
   return {
     ...PI_MODEL_DEFAULTS,
     ...defaults,
@@ -107,7 +109,9 @@ function resolvePiModelHeaders(
 ): Record<string, string> | undefined {
   if (!headers) return undefined;
   const resolved = resolvePiStaticHeaders(headers);
-  if (resolved === undefined) throw piProviderError(provider, model, "header environment value");
+  if (resolved === undefined) {
+    throw piProviderError(provider, model, "header environment value", HEADER_DETAIL);
+  }
   return resolved;
 }
 
@@ -120,12 +124,23 @@ function mergeCompat(
     : { ...base, ...override };
 }
 
-function piProviderError(provider: string, model: string, missing: string): ReviewError {
+const LOCATION_DETAIL =
+  "Pi custom models need an api and baseUrl on the model, provider, or an existing builtin model.";
+
+/** Its own detail, not the location one, which points at api and baseUrl — already right here. */
+const HEADER_DETAIL =
+  "Model headers resolve when lightspeed runs: every `$NAME` in a header value must be set in its environment, and a `!command` must print a value.";
+
+function piProviderError(
+  provider: string,
+  model: string,
+  missing: string,
+  detail: string,
+): ReviewError {
   return new ReviewError({
     code: "config_invalid",
     message: `Pi provider \`${provider}\` model \`${model}\` needs ${missing}`,
-    detail:
-      "Pi custom models need an api and baseUrl on the model, provider, or an existing builtin model.",
+    detail,
     suggestions: ["Fix ~/.pi/agent/models.json, then re-run lightspeed."],
   });
 }

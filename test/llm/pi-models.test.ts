@@ -12,6 +12,7 @@ import {
   resolvePiStaticConfigValue,
 } from "../../src/llm/pi-models.ts";
 import { applyConfiguredProviders, applyPiProviders } from "../../src/llm/providers.ts";
+import type { ReviewError } from "../../src/errors.ts";
 
 function piModelsFile(contents: unknown): string {
   const directory = mkdtempSync(join(tmpdir(), "lightspeed-pi-models-"));
@@ -260,5 +261,41 @@ test("a Pi models.json entry under a renamed provider's old id applies to the cu
     models.getModel("azure", "deepseek-v4-pro")?.api,
     "openai-completions",
     "the whole builtin catalogue stays, Foundry chat models included",
+  );
+});
+
+/**
+ * Each refusal's detail names the fix for its own cause. The header one used to
+ * share the api-and-baseUrl detail, pointing at fields that were already right.
+ */
+test("a Pi custom model with no api or baseUrl anywhere is refused as config_invalid", () => {
+  assert.throws(
+    () => applyPiProviders(createModels(), { "pi-bare": { models: [{ id: "lonely" }] } }),
+    (error: ReviewError) => {
+      assert.equal(error.code, "config_invalid");
+      assert.match(error.message, /`pi-bare` model `lonely` needs api and baseUrl/);
+      assert.match(error.detail ?? "", /api and baseUrl/);
+      return true;
+    },
+  );
+});
+
+test("a Pi model header naming an unset variable is refused with a detail about that header", () => {
+  const unset = {
+    "pi-gateway": {
+      baseUrl: "https://gateway.example.test/v1",
+      api: "openai-completions" as const,
+      models: [{ id: "pi-small", headers: { "x-pi-model": "$PI_TEST_UNSET_HEADER" } }],
+    },
+  };
+  assert.throws(
+    () => applyPiProviders(createModels(), unset),
+    (error: ReviewError) => {
+      assert.equal(error.code, "config_invalid");
+      assert.match(error.message, /`pi-gateway` model `pi-small` needs header environment value/);
+      assert.doesNotMatch(error.detail ?? "", /api and baseUrl/);
+      assert.match(error.detail ?? "", /\$NAME.*environment/);
+      return true;
+    },
   );
 });
