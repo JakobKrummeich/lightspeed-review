@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-09
 - **Status:** Proposed — needs a human decision, no code was changed
-- **Scope:** `src/commands/api-client.ts` and its callers (`work.ts`, `reply.ts`, `end.ts`, `round.ts`, `long-poll.ts`, `presence.ts`, `server-address.ts`); `src/server/http.ts`, `src/server/validate.ts`, `src/server/handlers-{session,turn,feedback,stream}.ts`, `src/server.ts`; new `src/api-contract.ts`
+- **Scope:** `src/commands/api-client.ts` and its callers (`work.ts`, `reply.ts`, `end.ts`, `round.ts`, `long-poll.ts`, `listen.ts`, `presence.ts`, `server-address.ts`); `src/server/http.ts`, `src/server/validate.ts`, `src/server/handlers-{session,turn,feedback,stream,review}.ts`, `src/server.ts`, `src/feedback.ts`; new `src/api-contract.ts` and `test/api-contract.test.ts`
 
 ## 1. Context
 
@@ -81,11 +81,16 @@ site. The server builds the same shape by spreading literals:
 Note that `replied` is already invisible to the CLI's type. That is harmless
 today, but it shows the two descriptions have started to diverge.
 
-**One route already does it right**, and it is the precedent for this proposal.
+**One route nearly does it right**, and it is the precedent for this proposal.
 `GET /api/poll` answers with `PollPayload`, declared once in
 `src/feedback.ts:38`, built by `batchPayload()` (`feedback.ts:140`) on the
-server, and read as `PollPayload` in `src/commands/listen.ts`. The team has also
-been fixing this disease one symbol at a time:
+server, and read as `PollPayload` in `src/commands/listen.ts`. Even here the
+shared type hides one drift. A superseded wait is answered 200 with
+`SUPERSEDED = { superseded: true, message }` (`handlers-stream.ts:89, 104`),
+which has none of `PollPayload`'s required `status`, `ended` and `items`.
+`PollPayload` absorbs it only through the optional `superseded?` and
+`message?` fields, and `listen.ts:37` casts the answer `as PollPayload`. The
+team has also been fixing this disease one symbol at a time:
 
 - `27c5c51` (#58): _"Type every 422 refusal by the one code list the CLI
   relays, so a new refusal code fails typecheck instead of reaching agents as
@@ -135,10 +140,20 @@ export interface CliRoutes {
     answer: { confirmed: boolean };
   };
   "GET /api/session/:key/presence": { request: undefined; answer: { waiting: boolean } };
-  "GET /api/poll": { request: undefined; answer: PollPayload };
+  "GET /api/poll": { request: undefined; answer: PollPayload | Superseded };
   "POST /api/shutdown": { request: undefined; answer: { status: "stopping" } };
+  "GET /health": {
+    request: undefined;
+    answer: { status: "ok"; version: string; stateDir: string };
+  };
 }
 export type CliRoute = keyof CliRoutes;
+
+/** A wait another waiting command took over: no turn, no items, nothing to do. */
+export interface Superseded {
+  superseded: true;
+  message: string;
+}
 ```
 
 Two thin helpers replace the untyped edges:
@@ -146,7 +161,8 @@ Two thin helpers replace the untyped edges:
 - **Client** (`src/commands/api-client.ts`):
   `callApi(origin, route, { key }, body, about): Promise<CliRoutes[R]["answer"]>`.
   It wraps today's `apiRequest`/`jsonPost` unchanged (same error mapping, same
-  `parseBody`). The only new logic is substituting `:key` in the route's path.
+  `parseBody`, same retry of a failed GET). The only new logic is substituting
+  `:key` in the route's path.
 - **Server** (`src/server/http.ts`):
   `sendAnswer(response, route, body: CliRoutes[R]["answer"])`, which is
   `sendJson(response, 200, body)` with a typed `body`.
@@ -158,10 +174,25 @@ string, `` `/api/session/${key}/work` ``, which does not match.
 
 The client keeps reading answers through `turnBlock()`, which accepts
 `Partial<TurnFacts>`. A full `TurnFacts` is assignable to it, so no reader
-changes behaviour. `/health` stays a deliberate exception on the client side:
-it is the version handshake with a server that may not speak this contract
-(`src/version.ts`), so `server-address.ts:79` keeps parsing it defensively.
-Only the server's answer to `/health` gets a type.
+changes behaviour.
+
+Three client calls stay on raw `fetch` as deliberate exceptions, because
+`apiRequest`'s semantics would change what they do. Where one reads an answer,
+it reads it with the contract's type, not through `callApi`:
+
+- **`/health`** (`server-address.ts:79`) is the version handshake with a server
+  that may not speak this contract (`src/version.ts`), so it keeps parsing
+  defensively.
+- **Presence** (`presence.ts:13-17`) must answer at once, server or no server.
+  It aborts after 800 ms and turns any non-ok status or error into `false`.
+  Through `apiRequest` it would lose the timeout, retry a failed GET after
+  50 ms (`api-client.ts:210-222`), and throw `session_not_found` on a 404
+  instead of returning `false`.
+- **Shutdown** (`server-address.ts:100`) returns `response.ok`. Through
+  `apiRequest` a non-ok status would throw a `ReviewError` instead of
+  returning `false`. It reads no body, so nothing there changes.
+
+The server answers all three routes through `sendAnswer`.
 
 ### Stepwise plan
 
@@ -181,14 +212,16 @@ changes.
    `"POST /api/session/:key/work"`, `callApi` and `sendAnswer`. Move
    `WorkRequest` from `validate.ts` to the contract (`validate.ts` imports it
    back). Declare `WorkAnswer = TurnFacts & { changed: boolean; open: string[] }`.
-   Migrate `work.ts:60-64` and `handlers-turn.ts:44`.
-3. **Land the fitness function** (section 4), with today's remaining raw call
-   sites recorded in its `NOT_YET_ON_CONTRACT` list. From this commit on, no
-   new raw call can be added, and the list can only shrink.
+   Migrate `work.ts:60-64` and `handlers-turn.ts:44`. Move the work route's
+   entry in `src/server.ts:178` into the contract-typed `cliHandlers` record
+   (section 4). From now on, each route added to `CliRoutes` fails typecheck
+   until it has a handler.
+3. **Land the behavioural test** (section 4). Its route list is typed by
+   `CliRoutes`, so every later step that adds a route must add it there too,
+   or fail typecheck.
 4. **`reply`:** move `ReplyRequest`, declare
    `ReplyAnswer = TurnFacts & ({ replied: number } | { rerun: true })`, and
-   migrate `reply.ts:61-65` and `handlers-feedback.ts:171, 185`. Remove
-   `reply.ts` from the list.
+   migrate `reply.ts:61-65` and `handlers-feedback.ts:171, 185`.
 5. **`end`:** migrate `end.ts:40-44` and `handlers-session.ts:185, 199`.
 6. **`sessions`:** move `CreatedSession` from `commands/round.ts` into the
    contract, with a re-export from `round.ts` for its other importers, and
@@ -199,90 +232,116 @@ changes.
 7. **`delivered` and `poll`:** migrate `long-poll.ts:63-67` to `callApi`, and
    type `pollOnce`'s result as `CliRoutes["GET /api/poll"]["answer"]`. It keeps
    its own `node:http` connection for the reason documented at
-   `long-poll.ts:30`. Migrate `handlers-stream.ts:89, 118, 138, 145, 169`.
-8. **`presence` and `shutdown`:** migrate `presence.ts:13-17` and
-   `server-address.ts:100`, and type the `/health` answer server-side
-   (`server.ts:151`). After this step, only `server-address.ts`'s `/health`
-   probe remains in the list, as the permanent, commented exception.
-9. **Drop the transitional re-exports** added in steps 1, 2 and 6 (including
-   `server.ts:41-42`) once nothing imports through them.
+   `long-poll.ts:30`. Declare `Superseded` in the contract, type
+   `handlers-stream.ts:104`'s `SUPERSEDED` with it, and drop the
+   `superseded?`/`message?` fields from `PollPayload` (`feedback.ts:61-62`), so
+   the poll answer is a discriminated union. `batchOutput()`
+   (`listen.ts:45`) narrows on `"superseded" in result`, and
+   `supersededOutput()` takes a `Superseded`. No byte on the wire changes.
+   Migrate `handlers-stream.ts:89, 118, 138, 145, 169`.
+8. **`presence`, `shutdown` and `/health`, server side:** migrate
+   `handlers-stream.ts:43`, `server.ts:193` and `server.ts:151` to
+   `sendAnswer`. On the client, `presence.ts:17` reads the answer as
+   `Partial<CliRoutes["GET /api/session/:key/presence"]["answer"]>` and keeps
+   its raw `fetch`, timeout and catch-to-`false`. `requestShutdown` and the
+   `/health` probe stay as they are (section 3).
+9. **Close the old doors.** Stop exporting `apiRequest` and `jsonPost` from
+   `api-client.ts`, and move `test/commands/api-client.test.ts` and
+   `long-poll.test.ts` onto `callApi`. Narrow `sendJson`'s `status` to the
+   refusal statuses (section 4), and send the browser routes' seven 200s
+   (`handlers-feedback.ts:48, 85`, `handlers-review.ts:36, 67, 96, 120, 131`)
+   through `sendPageJson`. Drop the transitional re-exports added in steps 1, 2
+   and 6 (including `server.ts:41-42`) once nothing imports through them.
 
 ## 4. Fitness function
 
-A new `test/api-contract.test.ts`, using only `node:test` and `node:fs`, in the
-same source-scanning style as `test/browser/stylesheet-boundary.test.ts`. It
-needs no new dependency and does not touch the protected
-`.dependency-cruiser.mjs` or `eslint.config.js`. The compiler enforces each
-call site's types once it uses `callApi`/`sendAnswer`. The test enforces that
-call sites _use_ them, and that the contract and the route table cannot
-silently disagree.
+The compiler is the fitness function, and no test reads source text. Three
+type decisions turn each kind of drift into a `pnpm typecheck` failure. One
+behavioural test then checks the wiring the compiler cannot see. Nothing here
+needs a new dependency or touches the protected `.dependency-cruiser.mjs` or
+`eslint.config.js`.
+
+- **The contract and the route table cannot disagree.** `src/server.ts`
+  registers every contract route from one record typed by the contract, and
+  spreads it into the table next to the browser routes:
+
+  ```ts
+  const cliHandlers: { [R in CliRoute]: ContextHandler } = {
+    "POST /api/session/:key/work": handleWork,
+    // …one entry per CliRoutes key
+  };
+  return [...cliRouteEntries(cliHandlers, bind) /* , browser routes as today */];
+  ```
+
+  `cliRouteEntries` splits each key into `method` and `pattern`. A contract
+  entry with no handler fails typecheck, and so does a handler under a key the
+  contract lacks. The route literal is written once on the server, not next to
+  a copy.
+
+- **Every success answer is typed.** `sendAnswer` types each body by its
+  route. Step 9 narrows `sendJson`'s `status` from `number` to the statuses it
+  sends for refusals and failures (`400 | 403 | 404 | 409 | 422 | 500 | 503`),
+  so an untyped 200 no longer compiles. The browser routes' 200s go through
+  `sendPageJson(response, body: unknown)`. That is a named door, and the
+  `PageRoutes` follow-on (section 6) closes it.
+
+- **Commands reach the server through `callApi`.** Step 9 stops exporting
+  `apiRequest` and `jsonPost`, so `callApi` is the only path with the
+  client's error mapping. Raw `fetch` stays callable for the three argued
+  exceptions in section 3 (`/health`, presence, shutdown). Forbidding a fourth
+  would need `no-restricted-globals` in the protected `eslint.config.js`. That
+  is a human decision, so this proposal records it and does not take it.
+
+The behavioural test, `test/api-contract.test.ts`, starts the real server and
+checks that every contract route reaches a handler. That proves
+`cliRouteEntries` splits keys the way the router matches them. Its route list
+is typed by the contract, so a new route cannot be left out:
 
 ```ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { CliRoute } from "../src/api-contract.ts";
+import { createReviewServer } from "../src/server.ts";
+import { SessionStore } from "../src/session-store.ts";
 
-const src = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
-const commandFiles = readdirSync(new URL("../src/commands/", import.meta.url), { recursive: true })
-  .map(String)
-  .filter((name) => name.endsWith(".ts"));
-const serverFiles = [
-  "server.ts",
-  ...readdirSync(new URL("../src/server/", import.meta.url)).map((n) => `server/${n}`),
-];
+/** Every contract route, in request order: shutdown last, because it stops the server. */
+const EVERY_ROUTE: { [R in CliRoute]: true } = {
+  "GET /health": true,
+  "POST /api/sessions": true,
+  "POST /api/session/:key/work": true,
+  "POST /api/session/:key/reply": true,
+  "POST /api/session/:key/end": true,
+  "POST /api/session/:key/delivered": true,
+  "GET /api/session/:key/presence": true,
+  "GET /api/poll": true,
+  "POST /api/shutdown": true,
+};
 
-/** "POST /api/session/:key/work" → ["POST", "/api/session/:key/work"], read off the contract. */
-const ROUTES = [...src("api-contract.ts").matchAll(/^\s*"(GET|POST) (\/[^"]+)": \{/gm)].map(
-  ([, method, path]) => ({ key: `${method} ${path}`, method: method!, path: path! }),
-);
-
-/**
- * Command files still calling the server without the contract. This list only
- * ever shrinks; a stale entry fails too, so it cannot outlive its migration.
- * `server-address.ts` stays: `/health` is the handshake with a server that may
- * not speak this contract at all (src/version.ts).
- */
-const NOT_YET_ON_CONTRACT = new Set([
-  "server-address.ts",
-  // step 3 records the rest here: end.ts, reply.ts, round.ts, long-poll.ts, presence.ts
-]);
-
-test("every contract route is registered by the server under the same literal", () => {
-  const table = src("server.ts");
-  const missing = ROUTES.filter(
-    (r) => !table.includes(`method: "${r.method}", pattern: "${r.path}"`),
-  );
-  assert.deepEqual(
-    missing.map((r) => r.key),
-    [],
-  );
-});
-
-test("every contract route is answered through sendAnswer", () => {
-  // Silent incompleteness: a route whose handler still uses sendJson(…, 200, …)
-  // type-checks, and its answer is back to `unknown` on the wire.
-  const server = serverFiles.map(src).join("\n");
-  const unanswered = ROUTES.filter((r) => !server.includes(`sendAnswer(response, "${r.key}"`));
-  assert.deepEqual(
-    unanswered.map((r) => r.key),
-    [],
-  );
-});
-
-test("commands reach the server only through callApi", () => {
-  const raw = commandFiles.filter(
-    (name) =>
-      name !== "api-client.ts" && /\b(apiRequest|jsonPost|fetch)\(/.test(src(`commands/${name}`)),
-  );
-  assert.deepEqual(
-    raw.sort(),
-    [...NOT_YET_ON_CONTRACT].sort(),
-    "call the server with callApi and a CliRoutes key, or argue the exception in NOT_YET_ON_CONTRACT",
-  );
+test("every contract route reaches a handler on the real server", async () => {
+  const store = new SessionStore(mkdtempSync(join(tmpdir(), "lsr-contract-")));
+  const server = createReviewServer({ store, port: 0 });
+  const { port } = await server.start();
+  try {
+    const unrouted: string[] = [];
+    for (const route of Object.keys(EVERY_ROUTE)) {
+      const [method, pattern] = route.split(" ") as [string, string];
+      const url = `http://127.0.0.1:${port}${pattern.replace(":key", "no-such-session")}`;
+      const body = (await (await fetch(url, { method })).json()) as { error?: { code?: string } };
+      // A handler may refuse (no session, no body); only the router says not_found.
+      if (body.error?.code === "not_found") unrouted.push(route);
+    }
+    assert.deepEqual(unrouted, []);
+  } finally {
+    await server.stop();
+  }
 });
 ```
 
-All three assertions fail loudly in `pnpm test`, which is already a gate.
+The compiler checks fail `pnpm typecheck`, and the test fails `pnpm test`.
+Both are already gates.
 
 ## 5. Alternatives rejected
 
@@ -299,7 +358,7 @@ All three assertions fail loudly in `pnpm test`, which is already a gate.
   ship in one package, pinned to one version by the `/health` handshake, so
   compile-time sharing gives the guarantee at no runtime cost.
 - **Generate a client from an OpenAPI document.** Framework-grade machinery for
-  eight routes. It also fails the grep test: generated names land in generated
+  nine routes. It also fails the grep test: generated names land in generated
   files, not at the code that runs.
 - **Export the request types through `src/server.ts`, as `DomainErrorBody` is
   today.** This is the smallest diff, but it makes the HTTP server's entry
@@ -309,6 +368,15 @@ All three assertions fail loudly in `pnpm test`, which is already a gate.
   the server cannot see it. A neutral file both sides import is the boundary
   `commands-only-from-cli` already asks for ("lives below commands/, as
   open-call.ts and turn-help.ts do").
+- **A test that scans `src/` for `sendAnswer(`, `callApi(` or the route
+  literals.** It was the first draft of section 4. Matching text proves
+  nothing: a commented-out call passes, and a helper that forwards the route
+  as a variable fails. The compiler already knows which call sites are typed,
+  so the checks belong there.
+- **Moving presence and shutdown onto `callApi` too.** That would change
+  behaviour (section 3), or it would need `callApi` to grow a timeout, a retry
+  switch and a non-throwing mode for two callers. Typing their answers is
+  enough.
 - **Free-standing `as WorkAnswer` / `satisfies WorkRequest` without a route
   map.** Better than today, but nothing stops reply's answer from being cast as
   `WorkAnswer`. Keying by the route literal ties the request, the answer and
@@ -316,8 +384,9 @@ All three assertions fail loudly in `pnpm test`, which is already a gate.
   dict" shape, not a plugin system.
 - **Change it in one commit.** About 30 call sites on both sides of the
   repo's second-busiest boundary. That is past the daily diff limit and past
-  cheap review. The ratchet list makes a half-migrated state safe to leave
-  overnight.
+  cheap review. A half-migrated state is safe to leave overnight: nothing on
+  the wire changes, every migrated route is already compiler-checked, and the
+  old untyped path keeps compiling until step 9 removes it.
 
 ## 6. Non-goals
 
@@ -327,8 +396,9 @@ All three assertions fail loudly in `pnpm test`, which is already a gate.
 - **Not the browser client.** `src/browser/dom/session-api.ts` reads
   `handlers-review.ts`/`handlers-feedback.ts` with six `as` casts. It is the
   same pattern, but those answer types (`SessionData`, `ApprovedFormData`,
-  `ReplayData`) are already shared declarations. A follow-on run can extend
-  `CliRoutes` into a `PageRoutes` once this one has proven itself.
+  `ReplayData`) are already shared declarations. Until a follow-on run
+  extends `CliRoutes` into a `PageRoutes`, their handlers answer through
+  `sendPageJson`.
 - **Not the test helper.** `test/helpers/review-server.ts` posts raw payloads.
   Tests may import anything, and typing fixtures is daily-agent sized.
 - Secondary finding, for a future run: `src/` holds 36 loose files (5,620 LOC)
