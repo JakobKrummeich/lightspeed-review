@@ -262,7 +262,8 @@ replay left with no unread words and no change does not open on its own
   names, the held button and the jump on timers (`SKY_TIMES`), never on a frame
   or an `animationend`, so every step comes on time whether or not anything was
   painted. `stop()` leaves no timer and no animation frame behind.
-- `paintSky` in `src/browser/dom/starfield-canvas.ts` — the only canvas code in
+- `paintSky` in `src/browser/dom/starfield-canvas.ts`, with the sky's inks and
+  star sprite in `src/browser/dom/star-sprite.ts` — the only canvas code in
   the page. Every star is one `drawImage` of a sprite rendered once, the
   figures are one path, and the jump strokes three batched paths a frame
   (`src/browser/warp-field.ts`), inside a 4 ms frame at 600 stars. It reuses
