@@ -9,7 +9,8 @@
  */
 import type { RefusalCode, ReviewErrorCode } from "./errors.ts";
 import type { AgentNote } from "./feedback.ts";
-import type { ReviewCloser } from "./session-types.ts";
+import type { CreateSessionRequest } from "./rounds/session-round.ts";
+import type { ReviewCloser, SessionStatus } from "./session-types.ts";
 import type { TurnFacts } from "./turn.ts";
 
 /**
@@ -19,6 +20,7 @@ import type { TurnFacts } from "./turn.ts";
  * JSON body (`undefined`: none is sent); `answer` is the 200's body.
  */
 export interface CliRoutes {
+  "POST /api/sessions": { request: CreateSessionRequest; answer: CreatedSession };
   "POST /api/session/:key/work": { request: WorkRequest; answer: WorkAnswer };
   "POST /api/session/:key/reply": { request: ReplyRequest; answer: ReplyAnswer };
   "POST /api/session/:key/end": { request: undefined; answer: EndAnswer };
@@ -38,6 +40,23 @@ export type CliRouteParams<R extends CliRoute> = R extends `${string}:key${strin
 export function routeParts(route: CliRoute): { method: "GET" | "POST"; pattern: string } {
   const [method, pattern] = route.split(" ") as ["GET" | "POST", string];
   return { method, pattern };
+}
+
+/**
+ * `open` and `publish`. The status is the server's, not the CLI's: a review the
+ * reviewer ended stays ended until they open a new one. At most one of
+ * `ledger`, `reattached` and `rerun` is set.
+ */
+export interface CreatedSession extends TurnFacts {
+  key: string;
+  url: string;
+  status: SessionStatus;
+  /** Set when a round was opened: whether the feedback ledger took it. */
+  ledger?: LedgerReport;
+  /** `open` on a live session: nothing was opened, the agent re-attached. */
+  reattached?: boolean;
+  /** A re-run `publish` the server recognised: nothing was posted twice. */
+  rerun?: boolean;
 }
 
 /**

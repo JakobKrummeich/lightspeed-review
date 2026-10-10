@@ -3,6 +3,7 @@
  * closes a round the same way.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { CreatedSession } from "../api-contract.ts";
 import { closedBy, withAgentReplies } from "../feedback.ts";
 import { sessionKey } from "../paths.ts";
 import {
@@ -57,11 +58,17 @@ function open(
     return;
   }
   if (existing !== undefined && existing.status !== "ended") {
-    sendJson(response, 200, { ...answerFor(context, existing), reattached: true });
+    sendAnswer(response, "POST /api/sessions", {
+      ...answerFor(context, existing),
+      reattached: true,
+    });
     return;
   }
   const record = openNextRound(context, existing, payload, new Date().toISOString());
-  sendJson(response, 200, { ...answerFor(context, record.session), ledger: record.ledger });
+  sendAnswer(response, "POST /api/sessions", {
+    ...answerFor(context, record.session),
+    ledger: record.ledger,
+  });
 }
 
 function publish(
@@ -85,7 +92,7 @@ function publishLive(
   const handback = handbackOf(existing, "publish", { intents: payload.intents, notes });
   const sameHead = headUnmoved(existing, payload);
   if (sameHead && isRerun(existing, handback)) {
-    sendJson(response, 200, { ...answerFor(context, existing), rerun: true });
+    sendAnswer(response, "POST /api/sessions", { ...answerFor(context, existing), rerun: true });
     return;
   }
   const refusal = publishRefusal(existing, sameHead, notes);
@@ -116,7 +123,10 @@ function publishRound(
     withHandback(withAgentReplies(record, notes, now), handback, now),
   );
   logReplies(context.log, opened.session, notes, now);
-  sendJson(response, 200, { ...answerFor(context, opened.session), ledger: opened.ledger });
+  sendAnswer(response, "POST /api/sessions", {
+    ...answerFor(context, opened.session),
+    ledger: opened.ledger,
+  });
 }
 
 /**
@@ -142,7 +152,7 @@ function openNextRound(
   return { session: record, ledger };
 }
 
-function answerFor(context: ServerContext, session: SessionRecord) {
+function answerFor(context: ServerContext, session: SessionRecord): CreatedSession {
   return {
     key: session.key,
     url: `${context.baseUrl()}/session/${session.key}`,

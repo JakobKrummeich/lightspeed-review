@@ -142,6 +142,7 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
  * fails typecheck.
  */
 const cliHandlers: { [R in CliRoute]: ContextHandler } = {
+  "POST /api/sessions": handleCreateSession,
   "POST /api/session/:key/work": handleWork,
   "POST /api/session/:key/reply": handleAgentReply,
   "POST /api/session/:key/end": handleEnd,
@@ -174,7 +175,6 @@ function buildRoutes(context: ServerContext): Route[] {
           stateDir: resolve(context.store.stateDir),
         }),
     },
-    { method: "POST", pattern: "/api/sessions", handler: bind(handleCreateSession) },
     { method: "GET", pattern: "/session/:key", handler: bind(handleReviewPage) },
     { method: "GET", pattern: "/api/session/:key/data", handler: bind(handleSessionData) },
     { method: "GET", pattern: "/api/session/:key/file", handler: bind(handleSessionFile) },

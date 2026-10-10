@@ -12,11 +12,11 @@ import { renamedProviderHelp } from "../llm/renamed-providers.ts";
 import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { currentGroupingMode } from "../rounds/session-round.ts";
-import type { LedgerReport } from "../api-contract.ts";
-import { SessionStore, type SessionStatus } from "../session-store.ts";
-import { turnBlock, type TurnLabel } from "../turn.ts";
+import type { CreatedSession, LedgerReport } from "../api-contract.ts";
+import { SessionStore } from "../session-store.ts";
+import { turnBlock } from "../turn.ts";
 import { groupingNotice } from "../turn-help.ts";
-import { apiRequest, jsonPost } from "./api-client.ts";
+import { callApi } from "./api-client.ts";
 import { listen, type ListenInput } from "./listen.ts";
 import { serverOrigin } from "./server-address.ts";
 import { openBrowser } from "./open-browser.ts";
@@ -52,21 +52,6 @@ export function resolveDeps(deps: RoundDeps = {}): Required<RoundDeps> {
     Object.entries(deps).filter(([, value]) => value !== undefined),
   ) as RoundDeps;
   return { ...DEFAULT_DEPS, ...given };
-}
-
-/** The status is the server's, not ours: a review the reviewer ended stays ended
- * until they open a new one. */
-export interface CreatedSession {
-  key: string;
-  url: string;
-  status: SessionStatus;
-  turn?: TurnLabel;
-  round?: number;
-  ledger?: LedgerReport;
-  /** `open` on a live session: nothing was opened, the agent re-attached. */
-  reattached?: boolean;
-  /** A re-run `publish` the server recognised: nothing was posted twice. */
-  rerun?: boolean;
 }
 
 export interface RoundInput {
@@ -115,9 +100,11 @@ async function publishRound(
   extracted: ExtractedDiff,
   grouping: GroupingResult,
 ): Promise<CreatedSession> {
-  return (await apiRequest(
-    `${serverOrigin(input.config.port)}/api/sessions`,
-    jsonPost({
+  return await callApi(
+    serverOrigin(input.config.port),
+    "POST /api/sessions",
+    {},
+    {
       repoRoot: input.repoRoot,
       branch: input.branch,
       base: input.base,
@@ -130,12 +117,12 @@ async function publishRound(
       reopen: input.reopen === true,
       verb: input.verb,
       notes: input.notes ?? [],
-    }),
+    },
     {
       key: sessionKey(input.repoRoot, input.branch, input.base),
       target: `${input.branch} ${input.base}`,
     },
-  )) as CreatedSession;
+  );
 }
 
 /**
