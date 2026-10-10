@@ -29,7 +29,7 @@ import {
   handlePresence,
 } from "./server/handlers-stream.ts";
 import { handleWork } from "./server/handlers-turn.ts";
-import { messageOf, sendJson } from "./server/http.ts";
+import { messageOf, sendAnswer, sendJson } from "./server/http.ts";
 import type { LedgerReport } from "./server/ledger-log.ts";
 import { hostIsAllowed, originIsAllowed } from "./server/security.ts";
 import { SessionTransport } from "./server/streams.ts";
@@ -148,6 +148,9 @@ const cliHandlers: { [R in CliRoute]: ContextHandler } = {
   "POST /api/session/:key/end": handleEnd,
   "POST /api/session/:key/delivered": handleDelivered,
   "GET /api/poll": handlePoll,
+  "GET /api/session/:key/presence": handlePresence,
+  "POST /api/shutdown": handleShutdown,
+  "GET /health": handleHealth,
 };
 
 function cliRouteEntries(bind: (handler: ContextHandler) => RouteHandler): Route[] {
@@ -164,19 +167,6 @@ function buildRoutes(context: ServerContext): Route[] {
       handler(context, request, response, params);
   return [
     ...cliRouteEntries(bind),
-    {
-      method: "GET",
-      pattern: "/health",
-      // The version and the state dir are the handshake: a client that reads a
-      // protocol this server does not speak, or keeps its reviews somewhere this
-      // server never looks, must find that out before it blocks on an answer.
-      handler: (_request, response) =>
-        sendJson(response, 200, {
-          status: "ok",
-          version: CLI_VERSION,
-          stateDir: resolve(context.store.stateDir),
-        }),
-    },
     { method: "GET", pattern: "/session/:key", handler: bind(handleReviewPage) },
     { method: "GET", pattern: "/api/session/:key/data", handler: bind(handleSessionData) },
     { method: "GET", pattern: "/api/session/:key/file", handler: bind(handleSessionFile) },
@@ -192,12 +182,27 @@ function buildRoutes(context: ServerContext): Route[] {
     },
     { method: "GET", pattern: "/api/session/:key/replay", handler: bind(handleReplay) },
     { method: "GET", pattern: "/api/session/:key/events", handler: bind(handleEvents) },
-    { method: "GET", pattern: "/api/session/:key/presence", handler: bind(handlePresence) },
     { method: "POST", pattern: "/api/session/:key/approved", handler: bind(handleApproved) },
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
-    { method: "POST", pattern: "/api/shutdown", handler: bind(handleShutdown) },
     { method: "GET", pattern: "/static/:asset", handler: bind(handleStatic) },
   ];
+}
+
+/**
+ * The version and the state dir are the handshake: a client that reads a
+ * protocol this server does not speak, or keeps its reviews somewhere this
+ * server never looks, must find that out before it blocks on an answer.
+ */
+function handleHealth(
+  context: ServerContext,
+  _request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  sendAnswer(response, "GET /health", {
+    status: "ok",
+    version: CLI_VERSION,
+    stateDir: resolve(context.store.stateDir),
+  });
 }
 
 /** `lightspeed stop`: acknowledged before the socket goes away. */
@@ -207,7 +212,7 @@ function handleShutdown(
   response: ServerResponse,
 ): void {
   response.on("finish", () => void context.stop());
-  sendJson(response, 200, { status: "stopping" });
+  sendAnswer(response, "POST /api/shutdown", { status: "stopping" });
 }
 
 async function handleRequest(

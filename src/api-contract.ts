@@ -30,6 +30,18 @@ export interface CliRoutes {
   };
   /** Keyed by `?key=`, not by path: the long poll builds its own URL (`long-poll.ts`). */
   "GET /api/poll": { request: undefined; answer: PollPayload | Superseded };
+  /*
+   * The three below are called on raw `fetch`, not `callApi`, and read their
+   * answers with these types: `/health` is the version handshake with a server
+   * that may not speak this contract; presence must answer at once, server or
+   * no server (no retry, a 404 is `false`); shutdown reads only `response.ok`.
+   */
+  "GET /api/session/:key/presence": { request: undefined; answer: { waiting: boolean } };
+  "POST /api/shutdown": { request: undefined; answer: { status: "stopping" } };
+  "GET /health": {
+    request: undefined;
+    answer: { status: "ok"; version: string; stateDir: string };
+  };
 }
 export type CliRoute = keyof CliRoutes;
 

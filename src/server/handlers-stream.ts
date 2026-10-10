@@ -41,7 +41,9 @@ export function handlePresence(
 ) {
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  sendJson(response, 200, { waiting: context.transport.isWaiting(session.key) });
+  sendAnswer(response, "GET /api/session/:key/presence", {
+    waiting: context.transport.isWaiting(session.key),
+  });
 }
 
 /**
