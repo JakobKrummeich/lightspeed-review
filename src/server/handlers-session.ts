@@ -16,7 +16,7 @@ import { handbackOf, isRerun, withHandback } from "../turn-moves.ts";
 import { loadAssets } from "../static-assets.ts";
 import { logReplies } from "./agent-notes.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { badRequest, sendJson } from "./http.ts";
+import { badRequest, sendAnswer, sendJson } from "./http.ts";
 import { reviewEnded } from "./turn-refusals.ts";
 import { logOutcomes, logRound, logRoundEnd, type LedgerReport } from "./ledger-log.ts";
 import { publishRefusal } from "./publish-rules.ts";
@@ -182,7 +182,7 @@ export function handleEnd(
   // Idempotent in fact, not just in exit code: closing again re-logged the round
   // end to the ledger and re-stamped a record nothing had changed.
   if (session.status === "ended") {
-    sendJson(response, 200, { status: "ended", ...turnFacts(session) });
+    sendAnswer(response, "POST /api/session/:key/end", { status: "ended", ...turnFacts(session) });
     return;
   }
   const now = new Date().toISOString();
@@ -196,7 +196,7 @@ export function handleEnd(
   context.store.save(ended);
   context.transport.wakePollers(session.key);
   announceRoundEnd(context, session, now);
-  sendJson(response, 200, { status: "ended", ...turnFacts(ended) });
+  sendAnswer(response, "POST /api/session/:key/end", { status: "ended", ...turnFacts(ended) });
 }
 
 export function announceRoundEnd(

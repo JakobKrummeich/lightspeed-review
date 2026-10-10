@@ -21,6 +21,7 @@ import type { TurnFacts } from "./turn.ts";
 export interface CliRoutes {
   "POST /api/session/:key/work": { request: WorkRequest; answer: WorkAnswer };
   "POST /api/session/:key/reply": { request: ReplyRequest; answer: ReplyAnswer };
+  "POST /api/session/:key/end": { request: undefined; answer: EndAnswer };
 }
 export type CliRoute = keyof CliRoutes;
 
@@ -65,6 +66,9 @@ export interface ReplyRequest {
 
 /** `rerun`: the last reply posted again, answered as if it had just landed and stored once. */
 export type ReplyAnswer = TurnFacts & ({ replied: number } | { rerun: true });
+
+/** `end` answers the same whether it closed the review or found it closed. */
+export type EndAnswer = TurnFacts & { status: "ended" };
 
 /**
  * The 422 an illegal move is answered with: the rule the server refused, and the

@@ -16,6 +16,7 @@ import { SessionStore } from "../src/session-store.ts";
 const EVERY_ROUTE: { [R in CliRoute]: true } = {
   "POST /api/session/:key/work": true,
   "POST /api/session/:key/reply": true,
+  "POST /api/session/:key/end": true,
 };
 
 test("every contract route reaches a handler on the real server", async () => {
