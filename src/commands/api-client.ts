@@ -1,5 +1,11 @@
 import { REFUSAL_CODES, ReviewError, type RefusalCode } from "../errors.ts";
-import type { DomainErrorBody } from "../api-contract.ts";
+import {
+  routeParts,
+  type CliRoute,
+  type CliRouteParams,
+  type CliRoutes,
+  type DomainErrorBody,
+} from "../api-contract.ts";
 import { openCall } from "../open-call.ts";
 import type { ReviewCloser } from "../session-types.ts";
 import { endedReview } from "../session-resolve.ts";
@@ -14,6 +20,25 @@ export interface SessionRef {
   key: string;
   /** `<branch> <base>`, for the commands an error suggests running. */
   target?: string;
+}
+
+/**
+ * A command's call to the server, typed by the route it names: the body it
+ * sends and the answer it reads are the ones `CliRoutes` declares for that
+ * literal, which the server's handler is held to as well (`sendAnswer`).
+ */
+export async function callApi<R extends CliRoute>(
+  origin: string,
+  route: R,
+  params: CliRouteParams<R>,
+  body: CliRoutes[R]["request"],
+  about?: SessionRef,
+): Promise<CliRoutes[R]["answer"]> {
+  const { method, pattern } = routeParts(route);
+  const { key } = params as { key?: string };
+  const path = key === undefined ? pattern : pattern.replace(":key", key);
+  const init = method === "GET" ? undefined : body === undefined ? { method } : jsonPost(body);
+  return (await apiRequest(`${origin}${path}`, init, about)) as CliRoutes[R]["answer"];
 }
 
 /** Maps transport failures to codes an agent can act on: no command interprets

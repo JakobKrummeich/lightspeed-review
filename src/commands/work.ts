@@ -2,9 +2,9 @@ import { invocationError } from "../errors.ts";
 import { branchState } from "../git-state.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
-import { turnBlock, type TurnFacts } from "../turn.ts";
+import { turnBlock } from "../turn.ts";
 import { nextRule } from "../turn-help.ts";
-import { apiRequest, jsonPost } from "./api-client.ts";
+import { callApi } from "./api-client.ts";
 import { scanArgs } from "./args.ts";
 import { serverOrigin } from "./server-address.ts";
 import { branchAndBase } from "./to-args.ts";
@@ -57,11 +57,13 @@ export async function runWork(input: WorkInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const target = `${input.branch} ${input.base}`;
   const { head, tree } = branchState(input.repoRoot, input.branch);
-  const declared = (await apiRequest(
-    `${serverOrigin(input.port)}/api/session/${key}/work`,
-    jsonPost({ plan: input.plan, head, tree }),
+  const declared = await callApi(
+    serverOrigin(input.port),
+    "POST /api/session/:key/work",
+    { key },
+    { plan: input.plan, head, tree },
     { key, target },
-  )) as Partial<TurnFacts> & { changed?: boolean; open?: string[] };
+  );
   return {
     ...turnBlock(declared),
     plan: input.plan,
@@ -71,6 +73,6 @@ export async function runWork(input: WorkInput): Promise<StructuredOutput> {
       declared.changed === false
         ? "the reviewer's header already names this plan (no-op)"
         : "the reviewer's header names this plan; they can queue, not send, until you publish",
-    next: nextRule(declared.turn ?? "agent working", target, declared.open ?? []),
+    next: nextRule(declared.turn, target, declared.open),
   };
 }

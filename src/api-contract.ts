@@ -9,6 +9,46 @@
  */
 import type { RefusalCode, ReviewErrorCode } from "./errors.ts";
 import type { ReviewCloser } from "./session-types.ts";
+import type { TurnFacts } from "./turn.ts";
+
+/**
+ * Every route the CLI calls, keyed exactly as `src/server.ts` registers it:
+ * searching a route literal lands on this entry, the handler that answers it
+ * (`cliHandlers`) and the command that calls it (`callApi`). `request` is the
+ * JSON body (`undefined`: none is sent); `answer` is the 200's body.
+ */
+export interface CliRoutes {
+  "POST /api/session/:key/work": { request: WorkRequest; answer: WorkAnswer };
+}
+export type CliRoute = keyof CliRoutes;
+
+/** What a route's path needs filled in: `:key` is the only capture any CLI route has. */
+export type CliRouteParams<R extends CliRoute> = R extends `${string}:key${string}`
+  ? { key: string }
+  : Record<never, never>;
+
+/**
+ * The one place a contract key is split into what the router matches, so the
+ * client that calls a route and the table that registers it cannot read one
+ * key two ways.
+ */
+export function routeParts(route: CliRoute): { method: "GET" | "POST"; pattern: string } {
+  const [method, pattern] = route.split(" ") as ["GET" | "POST", string];
+  return { method, pattern };
+}
+
+/**
+ * `work`: the plan the reviewer's header names, and the agent's account of the
+ * tree it starts from, which a later `reply` from working is measured against.
+ */
+export interface WorkRequest {
+  plan: string;
+  head?: string;
+  tree?: string;
+}
+
+/** `changed: false` is a redeclared plan; `open` is what `publish --to` may name. */
+export type WorkAnswer = TurnFacts & { changed: boolean; open: string[] };
 
 /**
  * The 422 an illegal move is answered with: the rule the server refused, and the

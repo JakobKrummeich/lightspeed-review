@@ -5,6 +5,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
+import { routeParts, type CliRoute } from "./api-contract.ts";
 import { createIdSource } from "./ledger/records.ts";
 import type { LedgerStore } from "./ledger/store.ts";
 import type { CreateSessionRequest } from "./rounds/session-round.ts";
@@ -135,12 +136,29 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   };
 }
 
+/**
+ * Every route the CLI calls, under its contract key (`CliRoutes`): a contract
+ * route with no handler here, or a handler under a key the contract lacks,
+ * fails typecheck.
+ */
+const cliHandlers: { [R in CliRoute]: ContextHandler } = {
+  "POST /api/session/:key/work": handleWork,
+};
+
+function cliRouteEntries(bind: (handler: ContextHandler) => RouteHandler): Route[] {
+  return (Object.keys(cliHandlers) as CliRoute[]).map((route) => ({
+    ...routeParts(route),
+    handler: bind(cliHandlers[route]),
+  }));
+}
+
 function buildRoutes(context: ServerContext): Route[] {
   const bind =
     (handler: ContextHandler): RouteHandler =>
     (request, response, params) =>
       handler(context, request, response, params);
   return [
+    ...cliRouteEntries(bind),
     {
       method: "GET",
       pattern: "/health",
@@ -175,7 +193,6 @@ function buildRoutes(context: ServerContext): Route[] {
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
     { method: "POST", pattern: "/api/session/:key/reply", handler: bind(handleAgentReply) },
     { method: "POST", pattern: "/api/session/:key/delivered", handler: bind(handleDelivered) },
-    { method: "POST", pattern: "/api/session/:key/work", handler: bind(handleWork) },
     { method: "POST", pattern: "/api/session/:key/end", handler: bind(handleEnd) },
     { method: "GET", pattern: "/api/poll", handler: bind(handlePoll) },
     { method: "POST", pattern: "/api/shutdown", handler: bind(handleShutdown) },

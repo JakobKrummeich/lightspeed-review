@@ -3,6 +3,7 @@
  * upstream), never an exception.
  */
 import type { IncomingMessage } from "node:http";
+import type { WorkRequest } from "../api-contract.ts";
 import { parseFeedbackRequest, type AgentNote } from "../feedback.ts";
 import type { CreateSessionRequest } from "../rounds/session-round.ts";
 import { readJsonSafely } from "./http.ts";
@@ -104,12 +105,6 @@ export async function readDelivered(request: IncomingMessage): Promise<string | 
   const delivery = (await readJsonSafely<{ delivery?: unknown }>(request))?.delivery;
   if (typeof delivery !== "string" || delivery === "") return undefined;
   return delivery;
-}
-
-export interface WorkRequest {
-  plan: string;
-  head?: string;
-  tree?: string;
 }
 
 export async function readWork(request: IncomingMessage): Promise<WorkRequest | undefined> {
