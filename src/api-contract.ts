@@ -8,6 +8,7 @@
  * would close an import cycle (`no-circular` in `pnpm arch`).
  */
 import type { RefusalCode, ReviewErrorCode } from "./errors.ts";
+import type { AgentNote } from "./feedback.ts";
 import type { ReviewCloser } from "./session-types.ts";
 import type { TurnFacts } from "./turn.ts";
 
@@ -19,6 +20,7 @@ import type { TurnFacts } from "./turn.ts";
  */
 export interface CliRoutes {
   "POST /api/session/:key/work": { request: WorkRequest; answer: WorkAnswer };
+  "POST /api/session/:key/reply": { request: ReplyRequest; answer: ReplyAnswer };
 }
 export type CliRoute = keyof CliRoutes;
 
@@ -49,6 +51,20 @@ export interface WorkRequest {
 
 /** `changed: false` is a redeclared plan; `open` is what `publish --to` may name. */
 export type WorkAnswer = TurnFacts & { changed: boolean; open: string[] };
+
+/**
+ * `reply`: every answer of the turn at once, each under the item it concerns.
+ * `head`/`tree` are the CLI's account of the working tree, which only a reply
+ * from `working` needs (W2: nothing half-written to protect).
+ */
+export interface ReplyRequest {
+  replies: AgentNote[];
+  head?: string;
+  tree?: string;
+}
+
+/** `rerun`: the last reply posted again, answered as if it had just landed and stored once. */
+export type ReplyAnswer = TurnFacts & ({ replied: number } | { rerun: true });
 
 /**
  * The 422 an illegal move is answered with: the rule the server refused, and the

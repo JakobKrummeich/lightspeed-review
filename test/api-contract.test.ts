@@ -15,6 +15,7 @@ import { SessionStore } from "../src/session-store.ts";
 /** Every contract route, in request order: shutdown last, because it stops the server. */
 const EVERY_ROUTE: { [R in CliRoute]: true } = {
   "POST /api/session/:key/work": true,
+  "POST /api/session/:key/reply": true,
 };
 
 test("every contract route reaches a handler on the real server", async () => {

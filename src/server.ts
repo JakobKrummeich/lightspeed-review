@@ -143,6 +143,7 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
  */
 const cliHandlers: { [R in CliRoute]: ContextHandler } = {
   "POST /api/session/:key/work": handleWork,
+  "POST /api/session/:key/reply": handleAgentReply,
 };
 
 function cliRouteEntries(bind: (handler: ContextHandler) => RouteHandler): Route[] {
@@ -191,7 +192,6 @@ function buildRoutes(context: ServerContext): Route[] {
     { method: "GET", pattern: "/api/session/:key/presence", handler: bind(handlePresence) },
     { method: "POST", pattern: "/api/session/:key/approved", handler: bind(handleApproved) },
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
-    { method: "POST", pattern: "/api/session/:key/reply", handler: bind(handleAgentReply) },
     { method: "POST", pattern: "/api/session/:key/delivered", handler: bind(handleDelivered) },
     { method: "POST", pattern: "/api/session/:key/end", handler: bind(handleEnd) },
     { method: "GET", pattern: "/api/poll", handler: bind(handlePoll) },
