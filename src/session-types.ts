@@ -146,8 +146,10 @@ export interface ReplyPrompt {
 
 /**
  * The reviewer's resolve toggle. It sends nothing by itself; it travels with
- * the next Send. On a change request it means "I agree with what you last
- * said", never "withdrawn".
+ * the next Send. It means "this thread needs no more changes and no more
+ * answers from the agent" — a question answered, or a change seen landed. An
+ * agreed change the agent has yet to make stays open, so the next round's
+ * replay (`src/rounds/replay.ts`) still shows it; a resolved thread gets no card.
  */
 export interface ResolvePrompt {
   type: "resolve";

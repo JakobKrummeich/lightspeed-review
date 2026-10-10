@@ -175,6 +175,67 @@ test("a general message is about the review, not a file, and gets no card", () =
   assert.deepEqual(replay(record, answersWith(patchFor("src/a.ts"))).comments, []);
 });
 
+function reviewerResolve(thread: string, resolved: boolean, at: string): ConversationEntry {
+  return { role: "reviewer", at, roundIndex: 1, prompts: [{ type: "resolve", thread, resolved }] };
+}
+
+/** Resolved means "nothing more wanted from the agent here": not news on the next round. */
+test("a comment whose thread the reviewer resolved gets no card, and git is not asked for it", () => {
+  const record = session({
+    conversation: [
+      reviewerEntry(0, [annotation({ id: "evt-q", comment: "why is this here?" })]),
+      agentReply("evt-q", "it guards the empty case"),
+      reviewerResolve("evt-q", true, "2024-01-02T14:00:00.000Z"),
+    ],
+  });
+
+  assert.deepEqual(replay(record, neverAsked).comments, []);
+});
+
+test("only the resolved thread leaves: an open change request beside it keeps its card", () => {
+  const record = session({
+    conversation: [
+      reviewerEntry(0, [
+        annotation({ id: "evt-q", comment: "why is this here?" }),
+        annotation({ id: "evt-c", comment: "rename this" }),
+      ]),
+      reviewerResolve("evt-q", true, "2024-01-02T14:00:00.000Z"),
+    ],
+  });
+
+  const { comments } = replay(record, answersWith(patchFor("src/a.ts")));
+
+  assert.deepEqual(
+    comments.map((comment) => comment.id),
+    ["evt-c"],
+  );
+});
+
+test("a thread reopened — by the reviewer or by the agent speaking in it — is news again", () => {
+  const reopened = session({
+    conversation: [
+      reviewerEntry(0, [annotation({ id: "evt-q" })]),
+      reviewerResolve("evt-q", true, "2024-01-02T14:00:00.000Z"),
+      reviewerResolve("evt-q", false, "2024-01-02T15:00:00.000Z"),
+    ],
+  });
+  const answeredAfter = session({
+    conversation: [
+      reviewerEntry(0, [annotation({ id: "evt-q" })]),
+      reviewerResolve("evt-q", true, "2024-01-02T14:00:00.000Z"),
+      agentReply("evt-q", "done: changed it after all"),
+    ],
+  });
+
+  for (const record of [reopened, answeredAfter]) {
+    const { comments } = replay(record, answersWith(patchFor("src/a.ts")));
+    assert.deepEqual(
+      comments.map((comment) => comment.id),
+      ["evt-q"],
+    );
+  }
+});
+
 test("a card carries the comment as it was made: id, file, group, anchor, words", () => {
   const { comments } = replay(session(), answersWith(patchFor("src/a.ts")));
 

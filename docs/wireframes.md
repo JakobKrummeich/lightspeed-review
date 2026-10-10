@@ -576,7 +576,9 @@ ended overlay, whose word is last.
 ## 9. Replay overlay — between rounds (round-replay.ts, dom/replay-overlay.ts)
 
 For rounds > 0: what became of each comment from the previous round, one card
-at a time, before the new diff is read. Never shown together with §7: a round
+at a time, before the new diff is read. A comment whose thread the reviewer
+resolved gets no card (`src/rounds/replay.ts`): resolved means nothing more is
+wanted from the agent, so it is not news. Never shown together with §7: a round
 arriving under a live opening closes it first (`dom/room-claim.ts`). When it
 opens on its own for a new round, §7's 1 s hyperspace jump
 (`.lsr-jump-overlay`, dom/jump-overlay.ts) starts before the new round is

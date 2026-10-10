@@ -106,9 +106,9 @@ items[3]:
   \`thread\`: everything said in it before, oldest first — \`you\` rows are
   yours — so answer from it, not from memory. A thread resolved in this batch
   brings only \`asked\` (what it was about) and any last words. A resolve
-  with words means "do what they say"; a bare one means "I accept your last
-  answer" — on a change request, make that agreed change; it is not withdrawn.
-  A batch holding resolves spells this out on a \`resolved:\` line of
+  means the reviewer needs nothing more there — no change, no answer; last
+  words with it are a closing note, not a request. An agreed change the
+  reviewer still wants stays open until it lands. A batch holding resolves spells this out on a \`resolved:\` line of
   \`next:\`. Every \`--to\` a line suggests names an open thread; never
   answer into one the reviewer resolved unless you must — doing so reopens it.
 - \`at\` is \`file:line\` (or \`file:start-end\`) as the reviewer drew it,

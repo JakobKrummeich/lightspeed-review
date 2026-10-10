@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- The **Between rounds** replay leaves out comments whose thread you
+  resolved. Resolving now means "this needs no more changes and no more
+  answers from the agent". Keep an agreed change open until you have seen it
+  land, so a change the agent skipped still shows in the replay. The agent's
+  `resolved:` line in `next:` says this too: a resolve is never work, and
+  words sent with one are a closing note, not a request.
 - `publish` on a branch and base with no review refuses `session_not_found`
   the way every other session verb does: it names the branch and base and the
   live reviews in this repository, and the `publish` command to run instead,

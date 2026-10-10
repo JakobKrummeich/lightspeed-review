@@ -124,9 +124,10 @@ posted:
 - A line thread whose line reads differently in the round on show is marked
   `outdated` (`src/anchor-drift.ts` compares the two rounds' files in git);
   nothing is claimed when git cannot produce the older file.
-- A resolve with words means "resolved with a last word — do what it says". A
-  bare resolve means "I accept your last answer": for a change request, make
-  the agreed change — it is not withdrawn. `next.resolved` spells this out by id.
+- A resolve means "this thread needs no more changes and no more answers from
+  the agent"; words sent with it are a closing note, not a request. An agreed
+  change stays open until it lands, so the next round's replay (which leaves
+  resolved threads out) still shows it. `next.resolved` spells this out by id.
 
 The reviewer never sees a thread id: `t3` names nothing they wrote, so ids live
 in `data-` attributes and a thread is labelled by its anchor or its first words.

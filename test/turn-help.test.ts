@@ -44,7 +44,7 @@ test("a line with no session to read names a placeholder id, never a made-up one
   assert.match(publishCall(TARGET), /--to <id> 'done: /);
 });
 
-test("resolved items get their meaning spelled out: last words to act on, or your answer accepted", () => {
+test("resolved items get their meaning spelled out: nothing more wanted, last words only a note", () => {
   const rule = nextRule(
     "agent digesting",
     TARGET,
@@ -58,11 +58,11 @@ test("resolved items get their meaning spelled out: last words to act on, or you
 
   assert.equal(
     rule.resolved,
-    "t1, t5: resolved with a last word — do what it says. t3: the reviewer accepts your" +
-      " last answer there — if it promised a change, make it (work); it is not withdrawn",
+    "t1, t3, t5: the reviewer needs nothing more there — no change, no answer." +
+      " t1, t5: the last word is a closing note, not a request",
   );
   const bare = nextRule("agent digesting", TARGET, [], [{ id: "t3", worded: false }]);
-  assert.match(bare.resolved!, /^t3: the reviewer accepts your last answer there/);
+  assert.equal(bare.resolved, "t3: the reviewer needs nothing more there — no change, no answer");
   assert.deepEqual(Object.keys(nextRule("agent digesting", TARGET, ["t2"])), [
     "talk",
     "work",
