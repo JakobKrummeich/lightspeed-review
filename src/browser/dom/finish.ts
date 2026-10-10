@@ -19,6 +19,9 @@ export interface FinishSide {
  * agent is listening — nothing else. A crossing on the agent's turn is spent,
  * not deferred: the agent coming back (from `digesting` it changed no file)
  * is not the reviewer finishing, so the turn's return never opens the card.
+ * Nor is a crossing the reviewer did not make — a new round drawn with its
+ * approvals carried over, another tab's ticks arriving — though it still moves
+ * the baseline the next tick is read against.
  * `opening` is the session's own turn, so a page loaded mid-work is not
  * treated as the reviewer's until SSE says otherwise.
  */
@@ -26,7 +29,7 @@ export function wireFinish(
   root: HTMLElement,
   opening: Turn,
 ): {
-  onApproved(complete: boolean): void;
+  onApproved(complete: boolean, byReviewer: boolean): void;
   setQueued(count: number): void;
   setTurn(turn: Turn): void;
   attach(side: FinishSide): void;
@@ -36,16 +39,15 @@ export function wireFinish(
   let queued = 0;
   let listening = opening.holder === "reviewer";
   const done = mountDonePopup({ root, onEnd: () => side?.panel.end() });
-  const onCrossing = crossings(() => {
-    if (!listening) return;
-    side?.railControl.expand();
-    done.open(queued);
-  });
+  const crossed = crossings();
   return {
-    onApproved: (complete) => {
+    onApproved: (complete, byReviewer) => {
       allApproved = complete;
       side?.panel.setAllApproved(complete);
-      onCrossing(complete);
+      if (crossed(complete) && byReviewer && listening) {
+        side?.railControl.expand();
+        done.open(queued);
+      }
       // A finish that came undone — a round took the page, a box came unticked
       // in another tab — takes its card with it.
       if (!complete) done.close();

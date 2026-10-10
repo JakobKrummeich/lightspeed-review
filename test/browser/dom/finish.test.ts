@@ -41,7 +41,7 @@ function wired(
 test("the report from before the panel existed is handed over when it is built", (t) => {
   const { finish, log, side, root } = wired(t);
 
-  finish.onApproved(true);
+  finish.onApproved(true, false);
   assert.deepEqual(log, [], "nothing to tell yet");
   assert.equal(root.hidden, true, "the state the page opened in is not a finish");
 
@@ -52,10 +52,10 @@ test("the report from before the panel existed is handed over when it is built",
 test("the crossing opens the rail and the card, with the queue's size on it", (t) => {
   const { finish, log, side, root } = wired(t);
   finish.attach(side);
-  finish.onApproved(false);
+  finish.onApproved(false, true);
   finish.setQueued(2);
 
-  finish.onApproved(true);
+  finish.onApproved(true, true);
 
   // Attach hands over the remembered report; the panel is what dedupes, not this.
   assert.deepEqual(log, ["note:false", "note:false", "note:true", "expand"]);
@@ -66,19 +66,19 @@ test("the crossing opens the rail and the card, with the queue's size on it", (t
 test("the card's end press is the panel's send, and a finish undone takes the card down", (t) => {
   const { finish, log, side, root } = wired(t);
   finish.attach(side);
-  finish.onApproved(false);
-  finish.onApproved(true);
+  finish.onApproved(false, true);
+  finish.onApproved(true, true);
 
   root.dispatch("click", { target: root.querySelector(".lsr-done-end") });
   assert.equal(log.at(-1), "end");
   assert.equal(root.hidden, true);
 
-  finish.onApproved(true);
+  finish.onApproved(true, true);
   assert.equal(root.hidden, true, "still finished: no crossing, no second card");
-  finish.onApproved(false);
-  finish.onApproved(true);
+  finish.onApproved(false, true);
+  finish.onApproved(true, true);
   assert.equal(root.hidden, false, "finished again, so said again");
-  finish.onApproved(false);
+  finish.onApproved(false, true);
   assert.equal(root.hidden, true, "a box came unticked under the card");
 });
 
@@ -90,9 +90,9 @@ test("the last tick on the agent's turn says nothing, whichever phase it is in",
   for (const turn of [DIGESTING, WORKING]) {
     const { finish, log, side, root } = wired(t, turn);
     finish.attach(side);
-    finish.onApproved(false);
+    finish.onApproved(false, true);
 
-    finish.onApproved(true);
+    finish.onApproved(true, true);
 
     assert.equal(root.hidden, true, `no card while the agent is ${turn.mode}`);
     assert.ok(!log.includes("expand"), "the rail is left as it was");
@@ -102,16 +102,16 @@ test("the last tick on the agent's turn says nothing, whichever phase it is in",
 test("the turn coming back is not a tick: only the reviewer's own last approval opens the card", (t) => {
   const { finish, side, root } = wired(t, DIGESTING);
   finish.attach(side);
-  finish.onApproved(false);
-  finish.onApproved(true);
+  finish.onApproved(false, true);
+  finish.onApproved(true, true);
 
   finish.setTurn(REVIEWERS);
   assert.equal(root.hidden, true, "the agent answering in words changes no file");
 
-  finish.onApproved(true);
+  finish.onApproved(true, true);
   assert.equal(root.hidden, true, "still finished: no crossing");
-  finish.onApproved(false);
-  finish.onApproved(true);
+  finish.onApproved(false, true);
+  finish.onApproved(true, true);
   assert.equal(root.hidden, false, "the reviewer approved the last file on their own turn");
 });
 
@@ -119,9 +119,9 @@ test("the turn arriving over the wire is heard before the last tick", (t) => {
   const { finish, side, root } = wired(t);
   finish.attach(side);
   finish.setTurn(WORKING);
-  finish.onApproved(false);
+  finish.onApproved(false, true);
 
-  finish.onApproved(true);
+  finish.onApproved(true, true);
 
   assert.equal(root.hidden, true);
 });
@@ -129,11 +129,51 @@ test("the turn arriving over the wire is heard before the last tick", (t) => {
 test("a card already up goes down when the turn passes to the agent", (t) => {
   const { finish, side, root } = wired(t);
   finish.attach(side);
-  finish.onApproved(false);
-  finish.onApproved(true);
+  finish.onApproved(false, true);
+  finish.onApproved(true, true);
   assert.equal(root.hidden, false);
 
   finish.setTurn(DIGESTING);
+
+  assert.equal(root.hidden, true);
+});
+
+test("a crossing the reviewer did not tick opens nothing, even on their turn", (t) => {
+  const { finish, log, side, root } = wired(t);
+  finish.attach(side);
+  finish.onApproved(false, false);
+
+  // A new round drawn with the rest carried over, or another tab's ticks arriving.
+  finish.onApproved(true, false);
+
+  assert.equal(root.hidden, true, "the reviewer approved nothing on this page");
+  assert.ok(!log.includes("expand"), "the rail is left as it was");
+  assert.equal(log.at(-1), "note:true", "the panel still knows the review is approved");
+
+  finish.onApproved(true, true);
+  assert.equal(root.hidden, true, "already approved: a later tick is no crossing");
+});
+
+test("a redraw that undoes the finish moves the baseline the next tick is read against", (t) => {
+  const { finish, side, root } = wired(t);
+  finish.attach(side);
+  finish.onApproved(true, false);
+
+  finish.onApproved(false, false);
+  assert.equal(root.hidden, true);
+  finish.onApproved(true, true);
+
+  assert.equal(root.hidden, false, "the reviewer's own tick finished the new round");
+});
+
+test("a redraw that undoes the finish takes the card down", (t) => {
+  const { finish, side, root } = wired(t);
+  finish.attach(side);
+  finish.onApproved(false, false);
+  finish.onApproved(true, true);
+  assert.equal(root.hidden, false);
+
+  finish.onApproved(false, false);
 
   assert.equal(root.hidden, true);
 });

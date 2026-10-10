@@ -4,7 +4,13 @@ import { crossings } from "../../src/browser/approval-crossing.ts";
 
 function watcher(): { report: (complete: boolean) => void; crossed: () => number } {
   let count = 0;
-  return { report: crossings(() => (count += 1)), crossed: () => count };
+  const crossed = crossings();
+  return {
+    report: (complete) => {
+      if (crossed(complete)) count += 1;
+    },
+    crossed: () => count,
+  };
 }
 
 test("a round that opens fully approved has not just crossed into it", () => {

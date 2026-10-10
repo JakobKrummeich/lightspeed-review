@@ -4,11 +4,11 @@
  * consumer auto-opens the panel: doing that on load would override a choice
  * for a state the reviewer knew.
  */
-export function crossings(onCross: () => void): (complete: boolean) => void {
+export function crossings(): (complete: boolean) => boolean {
   let before: boolean | undefined;
-  return (complete: boolean): void => {
+  return (complete: boolean): boolean => {
     const crossed = before === false && complete;
     before = complete;
-    if (crossed) onCross();
+    return crossed;
   };
 }
