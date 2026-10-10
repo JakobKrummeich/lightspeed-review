@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.8.0
 
 - The **Between rounds** replay leaves out comments whose thread you
   resolved. Resolving now means "this needs no more changes and no more
