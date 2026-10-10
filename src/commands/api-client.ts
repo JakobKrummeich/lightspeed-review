@@ -1,5 +1,5 @@
 import { REFUSAL_CODES, ReviewError, type RefusalCode } from "../errors.ts";
-import type { DomainErrorBody } from "../server.ts";
+import type { DomainErrorBody } from "../api-contract.ts";
 import { openCall } from "../open-call.ts";
 import type { ReviewCloser } from "../session-types.ts";
 import { endedReview } from "../session-resolve.ts";

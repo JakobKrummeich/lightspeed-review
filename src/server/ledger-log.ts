@@ -3,6 +3,7 @@
  * failure is swallowed — so a broken ledger can never change what a handler
  * does next.
  */
+import type { LedgerReport } from "../api-contract.ts";
 import { readDiffBetween } from "../git-file.ts";
 import { outcomeRecords } from "../ledger/outcomes.ts";
 import type { AnnotationRecord, AnnotationSide, IdSource } from "../ledger/records.ts";
@@ -25,11 +26,7 @@ export interface LedgerLog {
   nextId: IdSource;
 }
 
-export interface LedgerReport {
-  status: "on" | "off" | "degraded";
-  path?: string;
-  reason?: string;
-}
+export type { LedgerReport };
 
 function report(result: LedgerWriteResult): LedgerReport {
   return {

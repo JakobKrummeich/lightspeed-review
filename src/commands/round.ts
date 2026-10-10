@@ -12,7 +12,7 @@ import { renamedProviderHelp } from "../llm/renamed-providers.ts";
 import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { currentGroupingMode } from "../rounds/session-round.ts";
-import type { LedgerReport } from "../server.ts";
+import type { LedgerReport } from "../api-contract.ts";
 import { SessionStore, type SessionStatus } from "../session-store.ts";
 import { turnBlock, type TurnLabel } from "../turn.ts";
 import { groupingNotice } from "../turn-help.ts";
