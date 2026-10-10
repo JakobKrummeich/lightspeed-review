@@ -1,6 +1,7 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { wireFinish, type FinishSide } from "../../../src/browser/dom/finish.ts";
+import type { Turn } from "../../../src/session-store.ts";
 import { asPanelRoot, FakeNode, installFakeElements } from "./fake-panel-dom.ts";
 
 class FakeDocument {
@@ -9,7 +10,10 @@ class FakeDocument {
   removeEventListener(): void {}
 }
 
-function wired(t: TestContext): {
+function wired(
+  t: TestContext,
+  opening: Turn = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
+): {
   root: FakeNode;
   finish: ReturnType<typeof wireFinish>;
   log: string[];
@@ -31,7 +35,7 @@ function wired(t: TestContext): {
       end: () => log.push("end"),
     },
   } as unknown as FinishSide;
-  return { root, finish: wireFinish(asPanelRoot(root)), log, side };
+  return { root, finish: wireFinish(asPanelRoot(root), opening), log, side };
 }
 
 test("the report from before the panel existed is handed over when it is built", (t) => {
@@ -76,4 +80,60 @@ test("the card's end press is the panel's send, and a finish undone takes the ca
   assert.equal(root.hidden, false, "finished again, so said again");
   finish.onApproved(false);
   assert.equal(root.hidden, true, "a box came unticked under the card");
+});
+
+const REVIEWERS = { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" } as const;
+const DIGESTING = { holder: "agent", mode: "digesting", at: "2025-01-01T00:01:00.000Z" } as const;
+const WORKING = { holder: "agent", mode: "working", at: "2025-01-01T00:01:00.000Z" } as const;
+
+test("the last tick on the agent's turn says nothing, whichever phase it is in", (t) => {
+  for (const turn of [DIGESTING, WORKING]) {
+    const { finish, log, side, root } = wired(t, turn);
+    finish.attach(side);
+    finish.onApproved(false);
+
+    finish.onApproved(true);
+
+    assert.equal(root.hidden, true, `no card while the agent is ${turn.mode}`);
+    assert.ok(!log.includes("expand"), "the rail is left as it was");
+  }
+});
+
+test("the turn coming back is not a tick: only the reviewer's own last approval opens the card", (t) => {
+  const { finish, side, root } = wired(t, DIGESTING);
+  finish.attach(side);
+  finish.onApproved(false);
+  finish.onApproved(true);
+
+  finish.setTurn(REVIEWERS);
+  assert.equal(root.hidden, true, "the agent answering in words changes no file");
+
+  finish.onApproved(true);
+  assert.equal(root.hidden, true, "still finished: no crossing");
+  finish.onApproved(false);
+  finish.onApproved(true);
+  assert.equal(root.hidden, false, "the reviewer approved the last file on their own turn");
+});
+
+test("the turn arriving over the wire is heard before the last tick", (t) => {
+  const { finish, side, root } = wired(t);
+  finish.attach(side);
+  finish.setTurn(WORKING);
+  finish.onApproved(false);
+
+  finish.onApproved(true);
+
+  assert.equal(root.hidden, true);
+});
+
+test("a card already up goes down when the turn passes to the agent", (t) => {
+  const { finish, side, root } = wired(t);
+  finish.attach(side);
+  finish.onApproved(false);
+  finish.onApproved(true);
+  assert.equal(root.hidden, false);
+
+  finish.setTurn(DIGESTING);
+
+  assert.equal(root.hidden, true);
 });

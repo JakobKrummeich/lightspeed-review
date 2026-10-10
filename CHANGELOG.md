@@ -8,6 +8,9 @@
   land, so a change the agent skipped still shows in the replay. The agent's
   `resolved:` line in `next:` says this too: a resolve is never work, and
   words sent with one are a closing note, not a request.
+- The "Every file is approved" card opens only when you approve the last
+  file on your own turn. If you approve it while the agent is digesting or
+  working, nothing opens, not even once the turn comes back to you.
 - `publish` on a branch and base with no review refuses `session_not_found`
   the way every other session verb does: it names the branch and base and the
   live reviews in this repository, and the `publish` command to run instead,

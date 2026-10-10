@@ -1,8 +1,7 @@
 import { renderReviewDone } from "../review-done.ts";
 
 export interface MountedDonePopup {
-  /** `sendsQueue` is false on the agent's turn, where ending takes nothing with it. */
-  open(queued: number, sendsQueue: boolean): void;
+  open(queued: number): void;
   close(): void;
 }
 
@@ -34,7 +33,7 @@ export function mountDonePopup(options: DonePopupOptions): MountedDonePopup {
   };
   options.root.addEventListener("click", (event) => pressed(view, event));
   return {
-    open: (queued, sendsQueue) => show(view, queued, sendsQueue),
+    open: (queued) => show(view, queued),
     close: () => {
       if (!view.options.root.hidden) hide(view);
     },
@@ -54,7 +53,7 @@ function pressed(view: PopupView, event: Event): void {
   if (target.classList.contains("lsr-done-stay")) hide(view);
 }
 
-function show(view: PopupView, queued: number, sendsQueue: boolean): void {
+function show(view: PopupView, queued: number): void {
   const { root } = view.options;
   // A card already up keeps its place: the newest word replaces it without
   // taking the caret twice.
@@ -62,7 +61,7 @@ function show(view: PopupView, queued: number, sendsQueue: boolean): void {
     view.before = document.activeElement;
     document.addEventListener("keydown", view.onKey);
   }
-  root.innerHTML = renderReviewDone(queued, sendsQueue);
+  root.innerHTML = renderReviewDone(queued);
   root.hidden = false;
   root.querySelector<HTMLElement>(".lsr-done-end")?.focus();
 }

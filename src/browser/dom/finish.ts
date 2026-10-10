@@ -14,22 +14,32 @@ export interface FinishSide {
  * is only remembered; the first report is never a crossing (see the module),
  * so nothing is asked of a column that is not there yet. The queue's size is
  * kept because ending from the card sends the queue, and the card says so.
+ *
+ * The card is the answer to the reviewer approving the last file while the
+ * agent is listening — nothing else. A crossing on the agent's turn is spent,
+ * not deferred: the agent coming back (from `digesting` it changed no file)
+ * is not the reviewer finishing, so the turn's return never opens the card.
+ * `opening` is the session's own turn, so a page loaded mid-work is not
+ * treated as the reviewer's until SSE says otherwise.
  */
-export function wireFinish(root: HTMLElement): {
+export function wireFinish(
+  root: HTMLElement,
+  opening: Turn,
+): {
   onApproved(complete: boolean): void;
   setQueued(count: number): void;
-  /** The card's end press carries the queue only on the reviewer's turn. */
   setTurn(turn: Turn): void;
   attach(side: FinishSide): void;
 } {
   let side: FinishSide | undefined;
   let allApproved = false;
   let queued = 0;
-  let sendsQueue = true;
+  let listening = opening.holder === "reviewer";
   const done = mountDonePopup({ root, onEnd: () => side?.panel.end() });
   const onCrossing = crossings(() => {
+    if (!listening) return;
     side?.railControl.expand();
-    done.open(queued, sendsQueue);
+    done.open(queued);
   });
   return {
     onApproved: (complete) => {
@@ -44,7 +54,8 @@ export function wireFinish(root: HTMLElement): {
       queued = count;
     },
     setTurn: (turn) => {
-      sendsQueue = turn.holder === "reviewer";
+      listening = turn.holder === "reviewer";
+      if (!listening) done.close();
     },
     attach: (built) => {
       side = built;

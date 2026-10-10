@@ -563,8 +563,11 @@ ended overlay, whose word is last.
 └────────────────────────────────────────────────────┘
 ```
 
-- Goes up on the crossing only (`approval-crossing.ts`): a page that opens
-  fully approved says nothing, and a finish that comes undone — a round took
+- Goes up on the crossing only (`approval-crossing.ts`), and only while the
+  reviewer holds the turn: a last tick while the agent digests or works is
+  spent, not saved, so the turn coming back never puts the card up. A page
+  that opens fully approved says nothing; the card already up goes down when
+  the turn passes to the agent, and a finish that comes undone — a round took
   the page, a box came unticked in another tab — takes its card down.
 - "End review" is the panel's own Send & End (`MountedPanel.end`): queue and
   general comment go with it, the page locks, the closing summary follows.

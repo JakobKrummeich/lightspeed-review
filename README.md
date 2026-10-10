@@ -831,8 +831,9 @@ A ledger failure never fails a review: it is reported as
   annotation box does nothing; a queued note saved empty is removed.
 - A binary file is listed with "Binary file — no diff to show."; `open` and
   `publish` count those files as `diff.binary_skipped`.
-- Approving the last unapproved file opens an "Every file is approved" card:
-  **End review** is Send & End (on your turn queued notes go with it);
+- Approving the last unapproved file on your turn opens an "Every file is
+  approved" card; on the agent's turn it opens nothing, not even once the turn
+  comes back. **End review** is Send & End (queued notes go with it);
   **Keep looking** or `Esc` closes it. A page that opens with every file
   already approved shows no card.
 - The conversation is threads, grouped by whose move it is: **Resolved** on top

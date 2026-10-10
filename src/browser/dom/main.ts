@@ -101,7 +101,7 @@ async function main(): Promise<void> {
   // All reviewer-position state goes through this: a round arriving mid-read
   // asks it before taking the page.
   const reader = trackReader(page.reviewRoot, focus);
-  const finish = wireFinish(page.donePopup);
+  const finish = wireFinish(page.donePopup, session.turn);
   const diff = mountDiffView({
     root: page.diffRoot,
     progress: page.progress,
