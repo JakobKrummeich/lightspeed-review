@@ -335,26 +335,21 @@ function digestingRule(
 }
 
 /**
- * Said in the batch itself: the skill is read once, and a resolve read as
- * "dropped" costs a round. Two readings, because a resolve that carries words
- * is those words' deadline, not agreement with whatever the agent said last —
- * which may have been a question.
+ * Said in the batch itself: the skill is read once, and a misread resolve
+ * costs a round. Resolving means "this thread needs no more changes and no
+ * more answers from the agent" — the reviewer keeps an agreed change open
+ * until it lands, and the next round's replay (`src/rounds/replay.ts`) leaves
+ * resolved threads out. So a resolve is never work: words sent with it are a
+ * closing note, not a request the replay would then never show.
  */
 function resolvedMeaning(resolved: readonly Resolved[]): string {
-  const ids = (worded: boolean) =>
-    resolved.filter((one) => one.worded === worded).map((one) => one.id);
-  const said = ids(true);
-  const bare = ids(false);
+  const all = resolved.map((one) => one.id);
+  const worded = resolved.filter((one) => one.worded).map((one) => one.id);
   return [
-    ...(said.length === 0
+    `${all.join(", ")}: the reviewer needs nothing more there — no change, no answer`,
+    ...(worded.length === 0
       ? []
-      : [`${said.join(", ")}: resolved with a last word — do what it says`]),
-    ...(bare.length === 0
-      ? []
-      : [
-          `${bare.join(", ")}: the reviewer accepts your last answer there — if it promised a` +
-            " change, make it (work); it is not withdrawn",
-        ]),
+      : [`${worded.join(", ")}: the last word is a closing note, not a request`]),
   ].join(". ");
 }
 

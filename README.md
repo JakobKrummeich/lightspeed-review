@@ -354,7 +354,7 @@ Every skill `init` or `skill` writes carries a stamp: the lightspeed version tha
 wrote it and a hash of what it wrote.
 
 ```
-<!-- written by lightspeed 3.7.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
+<!-- written by lightspeed 3.8.0 for pi; content 0123456789abcdef; a later lightspeed refreshes or reports it, and never overwrites an edit -->
 ```
 
 Every command but `init` (the explicit install) then checks the places `init`
@@ -603,7 +603,7 @@ worth asking now. Every refusal names the one right command: `work` or `reply`
 on the reviewer's turn answer `turn_not_yours`, `publish` while digesting answers
 `turn_still_yours`, `publish` on an unmoved HEAD answers `nothing_to_publish`
 naming `reply` — checked before any model call. A resolve in the batch comes
-with a `resolved:` line saying what it means — do what the last words say, or, with none, your last answer is accepted — and every suggested `--to` names
+with a `resolved:` line saying what it means — the reviewer needs nothing more there, no change and no answer; last words are a closing note — and every suggested `--to` names
 an open thread, never a resolved one. One exit-code rule: exit 2 when re-running
 the same command cannot help — a wrong command line, or a move wrong for the
 review's state, `session_ended`, `session_not_found` and `ambiguous_session`
@@ -629,9 +629,11 @@ there whenever you can write: on your turn, and queueing while the agent works,
 whoever spoke last, so you can reply twice in a row. While the agent holds the
 turn, a thread whose last word is yours says "Waiting for the agent…" above
 it. **Resolve** folds a thread; it sends nothing by
-itself and travels with the next Send, where the agent reads `t4 resolved` — for
-a question "no further questions", for a change request "I agree with what you
-last said", not a withdrawn request. Thread replies and resolves queue like any
+itself and travels with the next Send, where the agent reads `t4 resolved` —
+"this needs no more changes and no more answers from you". Keep an agreed change
+open until you have seen it land: the next round's **Between rounds** replay
+leaves resolved threads out, so an open one is how a skipped change still
+shows. Thread replies and resolves queue like any
 other item and go out together on Send. The agent answering in a resolved thread
 reopens it. Each `--to main` post is its own card, with no Resolve toggle and no
 reply box — answer it from the general comment box. Every thread the agent spoke
@@ -829,10 +831,12 @@ A ledger failure never fails a review: it is reported as
   annotation box does nothing; a queued note saved empty is removed.
 - A binary file is listed with "Binary file — no diff to show."; `open` and
   `publish` count those files as `diff.binary_skipped`.
-- Approving the last unapproved file opens an "Every file is approved" card:
-  **End review** is Send & End (on your turn queued notes go with it);
-  **Keep looking** or `Esc` closes it. A page that opens with every file
-  already approved shows no card.
+- Approving the last unapproved file on your turn — a tick or the sweep
+  lane's press — opens an "Every file is approved" card; on the agent's turn
+  it opens nothing, not even once the turn comes back. **End review** is Send
+  & End (queued notes go with it); **Keep looking** or `Esc` closes it. A page
+  that opens with every file already approved, a new round that arrives
+  approved, or ticks made in another tab show no card.
 - The conversation is threads, grouped by whose move it is: **Resolved** on top
   (folded until you open it), **Waiting on agent**, and **Needs you** at the
   bottom next to the compose box. Each thread is named by its file and line or

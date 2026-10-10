@@ -71,10 +71,12 @@ export interface DiffViewOptions {
   onOpen(open: OpenFolds): void;
   /**
    * The approved list lives only in here, so this is the page's only way to
-   * know — reported on every draw and tick, so a round that opens fully
-   * approved is right from the first frame.
+   * know — reported whenever the list can have changed, so a round that opens
+   * fully approved is right from the first frame. `byReviewer` is true only
+   * for the reviewer's own tick or sweep on this page; a mount, a new round or
+   * another tab's ticks arriving are not the reviewer approving anything here.
    */
-  onApproved(allApproved: boolean): void;
+  onApproved(allApproved: boolean, byReviewer: boolean): void;
 }
 
 interface DiffViewState {
@@ -126,6 +128,7 @@ export function mountDiffView(options: DiffViewOptions): MountedDiff {
     }),
   };
   draw(view);
+  reportApproved(view, false);
   options.root.addEventListener("click", (event) => handleClick(view, event));
   options.root.addEventListener("change", (event) => handleTick(view, event));
   // The bar lives in the header, outside root's listeners: own listener needed.
@@ -143,6 +146,7 @@ export function mountDiffView(options: DiffViewOptions): MountedDiff {
       // would silently revive a focus the reviewer saw dissolve.
       state.focus = clampFocus(state.focus, state.groups.length);
       draw(view);
+      reportApproved(view, false);
     },
     setFormat(next: DiffOutputFormat) {
       state.renderer = createDiff2HtmlRenderer({ outputFormat: next });
@@ -223,7 +227,6 @@ function draw(view: DiffView): void {
   // The one place the bar is built: a re-group replaces its segments, a tick
   // only repaints them.
   progress.innerHTML = renderProgressBar(groups, approved, focus);
-  view.options.onApproved(reviewApproved(groups, approved));
   // Not awaited: the diff is readable before its colours land.
   highlightDiff(root, key).catch(() =>
     console.error("lightspeed: syntax highlighting is unavailable"),
@@ -304,9 +307,14 @@ function approveSweep(view: DiffView): void {
   state.approved = next;
   draw(view);
   light.redrawn(view.options.root);
+  reportApproved(view, true);
   persistApproved(view.options.key, state.approved).catch(() =>
     console.error("lightspeed: approved state was not saved"),
   );
+}
+
+function reportApproved(view: DiffView, byReviewer: boolean): void {
+  view.options.onApproved(reviewApproved(view.state.groups, view.state.approved), byReviewer);
 }
 
 function handleTick(view: DiffView, event: Event): void {
@@ -335,8 +343,7 @@ function handleTick(view: DiffView, event: Event): void {
     reportOpen(view);
     light.fire(input, () => applyProgressState(progress, state.groups, state.approved));
   }
-  // A tick redraws nothing, so completion has to be reported from here too.
-  view.options.onApproved(reviewApproved(state.groups, state.approved));
+  reportApproved(view, true);
   // Tick stays on screen either way; log rather than lose it silently.
   persistApproved(key, state.approved).catch(() =>
     console.error("lightspeed: approved state was not saved"),

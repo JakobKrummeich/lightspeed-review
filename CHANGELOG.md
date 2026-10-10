@@ -1,7 +1,18 @@
 # Changelog
 
-## Unreleased
+## 3.8.0
 
+- The **Between rounds** replay leaves out comments whose thread you
+  resolved. Resolving now means "this needs no more changes and no more
+  answers from the agent". Keep an agreed change open until you have seen it
+  land, so a change the agent skipped still shows in the replay. The agent's
+  `resolved:` line in `next:` says this too: a resolve is never work, and
+  words sent with one are a closing note, not a request.
+- The "Every file is approved" card opens only when you approve the last
+  file on your own turn, with a tick or the sweep lane's press. If you
+  approve it while the agent is digesting or working, nothing opens, not even
+  once the turn comes back to you; nor does a new round that arrives with
+  every file approved, or ticks made in another tab.
 - `publish` on a branch and base with no review refuses `session_not_found`
   the way every other session verb does: it names the branch and base and the
   live reviews in this repository, and the `publish` command to run instead,

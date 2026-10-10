@@ -107,6 +107,8 @@ interface Mounted {
   posted: string[][];
   asked: string[];
   reported: boolean[];
+  /** Parallel to `reported`: whether each came from the reviewer's own press on this page. */
+  byReviewer: boolean[];
   opened: OpenFolds[];
   focused: (number | undefined)[];
   read: string[];
@@ -144,6 +146,7 @@ function mount(
   const asked: string[] = [];
   const read: string[] = [];
   const reported: boolean[] = [];
+  const byReviewer: boolean[] = [];
   const opened: OpenFolds[] = [];
   const focused: (number | undefined)[] = [];
   const real = globalThis.fetch;
@@ -185,7 +188,10 @@ function mount(
     focus: options.focus,
     onFocus: (focus) => focused.push(focus),
     onOpen: (open) => opened.push(open),
-    onApproved: (all) => reported.push(all),
+    onApproved: (all, mine) => {
+      reported.push(all);
+      byReviewer.push(mine);
+    },
   });
   const find = (selector: string): FakeElement => {
     const found = root.querySelector(selector);
@@ -207,6 +213,7 @@ function mount(
     asked,
     read,
     reported,
+    byReviewer,
     opened,
     focused,
     fileBlock: (path) => find(`.lsr-file[data-file="${path}"]`),
@@ -1145,6 +1152,32 @@ test("a re-group reports where the new round stands, not where the last one did"
   assert.equal(page.reported.at(-1), false, "the new file is unread");
 });
 
+test("the reviewer's own ticks are reported as theirs; the page opening is not", (t) => {
+  const page = mount(t, [group("API", ["a.png"]), group("Docs", ["b.png"])], [], { focus: 0 });
+  assert.deepEqual(page.byReviewer, [false], "nobody ticked anything to open the page");
+
+  page.tick(page.fileTick("a.png"), true);
+  press(page, ".lsr-focus-exit");
+  press(page, `.lsr-index-entry[data-group-index="1"]`);
+  page.tick(page.fileTick("b.png"), true);
+
+  assert.deepEqual(page.reported, [false, false, true]);
+  assert.deepEqual(page.byReviewer, [false, true, true], "one report a tick, and nothing else");
+});
+
+test("a round drawn finished, or another tab's ticks arriving, is not the reviewer's doing", (t) => {
+  const page = mount(t, [group("API", ["a.png"]), group("Docs", ["b.png"])], ["a.png"]);
+
+  page.view.update(session([group("API", ["a.png"])], ["a.png"]), "regrouped");
+  assert.equal(page.reported.at(-1), true, "the file left unread is gone from the new round");
+  assert.equal(page.byReviewer.at(-1), false);
+
+  page.view.update(session([group("API", ["a.png"])], []), "same-round");
+  page.view.update(session([group("API", ["a.png"])], ["a.png"]), "same-round");
+  assert.equal(page.reported.at(-1), true);
+  assert.equal(page.byReviewer.at(-1), false, "ticked in another tab");
+});
+
 /** Crude heights — rows 40px, diffs 1000px. The point is a collapse removes ~1000px, not the numbers. */
 function giveHeights(page: Mounted): void {
   for (const row of page.root.querySelectorAll(".lsr-row")) row.ownHeight = 40;
@@ -1472,6 +1505,19 @@ test("the lane leaves the chapters worth reading alone, and completion with them
   press(page, `.lsr-index-entry[data-group-index="0"]`);
   page.tick(page.fileTick("a.png"), true);
   assert.deepEqual(page.reported.at(-1), true);
+});
+
+test("the lane's press that finishes the review is reported as the reviewer's", (t) => {
+  const page = mount(
+    t,
+    [group("API", ["a.png"]), { ...group("Docs", ["b.png", "c.png"]), tier: "sweep" as const }],
+    ["a.png"],
+  );
+
+  press(page, ".lsr-sweep-approve");
+
+  assert.deepEqual(page.reported, [false, true]);
+  assert.deepEqual(page.byReviewer, [false, true]);
 });
 
 test("a second press on the lane posts nothing, because it changes nothing", (t) => {

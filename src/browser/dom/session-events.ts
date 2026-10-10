@@ -157,7 +157,7 @@ function openStream(
       .catch(() => console.error("lightspeed: the conversation could not be refreshed"));
   });
   // Everything that speaks for the turn hears it at once: the finish card
-  // promises to carry the queue only when the queue can still go anywhere.
+  // only opens while the agent is listening.
   events.addEventListener("presence", (event: MessageEvent<string>) => {
     const presence = readPresence(event.data);
     banner.setPresence(presence);

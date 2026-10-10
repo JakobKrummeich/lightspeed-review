@@ -11,7 +11,7 @@ import type {
   SessionRecord,
   SessionRound,
 } from "../session-store.ts";
-import { threadsOf } from "../threads.ts";
+import { threadsOf, type Thread } from "../threads.ts";
 import { MAX_APPROVED_FORM_BYTES } from "./approved-form.ts";
 import { changedBetween, currentName, fileApproval, fileHistory } from "./history.ts";
 
@@ -102,20 +102,35 @@ export function replayData(
   // No round before this one: an empty replay is the definitive answer, not a
   // degraded one.
   if (current === undefined || made === undefined) return { comments: [] };
+  const threads = threadsOf(session.conversation);
   const review: Review = {
     session,
     made,
     current,
     later: annotations(session.conversation, rounds, (round) => round > made.index),
-    answered: agentAnswers(session.conversation),
+    answered: agentAnswers(threads),
     ask: askOnce(readBetween),
     readFileAt,
   };
+  const settled = resolvedIds(threads);
   return {
-    comments: annotations(session.conversation, rounds, (round) => round === made.index).map(
-      (prompt) => replayComment(review, prompt),
-    ),
+    comments: annotations(session.conversation, rounds, (round) => round === made.index)
+      .filter((prompt) => prompt.id === undefined || !settled.has(prompt.id))
+      .map((prompt) => replayComment(review, prompt)),
   };
+}
+
+/**
+ * Resolving a thread is the reviewer saying "this needs no more changes and no
+ * more answers from the agent" — a question answered in words, or a change
+ * seen landed. Such a thread is not news on the next round, so it gets no
+ * card. A change request the agent has yet to make stays unresolved, so it
+ * keeps its card: the replay is where a walked-past request shows. The state
+ * is the thread's latest — an agent speaking into a resolved thread reopens
+ * it (`src/threads.ts`), and then it is news again.
+ */
+function resolvedIds(threads: readonly Thread[]): Set<string> {
+  return new Set(threads.filter((thread) => thread.resolved).map((thread) => thread.id));
 }
 
 /**
@@ -138,9 +153,9 @@ interface AgentNote {
   note_at: string;
 }
 
-function agentAnswers(conversation: ConversationEntry[]): Map<string, AgentNote> {
+function agentAnswers(threads: readonly Thread[]): Map<string, AgentNote> {
   const answers = new Map<string, AgentNote>();
-  for (const thread of threadsOf(conversation)) {
+  for (const thread of threads) {
     const last = thread.messages.findLast((message) => message.role === "agent");
     if (last !== undefined && thread.legacy !== true) {
       answers.set(thread.id, { note: last.comment, note_at: last.at });
