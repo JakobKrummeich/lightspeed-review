@@ -8,7 +8,6 @@ import { resolve } from "node:path";
 import { routeParts, type CliRoute } from "./api-contract.ts";
 import { createIdSource } from "./ledger/records.ts";
 import type { LedgerStore } from "./ledger/store.ts";
-import type { CreateSessionRequest } from "./rounds/session-round.ts";
 import { matchRoute, type Route, type RouteHandler } from "./router.ts";
 import { type ContextHandler, type ServerContext } from "./server/context.ts";
 import { handleAgentReply, handleApproved, handleFeedback } from "./server/handlers-feedback.ts";
@@ -30,7 +29,6 @@ import {
 } from "./server/handlers-stream.ts";
 import { handleWork } from "./server/handlers-turn.ts";
 import { messageOf, sendAnswer, sendJson } from "./server/http.ts";
-import type { LedgerReport } from "./server/ledger-log.ts";
 import { hostIsAllowed, originIsAllowed } from "./server/security.ts";
 import { SessionTransport } from "./server/streams.ts";
 import { presenceOf } from "./turn.ts";
@@ -38,9 +36,6 @@ import type { SessionStore } from "./session-store.ts";
 import { DEFAULT_STATIC_DIR, loadAssets } from "./static-assets.ts";
 import { CLI_VERSION } from "./version.ts";
 
-export type { CreateSessionRequest };
-export type { LedgerReport };
-export type { DomainErrorBody } from "./server/http.ts";
 /** The rules a CLI checks before paying for a model call the server would refuse. */
 export { publishRefusal } from "./server/publish-rules.ts";
 export { stillWorking } from "./server/turn-refusals.ts";

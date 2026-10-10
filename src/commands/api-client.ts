@@ -43,11 +43,7 @@ export async function callApi<R extends CliRoute>(
 
 /** Maps transport failures to codes an agent can act on: no command interprets
  * an HTTP status itself. */
-export async function apiRequest(
-  url: string,
-  init?: RequestInit,
-  about?: SessionRef,
-): Promise<unknown> {
+async function apiRequest(url: string, init?: RequestInit, about?: SessionRef): Promise<unknown> {
   let response: Response;
   try {
     response = await sendOnce(url, init);
@@ -247,7 +243,7 @@ function isRetryable(init: RequestInit | undefined): boolean {
   return method === "GET";
 }
 
-export function jsonPost(body: unknown): RequestInit {
+function jsonPost(body: unknown): RequestInit {
   return {
     method: "POST",
     headers: { "content-type": "application/json" },

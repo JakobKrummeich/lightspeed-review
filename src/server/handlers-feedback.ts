@@ -3,7 +3,7 @@
  * ledger never changes an answer.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { ReplyRequest } from "../api-contract.ts";
+import type { DomainErrorBody, ReplyRequest } from "../api-contract.ts";
 import { withAgentReplies, withFeedback, type FeedbackRequest } from "../feedback.ts";
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
@@ -13,7 +13,7 @@ import { turnFacts } from "../turn.ts";
 import { handbackOf, isRerun, withHandback } from "../turn-moves.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { announceRoundEnd } from "./handlers-session.ts";
-import { badRequest, sendAnswer, sendJson, type DomainErrorBody } from "./http.ts";
+import { badRequest, sendAnswer, sendJson, sendPageJson } from "./http.ts";
 import { everyPrompt, knownThreads, logReplies, unknownNotes } from "./agent-notes.ts";
 import { logFeedback } from "./ledger-log.ts";
 import { reviewEnded, reviewerHolds, stillWorking, unknownThreads } from "./turn-refusals.ts";
@@ -46,7 +46,7 @@ export async function handleApproved(
   const known = reviewPaths(session.groups);
   const approved = posted.filter((path) => known.has(path));
   context.store.save({ ...session, approved, updatedAt: new Date().toISOString() });
-  sendJson(response, 200, { approved });
+  sendPageJson(response, { approved });
 }
 
 export async function handleFeedback(
@@ -83,7 +83,7 @@ export async function handleFeedback(
   context.transport.publish(session.key, "feedback", { queued: prompts.length });
   // "Send & End" is the reviewer closing the round, so it closes like one.
   if (feedback.ended) announceRoundEnd(context, session, now);
-  sendJson(response, 200, { queued: prompts.length });
+  sendPageJson(response, { queued: prompts.length });
 }
 
 /**

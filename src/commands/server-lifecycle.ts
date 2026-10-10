@@ -130,7 +130,7 @@ async function answersWithin(port: number, timeoutMs: number): Promise<boolean> 
  * client filled both in with defaults, and the agent read an invented turn off
  * a server that had never heard of turns. So the command stops before it
  * blocks. A port with nothing on it is not this function's business: `longPoll`
- * and `apiRequest` diagnose that, with the retries that tell a dead server from
+ * and `callApi` diagnose that, with the retries that tell a dead server from
  * a slow one.
  */
 export async function assertServerCurrent(port: number, target: string): Promise<void> {

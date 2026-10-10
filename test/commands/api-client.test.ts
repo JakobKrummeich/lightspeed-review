@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
-import { apiRequest, jsonPost, parseBody } from "../../src/commands/api-client.ts";
+import { callApi, parseBody } from "../../src/commands/api-client.ts";
 import { REFUSAL_CODES, ReviewError } from "../../src/errors.ts";
-import type { DomainErrorBody } from "../../src/server.ts";
+import type { DomainErrorBody } from "../../src/api-contract.ts";
 
 interface Harness {
   url: string;
@@ -46,10 +46,10 @@ async function serverDropping(dropped: number): Promise<Harness> {
 test("a GET whose connection is dropped is retried instead of reported as no server", async () => {
   const harness = await serverDropping(1);
 
-  const body = await apiRequest(`${harness.url}/api/poll?key=abc`);
+  const body = await callApi(harness.url, "GET /api/poll", {}, undefined);
 
   assert.deepEqual(body, { ok: true });
-  assert.deepEqual(harness.served, ["GET /api/poll?key=abc"]);
+  assert.deepEqual(harness.served, ["GET /api/poll"]);
   await harness.close();
 });
 
@@ -57,7 +57,7 @@ test("a GET is retried only once, and a port that is still open is not called de
   const harness = await serverDropping(5);
 
   await assert.rejects(
-    () => apiRequest(`${harness.url}/api/poll?key=abc`),
+    () => callApi(harness.url, "GET /api/poll", {}, undefined),
     (error: ReviewError) => {
       assert.equal(error.code, "server_unreachable");
       assert.match(error.message, /did not answer the request/);
@@ -75,7 +75,13 @@ test("a POST is never retried, so a dropped reply cannot be sent twice", async (
   const harness = await serverDropping(1);
 
   await assert.rejects(
-    () => apiRequest(`${harness.url}/api/session/abc/reply`, jsonPost({ comment: "hi" })),
+    () =>
+      callApi(
+        harness.url,
+        "POST /api/session/:key/reply",
+        { key: "abc" },
+        { replies: [{ to: "t1", text: "hi" }] },
+      ),
     (error: ReviewError) => error.code === "server_unreachable",
   );
   assert.deepEqual(harness.served, []);
@@ -190,7 +196,7 @@ test("a 2xx body that is not JSON is a lightspeed bug, never an answer", () => {
 
 test("nothing listening is still reported as no server, once retried", async () => {
   await assert.rejects(
-    () => apiRequest("http://127.0.0.1:1/health"),
+    () => callApi("http://127.0.0.1:1", "GET /health", {}, undefined),
     (error: ReviewError) => {
       assert.equal(error.code, "server_not_running");
       assert.match(error.detail ?? "", /nothing accepts a connection on port 1/);

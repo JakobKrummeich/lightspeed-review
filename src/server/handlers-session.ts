@@ -3,7 +3,7 @@
  * closes a round the same way.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { CreatedSession } from "../api-contract.ts";
+import type { CreatedSession, LedgerReport } from "../api-contract.ts";
 import { closedBy, withAgentReplies } from "../feedback.ts";
 import { sessionKey } from "../paths.ts";
 import {
@@ -19,7 +19,7 @@ import { logReplies } from "./agent-notes.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendAnswer, sendJson } from "./http.ts";
 import { reviewEnded } from "./turn-refusals.ts";
-import { logOutcomes, logRound, logRoundEnd, type LedgerReport } from "./ledger-log.ts";
+import { logOutcomes, logRound, logRoundEnd } from "./ledger-log.ts";
 import { publishRefusal } from "./publish-rules.ts";
 import { parseCreateSession } from "./validate.ts";
 

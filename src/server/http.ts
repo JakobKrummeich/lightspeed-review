@@ -2,9 +2,18 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { CliRoute, CliRoutes } from "../api-contract.ts";
 import { readJsonBody } from "../router.ts";
 
-export type { DomainErrorBody, SessionEndedBody } from "../api-contract.ts";
+/**
+ * The statuses a refusal or a failure is answered with. A 200 is not among them:
+ * a CLI route answers through `sendAnswer`, typed by its contract entry, and a
+ * browser route through `sendPageJson`, so an untyped 200 does not compile.
+ */
+export type FailureStatus = 400 | 403 | 404 | 409 | 422 | 500 | 503;
 
-export function sendJson(response: ServerResponse, status: number, body: unknown): void {
+export function sendJson(response: ServerResponse, status: FailureStatus, body: unknown): void {
+  writeJson(response, status, body);
+}
+
+function writeJson(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(body));
 }
@@ -19,7 +28,17 @@ export function sendAnswer<R extends CliRoute>(
   _route: R,
   body: CliRoutes[R]["answer"],
 ): void {
-  sendJson(response, 200, body);
+  writeJson(response, 200, body);
+}
+
+/**
+ * A browser route's 200. Untyped on purpose and named so it can be found: the
+ * page's answer types (`SessionData`, `ApprovedFormData`, `ReplayData`) are
+ * shared declarations already, and a `PageRoutes` beside `CliRoutes` is the
+ * follow-on that closes this door.
+ */
+export function sendPageJson(response: ServerResponse, body: unknown): void {
+  writeJson(response, 200, body);
 }
 
 export function badRequest(response: ServerResponse, message: string): void {

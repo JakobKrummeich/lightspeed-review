@@ -26,8 +26,6 @@ export interface LedgerLog {
   nextId: IdSource;
 }
 
-export type { LedgerReport };
-
 function report(result: LedgerWriteResult): LedgerReport {
   return {
     status: result.status,
