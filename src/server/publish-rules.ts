@@ -7,7 +7,7 @@
 import type { AgentNote } from "../feedback.ts";
 import type { SessionRecord } from "../session-types.ts";
 import { unknownNotes } from "./agent-notes.ts";
-import type { DomainErrorBody } from "./http.ts";
+import type { DomainErrorBody } from "../api-contract.ts";
 import { nothingToPublish, reviewerHolds, stillDigesting } from "./turn-refusals.ts";
 
 export function publishRefusal(

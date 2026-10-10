@@ -3,6 +3,7 @@
  * upstream), never an exception.
  */
 import type { IncomingMessage } from "node:http";
+import type { ReplyRequest, WorkRequest } from "../api-contract.ts";
 import { parseFeedbackRequest, type AgentNote } from "../feedback.ts";
 import type { CreateSessionRequest } from "../rounds/session-round.ts";
 import { readJsonSafely } from "./http.ts";
@@ -62,17 +63,6 @@ export async function readFeedback(request: IncomingMessage) {
   return parseFeedbackRequest(await readJsonSafely<unknown>(request));
 }
 
-/**
- * `reply`: every answer of the turn at once, each under the item it concerns.
- * `head`/`tree` are the CLI's account of the working tree, which only a reply
- * from `working` needs (W2: nothing half-written to protect).
- */
-export interface ReplyRequest {
-  replies: AgentNote[];
-  head?: string;
-  tree?: string;
-}
-
 export async function readReply(request: IncomingMessage): Promise<ReplyRequest | undefined> {
   const body = await readJsonSafely<{
     replies?: unknown;
@@ -104,12 +94,6 @@ export async function readDelivered(request: IncomingMessage): Promise<string | 
   const delivery = (await readJsonSafely<{ delivery?: unknown }>(request))?.delivery;
   if (typeof delivery !== "string" || delivery === "") return undefined;
   return delivery;
-}
-
-export interface WorkRequest {
-  plan: string;
-  head?: string;
-  tree?: string;
 }
 
 export async function readWork(request: IncomingMessage): Promise<WorkRequest | undefined> {

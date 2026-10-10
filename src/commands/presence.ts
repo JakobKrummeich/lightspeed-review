@@ -1,3 +1,4 @@
+import type { CliRoutes } from "../api-contract.ts";
 import { serverOrigin } from "./server-address.ts";
 
 /** Short: `lightspeed` alone must answer at once, server or no server. */
@@ -14,7 +15,10 @@ export async function listening(port: number, key: string): Promise<boolean> {
       signal: AbortSignal.timeout(PRESENCE_TIMEOUT_MS),
     });
     if (!response.ok) return false;
-    return ((await response.json()) as { waiting?: unknown }).waiting === true;
+    const answer = (await response.json()) as Partial<
+      CliRoutes["GET /api/session/:key/presence"]["answer"]
+    >;
+    return answer.waiting === true;
   } catch {
     return false;
   }

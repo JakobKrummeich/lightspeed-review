@@ -283,9 +283,6 @@ test("a resolved item is not offered as one to reply to", () => {
 test("a wait another command took over exits with nothing to do, not with a batch", () => {
   const output = batchOutput(
     {
-      status: "open",
-      ended: false,
-      items: [],
       superseded: true,
       message: "another lightspeed command took over listening for this review; nothing to do here",
     },

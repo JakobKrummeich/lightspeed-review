@@ -1,9 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Superseded } from "../api-contract.ts";
 import { batchPayload, endedPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import { withAck, withDelivery } from "../turn-moves.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { badRequest, sendJson } from "./http.ts";
+import { badRequest, sendAnswer, sendJson } from "./http.ts";
 import type { Waker } from "./streams.ts";
 import { stillWorking } from "./turn-refusals.ts";
 import { readDelivered } from "./validate.ts";
@@ -40,7 +41,9 @@ export function handlePresence(
 ) {
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  sendJson(response, 200, { waiting: context.transport.isWaiting(session.key) });
+  sendAnswer(response, "GET /api/session/:key/presence", {
+    waiting: context.transport.isWaiting(session.key),
+  });
 }
 
 /**
@@ -86,7 +89,7 @@ export function handlePoll(
         error: { code: "server_stopped", message: "the review server shut down" },
       });
     }
-    if (reason === "superseded") sendJson(response, 200, SUPERSEDED);
+    if (reason === "superseded") sendAnswer(response, "GET /api/poll", SUPERSEDED);
     return true;
   };
   context.transport.addPoller(session.key, wake);
@@ -101,7 +104,7 @@ export function handlePoll(
  * Not an error: the command that took over is the agent's own, and the one
  * answered here has nothing left to do but exit.
  */
-const SUPERSEDED = {
+const SUPERSEDED: Superseded = {
   superseded: true,
   message: "another lightspeed command took over listening for this review; nothing to do here",
 };
@@ -115,7 +118,7 @@ const SUPERSEDED = {
 function answer(context: ServerContext, key: string, response: ServerResponse): boolean {
   const session = context.store.get(key);
   if (session?.status !== "ended" && session?.turn.holder === "agent") {
-    sendJson(response, 200, batchPayload(session));
+    sendAnswer(response, "GET /api/poll", batchPayload(session));
     return true;
   }
   return deliver(context, key, response);
@@ -135,14 +138,14 @@ function deliver(context: ServerContext, key: string, response: ServerResponse):
   if (session.status === "ended") {
     const ended = endedPayload(session);
     context.store.save(ended.session);
-    sendJson(response, 200, ended.payload);
+    sendAnswer(response, "GET /api/poll", ended.payload);
     return true;
   }
   if (session.turn.holder !== "reviewer" || session.pending.length === 0) return false;
   const now = new Date().toISOString();
   const delivered = withDelivery(session, context.nextId("evt", now), now);
   context.store.save(delivered);
-  sendJson(response, 200, batchPayload(delivered));
+  sendAnswer(response, "GET /api/poll", batchPayload(delivered));
   context.transport.publishPresence(key);
   return true;
 }
@@ -166,5 +169,7 @@ export async function handleDelivered(
   }
   const acked = withAck(session, delivery);
   if (acked !== undefined) context.store.save(acked);
-  sendJson(response, 200, { confirmed: session.batch?.id === delivery });
+  sendAnswer(response, "POST /api/session/:key/delivered", {
+    confirmed: session.batch?.id === delivery,
+  });
 }

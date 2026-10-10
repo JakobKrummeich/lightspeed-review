@@ -8,7 +8,7 @@ import type { AgentTurn, SessionRecord } from "../session-types.ts";
 import { openIds } from "../threads.ts";
 import { agentWorking, turnFacts } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { badRequest, sendJson } from "./http.ts";
+import { badRequest, sendAnswer, sendJson } from "./http.ts";
 import { reviewEnded, reviewerHolds } from "./turn-refusals.ts";
 import { readWork } from "./validate.ts";
 
@@ -41,7 +41,7 @@ export async function handleWork(
   context.transport.publishPresence(session.key);
   // The ids the agent's `publish --to` may name: it has the batch, not the thread list.
   const open = openIds(updated.conversation, updated.batch?.prompts);
-  sendJson(response, 200, { ...turnFacts(updated), changed, open });
+  sendAnswer(response, "POST /api/session/:key/work", { ...turnFacts(updated), changed, open });
 }
 
 /**

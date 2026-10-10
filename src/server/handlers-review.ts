@@ -8,7 +8,7 @@ import { roundApproval } from "../rounds/history.ts";
 import { replayData } from "../rounds/replay.ts";
 import { currentCommits, currentIntents } from "../rounds/session-round.ts";
 import { requireSession, type ServerContext } from "./context.ts";
-import { sendJson } from "./http.ts";
+import { sendJson, sendPageJson } from "./http.ts";
 import { approvedFormData, gitPathOf, readSessionFile } from "./session-files.ts";
 
 export function handleReviewPage(
@@ -33,7 +33,7 @@ export function handleSessionData(
   if (!session) return;
   // Approval is derived on every read, never stored: the rounds are the truth,
   // and a stored copy could disagree with them after an `end` or a re-group.
-  sendJson(response, 200, {
+  sendPageJson(response, {
     ...session,
     approval: roundApproval(session.rounds, session.approved),
     intents: currentIntents(session),
@@ -64,7 +64,7 @@ export function handleSessionFile(
     });
     return;
   }
-  sendJson(response, 200, { path, side, contents });
+  sendPageJson(response, { path, side, contents });
 }
 
 /**
@@ -93,7 +93,7 @@ export function handleApprovedForm(
     });
     return;
   }
-  sendJson(response, 200, approvedFormData(session, path, form));
+  sendPageJson(response, approvedFormData(session, path, form));
 }
 
 /** On demand for the same cost reason; `lastRoundForm` says which files have one. */
@@ -117,7 +117,7 @@ export function handleLastRoundForm(
     });
     return;
   }
-  sendJson(response, 200, approvedFormData(session, path, form));
+  sendPageJson(response, approvedFormData(session, path, form));
 }
 
 export function handleReplay(
@@ -128,9 +128,8 @@ export function handleReplay(
 ) {
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
-  sendJson(
+  sendPageJson(
     response,
-    200,
     replayData(
       session,
       (from, to, paths) => readDiffBetween(session.repoRoot, from, to, paths),

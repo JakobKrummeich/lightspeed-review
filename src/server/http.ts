@@ -1,35 +1,44 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { RefusalCode, ReviewErrorCode } from "../errors.ts";
-import type { ReviewCloser } from "../session-types.ts";
+import type { CliRoute, CliRoutes } from "../api-contract.ts";
 import { readJsonBody } from "../router.ts";
 
 /**
- * The 422 an illegal move is answered with: the rule the server refused, and the
- * move that makes it legal. Declared once and returned by every builder of one,
- * because the reading side relays only `REFUSAL_CODES` (`api-client.ts`) — a
- * code outside that list reaches the agent as `internal_error`, which reads as
- * a lightspeed bug rather than something it can fix, and `help` is what it does
- * next, so there is always at least one line. `C` is widened only for a body
- * the page reads and the CLI never does (`lockedOut`).
- *
- * Not the shape of the 409s a session's status answers: those carry no help,
- * because the client knows the one move an ended review leaves — only who
- * ended it, which the client cannot know (`SessionEndedBody`).
+ * The statuses a refusal or a failure is answered with. A 200 is not among them:
+ * a CLI route answers through `sendAnswer`, typed by its contract entry, and a
+ * browser route through `sendPageJson`, so an untyped 200 does not compile.
  */
-export interface DomainErrorBody<C extends ReviewErrorCode = RefusalCode> {
-  error: { code: C; message: string; detail?: string };
-  help: [string, ...string[]];
+export type FailureStatus = 400 | 403 | 404 | 409 | 422 | 500 | 503;
+
+export function sendJson(response: ServerResponse, status: FailureStatus, body: unknown): void {
+  writeJson(response, status, body);
 }
 
-/** The 409 an agent's move on an ended review is answered with (`reviewEnded`). */
-export interface SessionEndedBody {
-  error: { code: "session_ended"; message: string };
-  endedBy?: ReviewCloser;
-}
-
-export function sendJson(response: ServerResponse, status: number, body: unknown): void {
+function writeJson(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(body));
+}
+
+/**
+ * A CLI route's 200, typed by the route it answers: the body the command reads
+ * is the one `CliRoutes` declares, or this does not compile. `route` is only
+ * there to pick that type, and to make the answering line greppable by it.
+ */
+export function sendAnswer<R extends CliRoute>(
+  response: ServerResponse,
+  _route: R,
+  body: CliRoutes[R]["answer"],
+): void {
+  writeJson(response, 200, body);
+}
+
+/**
+ * A browser route's 200. Untyped on purpose and named so it can be found: the
+ * page's answer types (`SessionData`, `ApprovedFormData`, `ReplayData`) are
+ * shared declarations already, and a `PageRoutes` beside `CliRoutes` is the
+ * follow-on that closes this door.
+ */
+export function sendPageJson(response: ServerResponse, body: unknown): void {
+  writeJson(response, 200, body);
 }
 
 export function badRequest(response: ServerResponse, message: string): void {

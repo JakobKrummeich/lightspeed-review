@@ -1,3 +1,4 @@
+import type { Superseded } from "../api-contract.ts";
 import { ReviewError } from "../errors.ts";
 import { END_VERDICTS, type EndApproval, type PollPayload } from "../feedback.ts";
 import { SELECTION_LIMIT, truncateContent, type StructuredOutput } from "../output.ts";
@@ -29,12 +30,12 @@ export async function listen(input: ListenInput): Promise<StructuredOutput> {
   // Before the wait, not after it: a wait against a server this CLI cannot read
   // would otherwise hold the agent for hours and then answer with defaults.
   await assertServerCurrent(input.port, target);
-  const result = (await longPoll({
+  const result = await longPoll({
     origin: serverOrigin(input.port),
     key,
     target,
     port: input.port,
-  })) as PollPayload;
+  });
   return batchOutput(result, target);
 }
 
@@ -42,8 +43,8 @@ export async function listen(input: ListenInput): Promise<StructuredOutput> {
  * `round` and `turn` lead, the items follow, and `next:` closes: the decision
  * rule for ending this turn is the last thing the agent reads (D5).
  */
-export function batchOutput(result: PollPayload, target: string): StructuredOutput {
-  if (result.superseded === true) return supersededOutput(result);
+export function batchOutput(result: PollPayload | Superseded, target: string): StructuredOutput {
+  if ("superseded" in result) return supersededOutput(result);
   const items = result.items.map(itemRow);
   if (result.ended) {
     return {
@@ -71,12 +72,10 @@ export function batchOutput(result: PollPayload, target: string): StructuredOutp
  * command holds the wait and will hand over the Send. No turn, no items — the
  * process that prints this is a leftover, and its only move is to stop.
  */
-function supersededOutput(result: PollPayload): StructuredOutput {
+function supersededOutput(result: Superseded): StructuredOutput {
   return {
     superseded: true,
-    message:
-      result.message ??
-      "another lightspeed command took over listening for this review; nothing to do here",
+    message: result.message,
     next: {
       done: "Nothing to do in this process: the command that took over hands you the reviewer's Send",
     },

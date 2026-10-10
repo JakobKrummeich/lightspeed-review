@@ -3,9 +3,9 @@ import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
 import { SessionStore } from "../session-store.ts";
 import type { SessionRecord } from "../session-types.ts";
-import { roundNumber, turnBlock, turnFacts, turnLabel, type TurnFacts } from "../turn.ts";
+import { roundNumber, turnBlock, turnFacts, turnLabel } from "../turn.ts";
 import { nextRule } from "../turn-help.ts";
-import { apiRequest } from "./api-client.ts";
+import { callApi } from "./api-client.ts";
 import { serverOrigin } from "./server-address.ts";
 
 export interface EndInput {
@@ -37,11 +37,13 @@ export async function runEnd(input: EndInput): Promise<StructuredOutput> {
       next: nextRule("ended", target),
     };
   }
-  const closed = (await apiRequest(
-    `${serverOrigin(input.port)}/api/session/${key}/end`,
-    { method: "POST" },
+  const closed = await callApi(
+    serverOrigin(input.port),
+    "POST /api/session/:key/end",
+    { key },
+    undefined,
     { key, target },
-  )) as Partial<TurnFacts>;
+  );
   const warning = unpublishedWarning(before, input);
   return {
     ...turnBlock(closed),

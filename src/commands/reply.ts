@@ -3,9 +3,10 @@ import type { AgentNote } from "../feedback.ts";
 import { branchState } from "../git-state.ts";
 import { printBlock, type StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
-import { turnBlock, type TurnFacts } from "../turn.ts";
+import type { ReplyAnswer } from "../api-contract.ts";
+import { turnBlock } from "../turn.ts";
 import { ifKilled, replyRerun, urlLast, waitClause } from "../turn-help.ts";
-import { apiRequest, jsonPost } from "./api-client.ts";
+import { callApi } from "./api-client.ts";
 import { scanArgs } from "./args.ts";
 import { listen, type ListenInput } from "./listen.ts";
 import { reviewUrl, serverOrigin } from "./server-address.ts";
@@ -58,23 +59,21 @@ export async function runReply(input: ReplyInput): Promise<StructuredOutput> {
   const key = sessionKey(input.repoRoot, input.branch, input.base);
   const target = `${input.branch} ${input.base}`;
   const state = branchState(input.repoRoot, input.branch);
-  const answer = (await apiRequest(
-    `${serverOrigin(input.port)}/api/session/${key}/reply`,
-    jsonPost({ replies: input.notes, ...state }),
+  const answer = await callApi(
+    serverOrigin(input.port),
+    "POST /api/session/:key/reply",
+    { key },
+    { replies: input.notes, ...state },
     { key, target },
-  )) as Partial<TurnFacts> & { rerun?: boolean };
+  );
   const announce = input.announce ?? printBlock;
   announce(urlLast(landed(answer, input.notes, target), reviewUrl(input.port, key)));
   return await (input.listen ?? listen)(input);
 }
 
-function landed(
-  answer: Partial<TurnFacts> & { rerun?: boolean },
-  notes: AgentNote[],
-  target: string,
-): StructuredOutput {
+function landed(answer: ReplyAnswer, notes: AgentNote[], target: string): StructuredOutput {
   const said =
-    answer.rerun === true
+    "rerun" in answer
       ? {
           rerun: true,
           message: `already replied; nothing posted twice — ${waitClause(answer.turn)}`,

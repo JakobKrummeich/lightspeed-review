@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { createServer as createSocketServer } from "node:net";
-import { apiRequest, jsonPost } from "../../src/commands/api-client.ts";
+import { callApi } from "../../src/commands/api-client.ts";
 import { longPoll } from "../../src/commands/long-poll.ts";
 import type { ReviewError } from "../../src/errors.ts";
 
@@ -142,7 +142,12 @@ test("a reply and then a poll: the wait gets its own connection and survives", a
   // The bug report's sequence — a `say` posts, then a `wait` blocks — against a server whose
   // idle keep-alive expires between the two: the poll takes its own connection and holds it.
   const harness = await pollServer({ keepAliveTimeoutMs: 50 });
-  await apiRequest(`http://127.0.0.1:${harness.port}/api/session/abc/reply`, jsonPost({ c: 1 }));
+  await callApi(
+    `http://127.0.0.1:${harness.port}`,
+    "POST /api/session/:key/reply",
+    { key: "abc" },
+    { replies: [{ to: "t1", text: "c" }] },
+  );
   await new Promise((resolve) => setTimeout(resolve, 100));
 
   const polling = pollFor(harness);

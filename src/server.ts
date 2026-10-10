@@ -5,9 +5,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
+import { routeParts, type CliRoute } from "./api-contract.ts";
 import { createIdSource } from "./ledger/records.ts";
 import type { LedgerStore } from "./ledger/store.ts";
-import type { CreateSessionRequest } from "./rounds/session-round.ts";
 import { matchRoute, type Route, type RouteHandler } from "./router.ts";
 import { type ContextHandler, type ServerContext } from "./server/context.ts";
 import { handleAgentReply, handleApproved, handleFeedback } from "./server/handlers-feedback.ts";
@@ -28,8 +28,7 @@ import {
   handlePresence,
 } from "./server/handlers-stream.ts";
 import { handleWork } from "./server/handlers-turn.ts";
-import { messageOf, sendJson } from "./server/http.ts";
-import type { LedgerReport } from "./server/ledger-log.ts";
+import { messageOf, sendAnswer, sendJson } from "./server/http.ts";
 import { hostIsAllowed, originIsAllowed } from "./server/security.ts";
 import { SessionTransport } from "./server/streams.ts";
 import { presenceOf } from "./turn.ts";
@@ -37,9 +36,6 @@ import type { SessionStore } from "./session-store.ts";
 import { DEFAULT_STATIC_DIR, loadAssets } from "./static-assets.ts";
 import { CLI_VERSION } from "./version.ts";
 
-export type { CreateSessionRequest };
-export type { LedgerReport };
-export type { DomainErrorBody } from "./server/http.ts";
 /** The rules a CLI checks before paying for a model call the server would refuse. */
 export { publishRefusal } from "./server/publish-rules.ts";
 export { stillWorking } from "./server/turn-refusals.ts";
@@ -135,26 +131,37 @@ export function createReviewServer(options: ReviewServerOptions): ReviewServer {
   };
 }
 
+/**
+ * Every route the CLI calls, under its contract key (`CliRoutes`): a contract
+ * route with no handler here, or a handler under a key the contract lacks,
+ * fails typecheck.
+ */
+const cliHandlers: { [R in CliRoute]: ContextHandler } = {
+  "POST /api/sessions": handleCreateSession,
+  "POST /api/session/:key/work": handleWork,
+  "POST /api/session/:key/reply": handleAgentReply,
+  "POST /api/session/:key/end": handleEnd,
+  "POST /api/session/:key/delivered": handleDelivered,
+  "GET /api/poll": handlePoll,
+  "GET /api/session/:key/presence": handlePresence,
+  "POST /api/shutdown": handleShutdown,
+  "GET /health": handleHealth,
+};
+
+function cliRouteEntries(bind: (handler: ContextHandler) => RouteHandler): Route[] {
+  return (Object.keys(cliHandlers) as CliRoute[]).map((route) => ({
+    ...routeParts(route),
+    handler: bind(cliHandlers[route]),
+  }));
+}
+
 function buildRoutes(context: ServerContext): Route[] {
   const bind =
     (handler: ContextHandler): RouteHandler =>
     (request, response, params) =>
       handler(context, request, response, params);
   return [
-    {
-      method: "GET",
-      pattern: "/health",
-      // The version and the state dir are the handshake: a client that reads a
-      // protocol this server does not speak, or keeps its reviews somewhere this
-      // server never looks, must find that out before it blocks on an answer.
-      handler: (_request, response) =>
-        sendJson(response, 200, {
-          status: "ok",
-          version: CLI_VERSION,
-          stateDir: resolve(context.store.stateDir),
-        }),
-    },
-    { method: "POST", pattern: "/api/sessions", handler: bind(handleCreateSession) },
+    ...cliRouteEntries(bind),
     { method: "GET", pattern: "/session/:key", handler: bind(handleReviewPage) },
     { method: "GET", pattern: "/api/session/:key/data", handler: bind(handleSessionData) },
     { method: "GET", pattern: "/api/session/:key/file", handler: bind(handleSessionFile) },
@@ -170,17 +177,27 @@ function buildRoutes(context: ServerContext): Route[] {
     },
     { method: "GET", pattern: "/api/session/:key/replay", handler: bind(handleReplay) },
     { method: "GET", pattern: "/api/session/:key/events", handler: bind(handleEvents) },
-    { method: "GET", pattern: "/api/session/:key/presence", handler: bind(handlePresence) },
     { method: "POST", pattern: "/api/session/:key/approved", handler: bind(handleApproved) },
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
-    { method: "POST", pattern: "/api/session/:key/reply", handler: bind(handleAgentReply) },
-    { method: "POST", pattern: "/api/session/:key/delivered", handler: bind(handleDelivered) },
-    { method: "POST", pattern: "/api/session/:key/work", handler: bind(handleWork) },
-    { method: "POST", pattern: "/api/session/:key/end", handler: bind(handleEnd) },
-    { method: "GET", pattern: "/api/poll", handler: bind(handlePoll) },
-    { method: "POST", pattern: "/api/shutdown", handler: bind(handleShutdown) },
     { method: "GET", pattern: "/static/:asset", handler: bind(handleStatic) },
   ];
+}
+
+/**
+ * The version and the state dir are the handshake: a client that reads a
+ * protocol this server does not speak, or keeps its reviews somewhere this
+ * server never looks, must find that out before it blocks on an answer.
+ */
+function handleHealth(
+  context: ServerContext,
+  _request: IncomingMessage,
+  response: ServerResponse,
+): void {
+  sendAnswer(response, "GET /health", {
+    status: "ok",
+    version: CLI_VERSION,
+    stateDir: resolve(context.store.stateDir),
+  });
 }
 
 /** `lightspeed stop`: acknowledged before the socket goes away. */
@@ -190,7 +207,7 @@ function handleShutdown(
   response: ServerResponse,
 ): void {
   response.on("finish", () => void context.stop());
-  sendJson(response, 200, { status: "stopping" });
+  sendAnswer(response, "POST /api/shutdown", { status: "stopping" });
 }
 
 async function handleRequest(

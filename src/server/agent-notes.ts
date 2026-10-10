@@ -6,7 +6,7 @@
 import type { AgentNote } from "../feedback.ts";
 import type { FeedbackPrompt, SessionRecord } from "../session-types.ts";
 import { threadIds } from "../threads.ts";
-import type { DomainErrorBody } from "./http.ts";
+import type { DomainErrorBody } from "../api-contract.ts";
 import { logAgentReply, type LedgerLog } from "./ledger-log.ts";
 import { unknownThreads } from "./turn-refusals.ts";
 

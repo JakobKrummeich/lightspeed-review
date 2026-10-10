@@ -3,6 +3,7 @@
  * ledger never changes an answer.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { DomainErrorBody, ReplyRequest } from "../api-contract.ts";
 import { withAgentReplies, withFeedback, type FeedbackRequest } from "../feedback.ts";
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
@@ -12,11 +13,11 @@ import { turnFacts } from "../turn.ts";
 import { handbackOf, isRerun, withHandback } from "../turn-moves.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { announceRoundEnd } from "./handlers-session.ts";
-import { badRequest, sendJson, type DomainErrorBody } from "./http.ts";
+import { badRequest, sendAnswer, sendJson, sendPageJson } from "./http.ts";
 import { everyPrompt, knownThreads, logReplies, unknownNotes } from "./agent-notes.ts";
 import { logFeedback } from "./ledger-log.ts";
 import { reviewEnded, reviewerHolds, stillWorking, unknownThreads } from "./turn-refusals.ts";
-import { parseApproved, readFeedback, readReply, type ReplyRequest } from "./validate.ts";
+import { parseApproved, readFeedback, readReply } from "./validate.ts";
 
 export async function handleApproved(
   context: ServerContext,
@@ -45,7 +46,7 @@ export async function handleApproved(
   const known = reviewPaths(session.groups);
   const approved = posted.filter((path) => known.has(path));
   context.store.save({ ...session, approved, updatedAt: new Date().toISOString() });
-  sendJson(response, 200, { approved });
+  sendPageJson(response, { approved });
 }
 
 export async function handleFeedback(
@@ -82,7 +83,7 @@ export async function handleFeedback(
   context.transport.publish(session.key, "feedback", { queued: prompts.length });
   // "Send & End" is the reviewer closing the round, so it closes like one.
   if (feedback.ended) announceRoundEnd(context, session, now);
-  sendJson(response, 200, { queued: prompts.length });
+  sendPageJson(response, { queued: prompts.length });
 }
 
 /**
@@ -168,7 +169,7 @@ export async function handleAgentReply(
   }
   const handback = handbackOf(session, "reply", reply.replies);
   if (isRerun(session, handback)) {
-    sendJson(response, 200, { ...turnFacts(session), rerun: true });
+    sendAnswer(response, "POST /api/session/:key/reply", { ...turnFacts(session), rerun: true });
     return;
   }
   const refusal = replyRefusal(session, reply);
@@ -182,7 +183,10 @@ export async function handleAgentReply(
   logReplies(context.log, session, reply.replies, now);
   context.transport.publishPresence(session.key);
   context.transport.publish(session.key, "session", { reason: "agent_reply" });
-  sendJson(response, 200, { ...turnFacts(updated), replied: reply.replies.length });
+  sendAnswer(response, "POST /api/session/:key/reply", {
+    ...turnFacts(updated),
+    replied: reply.replies.length,
+  });
 }
 
 /**

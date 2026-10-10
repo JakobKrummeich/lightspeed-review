@@ -1,7 +1,7 @@
 # The CLI ⇄ server protocol has no contract the compiler can see
 
 - **Date:** 2026-10-09
-- **Status:** Proposed — needs a human decision, no code was changed
+- **Status:** Implemented — all nine steps landed on `refactor/cli-server-wire-contract`
 - **Scope:** `src/commands/api-client.ts` and its callers (`work.ts`, `reply.ts`, `end.ts`, `round.ts`, `long-poll.ts`, `listen.ts`, `presence.ts`, `server-address.ts`); `src/server/http.ts`, `src/server/validate.ts`, `src/server/handlers-{session,turn,feedback,stream,review}.ts`, `src/server.ts`, `src/feedback.ts`; new `src/api-contract.ts` and `test/api-contract.test.ts`
 
 ## 1. Context

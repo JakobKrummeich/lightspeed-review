@@ -14,7 +14,7 @@ import {
   shownIds,
   workCall,
 } from "../turn-help.ts";
-import type { DomainErrorBody, SessionEndedBody } from "./http.ts";
+import type { DomainErrorBody, SessionEndedBody } from "../api-contract.ts";
 
 function targetOf(session: SessionRecord): string {
   return `${session.branch} ${session.base}`;
