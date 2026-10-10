@@ -1,7 +1,8 @@
 import { request as httpRequest } from "node:http";
+import { routeParts, type CliRoutes } from "../api-contract.ts";
 import { ReviewError } from "../errors.ts";
 import { holdSocketOpen } from "../hold-open.ts";
-import { apiRequest, jsonPost, parseBody, type SessionRef } from "./api-client.ts";
+import { callApi, parseBody, type SessionRef } from "./api-client.ts";
 import { helpRestart, reattachCall } from "../turn-help.ts";
 import { diagnosePort, reviewServerIsUp, type PortState } from "./server-address.ts";
 
@@ -33,11 +34,12 @@ const FAILURES_BEFORE_HEALTH_CHECK = 3;
  * `node:http` with `agent: false` gives the request its own connection, timers
  * off.
  */
-export async function longPoll(input: LongPollInput): Promise<unknown> {
+export async function longPoll(input: LongPollInput): Promise<PollAnswer> {
   const retry = retries(input);
+  const { pattern } = routeParts("GET /api/poll");
   for (;;) {
     try {
-      const answer = await pollOnce(`${input.origin}/api/poll?key=${input.key}`, about(input));
+      const answer = await pollOnce(`${input.origin}${pattern}?key=${input.key}`, about(input));
       await confirmDelivery(input, answer);
       return answer;
     } catch (error) {
@@ -55,14 +57,15 @@ export async function longPoll(input: LongPollInput): Promise<unknown> {
  * one re-delivery on the next poll, while a failed listen would cost the agent
  * the feedback it is holding.
  */
-async function confirmDelivery(input: LongPollInput, answer: unknown): Promise<void> {
-  if (typeof answer !== "object" || answer === null) return;
-  const { delivery } = answer as { delivery?: unknown };
-  if (typeof delivery !== "string") return;
+async function confirmDelivery(input: LongPollInput, answer: PollAnswer): Promise<void> {
+  const delivery = "delivery" in answer ? answer.delivery : undefined;
+  if (delivery === undefined) return;
   try {
-    await apiRequest(
-      `${input.origin}/api/session/${input.key}/delivered`,
-      jsonPost({ delivery }),
+    await callApi(
+      input.origin,
+      "POST /api/session/:key/delivered",
+      { key: input.key },
+      { delivery },
       about(input),
     );
   } catch {
@@ -134,8 +137,10 @@ function about(input: LongPollInput): SessionRef {
   return { key: input.key, ...(input.target === undefined ? {} : { target: input.target }) };
 }
 
-function pollOnce(url: string, ref: SessionRef): Promise<unknown> {
-  return new Promise<unknown>((resolve, reject) => {
+type PollAnswer = CliRoutes["GET /api/poll"]["answer"];
+
+function pollOnce(url: string, ref: SessionRef): Promise<PollAnswer> {
+  return new Promise<PollAnswer>((resolve, reject) => {
     const request = httpRequest(
       url,
       // `connection: close` because this socket is used once; nothing may pool it.
@@ -148,7 +153,7 @@ function pollOnce(url: string, ref: SessionRef): Promise<unknown> {
         response.on("end", () => {
           const answer = parseBody(response.statusCode ?? 0, body, ref);
           if (answer instanceof ReviewError) fail(answer);
-          else resolve(answer);
+          else resolve(answer as PollAnswer);
         });
       },
     );

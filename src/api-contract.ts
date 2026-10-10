@@ -8,7 +8,7 @@
  * would close an import cycle (`no-circular` in `pnpm arch`).
  */
 import type { RefusalCode, ReviewErrorCode } from "./errors.ts";
-import type { AgentNote } from "./feedback.ts";
+import type { AgentNote, PollPayload } from "./feedback.ts";
 import type { CreateSessionRequest } from "./rounds/session-round.ts";
 import type { ReviewCloser, SessionStatus } from "./session-types.ts";
 import type { TurnFacts } from "./turn.ts";
@@ -24,6 +24,12 @@ export interface CliRoutes {
   "POST /api/session/:key/work": { request: WorkRequest; answer: WorkAnswer };
   "POST /api/session/:key/reply": { request: ReplyRequest; answer: ReplyAnswer };
   "POST /api/session/:key/end": { request: undefined; answer: EndAnswer };
+  "POST /api/session/:key/delivered": {
+    request: { delivery: string };
+    answer: { confirmed: boolean };
+  };
+  /** Keyed by `?key=`, not by path: the long poll builds its own URL (`long-poll.ts`). */
+  "GET /api/poll": { request: undefined; answer: PollPayload | Superseded };
 }
 export type CliRoute = keyof CliRoutes;
 
@@ -111,6 +117,12 @@ export interface DomainErrorBody<C extends ReviewErrorCode = RefusalCode> {
 export interface SessionEndedBody {
   error: { code: "session_ended"; message: string };
   endedBy?: ReviewCloser;
+}
+
+/** A wait another waiting command took over: no turn, no items, nothing to do. */
+export interface Superseded {
+  superseded: true;
+  message: string;
 }
 
 /** Whether the feedback ledger took a round's records, as `publish` reports it. */

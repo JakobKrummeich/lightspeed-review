@@ -146,6 +146,8 @@ const cliHandlers: { [R in CliRoute]: ContextHandler } = {
   "POST /api/session/:key/work": handleWork,
   "POST /api/session/:key/reply": handleAgentReply,
   "POST /api/session/:key/end": handleEnd,
+  "POST /api/session/:key/delivered": handleDelivered,
+  "GET /api/poll": handlePoll,
 };
 
 function cliRouteEntries(bind: (handler: ContextHandler) => RouteHandler): Route[] {
@@ -193,8 +195,6 @@ function buildRoutes(context: ServerContext): Route[] {
     { method: "GET", pattern: "/api/session/:key/presence", handler: bind(handlePresence) },
     { method: "POST", pattern: "/api/session/:key/approved", handler: bind(handleApproved) },
     { method: "POST", pattern: "/api/session/:key/feedback", handler: bind(handleFeedback) },
-    { method: "POST", pattern: "/api/session/:key/delivered", handler: bind(handleDelivered) },
-    { method: "GET", pattern: "/api/poll", handler: bind(handlePoll) },
     { method: "POST", pattern: "/api/shutdown", handler: bind(handleShutdown) },
     { method: "GET", pattern: "/static/:asset", handler: bind(handleStatic) },
   ];
