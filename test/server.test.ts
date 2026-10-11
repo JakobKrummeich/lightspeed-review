@@ -12,7 +12,7 @@ import type { AnnotationRecord } from "../src/ledger/records.ts";
 import { createReviewServer } from "../src/server.ts";
 import { ReviewError } from "../src/errors.ts";
 import { MAX_APPROVED_FORM_BYTES } from "../src/rounds/approved-form.ts";
-import { sessionKey } from "../src/paths.ts";
+import { sessionFilePath, sessionKey } from "../src/paths.ts";
 import { git, newRepo } from "./helpers/git-repo.ts";
 import {
   annotation,
@@ -1211,6 +1211,28 @@ test("a malformed session payload is a 400, not a 500", async () => {
 
     assert.equal(response.status, 400);
     assert.match(JSON.stringify(await response.json()), /invalid_request/);
+  });
+});
+
+/**
+ * The one catch between a throwing handler and Node: requests are dispatched
+ * with `void handleRequest(...)`, so without it a handler's throw is an
+ * unhandled rejection that takes the whole server, and every open review with
+ * it, down mid-review. A corrupt session file is a real way to throw from
+ * inside a handler (the store's read raises session_corrupt).
+ */
+test("a handler that throws answers 500 internal_error and the server keeps serving", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    writeFileSync(sessionFilePath(store.stateDir, key), "{ not json", "utf8");
+
+    const response = await fetch(`${url}/api/session/${key}/data`);
+
+    assert.equal(response.status, 500);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    assert.equal(body.error.code, "internal_error");
+    assert.match(body.error.message, new RegExp(`session ${key} is not readable JSON`));
+    assert.equal((await fetch(`${url}/health`)).status, 200);
   });
 });
 
