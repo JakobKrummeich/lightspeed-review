@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- A corrupt session file no longer empties bare `lightspeed`'s list of
+  reviews. It hides only itself, so home stops answering "no active review
+  sessions" while a live review sits beside it. Commands that act on a
+  session still refuse `session_corrupt`, naming the file to delete.
+- A session file that is valid JSON but not a session (`null`, or one
+  missing its fields) is reported as `session_corrupt` with that
+  delete-the-file help, instead of a raw `TypeError`.
+
 ## 3.8.0
 
 - The **Between rounds** replay leaves out comments whose thread you

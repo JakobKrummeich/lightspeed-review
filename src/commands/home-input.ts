@@ -51,10 +51,14 @@ function codeOf(error: unknown): string | undefined {
   return error instanceof ReviewError ? error.code : undefined;
 }
 
-/** A corrupt session file must not take the whole view down with it. */
+/**
+ * A corrupt session file must not take the whole view down with it: one
+ * unreadable file once emptied the list, the false "no active review sessions"
+ * above. The catch is for a store that cannot be read at all.
+ */
 function storedSessions(stateDir: string): SessionRecord[] {
   try {
-    return new SessionStore(stateDir).list();
+    return new SessionStore(stateDir).listReadable();
   } catch {
     return [];
   }
