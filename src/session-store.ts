@@ -22,6 +22,17 @@ function parseSession(contents: string, key: string): SessionRecord {
   } catch (error) {
     throw sessionCorrupt(key, `session ${key} is not readable JSON`, (error as Error).message);
   }
+  try {
+    return normalizedSession(parsed, key);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw sessionCorrupt(key, `session ${key} is not a readable session`, error.message);
+    }
+    throw error;
+  }
+}
+
+function normalizedSession(parsed: SessionRecord, key: string): SessionRecord {
   if (!Array.isArray(parsed.rounds)) {
     throw sessionCorrupt(
       key,

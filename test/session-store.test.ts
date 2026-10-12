@@ -341,6 +341,29 @@ test("listReadable skips a corrupt session file where list names it", () => {
   );
 });
 
+test("a structurally broken session file hides itself from listReadable", () => {
+  for (const body of ["null", '{"rounds":[],"groups":[]}', '{"rounds":[null],"groups":[]}']) {
+    const dir = stateDir();
+    const store = new SessionStore(dir);
+    store.save(sessionRecord());
+    writeFileSync(join(dir, "sessions", "0000000000000000.json"), body);
+
+    assert.deepEqual(
+      store.listReadable().map((session) => session.key),
+      ["a3f8c21b9e4d5f60"],
+      body,
+    );
+    assert.throws(
+      () => store.get("0000000000000000"),
+      (error: unknown) =>
+        error instanceof ReviewError &&
+        error.code === "session_corrupt" &&
+        error.suggestions.some((line) => line.includes("0000000000000000.json")),
+      body,
+    );
+  }
+});
+
 test("a corrupt session file reports session_corrupt instead of vanishing", () => {
   const dir = stateDir();
   const store = new SessionStore(dir);
