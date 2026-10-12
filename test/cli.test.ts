@@ -186,6 +186,24 @@ test("bare invocation in a repo with no config reports the config, not an empty 
   assert.match(stdout, /lightspeed init --config/);
 });
 
+/**
+ * Regression: one unreadable session file made the home view report no
+ * sessions at all, the false "no active review sessions" home-input.ts warns
+ * sends an agent to open a second review beside the live one.
+ */
+test("a corrupt session file hides only itself from the home view", async () => {
+  const repoRoot = emptyRepo();
+  storeSession(join(repoRoot, "state"), repoRoot, "feature/greeting");
+  writeFileSync(join(repoRoot, "state", "sessions", "0000000000000000.json"), "{ truncated");
+
+  const { stdout, code } = await runCli([], repoRoot);
+
+  assert.equal(code, 0, stdout);
+  assert.match(stdout, /^sessions\[1\]/m);
+  assert.match(stdout, /feature\/greeting,main/);
+  assert.doesNotMatch(stdout, /no active review sessions/);
+});
+
 /** `--all` is the only flag that comes before a command, and the SDK refuses a
  * leading flag before it ever dispatches — so the CLI reads it itself. Proving
  * it here proves the plumbing, not just the renderer. */

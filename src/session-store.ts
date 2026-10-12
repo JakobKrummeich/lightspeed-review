@@ -94,17 +94,35 @@ export class SessionStore {
   }
 
   list(): SessionRecord[] {
+    return this.#keys().map((key) =>
+      parseSession(readFileSync(join(this.#directory, `${key}.json`), "utf8"), key),
+    );
+  }
+
+  /**
+   * For a view over every review (bare `lightspeed`): a corrupt file hides
+   * itself, not the live reviews beside it. Commands acting on a session use
+   * `list`, which names the corrupt file and how to clear it.
+   */
+  listReadable(): SessionRecord[] {
+    return this.#keys().flatMap((key) => {
+      try {
+        return this.get(key) ?? [];
+      } catch (error) {
+        if (error instanceof ReviewError && error.code === "session_corrupt") return [];
+        throw error;
+      }
+    });
+  }
+
+  #keys(): string[] {
     let entries: string[];
     try {
       entries = readdirSync(this.#directory);
     } catch {
       return [];
     }
-    return entries
-      .filter((entry) => entry.endsWith(".json"))
-      .map((entry) =>
-        parseSession(readFileSync(join(this.#directory, entry), "utf8"), entry.slice(0, -5)),
-      );
+    return entries.filter((entry) => entry.endsWith(".json")).map((entry) => entry.slice(0, -5));
   }
 
   save(record: SessionRecord): void {

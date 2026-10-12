@@ -325,6 +325,22 @@ test("a turn the agent holds survives the store being reopened", () => {
   });
 });
 
+test("listReadable skips a corrupt session file where list names it", () => {
+  const dir = stateDir();
+  const store = new SessionStore(dir);
+  store.save(sessionRecord());
+  writeFileSync(join(dir, "sessions", "0000000000000000.json"), "{ truncated");
+
+  assert.deepEqual(
+    store.listReadable().map((session) => session.key),
+    ["a3f8c21b9e4d5f60"],
+  );
+  assert.throws(
+    () => store.list(),
+    (error: unknown) => error instanceof ReviewError && error.code === "session_corrupt",
+  );
+});
+
 test("a corrupt session file reports session_corrupt instead of vanishing", () => {
   const dir = stateDir();
   const store = new SessionStore(dir);
