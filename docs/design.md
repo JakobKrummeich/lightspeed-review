@@ -100,9 +100,11 @@ the turn is recovered by re-running the command it died in.
 change under it, so composing, replying and resolving are locked; reading and
 approving are not. While it works, the reviewer queues, and the queue goes out
 with the next round. The server enforces the same lock (409 `agent_holds_turn`).
-Ending is never refused, but an ending Send that carries words while the agent
-holds the turn is: nothing would ever hand those words to the agent, whose next
-call only hears that the review ended.
+Ending an open review is never refused, but an ending Send that carries words
+while the agent holds the turn is: nothing would ever hand those words to the
+agent, whose next call only hears that the review ended. An ended review takes
+no feedback at all (409 `session_ended`), so a stale tab can neither reopen it
+nor close and ledger its round a second time.
 
 **One exit-code rule.** Exit 2 when re-running the same command cannot help —
 the command line is wrong, or the move is wrong for the review's state. Exit 1

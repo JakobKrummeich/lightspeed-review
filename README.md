@@ -556,7 +556,9 @@ fine) — because there is then nothing half-written to protect; the refusal say
 which of the two changed. Otherwise the agent publishes what exists and asks in
 the new round. The server holds the page to the same lock: a Send while the agent
 holds the turn is refused `agent_holds_turn`, and the page says "Not sent" — a
-Send & End with words included; End without Sending always goes.
+Send & End with words included; End without Sending always goes. Once the review
+has ended, a Send or End from a stale tab is refused `session_ended` and changes
+nothing.
 
 `open`, `reply` and `publish` **wait for the reviewer's Send**: they do not
 return until the next batch arrives (or the review ends), so one call is one
