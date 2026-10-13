@@ -9,6 +9,10 @@
 - A session file that is valid JSON but not a session (`null`, or one
   missing its fields) is reported as `session_corrupt` with that
   delete-the-file help, instead of a raw `TypeError`.
+- A Send or End from a stale tab on a review that has already ended is
+  refused `session_ended`, and the page says "Not sent". It no longer turns
+  the review back into a live one with words nobody would read, or closes its
+  round and records the round's end in the ledger a second time.
 
 ## 3.8.0
 
