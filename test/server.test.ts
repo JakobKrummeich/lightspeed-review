@@ -267,6 +267,38 @@ test("a tick posted after the reviewer ended the review is refused", async () =>
   });
 });
 
+/**
+ * The Send twin of the tick above. A stale or second tab's Send once flipped an
+ * ended review back to "feedback" with words nobody would read, and its Send &
+ * End closed the round again and ledgered a second round end — what `/end`
+ * already declines to do on a closed review.
+ */
+test("feedback posted after the review ended is refused and changes nothing", async () => {
+  const ledger = new LedgerStore(mkdtempSync(join(tmpdir(), "lsr-ledger-")));
+  await withServer(
+    async ({ url, store }) => {
+      const key = await endedSession(url, store);
+      const before = store.get(key)!;
+      const logged = ledger.read({}).matched;
+
+      for (const body of [
+        { prompts: [{ type: "message", comment: "one more thing" }], ended: false },
+        { prompts: [], ended: true },
+      ]) {
+        const { status, json } = await postFeedback(url, key, body);
+
+        assert.equal(status, 409);
+        assert.deepEqual(json, {
+          error: { code: "session_ended", message: "this review is ended; nothing was sent" },
+        });
+        assert.deepEqual(store.get(key), before);
+        assert.equal(ledger.read({}).matched, logged);
+      }
+    },
+    { ledger },
+  );
+});
+
 test("a file the agent edited after it was approved comes back needing re-approval", async () => {
   await withServer(async (running) => {
     const { url, store } = running;

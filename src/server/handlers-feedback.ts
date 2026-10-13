@@ -3,7 +3,7 @@
  * ledger never changes an answer.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { DomainErrorBody, ReplyRequest } from "../api-contract.ts";
+import type { DomainErrorBody, ReplyRequest, SessionEndedBody } from "../api-contract.ts";
 import { withAgentReplies, withFeedback, type FeedbackRequest } from "../feedback.ts";
 import { reviewPaths } from "../review-files.ts";
 import { withClosedRound } from "../rounds/session-round.ts";
@@ -94,13 +94,22 @@ export async function handleFeedback(
  * Send's words are: no command ever hands them to an agent that holds the turn,
  * whose next call only hears that the review ended.
  *
- * A 409 the page reads, never the CLI: its code is not one of `REFUSAL_CODES`.
+ * Walking away is an open review's: an ended one takes nothing, an End
+ * included, as `/approved` takes no tick. A stale tab's Send once turned it
+ * back into a live review with words nobody would read, and its End closed the
+ * round and ledgered its end a second time.
+ *
+ * Both are 409s the page reads, never the CLI; `agent_holds_turn` is not even
+ * one of `REFUSAL_CODES`.
  */
 function lockedOut(
   session: SessionRecord,
   feedback: FeedbackRequest,
-): DomainErrorBody<"agent_holds_turn"> | undefined {
-  if (session.status === "ended" || session.turn.holder !== "agent") return undefined;
+): DomainErrorBody<"agent_holds_turn"> | SessionEndedBody | undefined {
+  if (session.status === "ended") {
+    return { error: { code: "session_ended", message: "this review is ended; nothing was sent" } };
+  }
+  if (session.turn.holder !== "agent") return undefined;
   if (feedback.ended) return feedback.prompts.length === 0 ? undefined : wordsOnEnd();
   const message =
     session.turn.mode === "working"
