@@ -1,4 +1,6 @@
 import { test } from "node:test";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import assert from "node:assert/strict";
 import {
   createModels,
@@ -7,7 +9,14 @@ import {
   getCurrentSystemPrompt,
   withoutInitialSystemMessage,
 } from "@earendil-works/pi-ai";
-import type { Message, Model, MutableModels, TranscriptContext } from "@earendil-works/pi-ai";
+import type {
+  Message,
+  Model,
+  MutableModels,
+  Provider,
+  TranscriptContext,
+} from "@earendil-works/pi-ai";
+import { mistralProvider } from "@earendil-works/pi-ai/providers/mistral";
 import { runGroupingCall } from "../../src/llm/pi-client.ts";
 import { ReviewError } from "../../src/errors.ts";
 import type { ProviderConfig, ThinkingLevel } from "../../src/config.ts";
@@ -404,5 +413,50 @@ test("a failure names the provider entry that was applied, under whichever id ei
       [[true, true]],
       `${model} with ${Object.keys(providers).join(", ")}: ${error.suggestions.join(" | ")}`,
     );
+  }
+});
+
+/**
+ * pi-ai bounds only the wait for Mistral's response headers, and only when the call carries an
+ * abort signal of its own: without one, its header timeout is the very signal the response body
+ * streams under, so a long generation was cut off at the deadline mid-stream. The provider's
+ * deadline is shortened here so the stream outlives it in a fraction of a second.
+ */
+test("a Mistral stream that outlives the header timeout still finishes", async () => {
+  const chunk = (content: string, finish: string | null = null) =>
+    `data: ${JSON.stringify({ id: "r1", choices: [{ index: 0, delta: { content }, finish_reason: finish }] })}\n\n`;
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.write(chunk("one "));
+    setTimeout(() => {
+      response.write(chunk("two", "stop"));
+      response.end("data: [DONE]\n\n");
+    }, 600);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const { port } = server.address() as AddressInfo;
+    const mistral: Provider = mistralProvider();
+    const models = createModels();
+    models.setProvider({
+      ...mistral,
+      streamSimple: (model, context, options) =>
+        mistral.streamSimple(model, context, { ...options, timeoutMs: 200 }),
+    });
+
+    const result = await runGroupingCall({
+      model: "mistral/mistral-large-latest",
+      thinking: "off",
+      stateDir: "/tmp/lsr",
+      providers: { mistral: { baseUrl: `http://127.0.0.1:${port}`, apiKey: "k" } },
+      systemPrompt: "group these files",
+      messages: [userMessage],
+      models,
+    });
+
+    assert.equal(result.text, "one two");
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
   }
 });
