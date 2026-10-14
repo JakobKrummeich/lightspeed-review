@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Grouping runs on pi-ai 1.2.0, with its updated model catalog and provider
+  fixes — e.g. Mistral streams are no longer cut off mid-generation by the
+  request timeout.
 - A corrupt session file no longer empties bare `lightspeed`'s list of
   reviews. It hides only itself, so home stops answering "no active review
   sessions" while a live review sits beside it. Commands that act on a

@@ -56,7 +56,9 @@ export async function runGroupingCall(input: GroupingCallInput): Promise<Groupin
     },
     {
       ...(input.thinking === "off" ? {} : { reasoning: input.thinking }),
-      ...(input.signal ? { signal: input.signal } : {}),
+      // Always a signal of our own: without one, pi-ai's Mistral header timeout
+      // becomes the signal the whole body streams under and cuts it off.
+      signal: input.signal ?? new AbortController().signal,
     },
   );
   rejectFailedReply(reply, input);
