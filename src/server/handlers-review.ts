@@ -19,8 +19,12 @@ export function handleReviewPage(
 ) {
   const session = requireSession(context.store, response, params.key);
   if (!session) return;
+  // Rendered before the status line: a render that throws after `writeHead`
+  // leaves server.ts's catch writing a 500 over a sent 200, and that throw
+  // escapes as an unhandled rejection that takes the server down.
+  const page = renderReviewPage(session);
   response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  response.end(renderReviewPage(session));
+  response.end(page);
 }
 
 export function handleSessionData(
