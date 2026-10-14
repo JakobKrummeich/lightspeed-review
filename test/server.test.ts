@@ -1268,6 +1268,27 @@ test("a handler that throws answers 500 internal_error and the server keeps serv
   });
 });
 
+/**
+ * The same catch, reached after a handler has started its answer: a 500 written
+ * over a sent status line throws inside the catch, and that throw has nothing
+ * left to stop it. A session file that parses but has lost its `branch` throws
+ * from the page render (escapeHtml of undefined).
+ */
+test("a review page that fails to render answers 500 and the server keeps serving", async () => {
+  await withServer(async ({ url, store }) => {
+    const { key } = await postSession(url);
+    const unbranched = { ...store.get(key), branch: undefined };
+    writeFileSync(sessionFilePath(store.stateDir, key), JSON.stringify(unbranched), "utf8");
+
+    const response = await fetch(`${url}/session/${key}`);
+
+    assert.equal(response.status, 500);
+    const body = (await response.json()) as { error: { code: string } };
+    assert.equal(body.error.code, "internal_error");
+    assert.equal((await fetch(`${url}/health`)).status, 200);
+  });
+});
+
 test("posting approved files persists them on the session", async () => {
   await withServer(async ({ url, store }) => {
     const { key } = await postSession(url);

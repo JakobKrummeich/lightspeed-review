@@ -13,6 +13,9 @@
   refused `session_ended`, and the page says "Not sent". It no longer turns
   the review back into a live one with words nobody would read, or closes its
   round and records the round's end in the ledger a second time.
+- A review page that fails to render, such as one whose session file has
+  lost its branch, answers 500 `internal_error` instead of crashing the
+  review server and taking every other open review down with it.
 
 ## 3.8.0
 
