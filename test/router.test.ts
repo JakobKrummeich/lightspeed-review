@@ -27,6 +27,11 @@ test("decodes percent-encoded parameters", () => {
   assert.deepEqual(matchRoute(routes, "GET", "/session/a%2Fb")?.params, { key: "a/b" });
 });
 
+test("a parameter that is not valid percent-encoding matches no route instead of throwing", () => {
+  assert.equal(matchRoute(routes, "GET", "/session/%E0%A4%A"), undefined);
+  assert.equal(matchRoute(routes, "GET", "/api/session/100%/data"), undefined);
+});
+
 test("does not match a different method", () => {
   assert.equal(matchRoute(routes, "POST", "/health"), undefined);
 });
