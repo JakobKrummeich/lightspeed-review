@@ -44,12 +44,27 @@ function matchSegments(pattern: string[], actual: string[]): RouteParams | undef
   for (const [index, expected] of pattern.entries()) {
     const segment = actual[index] ?? "";
     if (expected.startsWith(":")) {
-      params[expected.slice(1)] = decodeURIComponent(segment);
+      const value = decodedSegment(segment);
+      if (value === undefined) return undefined;
+      params[expected.slice(1)] = value;
       continue;
     }
     if (expected !== segment) return undefined;
   }
   return params;
+}
+
+/**
+ * A stray `%` (`/session/100%`) is a path no route names, not an exception:
+ * routing runs outside the server's per-request catch, so a throw here is an
+ * unhandled rejection that ends the server and every open review with it.
+ */
+function decodedSegment(segment: string): string | undefined {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function readJsonBody<T>(

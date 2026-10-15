@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 import { routeParts, type CliRoute } from "./api-contract.ts";
 import { createIdSource } from "./ledger/records.ts";
 import type { LedgerStore } from "./ledger/store.ts";
-import { matchRoute, type Route, type RouteHandler } from "./router.ts";
+import { matchRoute, type Route, type RouteHandler, type RouteMatch } from "./router.ts";
 import { type ContextHandler, type ServerContext } from "./server/context.ts";
 import { handleAgentReply, handleApproved, handleFeedback } from "./server/handlers-feedback.ts";
 import {
@@ -222,8 +222,7 @@ async function handleRequest(
     });
     return;
   }
-  const pathname = context.requestUrl(request).pathname;
-  const match = matchRoute(routes, request.method ?? "GET", pathname);
+  const { pathname, match } = routeOf(context, routes, request);
   if (!match) {
     sendJson(response, 404, {
       error: { code: "not_found", message: `no route for ${pathname}` },
@@ -237,6 +236,24 @@ async function handleRequest(
       error: { code: "internal_error", message: messageOf(error) },
     });
   }
+}
+
+/**
+ * A target the URL parser rejects (`//%` reads as a host) names no route;
+ * thrown here, before the per-request catch, it would end the server.
+ */
+function routeOf(
+  context: ServerContext,
+  routes: Route[],
+  request: IncomingMessage,
+): { pathname: string; match: RouteMatch | undefined } {
+  let pathname: string;
+  try {
+    pathname = context.requestUrl(request).pathname;
+  } catch {
+    return { pathname: request.url ?? "/", match: undefined };
+  }
+  return { pathname, match: matchRoute(routes, request.method ?? "GET", pathname) };
 }
 
 /**

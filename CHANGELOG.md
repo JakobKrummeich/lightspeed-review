@@ -19,6 +19,9 @@
 - A review page that fails to render, such as one whose session file has
   lost its branch, answers 500 `internal_error` instead of crashing the
   review server and taking every other open review down with it.
+- A URL with a malformed percent-encoding, such as `/session/100%` or
+  `//%`, answers 404 `not_found` instead of crashing the review server and
+  taking every open review down with it.
 
 ## 3.8.0
 

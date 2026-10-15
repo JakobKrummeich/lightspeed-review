@@ -1269,6 +1269,44 @@ test("a handler that throws answers 500 internal_error and the server keeps serv
 });
 
 /**
+ * Routing runs before that catch, so a throw there once took the process down:
+ * one address-bar typo with a stray `%` ended every open review.
+ */
+test("a path that is not valid percent-encoding is a 404 and the server keeps serving", async () => {
+  await withServer(async ({ url }) => {
+    const response = await fetch(`${url}/api/session/%E0%A4%A/data`);
+
+    assert.equal(response.status, 404);
+    const body = (await response.json()) as { error: { code: string } };
+    assert.equal(body.error.code, "not_found");
+    assert.equal((await fetch(`${url}/health`)).status, 200);
+  });
+});
+
+test("a request target the URL parser rejects is a 404 and the server keeps serving", async () => {
+  await withServer(async ({ url }) => {
+    const { port } = new URL(url);
+    const answer = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const request = httpRequest(
+        { host: "127.0.0.1", port, path: "//%", headers: { host: `127.0.0.1:${port}` } },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk: string) => (body += chunk));
+          response.on("end", () => resolve({ status: response.statusCode ?? 0, body }));
+        },
+      );
+      request.on("error", reject);
+      request.end();
+    });
+
+    assert.equal(answer.status, 404);
+    assert.equal((JSON.parse(answer.body) as { error: { code: string } }).error.code, "not_found");
+    assert.equal((await fetch(`${url}/health`)).status, 200);
+  });
+});
+
+/**
  * The same catch, reached after a handler has started its answer: a 500 written
  * over a sent status line throws inside the catch, and that throw has nothing
  * left to stop it. A session file that parses but has lost its `branch` throws
