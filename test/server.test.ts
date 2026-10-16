@@ -1519,3 +1519,30 @@ test("a body that is not JSON is a 400", async () => {
     assert.equal(response.status, 400);
   });
 });
+
+test("a JSON null body is a 400 on every route that reads one, not a 500", async () => {
+  await withServer(async ({ url }) => {
+    const { key } = await postSession(url);
+    const routes = [
+      "/api/sessions",
+      `/api/session/${key}/reply`,
+      `/api/session/${key}/work`,
+      `/api/session/${key}/delivered`,
+      `/api/session/${key}/approved`,
+      `/api/session/${key}/feedback`,
+    ];
+
+    const statuses: Record<string, number> = {};
+    for (const route of routes) {
+      const response = await fetch(`${url}${route}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "null",
+      });
+      await response.body?.cancel();
+      statuses[route] = response.status;
+    }
+
+    assert.deepEqual(statuses, Object.fromEntries(routes.map((route) => [route, 400])));
+  });
+});

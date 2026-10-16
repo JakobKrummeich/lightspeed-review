@@ -49,10 +49,14 @@ export function sseFrame(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-/** Request bodies are untrusted input: a body that is not JSON is simply absent. */
+/**
+ * Request bodies are untrusted input: a body that is not JSON is simply absent.
+ * So is a JSON `null`: it parses, but every reader then destructures it, and
+ * the TypeError reached the client as a 500 instead of the reader's 400.
+ */
 export async function readJsonSafely<T>(request: IncomingMessage): Promise<T | undefined> {
   try {
-    return await readJsonBody<T>(request);
+    return (await readJsonBody<T | null>(request)) ?? undefined;
   } catch {
     return undefined;
   }
