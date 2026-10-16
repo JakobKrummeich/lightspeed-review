@@ -51,8 +51,8 @@ export function sseFrame(event: string, data: unknown): string {
 
 /**
  * Request bodies are untrusted input: a body that is not JSON is simply absent.
- * So is a JSON `null`: it parses, but every reader then destructures it, and
- * the TypeError reached the client as a 500 instead of the reader's 400.
+ * So is a JSON `null`: it parses, but every reader destructures the result, so
+ * a `null` passed through would throw and answer 500 instead of the reader's 400.
  */
 export async function readJsonSafely<T>(request: IncomingMessage): Promise<T | undefined> {
   try {
