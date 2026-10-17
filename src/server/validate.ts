@@ -4,6 +4,7 @@
  */
 import type { IncomingMessage } from "node:http";
 import type { ReplyRequest, WorkRequest } from "../api-contract.ts";
+import type { DiffFile, DiffGroup } from "../diff-extract.ts";
 import { parseFeedbackRequest, type AgentNote } from "../feedback.ts";
 import type { CreateSessionRequest } from "../rounds/session-round.ts";
 import { readJsonSafely } from "./http.ts";
@@ -38,7 +39,23 @@ function hasSessionShape(
   Pick<CreateSessionRequest, "repoRoot" | "branch" | "base" | "groups"> {
   const { repoRoot, branch, base, groups } = payload;
   const named = [repoRoot, branch, base].every((value) => typeof value === "string");
-  return named && Array.isArray(groups);
+  return named && Array.isArray(groups) && groups.every(isGroup);
+}
+
+/**
+ * As deep as building the round reaches. A group with no `files` array or a
+ * file that is not an object threw a TypeError (500), and a non-text `diff`
+ * threw in the ledger after the round was saved, so the CLI was told a round
+ * it had opened had failed. A file without a `path` is no file to review.
+ */
+function isGroup(group: unknown): boolean {
+  const files = (group as Partial<DiffGroup> | null)?.files;
+  return Array.isArray(files) && files.every(isFile);
+}
+
+function isFile(file: unknown): boolean {
+  const { path, diff } = (file ?? {}) as Partial<DiffFile>;
+  return typeof path === "string" && typeof diff === "string";
 }
 
 function isGroupingMode(value: unknown): value is "skipped" | "llm" | "fallback" {

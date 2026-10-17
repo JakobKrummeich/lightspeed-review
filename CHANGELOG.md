@@ -25,6 +25,11 @@
 - A request whose JSON body is `null`, such as a `POST /api/sessions` or a
   reply, is refused 400 like any other missing body, instead of answering
   500 `internal_error`.
+- A `POST /api/sessions` whose groups no round can be built from (a null
+  group or one with no `files`, or a file that is not an object, has no
+  `path`, or has a `diff` that is not text) is refused 400 and saves nothing,
+  instead of answering 500 `internal_error` or saving a round and then
+  reporting it failed.
 
 ## 3.8.0
 

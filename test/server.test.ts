@@ -1546,3 +1546,29 @@ test("a JSON null body is a 400 on every route that reads one, not a 500", async
     assert.deepEqual(statuses, Object.fromEntries(routes.map((route) => [route, 400])));
   });
 });
+
+test("a grouping no round can be built from is a 400 that saves nothing, not a 500", async () => {
+  await withServer(async ({ url, store }) => {
+    const file = sessionPayload.groups[0]!.files[0]!;
+    const group = { name: "g", rationale: "r" };
+    // The pathless file was saved as a round; the rest reached a TypeError, the
+    // last in the ledger after the round was saved: a failure that wasn't.
+    const groupings: Record<string, unknown[]> = {
+      "a null group": [null],
+      "a group with no files": [group],
+      "a null file": [{ ...group, files: [null] }],
+      "a file with no path": [{ ...group, files: [{ ...file, path: undefined }] }],
+      "a diff that is not text": [{ ...group, files: [{ ...file, diff: 3 }] }],
+    };
+
+    const statuses: Record<string, number> = {};
+    for (const [name, groups] of Object.entries(groupings)) {
+      const response = await postSessionRaw(url, { ...sessionPayload, branch: name, groups });
+      await response.body?.cancel();
+      statuses[name] = response.status;
+    }
+
+    assert.deepEqual(statuses, Object.fromEntries(Object.keys(groupings).map((n) => [n, 400])));
+    assert.deepEqual(store.listReadable(), []);
+  });
+});
