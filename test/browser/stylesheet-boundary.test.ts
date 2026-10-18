@@ -217,7 +217,8 @@ function statusBanners(): string {
  *
  * The emitters not listed here are guarded by nothing; adding one is an entry
  * plus a fixture, where every class the module draws is painted in one area.
- * Measured 2026-09-25, none of the remaining eight qualifies as it stands:
+ * Measured 2026-09-25, none of the remaining eight qualified; status-banner.ts
+ * has since (see its entry), and none of the other seven qualifies as it stands:
  * each wants a decision about where an area's edge runs that this table has
  * no shape for. diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts
  * and full-file.ts each draw across two or more areas by
