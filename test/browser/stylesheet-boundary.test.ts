@@ -12,6 +12,7 @@ import { renderIntent } from "../../src/browser/intent-view.ts";
 import { renderOpening, renderSkyNames } from "../../src/browser/opening-view.ts";
 import { renderProgressBar } from "../../src/browser/progress-bar.ts";
 import { renderReplayOverlay } from "../../src/browser/round-replay.ts";
+import { renderStatusBanner, type StatusState } from "../../src/browser/status-banner.ts";
 import type { ApprovedFormData } from "../../src/rounds/approved-form.ts";
 import type { ReplayComment } from "../../src/rounds/replay.ts";
 
@@ -187,6 +188,28 @@ function approvedForms(): string {
 }
 
 /**
+ * The banner in the three shapes that draw its three marks: the reviewer's turn
+ * a dot, the agent's a firefly, an ended review the overlay. The overlay's body
+ * is the closing summary, which closing.css paints and the closing-summary.ts
+ * entry already guards, so it is cut out here: what is left is the markup
+ * status-banner.ts writes itself.
+ */
+function statusBanners(): string {
+  const open: StatusState = {
+    status: "open",
+    agentWaiting: false,
+    turn: { holder: "reviewer", at: "2025-01-01T00:00:00.000Z" },
+    review: CLOSED_REVIEW,
+  };
+  const ended = renderStatusBanner({ ...open, status: "ended" });
+  return [
+    renderStatusBanner(open),
+    renderStatusBanner({ ...open, turn: { holder: "agent", mode: "digesting", at: open.turn.at } }),
+    ended.replace(renderClosingSummary(CLOSED_REVIEW), ""),
+  ].join("");
+}
+
+/**
  * Who paints what, module by module: the half of the boundary the import list
  * cannot state. A rule that drifts into another area still reaches the browser
  * — it is served one stylesheet either way — so nothing on screen and no other
@@ -196,8 +219,8 @@ function approvedForms(): string {
  * plus a fixture, where every class the module draws is painted in one area.
  * Measured 2026-09-25, none of the remaining eight qualifies as it stands:
  * each wants a decision about where an area's edge runs that this table has
- * no shape for. diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts,
- * status-banner.ts and full-file.ts each draw across two or more areas by
+ * no shape for. diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts
+ * and full-file.ts each draw across two or more areas by
  * design (the `.lsr-switch*` pair sits in code.css and is shared by two
  * modules), and several emit a class no area paints at all
  * (`.lsr-index-item`, `.lsr-focus-prev`, `.lsr-form-option`).
@@ -267,6 +290,15 @@ const AREA_OWNERS: AreaOwner[] = [
     // rules paint every one on the page, so there is nothing here to own.
     render: () => renderAnnotationPopup([{ file: "src/db.ts", group: "Schema", text: "+x" }]),
     marker: "lsr-popup-preview",
+  },
+  {
+    // Listed on 2026-09-25 as drawing across areas; it qualified once status.css
+    // took the header's presence and the ended overlay out of the conversation
+    // column, leaving only the wrapped closing summary outside it.
+    module: "src/browser/status-banner.ts",
+    area: "status.css",
+    render: statusBanners,
+    marker: "lsr-ended-overlay",
   },
 ];
 
