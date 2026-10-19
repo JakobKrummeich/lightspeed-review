@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import {
+  LOGIN_PROVIDERS,
   layeredCredentialStore,
   lightspeedAuthPath,
   lightspeedAuthStore,
@@ -227,4 +229,25 @@ test("a write for the current id lands under it and leaves the old entry as it w
     azure: written,
   });
   rmSync(path, { force: true });
+});
+
+/**
+ * The allowlist is hand-written and every login test fakes `models.login`, so
+ * only this reads the pi-ai installed. pi-ai has renamed a provider before
+ * (`azure-openai-responses` → `azure`, see renamed-providers.ts): a bump that
+ * renames or drops one of these would leave `lightspeed login` advertising,
+ * and accepting, a provider that fails only once a user runs it.
+ */
+test("every provider login offers is one pi-ai ships with an OAuth flow", () => {
+  const oauth = new Set(
+    builtinProviders()
+      .filter((provider) => provider.auth?.oauth !== undefined)
+      .map((provider) => provider.id),
+  );
+
+  assert.deepEqual(
+    LOGIN_PROVIDERS.filter((id) => !oauth.has(id)),
+    [],
+    "LOGIN_PROVIDERS names a provider pi-ai offers no OAuth login for",
+  );
 });
