@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { git, newRepo } from "./helpers/git-repo.ts";
 import { NO_SERVER_PORT } from "./helpers/ports.ts";
+import { LOGIN_PROVIDERS, lightspeedAuthPath, lightspeedAuthStore } from "../src/llm/pi-auth.ts";
 import { sessionKey } from "../src/paths.ts";
 import { SessionStore } from "../src/session-store.ts";
 
@@ -687,6 +688,41 @@ test("init --config on its own writes a config and no skill", async () => {
   assert.doesNotMatch(stdout, /^skill:$/m);
   assert.doesNotMatch(stdout, /[Rr]estart/);
   assert.deepEqual(readdirSync(home), []);
+});
+
+test("login and logout without a provider exit 2 naming the providers to sign in to", async () => {
+  for (const command of ["login", "logout"]) {
+    const { stdout, code } = await runCli([command]);
+
+    assert.equal(code, 2, command);
+    assert.match(stdout, /^ {2}code: invalid_arguments$/m, command);
+    assert.match(stdout, new RegExp(`lightspeed ${command} <provider>`), command);
+    assert.match(stdout, new RegExp(LOGIN_PROVIDERS.join(", ")), command);
+  }
+});
+
+/**
+ * Through the CLI rather than `runLogout`: what is pinned is which file the
+ * command touches. Credentials live in the stateDir the config names, resolved
+ * with no model configured (logout runs before a repository has one), and only
+ * the named provider leaves it.
+ */
+test("logout removes the credential from the stateDir the config names, and only that one", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "lsr-cli-logout-"));
+  const stateDir = join(cwd, "state");
+  writeFileSync(join(cwd, ".lightspeed.conf.json"), JSON.stringify({ stateDir }));
+  const store = lightspeedAuthStore(stateDir);
+  const oauth = { type: "oauth", refresh: "r", access: "a", expires: 1 } as const;
+  await store.modify("anthropic", async () => oauth);
+  await store.modify("github-copilot", async () => oauth);
+
+  const { stdout, code } = await runCli(["logout", "anthropic"], cwd);
+
+  assert.equal(code, 0);
+  assert.match(stdout, /^ {2}removed: true$/m);
+  assert.match(stdout, new RegExp(`^ {2}path: ${lightspeedAuthPath(stateDir)}$`, "m"));
+  const onDisk = JSON.parse(readFileSync(lightspeedAuthPath(stateDir), "utf8")) as object;
+  assert.deepEqual(Object.keys(onDisk), ["github-copilot"]);
 });
 
 test("--version prints the package version", async () => {
