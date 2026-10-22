@@ -192,6 +192,21 @@ test("a server error ends the poll at once as a lightspeed bug, not as feedback"
   await harness.close();
 });
 
+/** The body is read in a response listener: a throw there killed the waiting command. */
+test("a refusal whose body is JSON null still ends the poll as a refusal", async () => {
+  const harness = await pollServer();
+
+  const polling = pollFor(harness);
+  await untilPolled(harness, 1);
+  harness.answer(409, "null");
+
+  await assert.rejects(
+    () => polling,
+    (error: ReviewError) => error.code === "session_ended",
+  );
+  await harness.close();
+});
+
 /**
  * The prompts are in this process's hands before the acknowledgement goes out: a
  * refused acknowledgement costs one re-delivery on the next poll, while a failed

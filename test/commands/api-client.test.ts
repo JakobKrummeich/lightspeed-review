@@ -156,7 +156,8 @@ test("a refusal body with a code off the list does not compile", () => {
 });
 
 test("a 422 without a readable error is a lightspeed bug, not a silent success", () => {
-  for (const body of ["not json", JSON.stringify({ error: { code: "other" } })]) {
+  // `null` parses as JSON: it once threw a TypeError here instead of answering.
+  for (const body of ["not json", "null", JSON.stringify({ error: { code: "other" } })]) {
     const parsed = parseBody(422, body);
     assert.ok(parsed instanceof ReviewError, body);
     assert.equal(parsed.code, "internal_error", body);
@@ -245,12 +246,14 @@ test("a 409 names who ended the review, as the server reports it", () => {
   const byAgent = read({ error: { code: "session_ended", message: "x" }, endedBy: "agent" });
   const byReviewer = read({ error: { code: "session_ended", message: "x" }, endedBy: "reviewer" });
   const unknown = parseBody(409, "not json", about) as ReviewError;
+  const nullBody = parseBody(409, "null", about) as ReviewError;
 
   assert.equal(byAgent.code, "session_ended");
+  assert.equal(nullBody.code, "session_ended");
   assert.match(byAgent.message, /`lightspeed end` ended this review, not the reviewer/);
   assert.match(byReviewer.message, /^the reviewer ended this review; only they ask/);
   assert.doesNotMatch(unknown.message, /the reviewer ended/);
-  for (const error of [byAgent, byReviewer, unknown]) {
+  for (const error of [byAgent, byReviewer, unknown, nullBody]) {
     assert.match(error.suggestions.join("\n"), /lightspeed open feature-auth main --reopen/);
   }
 });
