@@ -30,6 +30,9 @@
   `path`, or has a `diff` that is not text) is refused 400 and saves nothing,
   instead of answering 500 `internal_error` or saving a round and then
   reporting it failed.
+- A 409 or 422 answer whose body is JSON `null` is read as the refusal its
+  status names, or as `internal_error`, instead of a raw `TypeError`; a
+  waiting command no longer crashes on one.
 
 ## 3.8.0
 

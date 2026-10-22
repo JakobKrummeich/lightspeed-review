@@ -170,9 +170,12 @@ type ErrorBody = {
   help?: unknown;
 };
 
+/** `null` parses too, and dereferencing it threw out of `parseBody` — inside the
+ * long poll's response listener, an uncaught crash of the waiting command. */
 function readErrorBody(body: string): ErrorBody {
   try {
-    return JSON.parse(body) as ErrorBody;
+    const parsed: unknown = JSON.parse(body);
+    return typeof parsed === "object" && parsed !== null ? (parsed as ErrorBody) : {};
   } catch {
     return {};
   }
