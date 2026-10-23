@@ -57,7 +57,7 @@
     "check": "pnpm run typecheck && pnpm run lint && pnpm run lint:css && pnpm run format:check && pnpm run build:skill --check && pnpm run dup && pnpm run arch"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-ai": "1.4.0",
     "@toon-format/toon": "^4.4.0",
     "axi-sdk-js": "^0.1.13",
     "diff2html": "^3.4.56",
