@@ -82,7 +82,7 @@ interface AreaOwner {
   marker: string;
   /**
    * Classes the module writes only for `dom/` code to find, which no rule
-   * paints. Each is checked: a hook the render stops drawing, or one its area
+   * paints. Each is checked: a hook the render stops drawing, or one any area
    * starts painting, fails the test, so the list cannot outlive its reason.
    */
   hooks?: readonly string[];
@@ -358,6 +358,7 @@ function paints(rules: string, cls: string): boolean {
 }
 
 test("every class a render module emits is painted in that module's own area", () => {
+  const everyRule = importedNames().map(areaRules).join("\n");
   for (const { module, area, render, marker, hooks = [] } of AREA_OWNERS) {
     const rules = areaRules(area);
     const classes = classesIn(render());
@@ -369,9 +370,9 @@ test("every class a render module emits is painted in that module's own area", (
       `${module} renders classes ${area} does not paint: move the rule into ${area}, or the markup into the module ${area} belongs to`,
     );
     assert.deepEqual(
-      hooks.filter((name) => paints(rules, name) || !classes.includes(name)),
+      hooks.filter((name) => paints(everyRule, name) || !classes.includes(name)),
       [],
-      `${module}: a hook ${area} paints, or the fixture no longer draws, is no hook: drop it from hooks`,
+      `${module}: a hook some area paints, or the fixture no longer draws, is no hook: drop it from hooks`,
     );
   }
 });
