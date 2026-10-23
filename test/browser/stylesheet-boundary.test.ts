@@ -13,6 +13,7 @@ import { renderOpening, renderSkyNames } from "../../src/browser/opening-view.ts
 import { renderProgressBar } from "../../src/browser/progress-bar.ts";
 import { renderReplayOverlay } from "../../src/browser/round-replay.ts";
 import { renderStatusBanner, type StatusState } from "../../src/browser/status-banner.ts";
+import { renderThreadFoot } from "../../src/browser/thread-foot.ts";
 import type { ApprovedFormData } from "../../src/rounds/approved-form.ts";
 import type { ReplayComment } from "../../src/rounds/replay.ts";
 
@@ -79,6 +80,12 @@ interface AreaOwner {
   render: () => string;
   /** A class the render must contain, so a fixture that draws nothing cannot pass. */
   marker: string;
+  /**
+   * Classes the module writes only for `dom/` code to find, which no rule
+   * paints. Each is checked: a hook the render stops drawing, or one its area
+   * starts painting, fails the test, so the list cannot outlive its reason.
+   */
+  hooks?: readonly string[];
 }
 
 const CLOSED_REVIEW: ClosedReview = {
@@ -210,6 +217,21 @@ function statusBanners(): string {
 }
 
 /**
+ * The foot in the two shapes that draw every part: the reviewer's turn draws
+ * the box under Resolve and Reply, the agent's working one the waiting line
+ * over Resolve alone. A folded thread's Reopen is the same button.
+ */
+function threadFeet(): string {
+  const card = {
+    id: "t1",
+    label: "src/db.ts",
+    main: false,
+    messages: [{ role: "reviewer" as const }],
+  };
+  return renderThreadFoot(card, false, "send") + renderThreadFoot(card, false, "queue");
+}
+
+/**
  * Who paints what, module by module: the half of the boundary the import list
  * cannot state. A rule that drifts into another area still reaches the browser
  * — it is served one stylesheet either way — so nothing on screen and no other
@@ -218,7 +240,8 @@ function statusBanners(): string {
  * The emitters not listed here are guarded by nothing; adding one is an entry
  * plus a fixture, where every class the module draws is painted in one area.
  * Measured 2026-09-25, none of the remaining eight qualified; status-banner.ts
- * has since (see its entry), and none of the other seven qualifies as it stands:
+ * has since (see its entry), as has thread-foot.ts, which is newer than the
+ * count; none of the other seven qualifies as it stands:
  * each wants a decision about where an area's edge runs that this table has
  * no shape for. diff-view.ts, html-template.ts, conversation-panel.ts, round-offer.ts
  * and full-file.ts each draw across two or more areas by
@@ -301,6 +324,15 @@ const AREA_OWNERS: AreaOwner[] = [
     render: statusBanners,
     marker: "lsr-ended-overlay",
   },
+  {
+    module: "src/browser/thread-foot.ts",
+    area: "thread-foot.css",
+    render: threadFeet,
+    marker: "lsr-thread-reply-box",
+    // Resolve is painted as the `.lsr-thread-action` it also is; its own class
+    // is how panel-mount.ts tells the press from Reply and panel-lock.ts finds it.
+    hooks: ["lsr-thread-resolve"],
+  },
 ];
 
 function classesIn(html: string): string[] {
@@ -326,15 +358,20 @@ function paints(rules: string, cls: string): boolean {
 }
 
 test("every class a render module emits is painted in that module's own area", () => {
-  for (const { module, area, render, marker } of AREA_OWNERS) {
+  for (const { module, area, render, marker, hooks = [] } of AREA_OWNERS) {
     const rules = areaRules(area);
     const classes = classesIn(render());
 
     assert.ok(classes.includes(marker), `${module}: the fixture rendered no ${marker}`);
     assert.deepEqual(
-      classes.filter((name) => !paints(rules, name)),
+      classes.filter((name) => !paints(rules, name) && !hooks.includes(name)),
       [],
       `${module} renders classes ${area} does not paint: move the rule into ${area}, or the markup into the module ${area} belongs to`,
+    );
+    assert.deepEqual(
+      hooks.filter((name) => paints(rules, name) || !classes.includes(name)),
+      [],
+      `${module}: a hook ${area} paints, or the fixture no longer draws, is no hook: drop it from hooks`,
     );
   }
 });
