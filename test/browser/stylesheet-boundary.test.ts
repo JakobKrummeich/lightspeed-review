@@ -238,7 +238,8 @@ function threadFeet(): string {
  * test says an area has started painting a second module's screen.
  *
  * The emitters not listed here are guarded by nothing; adding one is an entry
- * plus a fixture, where every class the module draws is painted in one area.
+ * plus a fixture, where every class the module draws is painted in one area
+ * or is one of its checked `hooks`.
  * Measured 2026-09-25, none of the remaining eight qualified; status-banner.ts
  * has since (see its entry), as has thread-foot.ts, which is newer than the
  * count; none of the other seven qualifies as it stands:
