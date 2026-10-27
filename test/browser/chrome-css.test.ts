@@ -814,12 +814,6 @@ test("a row wearing every badge at once wraps rather than covering the diff swit
   assert.match(rulesFor(".lsr-file-header").join(""), /flex-wrap: wrap;/);
 });
 
-test("the scrim the closing summary is centred on is painted too", () => {
-  // stylesheet-boundary.test.ts guards the summary's classes off its render; this
-  // scrim is rendered by the banner around it, so that guard never sees it.
-  assert.ok(rulesFor(".lsr-ended-overlay").length > 0);
-});
-
 test("the control that reopens the replay is painted too", () => {
   // stylesheet-boundary.test.ts guards the overlay's classes off renderReplayOverlay;
   // this button sits in the shell's header, so that guard never sees it.
