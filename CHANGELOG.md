@@ -36,6 +36,9 @@
 - A 409 or 422 answer whose body is JSON `null` is read as the refusal its
   status names, or as `internal_error`, instead of a raw `TypeError`; a
   waiting command no longer crashes on one.
+- `-v` or `-V` before a command, such as `lightspeed -v open`, is refused as
+  read only on its own, the way `--version` is, instead of as an unknown
+  flag.
 
 ## 3.8.0
 
