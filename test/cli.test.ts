@@ -489,6 +489,21 @@ test("unknown flag before a command exits 2, under a code that names the mistake
   assert.match(stdout, /Flags come after the command/);
 });
 
+/**
+ * Regression: `-v` and `-V` answer alone like `--version`, but the refusal read a
+ * second, shorter list and called them unknown — an agent told a flag it just
+ * saw work does not exist stops trusting the message.
+ */
+test("a version alias before a command is refused as alone-only, not as unknown", async () => {
+  for (const flag of ["-v", "-V", "--all"]) {
+    const { stdout, code } = await runCli([flag, "open"]);
+
+    assert.equal(code, 2);
+    assert.match(stdout, /^ {2}code: unknown_flag$/m);
+    assert.match(stdout, new RegExp(`${flag} is read only on its own`));
+  }
+});
+
 test("a forgotten argument is its own code, not the code an unknown flag has", async () => {
   const { stdout, code } = await runCli(["reply", "feature-auth"]);
 

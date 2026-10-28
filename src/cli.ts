@@ -307,12 +307,10 @@ function withHelpAlias(given: string[]): string[] {
 function leadingFlagProblem(given: string[]): ReviewError | undefined {
   const [flag] = given;
   if (flag === undefined || !flag.startsWith("-")) return undefined;
-  if (given.length === 1 && ["--all", "--help", "--version", "-v", "-V"].includes(flag)) {
-    return undefined;
-  }
+  if (given.length === 1 && ALONE_FLAGS.includes(flag)) return undefined;
   return invocationError(
     "unknown_flag",
-    LEADING_FLAGS.includes(flag)
+    ALONE_FLAGS.includes(flag)
       ? `${flag} is read only on its own, with no command after it`
       : `unknown flag ${flag}`,
     [
@@ -324,6 +322,11 @@ function leadingFlagProblem(given: string[]): ReviewError | undefined {
 }
 
 const LEADING_FLAGS = ["--all", "--help", "--version"];
+
+/** One list for both questions: when the alone-check and the refusal each had
+ * their own, `-v open` was answered "unknown flag -v". The SDK reads `-v` and
+ * `-V` as `--version`; the refusal's detail names only the long spellings. */
+const ALONE_FLAGS = [...LEADING_FLAGS, "-v", "-V"];
 
 /**
  * Worked out once, before the command runs, and carried by every TOON answer
