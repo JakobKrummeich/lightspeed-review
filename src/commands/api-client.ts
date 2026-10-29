@@ -42,15 +42,20 @@ export async function callApi<R extends CliRoute>(
 }
 
 /** Maps transport failures to codes an agent can act on: no command interprets
- * an HTTP status itself. */
+ * an HTTP status itself. The body is read inside the catch because `fetch`
+ * resolves on the headers: a connection cut mid-body rejects `text()` with a
+ * bare `TypeError: terminated`, which otherwise reached the agent as
+ * `internal_error`, a lightspeed bug, instead of a dropped connection. */
 async function apiRequest(url: string, init?: RequestInit, about?: SessionRef): Promise<unknown> {
   let response: Response;
+  let text: string;
   try {
     response = await sendOnce(url, init);
+    text = await response.text();
   } catch (error) {
     throw await transportError(url, error, about);
   }
-  const answer = parseBody(response.status, await response.text(), about);
+  const answer = parseBody(response.status, text, about);
   if (answer instanceof ReviewError) throw answer;
   return answer;
 }

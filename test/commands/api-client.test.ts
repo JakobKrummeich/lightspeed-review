@@ -88,6 +88,45 @@ test("a POST is never retried, so a dropped reply cannot be sent twice", async (
   await harness.close();
 });
 
+/**
+ * Regression: `fetch` resolves on the headers, so a connection cut while the
+ * body is still arriving (a server stopped or killed mid-answer) failed in
+ * `response.text()`, outside the transport catch, and reached the agent as
+ * `internal_error: terminated` — a lightspeed bug — instead of a dropped
+ * connection it can re-run.
+ */
+test("a connection cut mid-body is a transport failure, not a lightspeed bug", async () => {
+  const server: Server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "application/json", "content-length": "100" });
+    response.write('{"turn":');
+    setTimeout(() => response.socket?.destroy(), 10);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const port = typeof address === "object" && address !== null ? address.port : 0;
+
+  try {
+    await assert.rejects(
+      () =>
+        callApi(
+          `http://127.0.0.1:${port}`,
+          "POST /api/session/:key/end",
+          { key: "abc" },
+          undefined,
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ReviewError, String(error));
+        assert.equal(error.code, "server_unreachable");
+        assert.match(error.detail ?? "", /terminated/);
+        return true;
+      },
+    );
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test("a 422 relays the server's own structured error, help and all", () => {
   const body = JSON.stringify({
     error: {

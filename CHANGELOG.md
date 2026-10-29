@@ -39,6 +39,10 @@
 - `-v` or `-V` before a command, such as `lightspeed -v open`, is refused as
   read only on its own, the way `--version` is, instead of as an unknown
   flag.
+- A command whose connection to the review server is cut while the answer
+  is still arriving reports `server_unreachable` (or `server_not_running`
+  if the server is gone), instead of `internal_error: terminated`, which
+  read as a lightspeed bug.
 
 ## 3.8.0
 
