@@ -414,8 +414,9 @@ The review server appends every record: a round and its files when `open` or
 `publish` posts one, the reviewer's annotations and messages on Send, the
 agent's replies, the end of a round with its approved set, and the outcomes when
 the next round arrives. One writer means one place where records are built and
-ids are issued. Every write is wrapped: a full disk, a corrupt line or a git
-failure is swallowed, counted, and reported as
+ids are issued. Every write is wrapped, and so is building its records: a full
+disk, a corrupt line, a git failure or a record that cannot be built is
+swallowed (failed writes are counted) and reported as
 `ledger: {status: degraded, reason}`, and the review continues. With the ledger
 off, the store is simply absent — no null object, no backend interface for a
 single backend.
