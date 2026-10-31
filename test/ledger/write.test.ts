@@ -489,8 +489,7 @@ test("a session written before the ledger existed still logs, with an unknown ro
 });
 
 test("recording with no ledger reports the feature off and writes nothing", () => {
-  const result = recordSafely(
-    undefined,
+  const result = recordSafely(undefined, () =>
     roundRecords({ round: "r", session: session(), repo, now: NOW, nextId }),
   );
 
@@ -500,8 +499,7 @@ test("recording with no ledger reports the feature off and writes nothing", () =
 test("a healthy ledger reports its path and how many records it took", () => {
   const store = newStore();
 
-  const result = recordSafely(
-    store,
+  const result = recordSafely(store, () =>
     roundRecords({ round: "r", session: session(), repo, now: NOW, nextId }),
   );
 
@@ -513,8 +511,7 @@ test("a healthy ledger reports its path and how many records it took", () => {
 });
 
 test("a ledger that cannot be written degrades with a reason instead of throwing", () => {
-  const result = recordSafely(
-    unwritableStore(),
+  const result = recordSafely(unwritableStore(), () =>
     roundRecords({ round: "r", session: session(), repo, now: NOW, nextId }),
   );
 
@@ -522,4 +519,24 @@ test("a ledger that cannot be written degrades with a reason instead of throwing
   assert.equal(result.written, 0);
   assert.equal(result.failed, 2);
   assert.match(result.reason ?? "", /ENOTDIR|not a directory/i);
+});
+
+/**
+ * A non-text `diff` is what a round posted before #73 could save: its builder
+ * threw a TypeError out of the hook, after the store had saved, ledger or none.
+ */
+test("a builder that throws degrades the report and writes nothing, instead of throwing", () => {
+  const unreadable = session({
+    groups: [{ name: "g", rationale: "r", files: [{ ...changed, diff: 3 as unknown as string }] }],
+  });
+  const build = () => roundRecords({ round: "r", session: unreadable, repo, now: NOW, nextId });
+  const store = newStore();
+
+  const result = recordSafely(store, build);
+
+  assert.equal(result.status, "degraded");
+  assert.equal(result.written, 0);
+  assert.match(result.reason ?? "", /split/);
+  assert.equal(store.read({}).records.length, 0);
+  assert.deepEqual(recordSafely(undefined, build), { status: "off", written: 0, failed: 0 });
 });
