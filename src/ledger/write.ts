@@ -72,12 +72,39 @@ export interface LedgerWriteResult {
  * The single place ledger failures are swallowed and counted. A full disk, a
  * read-only state directory or an unserialisable record degrades the report and
  * never touches the review itself.
+ *
+ * Takes the builder, not its records: built as an argument, a builder's throw
+ * escaped before this guard ran, and every hook runs after the store has saved.
+ * That is how a non-text `diff` once turned an opened round into a 500 (#73),
+ * and a throw in `logFeedback` skips waking the agent parked on the review.
  */
 export function recordSafely(
   ledger: LedgerStore | undefined,
-  records: LedgerRecord[],
+  build: () => LedgerRecord[],
 ): LedgerWriteResult {
+  const records = builtSafely(build);
   if (ledger === undefined) return { status: "off", written: 0, failed: 0 };
+  if (records instanceof Error) {
+    return {
+      status: "degraded",
+      written: 0,
+      failed: 0,
+      path: ledger.path,
+      reason: records.message,
+    };
+  }
+  return appendAll(ledger, records);
+}
+
+function builtSafely(build: () => LedgerRecord[]): LedgerRecord[] | Error {
+  try {
+    return build();
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+}
+
+function appendAll(ledger: LedgerStore, records: LedgerRecord[]): LedgerWriteResult {
   let written = 0;
   let failed = 0;
   let reason: string | undefined;

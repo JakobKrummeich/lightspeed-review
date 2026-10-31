@@ -1,6 +1,6 @@
 /**
- * Every hook hands its records to `recordSafely`, the only place a write
- * failure is swallowed — so a broken ledger can never change what a handler
+ * Every hook hands its record builder to `recordSafely`, the only place a write
+ * or build failure is swallowed — so a broken ledger can never change what a handler
  * does next.
  */
 import type { LedgerReport } from "../api-contract.ts";
@@ -42,7 +42,7 @@ export function logRound(
 ): LedgerReport {
   const repo = repoRef(session.repoRoot);
   const { ledger, nextId } = log;
-  return report(recordSafely(ledger, roundRecords({ round, session, repo, now, nextId })));
+  return report(recordSafely(ledger, () => roundRecords({ round, session, repo, now, nextId })));
 }
 
 /**
@@ -55,16 +55,16 @@ export function logOutcomes(
   round: string,
   now: string,
 ): void {
-  if (log.ledger === undefined) return;
-  recordSafely(
-    log.ledger,
+  const { ledger } = log;
+  if (ledger === undefined) return;
+  recordSafely(ledger, () =>
     outcomeRecords({
       repo: repoRef(session.repoRoot),
       now,
       nextId: log.nextId,
       nextRound: round,
       session,
-      annotations: sessionAnnotations(log.ledger, session),
+      annotations: sessionAnnotations(ledger, session),
       // The ledger asks a yes/no question of the patch, so a patch it could
       // not read and a patch too big to read are the same `unknown` to it.
       diffFile: (from, to, paths) => {
@@ -86,7 +86,7 @@ export function logFeedback(
   const repo = repoRef(session.repoRoot);
   const readFile = (path: string, side: AnnotationSide) => readSessionFile(session, path, side);
   const { ledger, nextId } = log;
-  recordSafely(ledger, feedbackRecords({ session, repo, prompts, readFile, now, nextId }));
+  recordSafely(ledger, () => feedbackRecords({ session, repo, prompts, readFile, now, nextId }));
 }
 
 export function logAgentReply(
@@ -97,13 +97,13 @@ export function logAgentReply(
 ): void {
   const repo = repoRef(session.repoRoot);
   const { ledger, nextId } = log;
-  recordSafely(ledger, agentReplyRecords({ session, repo, comment, now, nextId }));
+  recordSafely(ledger, () => agentReplyRecords({ session, repo, comment, now, nextId }));
 }
 
 export function logRoundEnd(log: LedgerLog, session: SessionRecord, now: string): void {
   const repo = repoRef(session.repoRoot);
   const { ledger, nextId } = log;
-  recordSafely(ledger, roundEndRecords({ session, repo, now, nextId }));
+  recordSafely(ledger, () => roundEndRecords({ session, repo, now, nextId }));
 }
 
 /**
