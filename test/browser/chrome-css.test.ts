@@ -336,9 +336,13 @@ test("the rationale's ink is its own, clears AA on the card and never passes for
   );
   assert.doesNotMatch(sentence, /text-decoration/, "an underline would make the sentence a link");
   // `.lsr-gate-press` has no rule of its own today; the guard is for the day it gets one.
-  for (const other of [".lsr-gate-name", ".lsr-gate-counter", ".lsr-gate-press"]) {
+  for (const [other, rules] of [
+    [".lsr-gate-name", rulesFor(".lsr-gate-name")],
+    [".lsr-gate-counter", rulesFor(".lsr-gate-counter")],
+    [".lsr-gate-press", matchingRules(".lsr-gate-press")],
+  ] as const) {
     assert.equal(
-      matchingRules(other).some((body) => /--lsr-lead-ink/.test(body)),
+      rules.some((body) => /--lsr-lead-ink/.test(body)),
       false,
       `${other} shares the sentence's ink`,
     );
