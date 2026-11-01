@@ -102,12 +102,25 @@ test("unified spends its width on code, not on padding nothing is drawn in", () 
 // Strip comments so a selector match does not drag the preceding comment along.
 const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** Whitespace collapsed so formatter wraps don't matter. */
-function rulesFor(selector: string): string[] {
+/** Whitespace collapsed so formatter wraps don't matter. Empty when no rule names it. */
+function matchingRules(selector: string): string[] {
   const wanted = tidy(selector);
   return [...bare.matchAll(/([^{}]+)\{([^}]*)\}/g)]
     .filter(([, list]) => (list ?? "").split(",").some((one) => tidy(one) === wanted))
     .map(([, , body]) => body ?? "");
+}
+
+/**
+ * The rules for a selector the stylesheet styles, failing when there are none.
+ * Most guards here are `doesNotMatch` over these bodies, and over no rules at
+ * all they pass whatever the stylesheet says: without this, renaming
+ * `.lsr-diff {` leaves every test green while "the review scrolls inside its
+ * own row" guards nothing. Ask `matchingRules` only where no rule is the point.
+ */
+function rulesFor(selector: string): string[] {
+  const rules = matchingRules(selector);
+  assert.ok(rules.length > 0, `no rule styles ${selector}: point this guard at its new name`);
+  return rules;
 }
 
 function tidy(selector: string): string {
@@ -285,7 +298,11 @@ test("the chapter's rationale is marked by its ink alone: no stripe, no label, n
   // all read as stock callout dressing: the sentence is set apart by colour.
   const sentence = rulesFor(".lsr-gate-rationale").join("");
   assert.doesNotMatch(sentence, /border|box-shadow|background|padding|border-radius/);
-  assert.equal(rulesFor(".lsr-gate-rationale::before").length, 0, "the sentence wears a label");
+  assert.equal(
+    matchingRules(".lsr-gate-rationale::before").length,
+    0,
+    "the sentence wears a label",
+  );
   assert.doesNotMatch(css, /In short|--lsr-rationale-/);
 
   // With no box to inset it, the sentence starts where the name does and where
@@ -318,9 +335,10 @@ test("the rationale's ink is its own, clears AA on the card and never passes for
     "600 is the name's weight: the two read as one heading",
   );
   assert.doesNotMatch(sentence, /text-decoration/, "an underline would make the sentence a link");
+  // `.lsr-gate-press` has no rule of its own today; the guard is for the day it gets one.
   for (const other of [".lsr-gate-name", ".lsr-gate-counter", ".lsr-gate-press"]) {
     assert.equal(
-      rulesFor(other).some((body) => /--lsr-lead-ink/.test(body)),
+      matchingRules(other).some((body) => /--lsr-lead-ink/.test(body)),
       false,
       `${other} shares the sentence's ink`,
     );
@@ -545,7 +563,7 @@ test("the reviewer's bubble is violet and the agent's is grey, on every round", 
   // The bubble is the card's background whatever the round's state: a chat keeps its bubbles.
   assert.match(rulesFor(".lsr-message[data-role]").join(""), /background: var\(--lsr-bubble\);/);
   assert.equal(
-    rulesFor('.lsr-message[data-role][data-round-state="current"]').length,
+    matchingRules('.lsr-message[data-role][data-round-state="current"]').length,
     0,
     "the bubble is not a live-round effect",
   );
