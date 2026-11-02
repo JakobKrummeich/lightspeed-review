@@ -64,8 +64,10 @@ gate (`.no-mistakes.yaml`) runs `test:coverage` and `check`.
   otherwise block.
 
 `build:skill --check` is the one people forget: `skills/lightspeed/SKILL.md` is
-generated from the CLI's own `help[]` strings, so changing help text means
-running `pnpm run build:skill` and committing the regenerated file with it.
+generated from the CLI's own `help[]` strings and the source constants it
+quotes (config defaults, login providers, reachable models, limits), so
+changing either means running `pnpm run build:skill` and committing the
+regenerated file with it.
 
 ## Pull requests go through no-mistakes
 

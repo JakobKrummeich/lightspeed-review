@@ -1,4 +1,5 @@
-import { REACHABLE_MODELS } from "./config.ts";
+import { CONFIG_DEFAULTS, REACHABLE_MODELS } from "./config.ts";
+import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { DEFAULT_PATH_LIMIT, SELECTION_LIMIT } from "./output.ts";
 import { HELP_END, HELP_OPEN, TURN_RULES, WAITS_FOR_SEND, nextRule } from "./turn-help.ts";
 
@@ -181,13 +182,13 @@ than one file stops with \`pi_auth_missing\` (exit 1, no round opened) until
 the human runs \`lightspeed login <provider>\` or exports the provider's key —
 ask them, then re-run the command.
 
-Optional keys: \`port\` (4388), \`stateDir\` (\`~/.lightspeed\`),
-\`feedbackLog\` (\`on\`), \`classify\` — two glob lists,
+Optional keys: \`port\` (${CONFIG_DEFAULTS.port}), \`stateDir\` (\`${CONFIG_DEFAULTS.stateDir}\`),
+\`feedbackLog\` (\`${CONFIG_DEFAULTS.feedbackLog}\`), \`classify\` — two glob lists,
 \`{"mechanical": [], "guardrail": []}\`, naming this repository's bulk files and
 the files no verdict may call bulk.
 
-Subscription users run \`lightspeed login <provider>\` (\`anthropic\` ·
-\`openai-codex\` · \`github-copilot\`) once per machine — humans only, in
+Subscription users run \`lightspeed login <provider>\`
+(${LOGIN_PROVIDERS.map((id) => `\`${id}\``).join(" · ")}) once per machine — humans only, in
 their own terminal; an agent must never run it.`;
 
 const OUTPUT = `## Output
