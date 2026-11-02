@@ -172,8 +172,8 @@ Optional keys: `port` (4388), `stateDir` (`~/.lightspeed`),
 `{"mechanical": [], "guardrail": []}`, naming this repository's bulk files and
 the files no verdict may call bulk.
 
-Subscription users run `lightspeed login <provider>` (`anthropic` ·
-`openai-codex` · `github-copilot`) once per machine — humans only, in
+Subscription users run `lightspeed login <provider>`
+(`anthropic` · `openai-codex` · `github-copilot`) once per machine — humans only, in
 their own terminal; an agent must never run it.
 
 ## Output

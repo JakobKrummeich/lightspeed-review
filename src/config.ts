@@ -71,7 +71,8 @@ export interface LightspeedConfig {
   providers?: Record<string, ProviderConfig>;
 }
 
-const DEFAULTS = {
+/** Exported so the skill quotes the defaults instead of a copy that could drift. */
+export const CONFIG_DEFAULTS = {
   port: 4388,
   stateDir: "~/.lightspeed",
   feedbackLog: "on",
@@ -270,7 +271,7 @@ export function defaultStateDir(): string {
 
 /** The one place a state dir is decided: the `lightspeed-review` rename is adopted whichever command runs first. */
 function resolveStateDir(configured: unknown): string {
-  const stateDir = expandHome(readString(configured, "stateDir") ?? DEFAULTS.stateDir);
+  const stateDir = expandHome(readString(configured, "stateDir") ?? CONFIG_DEFAULTS.stateDir);
   adoptFormerStateDir(stateDir);
   return stateDir;
 }
@@ -338,7 +339,7 @@ function requireThinking(value: unknown): ThinkingLevel {
 }
 
 function readFeedbackLog(value: unknown): FeedbackLogMode {
-  if (value === undefined) return DEFAULTS.feedbackLog;
+  if (value === undefined) return CONFIG_DEFAULTS.feedbackLog;
   const modes: readonly string[] = FEEDBACK_LOG_MODES;
   if (typeof value !== "string" || !modes.includes(value)) {
     throw invalid(
@@ -351,7 +352,7 @@ function readFeedbackLog(value: unknown): FeedbackLogMode {
 
 function readPort(value: unknown): number {
   const port = readCount(value, "port");
-  if (port === undefined) return DEFAULTS.port;
+  if (port === undefined) return CONFIG_DEFAULTS.port;
   if (port < 1 || port > 65535) {
     throw invalid(`${CONFIG_FILENAME} has an out-of-range \`port\``, "valid values: 1-65535");
   }
