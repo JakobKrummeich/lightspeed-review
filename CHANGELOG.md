@@ -27,7 +27,7 @@
   taking every open review down with it.
 - `lightspeed end` refuses a flag it does not take, such as `--force`, with
   `unknown_flag`, like every other command. It no longer reads the flag as
-  the branch to end and answer by suggesting `lightspeed open --force main`.
+  the branch to end and answers by suggesting `lightspeed open --force main`.
 - A request whose JSON body is `null`, such as a `POST /api/sessions` or a
   reply, is refused 400 like any other missing body, instead of answering
   500 `internal_error`.
