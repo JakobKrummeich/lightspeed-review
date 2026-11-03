@@ -637,6 +637,19 @@ test("open rejects an unknown flag instead of running with it", async () => {
   assert.doesNotMatch(stdout, /git_ref_not_found/);
 });
 
+/**
+ * Regression: `end` read its words raw, so a flag became the branch it closed and
+ * the refusal told the agent to `open --force main` — a review of the flag.
+ */
+test("end rejects an unknown flag instead of ending a review named after it", async () => {
+  const { stdout, code } = await runCli(["end", "--force"]);
+
+  assert.equal(code, 2);
+  assert.match(stdout, /^ {2}code: unknown_flag$/m);
+  assert.match(stdout, /unknown flag --force/);
+  assert.doesNotMatch(stdout, /open --force/);
+});
+
 test("feedback rejects an unknown flag with exit 2", async () => {
   const { stdout, code } = await runCli(["feedback", "list", "--bogus"], emptyRepo());
 
