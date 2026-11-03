@@ -6,7 +6,7 @@ import { NO_SERVER_PORT } from "../helpers/ports.ts";
 import type { StructuredOutput } from "../../src/output.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runEnd } from "../../src/commands/end.ts";
+import { parseEndArgs, runEnd } from "../../src/commands/end.ts";
 import { ReviewError } from "../../src/errors.ts";
 import { sessionKey } from "../../src/paths.ts";
 import { createReviewServer } from "../../src/server.ts";
@@ -52,6 +52,23 @@ async function withServer(
     await server.stop();
   }
 }
+
+test("end reads a branch and a base, either left out for the store to resolve", () => {
+  assert.deepEqual(parseEndArgs(["feature-auth", "develop"]), {
+    branch: "feature-auth",
+    base: "develop",
+  });
+  assert.deepEqual(parseEndArgs([]), { branch: undefined, base: undefined });
+  // Agent verbs refuse only `--x`, so a branch named `-x` is still a branch.
+  assert.equal(parseEndArgs(["-x"]).branch, "-x");
+});
+
+test("end refuses a flag it does not take rather than ending a review named after it", () => {
+  assert.throws(() => parseEndArgs(["feature-auth", "--force"]), {
+    code: "unknown_flag",
+    message: "unknown flag --force",
+  });
+});
 
 test("closes the session and reports it as ended", async () => {
   await withServer(session(), async ({ port, store, stateDir }) => {

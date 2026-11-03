@@ -5,7 +5,7 @@ import { homeOutput } from "./commands/home.ts";
 import { homeInput } from "./commands/home-input.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
 import { commandHelp, commandSummary } from "./commands/command-help.ts";
-import { runEnd } from "./commands/end.ts";
+import { parseEndArgs, runEnd } from "./commands/end.ts";
 import { runFeedback } from "./commands/feedback.ts";
 import { parseInitArgs, runInit } from "./commands/init.ts";
 import { authStateDir, runLogin } from "./commands/login.ts";
@@ -198,7 +198,8 @@ async function approvalsCommand(args: string[]): Promise<StructuredOutput> {
 }
 
 async function endCommand(args: string[]): Promise<StructuredOutput> {
-  return await onSession(repoContext(), "end", args[0], args[1], ({ config, ...target }) =>
+  const { branch, base } = parseEndArgs(args);
+  return await onSession(repoContext(), "end", branch, base, ({ config, ...target }) =>
     runEnd({ ...target, port: config.port, stateDir: config.stateDir }),
   );
 }

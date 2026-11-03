@@ -1,3 +1,4 @@
+import { invocationError } from "../errors.ts";
 import { unpublishedCommits } from "../git-state.ts";
 import type { StructuredOutput } from "../output.ts";
 import { sessionKey } from "../paths.ts";
@@ -6,7 +7,27 @@ import type { SessionRecord } from "../session-types.ts";
 import { roundNumber, turnBlock, turnFacts, turnLabel } from "../turn.ts";
 import { nextRule } from "../turn-help.ts";
 import { callApi } from "./api-client.ts";
+import { scanArgs } from "./args.ts";
 import { serverOrigin } from "./server-address.ts";
+
+/**
+ * Scanned, not read raw: `end --force` once ended a review of the branch
+ * `--force`, and the refusal told the agent to open one.
+ */
+export function parseEndArgs(args: string[]): {
+  branch: string | undefined;
+  base: string | undefined;
+} {
+  const { positional } = scanArgs(args, {
+    onUnknown: (flag) =>
+      invocationError("unknown_flag", `unknown flag ${flag}`, [
+        "`lightspeed end` takes no flags",
+        "Run `lightspeed end --help` for what it takes",
+      ]),
+  });
+  const [branch, base] = positional;
+  return { branch, base };
+}
 
 export interface EndInput {
   repoRoot: string;
