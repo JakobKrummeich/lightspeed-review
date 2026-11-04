@@ -1187,6 +1187,28 @@ test("--intent is repeatable and keeps the order it was given in", () => {
   );
 });
 
+/**
+ * An unquoted `--intent` is split by the shell: `--intent` eats the first word
+ * and the rest land after the branch pair. Dropped, the review opened with half
+ * a reason; `publish`, `reply` and `work` already refuse the same split.
+ */
+test("an unquoted intent's stray words are refused, not dropped from the reason", () => {
+  assert.throws(
+    () => parseOpenArgs(["feature-auth", "main", "--intent", "sign", "the", "tokens"]),
+    (error: Error) => {
+      assert.match(error.message, /open got more than a branch and a base: feature-auth main the/);
+      assert.equal((error as AxiError).code, "invalid_arguments");
+      assert.match((error as AxiError).suggestions.join(" "), /lightspeed open .*--intent '/);
+      assert.doesNotMatch((error as AxiError).suggestions.join(" "), /--to/);
+      return true;
+    },
+  );
+  assert.throws(
+    () => parseOpenArgs(["feature-auth", "--intent", "sign", "the", "tokens"]),
+    /more than a branch and a base/,
+  );
+});
+
 test("a blank intent says nothing, so it does not count as one", () => {
   assert.deepEqual(parseOpenArgs(["feature-auth", "--intent", "   "]).intents, []);
   assert.deepEqual(parseOpenArgs(["feature-auth", "--intent"]).intents, []);

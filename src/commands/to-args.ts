@@ -84,7 +84,7 @@ export function branchAndBase(
 }
 
 function quotedCall(verb: string): string {
-  return verb === "work"
-    ? "lightspeed work '<the whole plan>' [branch] [base]"
-    : `lightspeed ${verb} --to <id> '<several words>' [branch] [base]`;
+  if (verb === "work") return "lightspeed work '<the whole plan>' [branch] [base]";
+  if (verb === "open") return "lightspeed open <branch> [base] --intent '<the whole reason>'";
+  return `lightspeed ${verb} --to <id> '<several words>' [branch] [base]`;
 }

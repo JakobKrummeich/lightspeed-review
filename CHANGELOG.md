@@ -28,6 +28,11 @@
 - `lightspeed end` refuses a flag it does not take, such as `--force`, with
   `unknown_flag`, like every other command. It no longer reads the flag as
   the branch to end and answers by suggesting `lightspeed open --force main`.
+- `lightspeed open` refuses words left over after the branch and base, such
+  as the rest of an unquoted `--intent sign the tokens`, with
+  `invalid_arguments` and the quoted form, as `publish`, `reply` and `work`
+  already do. It no longer opens the review with only the first word as its
+  reason.
 - A request whose JSON body is `null`, such as a `POST /api/sessions` or a
   reply, is refused 400 like any other missing body, instead of answering
   500 `internal_error`.
