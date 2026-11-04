@@ -1209,6 +1209,20 @@ test("an unquoted intent's stray words are refused, not dropped from the reason"
   );
 });
 
+test("a stray word beside --base is refused, not dropped for the flag's base", () => {
+  for (const parse of [parseOpenArgs, parsePublishArgs]) {
+    assert.throws(
+      () => parse(["feature-auth", "--base", "main", "--intent", "sign", "tokens"]),
+      (error: Error) => {
+        assert.match(error.message, /got more than a branch beside --base: feature-auth tokens/);
+        assert.equal((error as AxiError).code, "invalid_arguments");
+        return true;
+      },
+    );
+  }
+  assert.equal(parseOpenArgs(["feature-auth", "--base", "main"]).base, "main");
+});
+
 test("a blank intent says nothing, so it does not count as one", () => {
   assert.deepEqual(parseOpenArgs(["feature-auth", "--intent", "   "]).intents, []);
   assert.deepEqual(parseOpenArgs(["feature-auth", "--intent"]).intents, []);

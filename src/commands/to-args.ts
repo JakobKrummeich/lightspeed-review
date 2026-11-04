@@ -64,23 +64,26 @@ function textIsAFlag(verb: string, to: string, flag: string): ReviewError {
 
 /**
  * What is left after the pairs and the flags is the session: at most a branch
- * and a base. More means words the shell split — an unquoted `--to` text or
- * plan — and reading them as a branch would post half a sentence to the wrong
- * review.
+ * and a base, or only a branch when `--base` named the base. More means words
+ * the shell split — an unquoted `--to` text, plan or intent — and reading them
+ * as a branch or base would post half a sentence to the wrong review.
  */
 export function branchAndBase(
   positional: string[],
   verb: string,
+  baseFlag?: string,
 ): { branch: string | undefined; base: string | undefined } {
-  if (positional.length > 2) {
+  const limit = baseFlag === undefined ? 2 : 1;
+  if (positional.length > limit) {
+    const room = baseFlag === undefined ? "a branch and a base" : "a branch beside --base";
     throw new ReviewError({
       code: "invalid_arguments",
-      message: `${verb} got more than a branch and a base: ${positional.join(" ")}`,
+      message: `${verb} got more than ${room}: ${positional.join(" ")}`,
       detail: "an unquoted text is split by the shell into words that read as extra arguments",
       suggestions: [`Quote each text: \`${quotedCall(verb)}\``],
     });
   }
-  return { branch: positional[0], base: positional[1] };
+  return { branch: positional[0], base: baseFlag ?? positional[1] };
 }
 
 function quotedCall(verb: string): string {

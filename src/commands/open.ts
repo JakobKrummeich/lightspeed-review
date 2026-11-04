@@ -60,10 +60,10 @@ export function parseOpenArgs(args: string[]): OpenArgs {
         "Run `lightspeed open --help` for what each flag does",
       ]),
   });
-  const session = branchAndBase(scanned.positional, "open");
+  const session = branchAndBase(scanned.positional, "open", lastValue(scanned, "--base"));
   return {
     branch: session.branch,
-    base: lastValue(scanned, "--base") ?? session.base,
+    base: session.base,
     open: !hasFlag(scanned, "--no-open"),
     model: lastValue(scanned, "--model"),
     reopen: hasFlag(scanned, "--reopen"),

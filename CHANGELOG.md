@@ -33,6 +33,9 @@
   `invalid_arguments` and the quoted form, as `publish`, `reply` and `work`
   already do. It no longer opens the review with only the first word as its
   reason.
+- `lightspeed open` and `lightspeed publish` refuse a positional base given
+  beside `--base` with `invalid_arguments`. `--base` used to win and silently
+  drop the word, such as the last word of an unquoted two-word `--intent`.
 - A request whose JSON body is `null`, such as a `POST /api/sessions` or a
   reply, is refused 400 like any other missing body, instead of answering
   500 `internal_error`.

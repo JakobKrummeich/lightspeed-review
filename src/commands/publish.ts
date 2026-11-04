@@ -53,10 +53,10 @@ export function parsePublishArgs(args: string[]): PublishArgs {
         "Run `lightspeed publish --help` for what each flag does",
       ]),
   });
-  const session = branchAndBase(scanned.positional, "publish");
+  const session = branchAndBase(scanned.positional, "publish", lastValue(scanned, "--base"));
   return {
     branch: session.branch,
-    base: lastValue(scanned, "--base") ?? session.base,
+    base: session.base,
     model: lastValue(scanned, "--model"),
     intents: allValues(scanned, "--intent")
       .map((intent) => intent.trim())

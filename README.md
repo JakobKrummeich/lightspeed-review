@@ -504,8 +504,9 @@ pulling the tests out of it would leave the group behind them empty.
 | `lightspeed logout <provider>`                              | Drop lightspeed's stored credential for one provider                                                              |
 
 `[base]` defaults to `main` wherever a branch is named without one. `open`
-also takes `--base <ref>` (which wins over the positional base) and `--no-open`,
-which creates the review and prints its URL without opening a browser. Bare
+also takes `--base <ref>` (in place of the positional base, never beside it)
+and `--no-open`, which creates the review and prints its URL without opening a
+browser. Bare
 `lightspeed --all` lists the live reviews of every repository instead of just
 this one's. `login` is refused `login_needs_terminal` unless stdin and stderr
 are both terminals — the flow asks questions only a person can answer, so an
