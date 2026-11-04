@@ -506,10 +506,9 @@ pulling the tests out of it would leave the group behind them empty.
 `[base]` defaults to `main` wherever a branch is named without one. `open`
 also takes `--base <ref>` (in place of the positional base, never beside it)
 and `--no-open`, which creates the review and prints its URL without opening a
-browser. Bare
-`lightspeed --all` lists the live reviews of every repository instead of just
-this one's. `login` is refused `login_needs_terminal` unless stdin and stderr
-are both terminals — the flow asks questions only a person can answer, so an
+browser. Bare `lightspeed --all` lists the live reviews of every repository
+instead of just this one's. `login` is refused `login_needs_terminal` unless
+stdin and stderr are both terminals — the flow asks questions only a person can answer, so an
 agent must never run it — and it stores the credential in
 `<stateDir>/auth.json` with mode 600, never in pi's own file.
 
