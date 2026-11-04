@@ -19,6 +19,7 @@ import {
 import { refusalError } from "./api-client.ts";
 import { refuseLiveElsewhere } from "./live-elsewhere.ts";
 import { allValues, hasFlag, lastValue, scanArgs } from "./args.ts";
+import { branchAndBase } from "./to-args.ts";
 import { makeRound, publishedRound, resolveDeps, roundHelp, type RoundDeps } from "./round.ts";
 import { reviewUrl } from "./server-address.ts";
 
@@ -59,9 +60,10 @@ export function parseOpenArgs(args: string[]): OpenArgs {
         "Run `lightspeed open --help` for what each flag does",
       ]),
   });
+  const session = branchAndBase(scanned.positional, "open", lastValue(scanned, "--base"));
   return {
-    branch: scanned.positional[0],
-    base: lastValue(scanned, "--base") ?? scanned.positional[1],
+    branch: session.branch,
+    base: session.base,
     open: !hasFlag(scanned, "--no-open"),
     model: lastValue(scanned, "--model"),
     reopen: hasFlag(scanned, "--reopen"),
