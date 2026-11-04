@@ -2,9 +2,13 @@
 
 ## Unreleased
 
-- Grouping runs on pi-ai 1.4.0, with its updated model catalog and provider
-  fixes — e.g. Mistral streams are no longer cut off mid-generation by the
-  request timeout, and OpenCode Go Gemini models no longer fail with a 404.
+- Grouping runs on pi-ai 1.5.0, with its updated model catalog (models.dev
+  v2: realtime and image-only models are no longer offered as chat models)
+  and provider fixes — e.g. Mistral streams are no longer cut off
+  mid-generation by the request timeout, OpenCode Go Gemini models no longer
+  fail with a 404, OpenCode Zen and Go requests use their protocol-specific
+  endpoints, and a Zhipu/Z.ai usage-limit error is no longer retried as a
+  transient 429.
   Requests now send pi-ai's detailed `User-Agent` (`pi/<version> (...)`).
   A `kimi-coding` base URL override in Pi's `models.json` must now end in
   `/v1`.
