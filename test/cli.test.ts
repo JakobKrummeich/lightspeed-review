@@ -650,6 +650,29 @@ test("end rejects an unknown flag instead of ending a review named after it", as
   assert.doesNotMatch(stdout, /open --force/);
 });
 
+/**
+ * Regression: `stop` and `serve` read no words at all, so `stop --port 4000` stopped
+ * the configured port's server, and `stop feature-auth` would take down every
+ * review the server holds rather than the one it named.
+ */
+test("stop and serve refuse any word instead of acting on the configured port", async () => {
+  const repo = emptyRepo();
+
+  for (const verb of ["stop", "serve"]) {
+    const flag = await runCli([verb, "--port", "4000"], repo);
+    const word = await runCli([verb, "feature-auth"], repo);
+
+    assert.equal(flag.code, 2, verb);
+    assert.match(flag.stdout, /^ {2}code: unknown_flag$/m, verb);
+    assert.match(flag.stdout, /unknown flag --port/, verb);
+    assert.equal(word.code, 2, verb);
+    assert.match(word.stdout, /^ {2}code: invalid_arguments$/m, verb);
+    assert.match(word.stdout, new RegExp(`${verb} takes no arguments: feature-auth`), verb);
+  }
+  // The verb an agent meant when it named a branch to `stop`.
+  assert.match((await runCli(["stop", "feature-auth"], repo)).stdout, /lightspeed end/);
+});
+
 test("feedback rejects an unknown flag with exit 2", async () => {
   const { stdout, code } = await runCli(["feedback", "list", "--bogus"], emptyRepo());
 

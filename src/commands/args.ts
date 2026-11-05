@@ -1,3 +1,5 @@
+import { ReviewError, invocationError } from "../errors.ts";
+
 /**
  * Throws the caller's error at the exact token, so which mistake is reported
  * first stays per-command. No command may ignore a flag it does not know:
@@ -69,6 +71,28 @@ function readValueFlag(
 function edible(spec: ScanSpec, next: string | undefined): next is string {
   if (next === undefined) return false;
   return spec.values !== "bare" || !next.startsWith("-");
+}
+
+/**
+ * For the verbs that act on the configured port and on nothing named (`stop`,
+ * `serve`): every word after one is refused. Read raw, `stop --port 4000` stopped
+ * the configured port's server, and `stop <branch>` stops every review the
+ * server holds, not the one it named. `hint` says what the verb acts on instead.
+ */
+export function refuseArguments(args: string[], verb: string, hint: string): void {
+  const { positional } = scanArgs(args, {
+    onUnknown: (flag) =>
+      invocationError("unknown_flag", `unknown flag ${flag}`, [
+        `\`lightspeed ${verb}\` takes no flags`,
+        hint,
+      ]),
+  });
+  if (positional.length === 0) return;
+  throw new ReviewError({
+    code: "invalid_arguments",
+    message: `${verb} takes no arguments: ${positional.join(" ")}`,
+    suggestions: [hint],
+  });
 }
 
 export function allValues(scanned: ScannedArgs, flag: string): string[] {

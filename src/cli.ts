@@ -4,6 +4,7 @@ import { CLI_DESCRIPTION, CLI_VERSION } from "./version.ts";
 import { homeOutput } from "./commands/home.ts";
 import { homeInput } from "./commands/home-input.ts";
 import { parseApprovalsArgs, runApprovals } from "./commands/approvals.ts";
+import { refuseArguments } from "./commands/args.ts";
 import { commandHelp, commandSummary } from "./commands/command-help.ts";
 import { parseEndArgs, runEnd } from "./commands/end.ts";
 import { runFeedback } from "./commands/feedback.ts";
@@ -204,7 +205,12 @@ async function endCommand(args: string[]): Promise<StructuredOutput> {
   );
 }
 
-async function serveCommand(): Promise<StructuredOutput> {
+async function serveCommand(args: string[]): Promise<StructuredOutput> {
+  refuseArguments(
+    args,
+    "serve",
+    "`lightspeed serve` listens on the `port` set in .lightspeed.conf.json; change it there",
+  );
   const { config } = repoContext();
   return await runServe({
     stateDir: config.stateDir,
@@ -228,7 +234,13 @@ function feedbackCommand(args: string[]): StructuredOutput | string {
   });
 }
 
-async function stopCommand(): Promise<StructuredOutput> {
+async function stopCommand(args: string[]): Promise<StructuredOutput> {
+  refuseArguments(
+    args,
+    "stop",
+    "`lightspeed stop` shuts down the server on the configured `port` and every review on it;" +
+      " to close one review, run `lightspeed end [branch] [base]`",
+  );
   const { config } = repoContext();
   return await runStop({ port: config.port });
 }
