@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `lightspeed stop` and `lightspeed serve` refuse any flag (`unknown_flag`)
+  or word (`invalid_arguments`), exiting 2. `stop --port 4000` used to stop
+  the server on the configured port, and `stop <branch>` to shut down every
+  review on it; the refusal now points at `lightspeed end` to close one.
 - Grouping runs on pi-ai 1.5.0, with its updated model catalog (models.dev
   v2: realtime and image-only models are no longer offered as chat models)
   and provider fixes — e.g. Mistral streams are no longer cut off

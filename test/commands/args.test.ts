@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allValues, hasFlag, lastValue, scanArgs } from "../../src/commands/args.ts";
+import {
+  allValues,
+  hasFlag,
+  lastValue,
+  refuseArguments,
+  scanArgs,
+} from "../../src/commands/args.ts";
+import { ReviewError } from "../../src/errors.ts";
 
 /**
  * The scanner apart from any command: the unknown-flag error and the value
@@ -130,4 +137,27 @@ test("values 'bare' without onMissingValue leaves the flag-like token unconsumed
     { flag: "--limit", value: undefined },
     { flag: "--full", value: undefined },
   ]);
+});
+
+test("refuseArguments lets an empty line through and refuses a flag or a word with the hint", () => {
+  const hint = "acts on the configured port";
+
+  refuseArguments([], "stop", hint);
+  assert.throws(
+    () => refuseArguments(["--port", "4000"], "stop", hint),
+    (error: unknown) =>
+      error instanceof ReviewError &&
+      error.code === "unknown_flag" &&
+      error.message === "unknown flag --port" &&
+      error.suggestions.includes(hint),
+  );
+  // `-p` is no `--` flag, so it is refused as the stray word it is.
+  assert.throws(
+    () => refuseArguments(["-p", "4000"], "stop", hint),
+    (error: unknown) =>
+      error instanceof ReviewError &&
+      error.code === "invalid_arguments" &&
+      error.message === "stop takes no arguments: -p 4000" &&
+      error.suggestions.includes(hint),
+  );
 });
