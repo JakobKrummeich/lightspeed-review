@@ -2,11 +2,12 @@ import { createInterface } from "node:readline/promises";
 import { createModels } from "@earendil-works/pi-ai";
 import type { AuthInteraction, Credential, CredentialStore } from "@earendil-works/pi-ai";
 import { loadLedgerConfig } from "../config.ts";
-import { ReviewError } from "../errors.ts";
+import { ReviewError, invocationError } from "../errors.ts";
 import { LOGIN_PROVIDERS, lightspeedAuthPath, lightspeedAuthStore } from "../llm/pi-auth.ts";
 import type { StructuredOutput } from "../output.ts";
 import { repoRootOrNone } from "../repo.ts";
 import { HELP_OPEN } from "../turn-help.ts";
+import { scanArgs } from "./args.ts";
 import { loginInteraction, type InteractionIo } from "./login-interaction.ts";
 
 /** The one method of pi-ai's `Models` a login needs; a fake fits in a test. */
@@ -25,6 +26,33 @@ export interface LoginInput {
   provider: string;
   stateDir: string;
   deps?: LoginDeps;
+}
+
+/**
+ * `login` and `logout` take exactly one provider id. Scanned, not read as
+ * `args[0]`: `logout --provider anthropic` answered exit 0 and `removed: false`
+ * for a provider named `--provider`, the credential still on disk, and
+ * `logout anthropic github-copilot` signed out of the first alone.
+ */
+export function parseProviderArgs(args: string[], command: "login" | "logout"): string {
+  const usage = `Run \`lightspeed ${command} <provider>\`, e.g. ${LOGIN_PROVIDERS.join(", ")}`;
+  const { positional } = scanArgs(args, {
+    onUnknown: (flag) =>
+      invocationError("unknown_flag", `unknown flag ${flag}`, [
+        `\`lightspeed ${command}\` takes no flags`,
+        usage,
+      ]),
+  });
+  const [provider, ...extra] = positional;
+  if (provider !== undefined && extra.length === 0) return provider;
+  throw new ReviewError({
+    code: "invalid_arguments",
+    message:
+      provider === undefined
+        ? `${command} needs a provider id`
+        : `${command} takes one provider id, not ${positional.join(" ")}`,
+    suggestions: [usage],
+  });
 }
 
 /** Login runs before a repo has config (it makes the very first credential), so
