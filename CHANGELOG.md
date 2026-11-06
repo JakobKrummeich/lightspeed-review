@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `lightspeed login` and `lightspeed logout` take exactly one provider id and
+  refuse a flag (`unknown_flag`) or a second word (`invalid_arguments`),
+  exiting 2. `logout --provider anthropic` used to answer `removed: false`
+  for a provider named `--provider`, leaving the credential on disk, and
+  `logout anthropic github-copilot` signed out of the first alone.
 - `lightspeed stop` and `lightspeed serve` refuse any flag (`unknown_flag`)
   or word (`invalid_arguments`), exiting 2. `stop --port 4000` used to stop
   the server on the configured port, and `stop <branch>` to shut down every

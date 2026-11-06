@@ -9,7 +9,7 @@ import { commandHelp, commandSummary } from "./commands/command-help.ts";
 import { parseEndArgs, runEnd } from "./commands/end.ts";
 import { runFeedback } from "./commands/feedback.ts";
 import { parseInitArgs, runInit } from "./commands/init.ts";
-import { authStateDir, runLogin } from "./commands/login.ts";
+import { authStateDir, parseProviderArgs, runLogin } from "./commands/login.ts";
 import { runLogout } from "./commands/logout.ts";
 import { runServe } from "./commands/serve.ts";
 import { assertServerSharesState } from "./commands/server-lifecycle.ts";
@@ -27,10 +27,9 @@ import {
   type LightspeedConfig,
   type ServiceConfig,
 } from "./config.ts";
-import { ReviewError, exitCodeFor, invocationError } from "./errors.ts";
+import { exitCodeFor, invocationError, type ReviewError } from "./errors.ts";
 import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
-import { LOGIN_PROVIDERS } from "./llm/pi-auth.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
 import {
   readAgainstStore,
@@ -245,25 +244,13 @@ async function stopCommand(args: string[]): Promise<StructuredOutput> {
   return await runStop({ port: config.port });
 }
 
-function requireProvider(args: string[], command: string): string {
-  const provider = args[0];
-  if (provider === undefined) {
-    throw new ReviewError({
-      code: "invalid_arguments",
-      message: `${command} needs a provider id`,
-      suggestions: [`Run \`lightspeed ${command} <provider>\`, e.g. ${LOGIN_PROVIDERS.join(", ")}`],
-    });
-  }
-  return provider;
-}
-
 async function loginCommand(args: string[]): Promise<StructuredOutput> {
-  const provider = requireProvider(args, "login");
+  const provider = parseProviderArgs(args, "login");
   return await runLogin({ provider, stateDir: authStateDir(process.cwd()) });
 }
 
 async function logoutCommand(args: string[]): Promise<StructuredOutput> {
-  const provider = requireProvider(args, "logout");
+  const provider = parseProviderArgs(args, "logout");
   return await runLogout({ provider, stateDir: authStateDir(process.cwd()) });
 }
 

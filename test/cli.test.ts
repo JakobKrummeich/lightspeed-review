@@ -753,6 +753,36 @@ test("login and logout without a provider exit 2 naming the providers to sign in
 });
 
 /**
+ * Regression: both read `args[0]` raw. `logout --provider anthropic` answered
+ * exit 0, `removed: false` for a provider named `--provider`, with the
+ * credential still on disk; `logout anthropic github-copilot` signed out of the
+ * first alone and said nothing of the second.
+ */
+test("login and logout refuse a flag or a second word instead of reading the first", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "lsr-cli-logout-args-"));
+  const stateDir = join(cwd, "state");
+  writeFileSync(join(cwd, ".lightspeed.conf.json"), JSON.stringify({ stateDir }));
+  const store = lightspeedAuthStore(stateDir);
+  const oauth = { type: "oauth", refresh: "r", access: "a", expires: 1 } as const;
+  await store.modify("anthropic", async () => oauth);
+
+  for (const command of ["login", "logout"]) {
+    const flag = await runCli([command, "--provider", "anthropic"], cwd);
+    const extra = await runCli([command, "anthropic", "github-copilot"], cwd);
+
+    assert.equal(flag.code, 2, command);
+    assert.match(flag.stdout, /^ {2}code: unknown_flag$/m, command);
+    assert.match(flag.stdout, /unknown flag --provider/, command);
+    assert.equal(extra.code, 2, command);
+    assert.match(extra.stdout, /^ {2}code: invalid_arguments$/m, command);
+    assert.match(extra.stdout, new RegExp(`${command} takes one provider id`), command);
+    assert.match(extra.stdout, new RegExp(`lightspeed ${command} <provider>`), command);
+  }
+  // Refused before acting: the credential no command line named alone is still there.
+  assert.notEqual(await store.read("anthropic"), undefined);
+});
+
+/**
  * Through the CLI rather than `runLogout`: what is pinned is which file the
  * command touches. Credentials live in the stateDir the config names, resolved
  * with no model configured (logout runs before a repository has one), and only
