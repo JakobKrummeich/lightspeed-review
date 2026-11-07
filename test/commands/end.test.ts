@@ -70,6 +70,23 @@ test("end refuses a flag it does not take rather than ending a review named afte
   });
 });
 
+/**
+ * `end feature-a main feature-b` ended feature-a and dropped the rest: the agent
+ * reads success and believes feature-b is closed too, a review it leaks.
+ */
+test("end refuses a word after the branch and base rather than ending the first alone", () => {
+  assert.throws(
+    () => parseEndArgs(["feature-a", "main", "feature-b"]),
+    (error: Error) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "invalid_arguments");
+      assert.equal(error.message, "end takes a branch and a base, not feature-a main feature-b");
+      assert.match(error.suggestions[0] ?? "", /once per review/);
+      return true;
+    },
+  );
+});
+
 test("closes the session and reports it as ended", async () => {
   await withServer(session(), async ({ port, store, stateDir }) => {
     const output = await runEnd({ repoRoot: REPO, branch: BRANCH, base: BASE, port, stateDir });
