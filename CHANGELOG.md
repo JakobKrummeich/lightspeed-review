@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `lightspeed end` refuses a word after its branch and base with
+  `invalid_arguments`, exiting 2. `end feature-a main feature-b` used to end
+  feature-a alone and answer success, leaving feature-b open.
 - `lightspeed login` and `lightspeed logout` take exactly one provider id and
   refuse a flag (`unknown_flag`) or a second word (`invalid_arguments`),
   exiting 2. `logout --provider anthropic` used to answer `removed: false`
