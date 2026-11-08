@@ -17,7 +17,7 @@ const SHOW_FLAGS = ["--format"] as const;
 
 /** `show` is the escape hatch from `list`'s omissions: patches always in full. */
 export function showFeedback(args: string[], context: FeedbackContext): StructuredOutput | string {
-  const parsed = parseArgs(args, SHOW_FLAGS);
+  const parsed = parseArgs(args, SHOW_FLAGS, 1);
   const id = parsed.positional[0];
   if (id === undefined) {
     throw new ReviewError({
