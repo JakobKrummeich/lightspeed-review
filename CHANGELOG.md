@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `lightspeed feedback list`, `show` and `prune` refuse a word they do not
+  read with `invalid_arguments`, exiting 2. `feedback prune --before <date>
+<path>` (with `--repo` forgotten) used to delete every repository's
+  records instead of that one's.
 - `lightspeed end` refuses a word after its branch and base with
   `invalid_arguments`, exiting 2. `end feature-a main feature-b` used to end
   feature-a alone and answer success, leaving feature-b open.

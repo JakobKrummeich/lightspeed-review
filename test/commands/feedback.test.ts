@@ -656,6 +656,41 @@ test("prune without --before refuses instead of guessing a date", () => {
   );
 });
 
+test("prune refuses a stray word and deletes nothing, since it may be a lost flag", () => {
+  const stateDir = seededState();
+  const dir = feedbackDirPath(stateDir);
+  const before = readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8"));
+
+  // `--repo` forgotten: read raw, this pruned every repository, not this one.
+  assert.throws(
+    () => feedback(["prune", "--before", "2027-01-01", other.root], stateDir),
+    (error: unknown) =>
+      error instanceof ReviewError &&
+      error.code === "invalid_arguments" &&
+      exitCodeFor(error) === 2 &&
+      error.message.includes(other.root),
+  );
+  assert.deepEqual(
+    readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8")),
+    before,
+  );
+});
+
+test("list and show refuse words they do not read instead of answering without them", () => {
+  const stateDir = seededState();
+
+  for (const args of [
+    ["list", "30d"],
+    ["show", "evt_1", "evt_2"],
+  ]) {
+    assert.throws(
+      () => feedback(args, stateDir),
+      (error: unknown) => error instanceof ReviewError && error.code === "invalid_arguments",
+      args.join(" "),
+    );
+  }
+});
+
 test("list, show and prune refuse to work against a ledger that is off", () => {
   const stateDir = seededState();
 

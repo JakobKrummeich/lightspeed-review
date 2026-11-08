@@ -57,7 +57,12 @@ export interface ParsedArgs {
 
 const BOOLEAN_FLAGS = new Set(["--with-patches", "--dry-run"]);
 
-export function parseArgs(args: string[], allowed: readonly string[]): ParsedArgs {
+/**
+ * `words` is how many positionals the subcommand reads; any more are refused.
+ * Ignored, `prune --before 2027-01-01 /home/dev/app` (`--repo` forgotten)
+ * deleted every repository's records instead of that one's.
+ */
+export function parseArgs(args: string[], allowed: readonly string[], words = 0): ParsedArgs {
   const scanned = scanArgs(args, {
     value: allowed.filter((flag) => !BOOLEAN_FLAGS.has(flag)),
     boolean: allowed.filter((flag) => BOOLEAN_FLAGS.has(flag)),
@@ -66,12 +71,25 @@ export function parseArgs(args: string[], allowed: readonly string[]): ParsedArg
     values: "bare",
     flagPrefix: "-",
   });
+  const stray = scanned.positional.slice(words);
+  if (stray.length > 0) throw strayWords(stray, allowed);
   const parsed: ParsedArgs = { positional: scanned.positional, values: {}, present: new Set() };
   for (const { flag, value } of scanned.flags) {
     parsed.present.add(flag);
     if (value !== undefined) parsed.values[flag] = value;
   }
   return parsed;
+}
+
+function strayWords(stray: string[], allowed: readonly string[]): Error {
+  return new ReviewError({
+    code: "invalid_arguments",
+    message: `unexpected argument: ${stray.join(" ")}`,
+    suggestions: [
+      `Flags known here: ${allowed.join(", ")}`,
+      "Run `lightspeed feedback --help` for every subcommand and flag",
+    ],
+  });
 }
 
 function missingValue(flag: string): Error {
