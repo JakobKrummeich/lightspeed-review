@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `lightspeed approvals` refuses a word after its branch and base with
+  `invalid_arguments`, exiting 2. `approvals feature-a main feature-b` used
+  to list feature-a's ticks alone and say nothing about feature-b.
 - `lightspeed feedback list`, `show` and `prune` refuse a word they do not
   read with `invalid_arguments`, exiting 2. `feedback prune --before <date>
 <path>` (with `--repo` forgotten) used to delete every repository's

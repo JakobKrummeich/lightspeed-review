@@ -188,6 +188,22 @@ test("a mistyped flag is refused rather than read as a branch name", () => {
   );
 });
 
+test("a word after the branch and base is refused rather than dropped", () => {
+  assert.throws(
+    () => parseApprovalsArgs(["feature-a", "main", "feature-b"]),
+    (error: unknown) => {
+      assert.ok(error instanceof ReviewError);
+      assert.equal(error.code, "invalid_arguments");
+      assert.equal(
+        error.message,
+        "approvals takes a branch and a base, not feature-a main feature-b",
+      );
+      assert.match(error.suggestions[0] ?? "", /once per review/);
+      return true;
+    },
+  );
+});
+
 test("an ended review is answered as long as it is on disk, server or no server", () => {
   const stateDir = stateWith(
     session({ status: "ended", groups: [group("Auth", "study", "src/auth.ts")] }),
