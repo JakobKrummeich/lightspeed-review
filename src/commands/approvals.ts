@@ -27,6 +27,12 @@ const HELP_FULL =
   `A bare listing stops at ${DEFAULT_PATH_LIMIT} paths per list:` +
   " add `--full` for every path behind these counts";
 
+/**
+ * A third word is refused, as `end` refuses one: `approvals feature-a main
+ * feature-b` listed feature-a's ticks alone and answered as if that was all
+ * it was asked. Not `branchAndBase`'s refusal: approvals takes no text for the
+ * shell to split, so its quote-the-text advice would be wrong here.
+ */
 export function parseApprovalsArgs(args: string[]): ApprovalsArgs {
   const scanned = scanArgs(args, {
     boolean: ["--full"],
@@ -34,11 +40,17 @@ export function parseApprovalsArgs(args: string[]): ApprovalsArgs {
     // nobody opened, and answer `session_not_found` to a command that was right.
     onUnknown: unknownApprovalsFlag,
   });
-  return {
-    branch: scanned.positional[0],
-    base: scanned.positional[1],
-    full: hasFlag(scanned, "--full"),
-  };
+  const [branch, base, ...extra] = scanned.positional;
+  if (extra.length > 0) {
+    throw new ReviewError({
+      code: "invalid_arguments",
+      message: `approvals takes a branch and a base, not ${scanned.positional.join(" ")}`,
+      suggestions: [
+        "Run `lightspeed approvals <branch> [base]` once per review you mean to ask about",
+      ],
+    });
+  }
+  return { branch, base, full: hasFlag(scanned, "--full") };
 }
 
 function unknownApprovalsFlag(flag: string): Error {
