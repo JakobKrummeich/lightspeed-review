@@ -108,7 +108,9 @@ export function invocationError(
  * fixed. The SDK knows only its own `VALIDATION_ERROR`, so the codes are listed
  * here, beside the codes themselves rather than in the CLI entry point — which
  * runs the whole CLI on import and so cannot be asked what an error would exit
- * with.
+ * with. `satisfies` because the SDK types `code` as a bare string: without it a
+ * misspelled or renamed code here still typechecks and that refusal quietly
+ * exits 1, telling the agent to retry a command that can never succeed.
  */
 const ARGUMENT_ERROR_CODES: readonly string[] = [
   // The command line itself.
@@ -130,7 +132,7 @@ const ARGUMENT_ERROR_CODES: readonly string[] = [
   "session_not_found",
   "ambiguous_session",
   "live_review_elsewhere",
-];
+] satisfies readonly ReviewErrorCode[];
 
 export function exitCodeFor(error: unknown): number {
   if (error instanceof ReviewError && ARGUMENT_ERROR_CODES.includes(error.code)) return 2;
