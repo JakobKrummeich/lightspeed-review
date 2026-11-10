@@ -29,6 +29,23 @@ test("every refusal of the move or of the session state exits 2", () => {
   );
 });
 
+test("every refusal of the command line itself exits 2", () => {
+  const wrongLine: ReviewErrorCode[] = [
+    "unknown_command",
+    "unknown_flag",
+    "argument_missing",
+    "invalid_arguments",
+    "intent_missing",
+    "agent_missing",
+    "removed_verb",
+  ];
+
+  assert.deepEqual(
+    wrongLine.map(exitFor),
+    wrongLine.map(() => 2),
+  );
+});
+
 test("a failure of the machine, not of the command, exits 1", () => {
   const environment: ReviewErrorCode[] = [
     "server_not_running",
