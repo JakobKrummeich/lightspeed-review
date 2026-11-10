@@ -132,7 +132,7 @@ const ARGUMENT_ERROR_CODES: readonly string[] = [
   "session_not_found",
   "ambiguous_session",
   "live_review_elsewhere",
-];
+] satisfies readonly ReviewErrorCode[];
 
 export function exitCodeFor(error: unknown): number {
   if (error instanceof ReviewError && ARGUMENT_ERROR_CODES.includes(error.code)) return 2;
