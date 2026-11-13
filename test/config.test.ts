@@ -541,6 +541,60 @@ test("a model entry without an id reports config_invalid", () => {
   assert.match(error.message, /id/);
 });
 
+/**
+ * A model entry's `input` and `cost` had only their refusals tested: the path that
+ * accepts them, and every rate check, ran in no test at all.
+ */
+test("a model entry's input and cost are read through, a rate left out reading as 0", () => {
+  const repoRoot = repoWithConfig(
+    configWithProviders({
+      "corp-gateway": {
+        api: "openai-completions",
+        baseUrl: "https://llm.corp.internal",
+        model: { id: "m", input: ["text", "image"], cost: { input: 3, output: 15 } },
+      },
+    }),
+  );
+
+  assert.deepEqual(loadConfig(repoRoot).providers?.["corp-gateway"]?.model, {
+    id: "m",
+    input: ["text", "image"],
+    cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 },
+  });
+});
+
+test("a model input naming a modality pi-ai has no reader for reports config_invalid", () => {
+  const error = loadError(
+    configWithProviders({ anthropic: { model: { id: "m", input: ["text", "video"] } } }),
+  );
+
+  assert.equal(error.code, "config_invalid");
+  assert.match(error.message, /providers\.anthropic\.model\.input/);
+});
+
+test("an unknown key inside a model cost reports config_invalid naming it", () => {
+  const error = loadError(
+    configWithProviders({ anthropic: { model: { id: "m", cost: { input: 1, cache_read: 1 } } } }),
+  );
+
+  assert.equal(error.code, "config_invalid");
+  assert.match(error.message, /cache_read/);
+  assert.match(error.detail ?? "", /cacheRead/);
+});
+
+/** `1e400` is valid JSON that parses to Infinity: a rate no bill can be computed from. */
+test("a model cost rate that is not a finite non-negative number names the rate", () => {
+  for (const rate of ['"3"', "-1", "1e400"]) {
+    const contents = configWithProviders({
+      anthropic: { model: { id: "m", cost: { output: "RATE" } } },
+    }).replace('"RATE"', rate);
+    const error = loadError(contents);
+
+    assert.equal(error.code, "config_invalid", `expected output: ${rate} to be rejected`);
+    assert.match(error.message, /providers\.anthropic\.model\.cost\.output/);
+  }
+});
+
 test("an empty provider id reports config_invalid", () => {
   assert.equal(
     loadError(configWithProviders({ "": { baseUrl: "http://x" } })).code,
