@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A changed file whose name git quotes — non-ASCII characters such as
+  `café.ts`, or a quote, backslash or control character — is reviewed under
+  its real name. `café.ts` used to appear as `caf\303\251.ts`, a name git
+  could not find, so the file showed without its full-file context.
 - `lightspeed approvals` refuses a word after its branch and base with
   `invalid_arguments`, exiting 2. `approvals feature-a main feature-b` used
   to list feature-a's ticks alone and say nothing about feature-b.
