@@ -340,12 +340,27 @@ function stripPathPrefix(token: string): string {
   return path.replace(/^[ab]\//, "");
 }
 
-/** git wraps paths containing spaces or non-ASCII in C-style quotes. */
+/**
+ * git wraps a path holding a quote, backslash, control or non-ASCII byte in
+ * C-style quotes (quote.c): a letter for the control characters, three octal
+ * digits per byte for the rest. Read as bytes, then as UTF-8, because
+ * `core.quotePath` (on by default) writes every byte of a name like `café.ts`
+ * as `\ooo` — which JSON cannot parse, so the review once stored the path as
+ * `caf\303\251.ts` and every later `git show` of it found nothing.
+ */
 function unquote(token: string): string {
   if (!token.startsWith('"')) return token;
-  try {
-    return JSON.parse(token) as string;
-  } catch {
-    return token.slice(1, -1);
-  }
+  const bytes = token
+    .slice(1, -1)
+    .split(/\\([0-7]{3}|.)/)
+    .flatMap((part, index) => (index % 2 === 0 ? [...Buffer.from(part)] : [escapedByte(part)]));
+  return Buffer.from(bytes).toString("utf8");
+}
+
+const C_ESCAPES: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 };
+
+/** `\"` and `\\` stand for the character itself, as any other escaped one would. */
+function escapedByte(code: string): number {
+  if (code.length === 3) return Number.parseInt(code, 8);
+  return C_ESCAPES[code] ?? code.charCodeAt(0);
 }
