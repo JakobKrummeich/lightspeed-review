@@ -13,6 +13,7 @@ import {
   type DiffHunk,
 } from "../src/diff-extract.ts";
 import { ReviewError } from "../src/errors.ts";
+import { readFileAtCommit } from "../src/git-file.ts";
 import { git as fixtureGit, newRepo } from "./helpers/git-repo.ts";
 
 const sampleDiff = readFileSync(new URL("./fixtures/sample.diff", import.meta.url), "utf8");
@@ -132,6 +133,52 @@ test("parseDiff handles paths that git quotes because of spaces", () => {
   ].join("\n");
 
   assert.equal(parseDiff(diff)[0]?.path, "src/my file.ts");
+});
+
+test("parseDiff decodes the octal bytes and C escapes git quotes a path in", () => {
+  // As git 2.43 writes it with `core.quotePath` at its default: every byte past
+  // ASCII as `\ooo`, which JSON cannot read, beside the `\"` and `\t` it can.
+  const diff = [
+    'diff --git "a/docs/\\303\\274ber.md" "b/docs/na\\303\\257ve caf\\303\\251 \\"x\\"\\t.md"',
+    "similarity index 73%",
+    'rename from "docs/\\303\\274ber.md"',
+    'rename to "docs/na\\303\\257ve caf\\303\\251 \\"x\\"\\t.md"',
+    '--- "a/docs/\\303\\274ber.md"',
+    '+++ "b/docs/na\\303\\257ve caf\\303\\251 \\"x\\"\\t.md"\t',
+    "@@ -1 +1 @@",
+    "-a",
+    "+b",
+    "",
+  ].join("\n");
+
+  const [file] = parseDiff(diff);
+
+  assert.equal(file?.path, 'docs/naïve café "x"\t.md');
+  assert.equal(file?.previousPath, "docs/über.md");
+});
+
+test("a non-ASCII path from real git is the name git show reads the file by", () => {
+  const repoRoot = newRepo("lsr-quoted-");
+  // Pinned on: a machine-wide `core.quotePath=false` would hide the escapes.
+  fixtureGit(repoRoot, "config", "core.quotePath", "true");
+  fixtureGit(repoRoot, "commit", "--allow-empty", "-m", "base");
+  fixtureGit(repoRoot, "checkout", "-b", "feature");
+  writeFileSync(join(repoRoot, "café.ts"), "export const x = 1;\n");
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "add");
+
+  const { files, headCommit } = extractDiff(repoRoot, "feature", "main");
+
+  assert.deepEqual(
+    files.map((file) => file.path),
+    ["café.ts"],
+  );
+  // The path every later read hands back to git: the page's file, the ledger, the forms.
+  assert.equal(
+    readFileAtCommit(repoRoot, headCommit, files[0]?.path ?? ""),
+    "export const x = 1;\n",
+  );
+  rmSync(repoRoot, { recursive: true, force: true });
 });
 
 function gitRepoWithBranch(): string {
