@@ -9,6 +9,7 @@ import { commandHelp, commandSummary } from "./commands/command-help.ts";
 import { parseEndArgs, runEnd } from "./commands/end.ts";
 import { runFeedback } from "./commands/feedback.ts";
 import { parseInitArgs, runInit } from "./commands/init.ts";
+import { leadingFlagProblem, withHelpAlias } from "./commands/leading-args.ts";
 import { authStateDir, parseProviderArgs, runLogin } from "./commands/login.ts";
 import { runLogout } from "./commands/logout.ts";
 import { runServe } from "./commands/serve.ts";
@@ -27,7 +28,7 @@ import {
   type LightspeedConfig,
   type ServiceConfig,
 } from "./config.ts";
-import { exitCodeFor, invocationError, type ReviewError } from "./errors.ts";
+import { exitCodeFor, invocationError } from "./errors.ts";
 import type { StructuredOutput } from "./output.ts";
 import { errorOutput, exitQuietlyWhenReaderCloses, renderToon } from "./output.ts";
 import { findRepoRoot, repoRootOrNone } from "./repo.ts";
@@ -287,46 +288,6 @@ function unknownCommandOutput(command: string): string {
  */
 const argv = withHelpAlias(process.argv.slice(2));
 const allRepos = argv.length === 1 && argv[0] === "--all";
-
-/**
- * Translated into the flag rather than registered as a command, so there is
- * one help text and `help open` is `open --help` exactly — including the
- * unknown-command error a name that is not a command still earns.
- */
-function withHelpAlias(given: string[]): string[] {
-  if (given[0] !== "help") return given;
-  const [, name] = given;
-  return name === undefined ? ["--help"] : [name, "--help"];
-}
-
-/**
- * The SDK refuses a flag before the command in prose of its own, under its own
- * code; answered here instead, so `lightspeed --bogus` parses like every other
- * failure.
- */
-function leadingFlagProblem(given: string[]): ReviewError | undefined {
-  const [flag] = given;
-  if (flag === undefined || !flag.startsWith("-")) return undefined;
-  if (given.length === 1 && ALONE_FLAGS.includes(flag)) return undefined;
-  return invocationError(
-    "unknown_flag",
-    ALONE_FLAGS.includes(flag)
-      ? `${flag} is read only on its own, with no command after it`
-      : `unknown flag ${flag}`,
-    [
-      "Flags come after the command: `lightspeed <command> [args] [flags]`",
-      "Run `lightspeed --help` for the commands, or `lightspeed` for this repository's reviews",
-    ],
-    `before a command only ${LEADING_FLAGS.join(", ")} are read`,
-  );
-}
-
-const LEADING_FLAGS = ["--all", "--help", "--version"];
-
-/** One list for both questions: when the alone-check and the refusal each had
- * their own, `-v open` was answered "unknown flag -v". The SDK reads `-v` and
- * `-V` as `--version`; the refusal's detail names only the long spellings. */
-const ALONE_FLAGS = [...LEADING_FLAGS, "-v", "-V"];
 
 /**
  * Worked out once, before the command runs, and carried by every TOON answer
