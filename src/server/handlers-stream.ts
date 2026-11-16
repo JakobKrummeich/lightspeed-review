@@ -3,6 +3,7 @@ import type { Superseded } from "../api-contract.ts";
 import { batchPayload, endedPayload } from "../feedback.ts";
 import { holdSocketOpen } from "../hold-open.ts";
 import { withAck, withDelivery } from "../turn-moves.ts";
+import { turnLabel } from "../turn.ts";
 import { requireSession, type ServerContext } from "./context.ts";
 import { badRequest, sendAnswer, sendJson } from "./http.ts";
 import type { Waker } from "./streams.ts";
@@ -60,12 +61,10 @@ export function handlePoll(
   const session = requireSession(context.store, response, key);
   if (!session) return;
   // Waiting is a turn handed back, and a working agent has not handed it
-  // back: the edits it is making are what the reviewer is waiting for.
-  if (
-    session.status !== "ended" &&
-    session.turn.holder === "agent" &&
-    session.turn.mode === "working"
-  ) {
+  // back: the edits it is making are what the reviewer is waiting for. Read
+  // through `turnLabel`, which says "ended" before it reads the holder: an
+  // ended record can still name a working agent, and its wait is answered.
+  if (turnLabel(session) === "agent working") {
     sendJson(
       response,
       422,

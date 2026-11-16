@@ -703,3 +703,22 @@ test("listening while still working is refused with the move that give the turn 
     );
   });
 });
+
+/**
+ * Status and turn are two fields of the record, so an ended one can still name
+ * the agent working: the wait is answered with the end, never refused as a turn
+ * still to publish, which would send the agent to publish into a review nobody
+ * reads.
+ */
+test("listening on an ended review whose record still names a working agent reports the end", async () => {
+  const record = session({
+    status: "ended",
+    turn: { holder: "agent", mode: "working", at: "2025-01-01T00:01:00.000Z", note: "splitting" },
+  });
+  await withServer(record, async ({ port }) => {
+    const output = await listen({ repoRoot: REPO, branch: BRANCH, base: BASE, port });
+
+    assert.equal(output.ended, true);
+    assert.equal(output.turn, "ended");
+  });
+});
