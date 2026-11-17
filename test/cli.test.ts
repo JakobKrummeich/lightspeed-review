@@ -188,6 +188,45 @@ test("bare invocation in a repo with no config reports the config, not an empty 
 });
 
 /**
+ * The other half of the regression above: a config that is there but cannot be
+ * read is its own answer, not a crash and not `missing`. The store is still
+ * read, at the default the broken config could not redirect (home-input.ts).
+ */
+test("bare invocation in a repo whose config cannot be read reports it invalid and still counts the default store", async () => {
+  const repoRoot = newRepo("lsr-cli-badconf-");
+  writeFileSync(join(repoRoot, ".lightspeed.conf.json"), "{ truncated");
+  const home = mkdtempSync(join(tmpdir(), "lsr-cli-home-dir-"));
+  storeSession(join(home, ".lightspeed"), "/somewhere/else", "feat/tokens");
+
+  const { stdout, code } = await runCli([], repoRoot, { ...process.env, HOME: home });
+
+  assert.equal(code, 0, stdout);
+  assert.match(stdout, new RegExp(`^repo: ${repoRoot}$`, "m"));
+  assert.match(stdout, /^config: invalid$/m);
+  assert.match(
+    stdout,
+    /^message: .*the config in this repo cannot be read, so no review can run here; 1 session lives in another repo/m,
+  );
+  assert.doesNotMatch(stdout, /code: config_invalid/);
+});
+
+/** Outside any repository there is no config to read, so the default store is the one counted. */
+test("bare invocation outside a repository says so and still counts the default store", async () => {
+  const nowhere = mkdtempSync(join(tmpdir(), "lsr-cli-nowhere-"));
+  const home = mkdtempSync(join(tmpdir(), "lsr-cli-home-dir-"));
+  storeSession(join(home, ".lightspeed"), "/somewhere/else", "feat/tokens");
+
+  const { stdout, code } = await runCli([], nowhere, { ...process.env, HOME: home });
+
+  assert.equal(code, 0, stdout);
+  assert.match(stdout, /^repo: none$/m);
+  assert.match(
+    stdout,
+    /^message: "?not inside a git repository, so no review can run here; 1 session lives in another repo/m,
+  );
+});
+
+/**
  * Regression: one unreadable session file made the home view report no
  * sessions at all, the false "no active review sessions" home-input.ts warns
  * sends an agent to open a second review beside the live one.
