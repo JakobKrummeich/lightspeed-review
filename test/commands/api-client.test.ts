@@ -1,7 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { createServer, type Server } from "node:http";
-import { callApi, parseBody } from "../../src/commands/api-client.ts";
+import { syncBuiltinESMExports } from "node:module";
+import net from "node:net";
+import { callApi, parseBody, transportError } from "../../src/commands/api-client.ts";
 import { REFUSAL_CODES, ReviewError } from "../../src/errors.ts";
 import type { DomainErrorBody } from "../../src/api-contract.ts";
 
@@ -232,6 +235,47 @@ test("a 2xx body that is not JSON is a lightspeed bug, never an answer", () => {
     assert.match(parsed.message, /not JSON/);
     assert.equal(parsed.detail, body.slice(0, 200));
   }
+});
+
+/**
+ * A port that neither accepts nor refuses (a firewall DROP, a wedged host) is
+ * unreachable, and loopback cannot be made to do that on cue, so `connect` is
+ * replaced for the probe: an error that is not ECONNREFUSED is exactly what
+ * `probePort` reads as `unreachable`. `syncBuiltinESMExports` carries the swap
+ * into the `node:net` named import server-address.ts holds, and back out.
+ */
+async function withUnreachablePorts<T>(run: () => Promise<T>): Promise<T> {
+  const realConnect = net.connect;
+  const unanswered = (): net.Socket => {
+    const socket = Object.assign(new EventEmitter(), {
+      setTimeout: () => socket,
+      destroy: () => socket,
+    });
+    const error = Object.assign(new Error("connect EHOSTUNREACH"), { code: "EHOSTUNREACH" });
+    setImmediate(() => socket.emit("error", error));
+    return socket as unknown as net.Socket;
+  };
+  Object.assign(net, { connect: unanswered });
+  syncBuiltinESMExports();
+  try {
+    return await run();
+  } finally {
+    Object.assign(net, { connect: realConnect });
+    syncBuiltinESMExports();
+  }
+}
+
+/** Regression: this case once said "the port is still reachable, so the server is
+ * there" — the one thing the probe had just failed to find. */
+test("a port nothing answers on is not called reachable", async () => {
+  const error = await withUnreachablePorts(() =>
+    transportError("http://127.0.0.1:4777/health", new TypeError("fetch failed")),
+  );
+
+  assert.equal(error.code, "server_unreachable");
+  assert.equal(error.message, "port 4777 neither accepted a connection nor refused one");
+  assert.equal(error.detail, "fetch failed; the machine answered nothing at all on that port");
+  assert.doesNotMatch(`${error.message} ${error.detail}`, /reachable|server is there/);
 });
 
 test("nothing listening is still reported as no server, once retried", async () => {
