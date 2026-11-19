@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A command whose request fails against a port that neither accepts nor
+  refuses a connection says so (`port <n> neither accepted a connection nor
+refused one`). It used to answer `server_unreachable` with "the port is
+  still reachable, so the server is there" — the one thing the probe had
+  just failed to find. The code and the suggested commands are unchanged.
 - A changed file whose name git quotes — non-ASCII characters such as
   `café.ts`, or a quote, backslash or control character — is reviewed under
   its real name. `café.ts` used to appear as `caf\303\251.ts`, a name git

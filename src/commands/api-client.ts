@@ -197,7 +197,8 @@ export async function transportError(
 ): Promise<ReviewError> {
   const port = portOf(url);
   const detail = failureDetail(error);
-  if ((await diagnosePort(port)) === "refused") {
+  const state = await diagnosePort(port);
+  if (state === "refused") {
     return new ReviewError({
       code: "server_not_running",
       message: "no lightspeed server is listening",
@@ -205,10 +206,23 @@ export async function transportError(
       suggestions: [helpRestart(target(about))],
     });
   }
+  // Worded as the long poll words the same probe: an `unreachable` port
+  // answered nothing, so saying "the server is there" was the one claim the
+  // probe had just failed to find. The code and the advice do not change.
+  const said =
+    state === "open"
+      ? {
+          message: `the review server on port ${port} did not answer the request`,
+          why: "the port is still reachable, so the server is there",
+        }
+      : {
+          message: `port ${port} neither accepted a connection nor refused one`,
+          why: "the machine answered nothing at all on that port",
+        };
   return new ReviewError({
     code: "server_unreachable",
-    message: `the review server on port ${port} did not answer the request`,
-    detail: `${detail}; the port is still reachable, so the server is there`,
+    message: said.message,
+    detail: `${detail}; ${said.why}`,
     suggestions: [
       "Re-run the command; the connection failed, not the review",
       `Run \`lightspeed stop\` and then \`${reattachCall(target(about))}\` if it keeps failing`,
