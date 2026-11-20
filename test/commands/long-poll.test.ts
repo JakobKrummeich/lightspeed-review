@@ -5,6 +5,7 @@ import { createServer as createSocketServer } from "node:net";
 import { callApi } from "../../src/commands/api-client.ts";
 import { longPoll } from "../../src/commands/long-poll.ts";
 import type { ReviewError } from "../../src/errors.ts";
+import { NO_SERVER_PORT, withUnreachablePorts } from "../helpers/ports.ts";
 
 interface PollRequest {
   url: string;
@@ -251,6 +252,37 @@ test("nothing listening is reported as server_not_running once the probes are sp
       return true;
     },
   );
+});
+
+/**
+ * Only a refused port proves nothing is listening. A port the probes got no
+ * answer from at all may still hold the review server, so the wait must not
+ * send the agent to restart one: it says to re-run the same wait instead.
+ */
+test("a port nothing answers on is reported as unreachable, never as no server", async () => {
+  const error = await withUnreachablePorts(() =>
+    longPoll({
+      origin: `http://127.0.0.1:${NO_SERVER_PORT}`,
+      key: "abc",
+      target: "feature-auth main",
+      port: NO_SERVER_PORT,
+      probeBackoffMs: [5, 5],
+    }).then(
+      () => assert.fail("the poll answered"),
+      (failure: ReviewError) => failure,
+    ),
+  );
+
+  assert.equal(error.code, "server_unreachable");
+  assert.equal(
+    error.message,
+    `port ${NO_SERVER_PORT} neither accepted a connection nor refused one`,
+  );
+  assert.match(error.detail ?? "", /; the machine answered nothing at all on that port$/);
+  assert.deepEqual(error.suggestions, [
+    "Re-run the command that was waiting, with NO timeout parameter — it posts nothing twice",
+    "Run `lightspeed stop` and then `lightspeed open feature-auth main` if it keeps failing",
+  ]);
 });
 
 test("a port held by something that is not a review server is named, not waited on", async () => {

@@ -1,5 +1,7 @@
+import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
-import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
+import { syncBuiltinESMExports } from "node:module";
+import net, { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
 /**
  * A port nothing listens on: nothing in the suite ever binds it, and no normal
@@ -102,6 +104,36 @@ function reservedPorts(): [number, number][] {
       const [from = 0, to = from] = entry.split("-").map(Number);
       return [from, to];
     });
+}
+
+/**
+ * A port that neither accepts nor refuses (a firewall DROP, a wedged host) is
+ * unreachable, and loopback cannot be made to do that on cue, so `connect` is
+ * replaced for the probe: an error that is not ECONNREFUSED is exactly what
+ * `probePort` reads as `unreachable`. `syncBuiltinESMExports` carries the swap
+ * into the `node:net` named import server-address.ts holds, and back out.
+ * Only `connect` is swapped: node:http dials through `createConnection`, so a
+ * request made inside `run` still reaches the real port.
+ */
+export async function withUnreachablePorts<T>(run: () => Promise<T>): Promise<T> {
+  const realConnect = net.connect;
+  const unanswered = (): Socket => {
+    const socket = Object.assign(new EventEmitter(), {
+      setTimeout: () => socket,
+      destroy: () => socket,
+    });
+    const error = Object.assign(new Error("connect EHOSTUNREACH"), { code: "EHOSTUNREACH" });
+    setImmediate(() => socket.emit("error", error));
+    return socket as unknown as Socket;
+  };
+  Object.assign(net, { connect: unanswered });
+  syncBuiltinESMExports();
+  try {
+    return await run();
+  } finally {
+    Object.assign(net, { connect: realConnect });
+    syncBuiltinESMExports();
+  }
 }
 
 export interface OccupiedPort {
