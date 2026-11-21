@@ -30,13 +30,18 @@ refused one`). It used to answer `server_unreachable` with "the port is
   or word (`invalid_arguments`), exiting 2. `stop --port 4000` used to stop
   the server on the configured port, and `stop <branch>` to shut down every
   review on it; the refusal now points at `lightspeed end` to close one.
-- Grouping runs on pi-ai 1.5.0, with its updated model catalog (models.dev
-  v2: realtime and image-only models are no longer offered as chat models)
+- Grouping runs on pi-ai 1.6.0, with its updated model catalog (models.dev
+  v2: realtime and image-only models are no longer offered as chat models;
+  GPT-6.2 Astra and GPT-6.2 Sol on `openai`, `azure` and `openai-codex`)
   and provider fixes — e.g. Mistral streams are no longer cut off
   mid-generation by the request timeout, OpenCode Go Gemini models no longer
   fail with a 404, OpenCode Zen and Go requests use their protocol-specific
-  endpoints, and a Zhipu/Z.ai usage-limit error is no longer retried as a
-  transient 429.
+  endpoints, a Zhipu/Z.ai usage-limit error is no longer retried as a
+  transient 429, and Groq's Qwen models no longer fail with
+  `400 Unexpected message role`.
+  The Qwen Token Plan Team providers (`qwen-token-plan`,
+  `qwen-token-plan-cn`) no longer offer the retired `deepseek-v3.2` and
+  `deepseek-v4-flash`; use `deepseek-v4-flash-0731` or `deepseek-v4.1-flash`.
   Requests now send pi-ai's detailed `User-Agent` (`pi/<version> (...)`).
   A `kimi-coding` base URL override in Pi's `models.json` must now end in
   `/v1`.
