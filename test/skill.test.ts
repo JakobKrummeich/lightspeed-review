@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { HELP_OPEN, TURN_RULES, WAITS_FOR_SEND, nextRule } from "../src/turn-help.ts";
 import { REACHABLE_MODELS } from "../src/config.ts";
+import type { ReviewErrorCode } from "../src/errors.ts";
 import { renderSkill, SKILL_PATH } from "../src/skill.ts";
 
 const skill = renderSkill();
@@ -97,6 +98,39 @@ test("the skill's setup names models that exist instead of a placeholder", () =>
 test("the skill says an ended review is refused, and how the reviewer asks for more", () => {
   assert.match(skill, /session_ended/);
   assert.match(skill, /open <branch> \[base\] --reopen/);
+});
+
+/**
+ * Every error code the skill teaches by name, checked against the CLI's own
+ * closed list: a code renamed or dropped in src/errors.ts fails typecheck here,
+ * and a code quoted in the skill but missing below fails the test. The skill is
+ * hand-written prose installed into every agent's file, so nothing else ties its
+ * codes to the ones the CLI answers — ecb9044 dropped `declaration_invalid`
+ * and had to find the skill's mention of it by hand.
+ */
+const CODES_THE_SKILL_NAMES = [
+  "intent_missing",
+  "live_review_elsewhere",
+  "nothing_to_publish",
+  "pi_auth_missing",
+  "removed_verb",
+  "session_ended",
+  "turn_not_yours",
+  "turn_still_yours",
+] as const satisfies readonly ReviewErrorCode[];
+
+/** Snake_case words the skill quotes that are output keys, not error codes. */
+const OUTPUT_KEYS = ["if_killed"];
+
+test("every error code the skill names is one the CLI answers with", () => {
+  const quoted = new Set([...skill.matchAll(/`([a-z]+(?:_[a-z]+)+)`/g)].map(([, word]) => word));
+  const codes = [...quoted].filter((word) => word !== undefined && !OUTPUT_KEYS.includes(word));
+
+  assert.deepEqual(
+    codes.sort(),
+    [...CODES_THE_SKILL_NAMES].sort(),
+    "list a code the skill quotes in CODES_THE_SKILL_NAMES (an output key in OUTPUT_KEYS)",
+  );
 });
 
 test("the checked-in SKILL.md is current — run `pnpm run build:skill`", () => {
