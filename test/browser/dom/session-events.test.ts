@@ -309,6 +309,47 @@ test("a reconnect onto a new round waits behind the offer while the reviewer is 
   assert.match(roots.offer.textContent, /Round 2 is ready/);
 });
 
+/**
+ * A held round is offered by two mouths, the header's offer and the card. Each
+ * mount clears only itself on a take; the other is cleared by session-events'
+ * wiring alone, so these two are the only tests that say a round already on
+ * screen is offered by neither.
+ */
+async function heldRound(t: TestContext) {
+  const page = world(t).page({ scrolled: 500, queued: NOTHING_QUEUED, focus: 0 });
+  page.server.serving = session(1);
+  page.stream().emit("session");
+  await settled();
+  assert.equal(page.live.round, 0, "held, not taken");
+  assert.equal(page.roots.offer.hidden, false, "the header offers it");
+  assert.equal(page.roots.popup.hidden, false, "the card offers it");
+  return page;
+}
+
+test("taking a held round from the card draws it and takes the header's offer down", async (t) => {
+  const { log, live, roots } = await heldRound(t);
+  const take = roots.popup.querySelector(".lsr-round-take");
+  assert.ok(take, "the card has its take button");
+
+  roots.popup.dispatch("click", { target: take });
+
+  assert.equal(live.round, 1);
+  assert.deepEqual(log.slice(0, 2), ["arriving", "diff regrouped"]);
+  assert.equal(roots.popup.hidden, true);
+  assert.equal(roots.offer.hidden, true, "an offer left up invites a press for a round on screen");
+});
+
+test("taking a held round from the header's offer draws it and takes the card down", async (t) => {
+  const { log, live, roots } = await heldRound(t);
+
+  roots.offer.dispatch("click", { target: roots.offer });
+
+  assert.equal(live.round, 1);
+  assert.deepEqual(log.slice(0, 2), ["arriving", "diff regrouped"]);
+  assert.equal(roots.offer.hidden, true);
+  assert.equal(roots.popup.hidden, true, "a card left up would take the same round twice");
+});
+
 test("a reconnect onto the same round with missed talk draws it in place", async (t) => {
   const { stream, server, log, live, roots } = world(t).page();
   server.serving = session(0, [reply]);
