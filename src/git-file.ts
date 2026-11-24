@@ -46,7 +46,10 @@ export type DiffBetween =
 
 /**
  * Renames are followed, which is why a caller passes every name the file has
- * had rather than only today's.
+ * had rather than only today's. The paths are file names, never patterns:
+ * without `--literal-pathspecs`, git reads `app/[id]/page.tsx` as a glob that
+ * also matches `app/i/page.tsx`, and a sibling's edit was served as this
+ * file's: in its approved form, its replay and its ledgered response patch.
  */
 export function readDiffBetween(
   repoRoot: string,
@@ -56,7 +59,8 @@ export function readDiffBetween(
 ): DiffBetween {
   if (!COMMIT_PATTERN.test(from) || !COMMIT_PATTERN.test(to)) return { state: "unreachable" };
   try {
-    const patch = execFileSync("git", ["diff", "--find-renames", from, to, "--", ...paths], {
+    const args = ["--literal-pathspecs", "diff", "--find-renames", from, to, "--", ...paths];
+    const patch = execFileSync("git", args, {
       cwd: repoRoot,
       maxBuffer: MAX_FILE_BYTES + 1,
       stdio: ["ignore", "pipe", "ignore"],

@@ -70,6 +70,34 @@ test("readDiffBetween reports an untouched file as an empty diff, not a failure"
   });
 });
 
+test("readDiffBetween reads a bracketed path as its name, never as a glob over its siblings", () => {
+  // `app/[id]/page.tsx` as a glob also matches `app/i/page.tsx`: the sibling's
+  // edit was read as this file's, though this file never changed.
+  const repoRoot = newRepo("lsr-glob-");
+  mkdirSync(join(repoRoot, "app", "[id]"), { recursive: true });
+  mkdirSync(join(repoRoot, "app", "i"));
+  writeFileSync(join(repoRoot, "app", "[id]", "page.tsx"), "one\n");
+  writeFileSync(join(repoRoot, "app", "i", "page.tsx"), "one\n");
+  git(repoRoot, "add", ".");
+  git(repoRoot, "commit", "-m", "first");
+  const first = git(repoRoot, "rev-parse", "HEAD");
+  writeFileSync(join(repoRoot, "app", "i", "page.tsx"), "two\n");
+  git(repoRoot, "commit", "-am", "sibling only");
+  const second = git(repoRoot, "rev-parse", "HEAD");
+  writeFileSync(join(repoRoot, "app", "[id]", "page.tsx"), "two\n");
+  writeFileSync(join(repoRoot, "app", "i", "page.tsx"), "three\n");
+  git(repoRoot, "commit", "-am", "both");
+  const third = git(repoRoot, "rev-parse", "HEAD");
+
+  assert.deepEqual(readDiffBetween(repoRoot, first, second, ["app/[id]/page.tsx"]), {
+    state: "patch",
+    patch: "",
+  });
+  const own = patchOf(readDiffBetween(repoRoot, second, third, ["app/[id]/page.tsx"]));
+  assert.match(own, /^diff --git a\/app\/\[id\]\/page\.tsx /m);
+  assert.doesNotMatch(own, /app\/i\//);
+});
+
 test("a patch too large for the read buffer is reported as oversize, not as a lost commit", () => {
   // Both commits are right there: calling this "unreachable" would tell the
   // reviewer git had lost one of them, when the only problem was the size.
