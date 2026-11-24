@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A file whose name holds a glob character, such as Next.js's
+  `app/[id]/page.tsx`, shows only its own changes in its approved and
+  last-round forms and in the replay. Its name used to be read as a pattern,
+  so a sibling it matched (`app/i/page.tsx`) had its edits shown, and
+  ledgered as the response, as if they were this file's.
 - A command whose request fails against a port that neither accepts nor
   refuses a connection says so (`port <n> neither accepted a connection nor
 refused one`). It used to answer `server_unreachable` with "the port is
