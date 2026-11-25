@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { parseApprovalsArgs } from "../src/commands/approvals.ts";
 import { parseEndArgs } from "../src/commands/end.ts";
 import { parseOpenArgs } from "../src/commands/open.ts";
 import { parsePublishArgs } from "../src/commands/publish.ts";
@@ -12,6 +13,7 @@ import {
   WAITS_FOR_SEND,
   endedClause,
   endedMessage,
+  helpEndedOn,
   helpReopen,
   groupingNotice,
   ifKilled,
@@ -196,39 +198,68 @@ function argvOf(line: string): { verb: string | undefined; args: string[] } {
   return { verb: words[1], args: words.slice(2) };
 }
 
-const PARSERS: Record<string, (args: string[]) => { branch?: string; base?: string }> = {
+/** The one command a help sentence prints, between backticks. */
+function commandIn(sentence: string): string {
+  const commands = [...sentence.matchAll(/`([^`]*)`/g)].map(([, command]) => command!);
+  assert.equal(commands.length, 1, sentence);
+  return commands[0]!;
+}
+
+const PARSERS: Record<string, (args: string[]) => object> = {
   open: parseOpenArgs,
   reply: parseReplyArgs,
   work: parseWorkArgs,
   publish: parsePublishArgs,
   end: parseEndArgs,
+  approvals: parseApprovalsArgs,
 };
+
+const OPEN_DEFAULTS = { open: true, reopen: false, model: undefined };
 
 /**
  * These lines are built here and read by the verbs' own parsers in
  * `commands/`, and nothing else ties the two: a flag renamed on one side would
  * still print, and the agent who pasted it would get `unknown_flag` — or a
- * command aimed at another review.
+ * command aimed at another review. Each expectation is the words as the line
+ * shows them to the agent.
  */
-const HELP_LINES = [
-  openCall(TARGET),
-  reattachCall(TARGET),
-  reopenCall(TARGET),
-  replyCall(TARGET),
-  replyCall(TARGET, ["t1", "t4"]),
-  workCall(TARGET),
-  publishCall(TARGET),
-  endCall(TARGET),
+const HELP_LINES: [string, string, object][] = [
+  [openCall(TARGET), "open", { ...OPEN_DEFAULTS, intents: ["<why this branch exists>"] }],
+  [reattachCall(TARGET), "open", { ...OPEN_DEFAULTS, intents: [] }],
+  [reopenCall(TARGET), "open", { ...OPEN_DEFAULTS, reopen: true, intents: ["<why>"] }],
+  [replyCall(TARGET), "reply", { notes: [{ to: "<id>", text: "<answer>" }] }],
+  [
+    replyCall(TARGET, ["t1", "t4"]),
+    "reply",
+    {
+      notes: [
+        { to: "t1", text: "<answer>" },
+        { to: "t4", text: "<answer>" },
+      ],
+    },
+  ],
+  [workCall(TARGET), "work", { message: "<plan>" }],
+  [
+    publishCall(TARGET),
+    "publish",
+    {
+      model: undefined,
+      intents: ["<what this round changed>"],
+      notes: [{ to: "<id>", text: "done: <what you did>" }],
+    },
+  ],
+  [endCall(TARGET), "end", {}],
+  [commandIn(helpEndedOn(TARGET)), "approvals", { full: false }],
 ];
 
-test("every command a help line prints is one its verb reads, aimed at the same review", () => {
-  for (const line of HELP_LINES) {
+test("every command a help line prints is one its verb reads, aimed at the same review with the same words", () => {
+  for (const [line, expectedVerb, words] of HELP_LINES) {
     const { verb, args } = argvOf(line);
+    assert.equal(verb, expectedVerb, line);
     const parse = PARSERS[verb ?? ""];
     assert.ok(parse !== undefined, `${line}: no parser for ${verb}`);
 
-    const { branch, base } = parse(args);
-    assert.deepEqual({ branch, base }, { branch: "feat/tokens", base: "main" }, line);
+    assert.deepEqual(parse(args), { branch: "feat/tokens", base: "main", ...words }, line);
   }
 });
 
