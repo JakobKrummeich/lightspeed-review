@@ -1,5 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { parseEndArgs } from "../src/commands/end.ts";
+import { parseOpenArgs } from "../src/commands/open.ts";
+import { parsePublishArgs } from "../src/commands/publish.ts";
+import { parseReplyArgs } from "../src/commands/reply.ts";
+import { parseWorkArgs } from "../src/commands/work.ts";
+import { openCall } from "../src/open-call.ts";
 import {
   HELP_OPEN,
   TURN_RULES,
@@ -11,8 +17,13 @@ import {
   ifKilled,
   openRerun,
   nextRule,
+  endCall,
   publishCall,
+  publishLine,
+  reattachCall,
+  reopenCall,
   replyCall,
+  replyRerun,
   workCall,
 } from "../src/turn-help.ts";
 
@@ -172,4 +183,84 @@ test("a fresh open's re-run repeats every intent and the switches, and gives up 
   );
   assert.equal(openRerun("feat main", ["a"], {}), "lightspeed open feat main --intent 'a'");
   assert.equal(openRerun("feat main", ["it's"], {}), undefined);
+});
+
+/**
+ * The argv a shell hands the CLI for a pasted line: a single-quoted text is one
+ * word. Single quotes only, because that is all these lines print
+ * (`pastesAsPrinted`).
+ */
+function argvOf(line: string): { verb: string | undefined; args: string[] } {
+  const words = [...line.matchAll(/'([^']*)'|(\S+)/g)].map(([, quoted, bare]) => quoted ?? bare!);
+  assert.equal(words[0], "lightspeed", line);
+  return { verb: words[1], args: words.slice(2) };
+}
+
+const PARSERS: Record<string, (args: string[]) => { branch?: string; base?: string }> = {
+  open: parseOpenArgs,
+  reply: parseReplyArgs,
+  work: parseWorkArgs,
+  publish: parsePublishArgs,
+  end: parseEndArgs,
+};
+
+/**
+ * These lines are built here and read by the verbs' own parsers in
+ * `commands/`, and nothing else ties the two: a flag renamed on one side would
+ * still print, and the agent who pasted it would get `unknown_flag` — or a
+ * command aimed at another review.
+ */
+const HELP_LINES = [
+  openCall(TARGET),
+  reattachCall(TARGET),
+  reopenCall(TARGET),
+  replyCall(TARGET),
+  replyCall(TARGET, ["t1", "t4"]),
+  workCall(TARGET),
+  publishCall(TARGET),
+  endCall(TARGET),
+];
+
+test("every command a help line prints is one its verb reads, aimed at the same review", () => {
+  for (const line of HELP_LINES) {
+    const { verb, args } = argvOf(line);
+    const parse = PARSERS[verb ?? ""];
+    assert.ok(parse !== undefined, `${line}: no parser for ${verb}`);
+
+    const { branch, base } = parse(args);
+    assert.deepEqual({ branch, base }, { branch: "feat/tokens", base: "main" }, line);
+  }
+});
+
+/**
+ * "Re-run exactly this — it posts nothing twice" holds only if the line reads
+ * back as the same words: the server knows a re-run by its verb and words
+ * (`fingerprintOf`), so a line that parsed to anything else would be a second
+ * post of the reply the reviewer already has.
+ */
+test("a kill recovery reads back through its verb's parser as the call that printed it", () => {
+  const notes = [
+    { to: "t1", text: "it is one already" },
+    { to: "main", text: "-1 on that,  spaced" },
+  ];
+  const intents = ["sign the tokens", "drop the legacy /login handler"];
+  const session = { branch: "feat/tokens", base: "main" };
+
+  assert.deepEqual(parseReplyArgs(argvOf(replyRerun(TARGET, notes)).args), { notes, ...session });
+  assert.deepEqual(parsePublishArgs(argvOf(publishLine(TARGET, intents, notes)!).args), {
+    ...session,
+    model: undefined,
+    intents,
+    notes,
+  });
+  for (const switches of [{}, { open: false, reopen: true }]) {
+    assert.deepEqual(parseOpenArgs(argvOf(openRerun(TARGET, intents, switches)!).args), {
+      ...session,
+      open: true,
+      reopen: false,
+      ...switches,
+      model: undefined,
+      intents,
+    });
+  }
 });
