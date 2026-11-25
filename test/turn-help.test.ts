@@ -1,18 +1,31 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { parseApprovalsArgs } from "../src/commands/approvals.ts";
+import { parseEndArgs } from "../src/commands/end.ts";
+import { parseOpenArgs } from "../src/commands/open.ts";
+import { parsePublishArgs } from "../src/commands/publish.ts";
+import { parseReplyArgs } from "../src/commands/reply.ts";
+import { parseWorkArgs } from "../src/commands/work.ts";
+import { openCall } from "../src/open-call.ts";
 import {
   HELP_OPEN,
   TURN_RULES,
   WAITS_FOR_SEND,
   endedClause,
   endedMessage,
+  helpEndedOn,
   helpReopen,
   groupingNotice,
   ifKilled,
   openRerun,
   nextRule,
+  endCall,
   publishCall,
+  publishLine,
+  reattachCall,
+  reopenCall,
   replyCall,
+  replyRerun,
   workCall,
 } from "../src/turn-help.ts";
 
@@ -172,4 +185,113 @@ test("a fresh open's re-run repeats every intent and the switches, and gives up 
   );
   assert.equal(openRerun("feat main", ["a"], {}), "lightspeed open feat main --intent 'a'");
   assert.equal(openRerun("feat main", ["it's"], {}), undefined);
+});
+
+/**
+ * The argv a shell hands the CLI for a pasted line: a single-quoted text is one
+ * word. Single quotes only, because that is all these lines print
+ * (`pastesAsPrinted`).
+ */
+function argvOf(line: string): { verb: string | undefined; args: string[] } {
+  const words = [...line.matchAll(/'([^']*)'|(\S+)/g)].map(([, quoted, bare]) => quoted ?? bare!);
+  assert.equal(words[0], "lightspeed", line);
+  return { verb: words[1], args: words.slice(2) };
+}
+
+/** The one command a help sentence prints, between backticks. */
+function commandIn(sentence: string): string {
+  const commands = [...sentence.matchAll(/`([^`]*)`/g)].map(([, command]) => command!);
+  assert.equal(commands.length, 1, sentence);
+  return commands[0]!;
+}
+
+const PARSERS: Record<string, (args: string[]) => object> = {
+  open: parseOpenArgs,
+  reply: parseReplyArgs,
+  work: parseWorkArgs,
+  publish: parsePublishArgs,
+  end: parseEndArgs,
+  approvals: parseApprovalsArgs,
+};
+
+const OPEN_DEFAULTS = { open: true, reopen: false, model: undefined };
+
+/**
+ * These lines are built here and read by the verbs' own parsers in
+ * `commands/`, and nothing else ties the two: a flag renamed on one side would
+ * still print, and the agent who pasted it would get `unknown_flag` — or a
+ * command aimed at another review. Each expectation is the words as the line
+ * shows them to the agent.
+ */
+const HELP_LINES: [string, string, object][] = [
+  [openCall(TARGET), "open", { ...OPEN_DEFAULTS, intents: ["<why this branch exists>"] }],
+  [reattachCall(TARGET), "open", { ...OPEN_DEFAULTS, intents: [] }],
+  [reopenCall(TARGET), "open", { ...OPEN_DEFAULTS, reopen: true, intents: ["<why>"] }],
+  [replyCall(TARGET), "reply", { notes: [{ to: "<id>", text: "<answer>" }] }],
+  [
+    replyCall(TARGET, ["t1", "t4"]),
+    "reply",
+    {
+      notes: [
+        { to: "t1", text: "<answer>" },
+        { to: "t4", text: "<answer>" },
+      ],
+    },
+  ],
+  [workCall(TARGET), "work", { message: "<plan>" }],
+  [
+    publishCall(TARGET),
+    "publish",
+    {
+      model: undefined,
+      intents: ["<what this round changed>"],
+      notes: [{ to: "<id>", text: "done: <what you did>" }],
+    },
+  ],
+  [endCall(TARGET), "end", {}],
+  [commandIn(helpEndedOn(TARGET)), "approvals", { full: false }],
+];
+
+test("every command a help line prints is one its verb reads, aimed at the same review with the same words", () => {
+  for (const [line, expectedVerb, words] of HELP_LINES) {
+    const { verb, args } = argvOf(line);
+    assert.equal(verb, expectedVerb, line);
+    const parse = PARSERS[verb ?? ""];
+    assert.ok(parse !== undefined, `${line}: no parser for ${verb}`);
+
+    assert.deepEqual(parse(args), { branch: "feat/tokens", base: "main", ...words }, line);
+  }
+});
+
+/**
+ * "Re-run exactly this — it posts nothing twice" holds only if the line reads
+ * back as the same words: the server knows a re-run by its verb and words
+ * (`fingerprintOf`), so a line that parsed to anything else would be a second
+ * post of the reply the reviewer already has.
+ */
+test("a kill recovery reads back through its verb's parser as the call that printed it", () => {
+  const notes = [
+    { to: "t1", text: "it is one already" },
+    { to: "main", text: "-1 on that,  spaced" },
+  ];
+  const intents = ["sign the tokens", "drop the legacy /login handler"];
+  const session = { branch: "feat/tokens", base: "main" };
+
+  assert.deepEqual(parseReplyArgs(argvOf(replyRerun(TARGET, notes)).args), { notes, ...session });
+  assert.deepEqual(parsePublishArgs(argvOf(publishLine(TARGET, intents, notes)!).args), {
+    ...session,
+    model: undefined,
+    intents,
+    notes,
+  });
+  for (const switches of [{}, { open: false, reopen: true }]) {
+    assert.deepEqual(parseOpenArgs(argvOf(openRerun(TARGET, intents, switches)!).args), {
+      ...session,
+      open: true,
+      reopen: false,
+      ...switches,
+      model: undefined,
+      intents,
+    });
+  }
 });
