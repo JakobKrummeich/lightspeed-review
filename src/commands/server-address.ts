@@ -74,16 +74,25 @@ export async function serverHealth(port: number): Promise<ServerHealth | undefin
   }
 }
 
-function statedHealth(body: string): ServerHealth {
+/**
+ * Every lightspeed since 1.0.0 has answered `/health` with a JSON object, so
+ * any other body is a stranger — a dev server's history fallback answers 200
+ * with its index page for every path. Read as `{}` ("ours, too old to say"),
+ * `open` sent it `/api/shutdown` and took its 200 for the server it spawned.
+ */
+function statedHealth(body: string): ServerHealth | undefined {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(body) as { version?: unknown; stateDir?: unknown };
-    return {
-      ...(typeof parsed.version === "string" ? { version: parsed.version } : {}),
-      ...(typeof parsed.stateDir === "string" ? { stateDir: parsed.stateDir } : {}),
-    };
+    parsed = JSON.parse(body);
   } catch {
-    return {};
+    return undefined;
   }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
+  const { version, stateDir } = parsed as { version?: unknown; stateDir?: unknown };
+  return {
+    ...(typeof version === "string" ? { version } : {}),
+    ...(typeof stateDir === "string" ? { stateDir } : {}),
+  };
 }
 
 export async function reviewServerIsUp(port: number): Promise<boolean> {
