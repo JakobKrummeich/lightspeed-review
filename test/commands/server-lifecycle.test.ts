@@ -134,6 +134,39 @@ test("a port held by something that is not a review server fails fast", async ()
 });
 
 /**
+ * A dev server's history fallback answers 200 with its index page for any
+ * path, `/health` included. Every lightspeed since 1.0.0 has answered a JSON
+ * object there, so HTML is a stranger: it is not sent `/api/shutdown`, and a
+ * failed spawn is not mistaken for one that came up.
+ */
+test("a port whose /health answers HTML is someone else's, not an old review server", async () => {
+  let shutdowns = 0;
+  const stranger = createHttpServer((request, response) => {
+    if (request.url === "/api/shutdown") shutdowns += 1;
+    response.writeHead(200, { "content-type": "text/html" });
+    response.end("<!doctype html><div id=root></div>");
+  });
+  await new Promise<void>((resolve) => stranger.listen(0, "127.0.0.1", resolve));
+  const { port } = stranger.address() as AddressInfo;
+  let spawns = 0;
+
+  try {
+    await assert.rejects(
+      () => ensureServerRunning({ port, stateDir: STATE_DIR, spawnServer: () => (spawns += 1) }),
+      (error: unknown) => {
+        assert.ok(error instanceof ReviewError);
+        assert.equal(error.code, "port_unavailable");
+        return true;
+      },
+    );
+    assert.deepEqual({ shutdowns, spawns }, { shutdowns: 0, spawns: 0 });
+  } finally {
+    stranger.closeAllConnections();
+    await new Promise<void>((resolve) => stranger.close(() => resolve()));
+  }
+});
+
+/**
  * The detached server has no stdio anyone reads, so a bundle it cannot serve
  * has to be caught before the spawn or it arrives as a ten-second timeout.
  */

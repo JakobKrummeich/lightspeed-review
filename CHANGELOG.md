@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- A port held by a web server that answers `/health` with a page rather
+  than JSON (a dev server's fallback answers 200 to any path) is reported
+  `port_unavailable`. `lightspeed open` used to take it for an old review
+  server: it sent that server `/api/shutdown`, then took its 200 for the
+  server it had just failed to start. `serve` called it a review server
+  already running.
 - A file whose name holds a glob character, such as Next.js's
   `app/[id]/page.tsx`, shows only its own changes in its approved and
   last-round forms and in the replay. Its name used to be read as a pattern,
