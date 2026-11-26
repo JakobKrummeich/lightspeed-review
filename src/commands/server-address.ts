@@ -87,7 +87,7 @@ function statedHealth(body: string): ServerHealth | undefined {
   } catch {
     return undefined;
   }
-  if (typeof parsed !== "object" || parsed === null) return undefined;
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
   const { version, stateDir } = parsed as { version?: unknown; stateDir?: unknown };
   return {
     ...(typeof version === "string" ? { version } : {}),

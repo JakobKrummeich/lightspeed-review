@@ -3,8 +3,8 @@
 ## Unreleased
 
 - A port held by a web server that answers `/health` with a page rather
-  than JSON (a dev server's fallback answers 200 to any path) is reported
-  `port_unavailable`. `lightspeed open` used to take it for an old review
+  than a JSON object (a dev server's fallback answers 200 to any path) is
+  reported `port_unavailable`. `lightspeed open` used to take it for an old review
   server: it sent that server `/api/shutdown`, then took its 200 for the
   server it had just failed to start. `serve` called it a review server
   already running.
