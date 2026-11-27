@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- A repository whose git config names an external diff tool
+  (`diff.external`, as difftastic's setup writes, or `GIT_EXTERNAL_DIFF`)
+  is reviewed from git's own patch. `lightspeed open` used to read the
+  tool's output instead and find no changed files in it, and a file's
+  approved and last-round forms, its replay and its ledgered response
+  showed that output in place of a patch.
 - A port held by a web server that answers `/health` with a page rather
   than a JSON object (a dev server's fallback answers 200 to any path) is
   reported `port_unavailable`. `lightspeed open` used to take it for an old review

@@ -220,6 +220,18 @@ test("extractDiff reads the merge-base diff between two real branches", () => {
   assert.equal(stats.binary_skipped, 0);
 });
 
+test("a reviewer's external diff tool does not replace the patch the review reads", () => {
+  // `git config diff.external difft` is difftastic's own install step; the
+  // review got the tool's output in place of a patch and parsed no files.
+  const repoRoot = gitRepoWithBranch();
+  execFileSync("git", ["config", "diff.external", "echo external-tool"], { cwd: repoRoot });
+
+  const { files } = extractDiff(repoRoot, "feature", "main");
+
+  assert.deepEqual(files.map((file) => file.path).sort(), ["kept.txt", "src/added.txt"]);
+  assert.match(fileByPath(files, "kept.txt").diff, /^\+two$/m);
+});
+
 test("extractDiff resolves the merge base and the branch tip to commit ids", () => {
   const repoRoot = gitRepoWithBranch();
   const revision = (rev: string) =>

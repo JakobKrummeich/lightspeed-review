@@ -61,6 +61,18 @@ test("readDiffBetween returns one file's diff between two commits", () => {
   assert.match(patchOf(read), /\+const b = 3;/);
 });
 
+test("readDiffBetween reads git's own patch past a configured external diff tool", () => {
+  // With `diff.external` set, `git diff` prints the tool's output instead, and
+  // that output was served as the file's approved form, replay and ledgered patch.
+  const { repoRoot, first, second } = repoWithTwoCommits();
+  git(repoRoot, "config", "diff.external", "echo external-tool");
+
+  const patch = patchOf(readDiffBetween(repoRoot, first, second, ["src/app.tsx"]));
+
+  assert.match(patch, /^diff --git a\/src\/app\.tsx b\/src\/app\.tsx$/m);
+  assert.doesNotMatch(patch, /external-tool/);
+});
+
 test("readDiffBetween reports an untouched file as an empty diff, not a failure", () => {
   const { repoRoot, first, second } = repoWithTwoCommits();
 

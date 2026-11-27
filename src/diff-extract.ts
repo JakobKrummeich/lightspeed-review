@@ -143,8 +143,11 @@ export function diffStats(files: DiffFile[]): DiffStats {
  * `--full-index`: rounds compare `index` shas to tell edited from untouched;
  * abbreviated width is git's choice (repo size, `core.abbrev`), so two rounds
  * could name one object differently — the full sha never varies.
+ * `--no-ext-diff`: a `diff.external` (difftastic's install step) or
+ * `GIT_EXTERNAL_DIFF` otherwise replaces the patch with the tool's own output,
+ * and `parseDiff` found no files in it.
  */
-const DIFF_ARGS = ["diff", "--histogram", "-M40%", "--full-index"];
+const DIFF_ARGS = ["diff", "--no-ext-diff", "--histogram", "-M40%", "--full-index"];
 
 /** `base...branch`: everything the branch added since the two last agreed. */
 function ref(base: string, branch: string): string {
