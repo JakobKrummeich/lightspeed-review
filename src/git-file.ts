@@ -50,6 +50,8 @@ export type DiffBetween =
  * without `--literal-pathspecs`, git reads `app/[id]/page.tsx` as a glob that
  * also matches `app/i/page.tsx`, and a sibling's edit was served as this
  * file's: in its approved form, its replay and its ledgered response patch.
+ * `--no-ext-diff` for the same three: a configured external diff tool's output
+ * is not a patch.
  */
 export function readDiffBetween(
   repoRoot: string,
@@ -59,7 +61,16 @@ export function readDiffBetween(
 ): DiffBetween {
   if (!COMMIT_PATTERN.test(from) || !COMMIT_PATTERN.test(to)) return { state: "unreachable" };
   try {
-    const args = ["--literal-pathspecs", "diff", "--find-renames", from, to, "--", ...paths];
+    const args = [
+      "--literal-pathspecs",
+      "diff",
+      "--no-ext-diff",
+      "--find-renames",
+      from,
+      to,
+      "--",
+      ...paths,
+    ];
     const patch = execFileSync("git", args, {
       cwd: repoRoot,
       maxBuffer: MAX_FILE_BYTES + 1,
