@@ -51,7 +51,9 @@ export type DiffBetween =
  * also matches `app/i/page.tsx`, and a sibling's edit was served as this
  * file's: in its approved form, its replay and its ledgered response patch.
  * `--no-ext-diff` for the same three: a configured external diff tool's output
- * is not a patch.
+ * is not a patch. `--src-prefix=a/ --dst-prefix=b/`: replay reads the patch
+ * with `parseDiff`, which strips exactly those, so `diff.noprefix` turned
+ * `b/real.txt` into `real.txt` and its response hunks were never found.
  */
 export function readDiffBetween(
   repoRoot: string,
@@ -66,6 +68,8 @@ export function readDiffBetween(
       "diff",
       "--no-ext-diff",
       "--find-renames",
+      "--src-prefix=a/",
+      "--dst-prefix=b/",
       from,
       to,
       "--",
