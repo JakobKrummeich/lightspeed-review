@@ -8,6 +8,7 @@ import {
   readFileAtCommit,
   type DiffBetween,
 } from "../src/git-file.ts";
+import { parseDiff } from "../src/diff-extract.ts";
 import { git, newRepo } from "./helpers/git-repo.ts";
 
 function repoWithTwoCommits(): { repoRoot: string; first: string; second: string } {
@@ -71,6 +72,28 @@ test("readDiffBetween reads git's own patch past a configured external diff tool
 
   assert.match(patch, /^diff --git a\/src\/app\.tsx b\/src\/app\.tsx$/m);
   assert.doesNotMatch(patch, /external-tool/);
+});
+
+test("readDiffBetween keeps a reviewer's diff.noprefix from renaming a top-level b/ file", () => {
+  // Replay finds a file's response hunks by `parseDiff` path; under noprefix
+  // `+++ b/real.txt` lost `b/` to the prefix strip and the edit went unseen.
+  const repoRoot = newRepo("lsr-noprefix-");
+  git(repoRoot, "config", "diff.noprefix", "true");
+  mkdirSync(join(repoRoot, "b"));
+  writeFileSync(join(repoRoot, "b", "real.txt"), "one\n");
+  git(repoRoot, "add", ".");
+  git(repoRoot, "commit", "-m", "first");
+  const first = git(repoRoot, "rev-parse", "HEAD");
+  writeFileSync(join(repoRoot, "b", "real.txt"), "two\n");
+  git(repoRoot, "commit", "-am", "second");
+  const second = git(repoRoot, "rev-parse", "HEAD");
+
+  const patch = patchOf(readDiffBetween(repoRoot, first, second, ["b/real.txt"]));
+
+  assert.deepEqual(
+    parseDiff(patch).map((file) => file.path),
+    ["b/real.txt"],
+  );
 });
 
 test("readDiffBetween reports an untouched file as an empty diff, not a failure", () => {
