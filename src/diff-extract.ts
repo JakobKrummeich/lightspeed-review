@@ -146,8 +146,20 @@ export function diffStats(files: DiffFile[]): DiffStats {
  * `--no-ext-diff`: a `diff.external` (difftastic's install step) or
  * `GIT_EXTERNAL_DIFF` otherwise replaces the patch with the tool's own output,
  * and `parseDiff` found no files in it.
+ * `--src-prefix=a/ --dst-prefix=b/`: `parseDiff` strips exactly those, so they
+ * are asked for rather than left to `diff.noprefix` or `diff.srcPrefix`. Under
+ * `noprefix` an empty or binary file was named `x x` from its header, and a
+ * real top-level `b/` directory lost its name to the strip.
  */
-const DIFF_ARGS = ["diff", "--no-ext-diff", "--histogram", "-M40%", "--full-index"];
+const DIFF_ARGS = [
+  "diff",
+  "--no-ext-diff",
+  "--src-prefix=a/",
+  "--dst-prefix=b/",
+  "--histogram",
+  "-M40%",
+  "--full-index",
+];
 
 /** `base...branch`: everything the branch added since the two last agreed. */
 function ref(base: string, branch: string): string {

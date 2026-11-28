@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A repository whose git config sets `diff.noprefix` is reviewed under its
+  files' real names. An empty or binary file used to be named twice over
+  (`logo.png logo.png`), and a file under a top-level `a/` or `b/`
+  directory lost the directory from its name.
 - A repository whose git config names an external diff tool
   (`diff.external`, as difftastic's setup writes, or `GIT_EXTERNAL_DIFF`)
   is reviewed from git's own patch. `lightspeed open` used to read the

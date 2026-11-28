@@ -232,6 +232,28 @@ test("a reviewer's external diff tool does not replace the patch the review read
   assert.match(fileByPath(files, "kept.txt").diff, /^\+two$/m);
 });
 
+test("a reviewer's diff.noprefix does not change the paths the review reads", () => {
+  // Without `a/` and `b/`, a file with no `+++` line (empty, binary, mode-only)
+  // has `diff --git x x` as its only name, read whole as `x x`, and a real
+  // top-level `b/` directory lost its name to the prefix strip.
+  const repoRoot = gitRepoWithBranch();
+  fixtureGit(repoRoot, "config", "diff.noprefix", "true");
+  mkdirSync(join(repoRoot, "b"));
+  writeFileSync(join(repoRoot, "b", "real.txt"), "dir\n");
+  writeFileSync(join(repoRoot, "empty.txt"), "");
+  fixtureGit(repoRoot, "add", ".");
+  fixtureGit(repoRoot, "commit", "-m", "more");
+
+  const { files } = extractDiff(repoRoot, "feature", "main");
+
+  assert.deepEqual(files.map((file) => file.path).sort(), [
+    "b/real.txt",
+    "empty.txt",
+    "kept.txt",
+    "src/added.txt",
+  ]);
+});
+
 test("extractDiff resolves the merge base and the branch tip to commit ids", () => {
   const repoRoot = gitRepoWithBranch();
   const revision = (rev: string) =>
